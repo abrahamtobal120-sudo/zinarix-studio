@@ -30,7 +30,12 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: 16px/1.65 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font:
+    16px/1.65 Inter,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -100,7 +105,8 @@ pre {
 .grid-overlay {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   background-size: 64px 64px;
   mask-image: radial-gradient(ellipse at 50% 0%, #000 20%, transparent 75%);
@@ -116,7 +122,10 @@ pre {
   align-items: center;
   gap: 16px;
   padding: 14px clamp(16px, 4vw, 48px);
-  transition: background 0.25s, border-color 0.25s, backdrop-filter 0.25s;
+  transition:
+    background 0.25s,
+    border-color 0.25s,
+    backdrop-filter 0.25s;
   border-bottom: 1px solid transparent;
 }
 .nav.scrolled {
@@ -174,7 +183,11 @@ pre {
   color: var(--fg);
   border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.04);
-  transition: transform 0.2s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    background 0.2s,
+    border-color 0.2s;
   white-space: nowrap;
 }
 .btn:hover {
@@ -196,11 +209,15 @@ pre {
   color: #fff;
   background: var(--grad-loop);
   background-size: 200% 100%;
-  box-shadow: 0 10px 40px -10px rgba(47, 107, 255, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 10px 40px -10px rgba(47, 107, 255, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
   animation: sheen 6s linear infinite;
 }
 .btn-primary:hover {
-  box-shadow: 0 16px 50px -10px rgba(139, 61, 255, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 16px 50px -10px rgba(139, 61, 255, 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 @keyframes sheen {
   to {
@@ -337,7 +354,9 @@ h1 {
   overflow: hidden;
   background: #0b0f22;
   border: 1px solid var(--line-strong);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 40px 120px -30px rgba(47, 107, 255, 0.55),
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 40px 120px -30px rgba(47, 107, 255, 0.55),
     0 30px 60px -40px rgba(139, 61, 255, 0.8);
 }
 .window::after {
@@ -550,7 +569,11 @@ h2 {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(90, 120, 255, 0.18), transparent 45%);
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(90, 120, 255, 0.18),
+    transparent 45%
+  );
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -587,7 +610,9 @@ h2 {
   padding: 9px 18px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 .tabs button[aria-selected='true'] {
   color: #fff;
@@ -696,7 +721,9 @@ h2 {
 }
 .os.recommended {
   border-color: transparent;
-  background: linear-gradient(var(--card-solid), var(--card-solid)) padding-box, var(--grad) border-box;
+  background:
+    linear-gradient(var(--card-solid), var(--card-solid)) padding-box,
+    var(--grad) border-box;
   border: 1.5px solid transparent;
   box-shadow: 0 30px 80px -40px rgba(47, 107, 255, 0.9);
 }
@@ -812,7 +839,8 @@ pre {
   padding: 64px 24px;
   text-align: center;
   border-radius: 28px;
-  background: radial-gradient(600px circle at 20% 0%, rgba(255, 255, 255, 0.18), transparent 60%),
+  background:
+    radial-gradient(600px circle at 20% 0%, rgba(255, 255, 255, 0.18), transparent 60%),
     linear-gradient(120deg, #1f6bff, #6d36ff 60%, #b44dff);
   box-shadow: 0 40px 120px -40px rgba(109, 54, 255, 0.9);
   position: relative;
@@ -849,7 +877,9 @@ pre {
 .reveal {
   opacity: 0;
   transform: translateY(26px);
-  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0s), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0s);
+  transition:
+    opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0s),
+    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0s);
 }
 .reveal.in {
   opacity: 1;

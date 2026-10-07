@@ -39,7 +39,8 @@ const es = {
   'use.set': 'Modelo por defecto: {model}',
   'use.no_default': 'No hay modelo por defecto. Usa `omni use <proveedor>/<modelo>` o `-m`.',
   'ask.no_prompt': 'Escribe una pregunta o envía texto por stdin.',
-  'chat.welcome': 'Zinarix Studio chat · {model}  —  /model <p/m> cambia de modelo · /clear · /exit',
+  'chat.welcome':
+    'Zinarix Studio chat · {model}  —  /model <p/m> cambia de modelo · /clear · /exit',
   'chat.thinking': 'pensando…',
   'chat.switched': 'Modelo cambiado a {model}',
   'usage.none': 'Sin uso registrado en el periodo.',

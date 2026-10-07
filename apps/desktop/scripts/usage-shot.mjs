@@ -8,12 +8,39 @@ const out = process.argv[2] ?? tmpdir();
 const home = mkdtempSync(join(tmpdir(), 'zs-usage-'));
 const core = OmniCore.open({ home, env: { OMNI_NO_KEYCHAIN: '1' } });
 const day = 86_400_000;
-const sample = [['anthropic', 'claude-sonnet-5-5', 0.42], ['openai', 'gpt-6.1-sol', 0.18], ['groq', 'llama', 0.03]];
-for (let d = 0; d < 30; d++) for (const [p, m, c] of sample) if ((d + p.length) % 3) recordUsage(core.db, { provider: p, model: m, inputTokens: 40000 + d * 900, outputTokens: 6000, costUsd: c * (1 + (d % 5) / 3) }, Date.now() - d * day);
-recordUsage(core.db, { provider: 'ollama', model: 'qwen2.5:0.5b', inputTokens: 3000, outputTokens: 900, costUsd: null });
+const sample = [
+  ['anthropic', 'claude-sonnet-5-5', 0.42],
+  ['openai', 'gpt-6.1-sol', 0.18],
+  ['groq', 'llama', 0.03],
+];
+for (let d = 0; d < 30; d++)
+  for (const [p, m, c] of sample)
+    if ((d + p.length) % 3)
+      recordUsage(
+        core.db,
+        {
+          provider: p,
+          model: m,
+          inputTokens: 40000 + d * 900,
+          outputTokens: 6000,
+          costUsd: c * (1 + (d % 5) / 3),
+        },
+        Date.now() - d * day,
+      );
+recordUsage(core.db, {
+  provider: 'ollama',
+  model: 'qwen2.5:0.5b',
+  inputTokens: 3000,
+  outputTokens: 900,
+  costUsd: null,
+});
 core.saveConfig({ ...core.config, budgets: { anthropic: { monthly: 25, hardStop: false } } });
 core.close();
-const app = await electron.launch({ executablePath: 'node_modules/electron/dist/electron', args: ['.'], env: { ...process.env, OMNI_HOME: home, OMNI_NO_KEYCHAIN: '1' } });
+const app = await electron.launch({
+  executablePath: 'node_modules/electron/dist/electron',
+  args: ['.'],
+  env: { ...process.env, OMNI_HOME: home, OMNI_NO_KEYCHAIN: '1' },
+});
 const win = await app.firstWindow();
 const errors = [];
 win.on('pageerror', (e) => errors.push(e.message));

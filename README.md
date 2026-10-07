@@ -32,6 +32,7 @@ Instaladores: `pnpm --filter @omni/desktop dist` (local) o empuja un tag `vX.Y.Z
 ---
 
 ## Núcleo de IA y CLI (Fase 1)
+
 **Estado: Fase 1 completa** — núcleo de IA (`@omni/core`), adaptadores de proveedores, catálogo verificado de 50 proveedores, bóveda de llaves y la CLI `omni`.
 
 > _English version below._

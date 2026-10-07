@@ -15,7 +15,11 @@ const MATCHERS = {
   rpm: (n) => /\.rpm$/i.test(n),
   appimage: (n) => /\.AppImage$/i.test(n),
 };
-const OS_LABEL = { windows: 'Descargar para Windows', mac: 'Descargar para macOS', linux: 'Descargar para Linux' };
+const OS_LABEL = {
+  windows: 'Descargar para Windows',
+  mac: 'Descargar para macOS',
+  linux: 'Descargar para Linux',
+};
 const OS_GLYPH = { windows: '⊞', mac: '', linux: '🐧' };
 const OS_BEST = { windows: 'win-exe', mac: 'mac-arm64', linux: 'deb' };
 
@@ -69,12 +73,55 @@ async function setupDownloads() {
 
 // ---------- provider marquee ----------
 const PROVIDERS = [
-  'OpenAI', 'Anthropic', 'Google Gemini', 'DeepSeek', 'xAI Grok', 'Mistral', 'Meta', 'Cohere', 'OpenRouter', 'Groq',
-  'Cerebras', 'Together AI', 'Fireworks', 'DeepInfra', 'Hugging Face', 'NVIDIA NIM', 'Qwen', 'Kimi', 'Z.ai GLM',
-  'MiniMax', 'SiliconFlow', 'Chutes', 'Featherless', 'StepFun', 'Venice', 'Requesty', 'Azure OpenAI', 'Ollama',
-  'LM Studio', 'vLLM', 'llama.cpp', 'Nebius', 'SambaNova', 'Cloudflare', 'Scaleway', 'Upstage',
+  'OpenAI',
+  'Anthropic',
+  'Google Gemini',
+  'DeepSeek',
+  'xAI Grok',
+  'Mistral',
+  'Meta',
+  'Cohere',
+  'OpenRouter',
+  'Groq',
+  'Cerebras',
+  'Together AI',
+  'Fireworks',
+  'DeepInfra',
+  'Hugging Face',
+  'NVIDIA NIM',
+  'Qwen',
+  'Kimi',
+  'Z.ai GLM',
+  'MiniMax',
+  'SiliconFlow',
+  'Chutes',
+  'Featherless',
+  'StepFun',
+  'Venice',
+  'Requesty',
+  'Azure OpenAI',
+  'Ollama',
+  'LM Studio',
+  'vLLM',
+  'llama.cpp',
+  'Nebius',
+  'SambaNova',
+  'Cloudflare',
+  'Scaleway',
+  'Upstage',
 ];
-const COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#4f46e5', '#b45309', '#be123c', '#0d9488'];
+const COLORS = [
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+  '#ea580c',
+  '#059669',
+  '#0891b2',
+  '#4f46e5',
+  '#b45309',
+  '#be123c',
+  '#0d9488',
+];
 function color(name) {
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -83,7 +130,11 @@ function color(name) {
 function setupMarquee() {
   const track = document.getElementById('marquee');
   const html = PROVIDERS.map(
-    (p) => `<span class="chip"><i style="background:${color(p)}">${p.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase()}</i>${p}</span>`,
+    (p) =>
+      `<span class="chip"><i style="background:${color(p)}">${p
+        .replace(/[^A-Za-z0-9]/g, '')
+        .slice(0, 2)
+        .toUpperCase()}</i>${p}</span>`,
   ).join('');
   track.innerHTML = html + html; // doubled for a seamless loop
 }

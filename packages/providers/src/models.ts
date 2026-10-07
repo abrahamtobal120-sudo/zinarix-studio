@@ -46,7 +46,9 @@ export function baseModel(
     capabilities: {
       tools: extra.capabilities?.tools ?? cat?.tools ?? (entry.supports.tools ? null : false),
       vision:
-        extra.capabilities?.vision ?? cat?.vision ?? (entry.supports.vision ? guessVision(id) : false),
+        extra.capabilities?.vision ??
+        cat?.vision ??
+        (entry.supports.vision ? guessVision(id) : false),
       reasoning: extra.capabilities?.reasoning ?? cat?.reasoning ?? guessReasoning(id),
       fim: extra.capabilities?.fim ?? (entry.supports.fim ? null : false),
     },

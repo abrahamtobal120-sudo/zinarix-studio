@@ -210,10 +210,14 @@ async function* chat(
         const block = blocks[e.index ?? 0];
         if (block && d) {
           if (d.type === 'text_delta') block.text = String(block.text ?? '') + (d.text ?? '');
-          if (d.type === 'thinking_delta') block.thinking = String(block.thinking ?? '') + (d.thinking ?? '');
+          if (d.type === 'thinking_delta')
+            block.thinking = String(block.thinking ?? '') + (d.thinking ?? '');
           if (d.type === 'signature_delta') block.signature = d.signature;
           if (d.type === 'input_json_delta')
-            partialJson.set(e.index ?? 0, (partialJson.get(e.index ?? 0) ?? '') + (d.partial_json ?? ''));
+            partialJson.set(
+              e.index ?? 0,
+              (partialJson.get(e.index ?? 0) ?? '') + (d.partial_json ?? ''),
+            );
         }
         if (d?.type === 'text_delta' && d.text) yield { type: 'text', delta: d.text };
         else if (d?.type === 'thinking_delta' && d.thinking)
