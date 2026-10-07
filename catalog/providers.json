@@ -1,0 +1,4481 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-06",
+  "providers": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "adapter": "openai-responses",
+      "baseUrl": "https://api.openai.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "OPENAI_API_KEY"
+      ],
+      "docsUrl": "https://developers.openai.com/api/docs",
+      "keyUrl": "https://platform.openai.com/api-keys",
+      "region": "global",
+      "category": "lab",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "gpt-6-astra",
+          "label": "GPT-6 Astra",
+          "context": 1050000,
+          "inputPrice": 10.0,
+          "outputPrice": 50.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "label": "GPT-6.1 Sol",
+          "context": 1050000,
+          "inputPrice": 2.0,
+          "outputPrice": 10.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "gpt-6-luna",
+          "label": "GPT-6 Luna",
+          "context": 1050000,
+          "inputPrice": 0.1,
+          "outputPrice": 0.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "gpt-6-sol",
+          "label": "GPT-6 Sol",
+          "inputPrice": 2.0,
+          "outputPrice": 10.0
+        },
+        {
+          "id": "gpt-5.6-sol",
+          "label": "GPT-5.6 Sol",
+          "inputPrice": 4.0,
+          "outputPrice": 20.0
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "label": "GPT-5.6 Terra",
+          "inputPrice": 2.0,
+          "outputPrice": 12.0
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "label": "GPT-5.6 Luna",
+          "inputPrice": 0.2,
+          "outputPrice": 1.2
+        },
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "inputPrice": 5.0,
+          "outputPrice": 30.0
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "label": "GPT-5.4 mini",
+          "inputPrice": 0.75,
+          "outputPrice": 4.5
+        },
+        {
+          "id": "gpt-5.4-nano",
+          "label": "GPT-5.4 nano",
+          "inputPrice": 0.2,
+          "outputPrice": 1.25
+        },
+        {
+          "id": "gpt-5.3-codex",
+          "label": "GPT-5.3 Codex",
+          "inputPrice": 1.75,
+          "outputPrice": 14.0,
+          "reasoning": true
+        },
+        {
+          "id": "o3",
+          "label": "o3",
+          "inputPrice": 2.0,
+          "outputPrice": 8.0,
+          "reasoning": true
+        },
+        {
+          "id": "o4-mini",
+          "label": "o4-mini",
+          "inputPrice": 1.1,
+          "outputPrice": 4.4,
+          "reasoning": true
+        },
+        {
+          "id": "gpt-4.1",
+          "label": "GPT-4.1",
+          "inputPrice": 2.0,
+          "outputPrice": 8.0,
+          "reasoning": false
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Model IDs/context from developers.openai.com/api/docs/models. Chat Completions also supported (gpt-6-luna page). Base URL, key URL, /models from prior knowledge, not re-fetched."
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "adapter": "anthropic",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "header",
+        "header": "x-api-key"
+      },
+      "envVars": [
+        "ANTHROPIC_API_KEY"
+      ],
+      "docsUrl": "https://platform.claude.com/docs/en/models/overview",
+      "keyUrl": "https://platform.claude.com/settings/keys",
+      "region": "global",
+      "category": "lab",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "claude-opus-5-5",
+          "label": "Claude Opus 5.5",
+          "context": 1000000,
+          "inputPrice": 4,
+          "outputPrice": 20,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "label": "Claude Sonnet 5.5",
+          "context": 1000000,
+          "inputPrice": 2,
+          "outputPrice": 10,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "claude-fable-5-1",
+          "label": "Claude Fable 5.1",
+          "context": 1000000,
+          "inputPrice": 10,
+          "outputPrice": 50,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "claude-haiku-4-5",
+          "label": "Claude Haiku 4.5",
+          "context": 200000,
+          "inputPrice": 1,
+          "outputPrice": 5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "claude-opus-5",
+          "label": "Claude Opus 5",
+          "context": 1000000,
+          "inputPrice": 5,
+          "outputPrice": 25,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "claude-sonnet-5",
+          "label": "Claude Sonnet 5",
+          "context": 1000000,
+          "inputPrice": 2,
+          "outputPrice": 10,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "claude-opus-4-8",
+          "label": "Claude Opus 4.8",
+          "context": 1000000,
+          "inputPrice": 5,
+          "outputPrice": 25,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6",
+          "context": 1000000,
+          "inputPrice": 3,
+          "outputPrice": 15,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Requires anthropic-version: 2023-06-01 header (from prior knowledge). Models API documented at platform.claude.com. Haiku 4.5 retirement not sooner than 2026-10-15."
+    },
+    {
+      "id": "google-gemini",
+      "name": "Google Gemini (AI Studio)",
+      "adapter": "google-gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "header",
+        "header": "x-goog-api-key"
+      },
+      "envVars": [
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY"
+      ],
+      "docsUrl": "https://ai.google.dev/gemini-api/docs",
+      "keyUrl": "https://aistudio.google.com/apikey",
+      "region": "global",
+      "category": "lab",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash",
+          "inputPrice": 0.75,
+          "outputPrice": 3.75
+        },
+        {
+          "id": "gemini-3.7-flash",
+          "label": "Gemini 3.7 Flash",
+          "inputPrice": 0.75,
+          "outputPrice": 3.75
+        },
+        {
+          "id": "gemini-3.6-flash",
+          "label": "Gemini 3.6 Flash",
+          "inputPrice": 0.75,
+          "outputPrice": 3.75
+        },
+        {
+          "id": "gemini-3.5-flash",
+          "label": "Gemini 3.5 Flash",
+          "inputPrice": 1.5,
+          "outputPrice": 9.0
+        },
+        {
+          "id": "gemini-3.5-flash-lite",
+          "label": "Gemini 3.5 Flash-Lite",
+          "inputPrice": 0.3,
+          "outputPrice": 2.5
+        },
+        {
+          "id": "gemini-3.1-flash-lite",
+          "label": "Gemini 3.1 Flash-Lite",
+          "inputPrice": 0.25,
+          "outputPrice": 1.5
+        },
+        {
+          "id": "gemini-3.1-pro-preview",
+          "label": "Gemini 3.1 Pro (Preview)",
+          "inputPrice": 2.0,
+          "outputPrice": 12.0
+        },
+        {
+          "id": "gemini-3-flash-preview",
+          "label": "Gemini 3 Flash (Preview)"
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "label": "Gemini 2.5 Pro",
+          "inputPrice": 1.25,
+          "outputPrice": 10.0,
+          "reasoning": true
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "label": "Gemini 2.5 Flash",
+          "inputPrice": 0.3,
+          "outputPrice": 2.5,
+          "reasoning": true
+        },
+        {
+          "id": "gemini-2.5-flash-lite",
+          "label": "Gemini 2.5 Flash-Lite",
+          "inputPrice": 0.1,
+          "outputPrice": 0.4,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Native path models/{model}:generateContent / :streamGenerateContent (prior knowledge). OpenAI-compatible alt: https://generativelanguage.googleapis.com/v1beta/openai (verified; /chat/completions, Bearer key). Key can alternatively be sent as ?key= query param. Pro-tier model ID not found on stable list."
+    },
+    {
+      "id": "google-vertex",
+      "name": "Google Vertex AI",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://{location}-aiplatform.googleapis.com/v1/projects/{project_id}/locations/{location}/endpoints/openapi",
+      "baseUrlParams": [
+        {
+          "name": "location",
+          "label": "Location (e.g. us-central1, or global)"
+        },
+        {
+          "name": "project_id",
+          "label": "GCP Project ID"
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "GOOGLE_CLOUD_PROJECT",
+        "GOOGLE_CLOUD_LOCATION",
+        "GOOGLE_APPLICATION_CREDENTIALS"
+      ],
+      "docsUrl": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/migrate/openai/overview",
+      "keyUrl": null,
+      "region": "global",
+      "category": "enterprise",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "google/gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash"
+        },
+        {
+          "id": "google/gemini-3.5-flash-lite",
+          "label": "Gemini 3.5 Flash-Lite"
+        }
+      ],
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Official page confirms OpenAI-compat with project/location and google/gemini-... model id format, but the exact base URL came from third-party sources (docs fetch lacked details); global location uses https://aiplatform.googleapis.com. Bearer token is a short-lived OAuth access token (gcloud auth print-access-token), not a static API key; needs token refresh in the IDE. Model IDs on Vertex listed in docs (Gemini 3.8 Flash, 3.5 Flash-Lite) but google/ prefixed IDs not explicitly confirmed."
+    },
+    {
+      "id": "azure-openai",
+      "name": "Microsoft Azure OpenAI / AI Foundry",
+      "adapter": "azure-openai",
+      "baseUrl": "https://{resource}.openai.azure.com/openai/v1",
+      "baseUrlParams": [
+        {
+          "name": "resource",
+          "label": "Resource name"
+        }
+      ],
+      "auth": {
+        "type": "header",
+        "header": "api-key"
+      },
+      "envVars": [
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_ENDPOINT"
+      ],
+      "docsUrl": "https://learn.microsoft.com/en-us/azure/foundry/openai/api-version-lifecycle",
+      "keyUrl": "https://ai.azure.com",
+      "region": "global",
+      "category": "enterprise",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "v1 API: no api-version needed; model field is the user's DEPLOYMENT name, so no fixed fallback models. Key auth via api-key header (Entra ID uses Authorization: Bearer with scope https://ai.azure.com/.default). Alt host {resource}.services.ai.azure.com/openai/v1. Chat Completions works for non-OpenAI models (DeepSeek, Grok); Responses recommended for OpenAI models. Docs examples use trailing slash; omit it. /models listing not confirmed on the fetched page."
+    },
+    {
+      "id": "amazon-bedrock",
+      "name": "Amazon Bedrock",
+      "adapter": "aws-bedrock",
+      "baseUrl": "https://bedrock-runtime.{region}.amazonaws.com",
+      "baseUrlParams": [
+        {
+          "name": "region",
+          "label": "AWS Region (e.g. us-east-1)"
+        }
+      ],
+      "auth": {
+        "type": "aws-sigv4"
+      },
+      "envVars": [
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION",
+        "AWS_BEARER_TOKEN_BEDROCK"
+      ],
+      "docsUrl": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards.html",
+      "keyUrl": "https://console.aws.amazon.com/bedrock/home#/api-keys/long-term/create",
+      "region": "global",
+      "category": "enterprise",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "anthropic.claude-sonnet-5-5",
+          "label": "Claude Sonnet 5.5",
+          "context": 1000000
+        },
+        {
+          "id": "anthropic.claude-opus-5-5",
+          "label": "Claude Opus 5.5",
+          "context": 1000000
+        },
+        {
+          "id": "amazon.nova-2-lite-v1:0",
+          "label": "Amazon Nova 2 Lite",
+          "context": 1000000
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Use Converse/InvokeModel on bedrock-runtime (SigV4), or a long-term Bedrock API key sent as Authorization: Bearer (AWS_BEARER_TOKEN_BEDROCK). Model listing is on the separate control-plane host bedrock.{region}.amazonaws.com (GET /foundation-models). Geo/global inference profiles use prefixes us./eu./global. (e.g. us.amazon.nova-2-lite-v1:0). Optional OpenAI-compatible endpoint bedrock-mantle: https://bedrock-mantle.{region}.api.aws/v1 (not supported for all models; Nova 2 Lite no)."
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral AI",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "MISTRAL_API_KEY"
+      ],
+      "docsUrl": "https://docs.mistral.ai/api/",
+      "keyUrl": "https://console.mistral.ai/api-keys",
+      "region": "eu",
+      "category": "lab",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": true
+      },
+      "fallbackModels": [
+        {
+          "id": "mistral-large-4-0",
+          "label": "Mistral Large 4",
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "mistral-medium-3-5-26-04",
+          "label": "Mistral Medium 3.5",
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "mistral-small-4-0-26-03",
+          "label": "Mistral Small 4",
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "mistral-large-26-10",
+          "label": "Mistral Large 4"
+        },
+        {
+          "id": "mistral-medium-26-04",
+          "label": "Mistral Medium 3.5"
+        },
+        {
+          "id": "mistral-small-2603",
+          "label": "Mistral Small 4"
+        },
+        {
+          "id": "codestral-25-08",
+          "label": "Codestral"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "IDs from docs.mistral.ai models overview; context windows not listed there. FIM endpoint is /v1/fim/completions (Codestral). Codestral may also be served from codestral.mistral.ai. Key URL from prior knowledge."
+    },
+    {
+      "id": "xai",
+      "name": "xAI (Grok)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.x.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "XAI_API_KEY"
+      ],
+      "docsUrl": "https://docs.x.ai/docs",
+      "keyUrl": "https://console.x.ai",
+      "region": "us",
+      "category": "lab",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "grok-4.7",
+          "label": "Grok 4.7",
+          "context": 500000,
+          "inputPrice": 2.0,
+          "outputPrice": 6.0,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "grok-4.6",
+          "label": "Grok 4.6",
+          "context": 500000,
+          "inputPrice": 2.0,
+          "outputPrice": 6.0
+        },
+        {
+          "id": "grok-4.5",
+          "label": "Grok 4.5",
+          "context": 500000,
+          "inputPrice": 2.0,
+          "outputPrice": 6.0
+        },
+        {
+          "id": "grok-4.3",
+          "label": "Grok 4.3",
+          "context": 1000000,
+          "inputPrice": 1.25,
+          "outputPrice": 2.5,
+          "reasoning": true
+        },
+        {
+          "id": "grok-4.20-0309-reasoning",
+          "label": "Grok 4.20 (reasoning)",
+          "context": 1000000,
+          "inputPrice": 1.25,
+          "outputPrice": 2.5,
+          "reasoning": true
+        },
+        {
+          "id": "grok-4.20-0309-non-reasoning",
+          "label": "Grok 4.20 (non-reasoning)",
+          "context": 1000000,
+          "inputPrice": 1.25,
+          "outputPrice": 2.5,
+          "reasoning": false
+        },
+        {
+          "id": "grok-4.20-multi-agent-0309",
+          "label": "Grok 4.20 Multi-Agent",
+          "context": 1000000,
+          "inputPrice": 1.25,
+          "outputPrice": 2.5
+        },
+        {
+          "id": "grok-build-0.1",
+          "label": "Grok Build 0.1",
+          "context": 256000,
+          "inputPrice": 1.0,
+          "outputPrice": 2.0
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Chat Completions is documented as a LEGACY endpoint; Responses API (/v1/responses) is primary and gets new features first. Key URL and /models from prior knowledge."
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.deepseek.com",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "DEEPSEEK_API_KEY"
+      ],
+      "docsUrl": "https://api-docs.deepseek.com",
+      "keyUrl": "https://platform.deepseek.com/api_keys",
+      "region": "cn",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": true
+      },
+      "fallbackModels": [
+        {
+          "id": "deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro",
+          "context": 1000000,
+          "inputPrice": 0.66,
+          "outputPrice": 1.98,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek-flash",
+          "label": "DeepSeek Flash",
+          "context": 1000000,
+          "inputPrice": 0.15,
+          "outputPrice": 0.6,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL has no /v1 (docs); /v1 also accepted historically. Anthropic-format endpoint: https://api.deepseek.com/anthropic. Legacy names deepseek-v4-flash and deepseek-v4-flash-vision-exp still accepted (served by Flash). FIM beta uses https://api.deepseek.com/beta (prior knowledge, not re-verified). Flash supports vision per docs; Pro vision not stated. Key URL from prior knowledge."
+    },
+    {
+      "id": "meta-llama",
+      "name": "Meta Model API (Llama / Muse)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.meta.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "MODEL_API_KEY"
+      ],
+      "docsUrl": "https://dev.meta.ai/docs/overview",
+      "keyUrl": null,
+      "region": "us",
+      "category": "lab",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "muse-spark-1.3",
+          "label": "Muse Spark 1.3",
+          "context": 1048576
+        },
+        {
+          "id": "muse-spark-1.2",
+          "label": "Muse Spark 1.2",
+          "context": 1048576
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Meta's API (formerly llama.developer.meta.com, now dev.meta.ai) serves Muse Spark models, not Llama; Llama weights are open and available via other hosts. Supports Chat Completions, Responses and Messages protocols. Key creation page not found in fetched docs (keyUrl null). Vision/jsonMode flags assumed from multimodal description, not confirmed."
+    },
+    {
+      "id": "cohere",
+      "name": "Cohere",
+      "adapter": "cohere",
+      "baseUrl": "https://api.cohere.ai/compatibility/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "COHERE_API_KEY"
+      ],
+      "docsUrl": "https://docs.cohere.com/docs/compatibility-api",
+      "keyUrl": "https://dashboard.cohere.com/api-keys",
+      "region": "global",
+      "category": "lab",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "command-a-plus-05-2026",
+          "label": "Command A+",
+          "context": 128000,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "command-a-03-2025",
+          "label": "Command A",
+          "context": 256000,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "command-a-reasoning-08-2025",
+          "label": "Command A Reasoning",
+          "context": 256000,
+          "tools": false,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "command-a-vision-07-2025",
+          "label": "Command A Vision",
+          "context": 128000,
+          "tools": false,
+          "vision": true,
+          "reasoning": false
+        },
+        {
+          "id": "command-a-translate-08-2025",
+          "label": "Command A Translate",
+          "context": 8000,
+          "tools": false,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "command-r-plus-08-2024",
+          "label": "Command R+",
+          "context": 128000,
+          "inputPrice": 2.5,
+          "outputPrice": 10.0,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "command-r-08-2024",
+          "label": "Command R",
+          "context": 128000,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "command-r7b-12-2024",
+          "label": "Command R7B",
+          "context": 128000,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "OpenAI-compat endpoint verified; docs do not list /models there (native API has /v1/models), so listModels is unconfirmed for compat path. Native adapter alternative: https://api.cohere.com/v2. Unsupported on compat: logit_bias, documents, connectors."
+    },
+    {
+      "id": "ai21",
+      "name": "AI21 Labs",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.ai21.com/studio/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "AI21_API_KEY"
+      ],
+      "docsUrl": "https://docs.ai21.com/reference/jamba-1-6-api-ref",
+      "keyUrl": "https://studio.ai21.com/account/api-key",
+      "region": "global",
+      "category": "lab",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "jamba-large",
+          "label": "Jamba Large",
+          "context": 256000
+        },
+        {
+          "id": "jamba-mini",
+          "label": "Jamba Mini",
+          "context": 256000
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Endpoint is /chat/completions with OpenAI-like request shape (model, messages, Bearer auth) but docs do not explicitly state OpenAI compatibility; no models-list endpoint documented. Dated ids exist (jamba-large-1.7-2025-07, jamba-mini-2-2026-01); docs recommend pinning. Streaming incompatible with tools."
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "OPENROUTER_API_KEY"
+      ],
+      "docsUrl": "https://openrouter.ai/docs/quickstart",
+      "keyUrl": "https://openrouter.ai/settings/keys",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "anthropic/claude-opus-5.5",
+          "label": "Claude Opus 5.5",
+          "context": 1000000,
+          "inputPrice": 4.0,
+          "outputPrice": 20.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "anthropic/claude-sonnet-5.5",
+          "label": "Claude Sonnet 5.5",
+          "context": 1000000,
+          "inputPrice": 2.0,
+          "outputPrice": 10.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "openai/gpt-6-sol",
+          "label": "GPT-6 Sol",
+          "context": 1050000,
+          "inputPrice": 2.0,
+          "outputPrice": 10.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "openai/gpt-6-luna",
+          "label": "GPT-6 Luna",
+          "context": 1050000,
+          "inputPrice": 0.1,
+          "outputPrice": 0.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash",
+          "context": 1048576,
+          "inputPrice": 0.75,
+          "outputPrice": 3.75,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "x-ai/grok-4.7",
+          "label": "Grok 4.7",
+          "context": 500000,
+          "inputPrice": 2.0,
+          "outputPrice": 6.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek/deepseek-v4.1-flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1048576,
+          "inputPrice": 0.044,
+          "outputPrice": 0.3,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "qwen/qwen3.8-max-0902",
+          "label": "Qwen3.8 Max",
+          "context": 1000000,
+          "inputPrice": 2.0,
+          "outputPrice": 6.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "moonshotai/kimi-k3",
+          "label": "Kimi K3",
+          "context": 1048576,
+          "inputPrice": 0.89,
+          "outputPrice": 15.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "z-ai/glm-5.3",
+          "label": "GLM 5.3",
+          "context": 1048576,
+          "inputPrice": 0.07,
+          "outputPrice": 7.0,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "minimax/minimax-m3",
+          "label": "MiniMax M3",
+          "context": 1048576,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "mistralai/mistral-large-4-0",
+          "label": "Mistral Large 4",
+          "context": 524288,
+          "inputPrice": 0.68,
+          "outputPrice": 2.09,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "meta/muse-spark-1.3",
+          "label": "Muse Spark 1.3",
+          "context": 1048576,
+          "inputPrice": 1.25,
+          "outputPrice": 4.25,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "openrouter/auto",
+          "label": "Auto Router",
+          "context": 2000000
+        },
+        {
+          "id": "openai/gpt-6.1-sol-pro",
+          "label": "GPT-6.1 Sol Pro",
+          "context": 1050000
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Optional attribution headers HTTP-Referer and X-OpenRouter-Title. Model list is huge and changes constantly; always use listModels. Anthropic id slug 'anthropic/claude-opus-5.5' is inferred from the models list display name and should be checked via /models."
+    },
+    {
+      "id": "groq",
+      "name": "Groq",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "GROQ_API_KEY"
+      ],
+      "docsUrl": "https://console.groq.com/docs/models",
+      "keyUrl": "https://console.groq.com/keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "GPT OSS 120B",
+          "context": 131072,
+          "inputPrice": 0.15,
+          "outputPrice": 0.6,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "GPT OSS 20B",
+          "context": 131072,
+          "inputPrice": 0.075,
+          "outputPrice": 0.3,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "llama-3.3-70b-versatile",
+          "label": "Llama 3.3 70B Versatile",
+          "context": 131072,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "llama-3.1-8b-instant",
+          "label": "Llama 3.1 8B Instant",
+          "context": 131072,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "qwen/qwen3.8-27b",
+          "label": "Qwen3.8 27B",
+          "context": 131072,
+          "inputPrice": 0.8,
+          "outputPrice": 4.0,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "minimaxai/minimax-m2.7",
+          "label": "MiniMax M2.7",
+          "context": 196608,
+          "tools": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "LPU inference. Preview models (Qwen etc.) are evaluation only. Whisper models are speech-to-text."
+    },
+    {
+      "id": "cerebras",
+      "name": "Cerebras",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.cerebras.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "CEREBRAS_API_KEY"
+      ],
+      "docsUrl": "https://inference-docs.cerebras.ai/models/overview",
+      "keyUrl": "https://cloud.cerebras.ai/platform",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "gpt-oss-120b",
+          "label": "OpenAI GPT OSS 120B",
+          "context": 131072,
+          "inputPrice": 0.35,
+          "outputPrice": 0.75,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "qwen-3.8-27b",
+          "label": "Qwen 3.8 27B",
+          "context": 65536,
+          "inputPrice": 0.99,
+          "outputPrice": 1.49,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Context shown is paid tier (free tier is about half). Very small model roster in Shared Inference; more via Dedicated. /models endpoint returns 401 without key (confirms existence)."
+    },
+    {
+      "id": "sambanova",
+      "name": "SambaNova",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.sambanova.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "SAMBANOVA_API_KEY"
+      ],
+      "docsUrl": "https://docs.sambanova.ai/docs/en/models/sambacloud-models",
+      "keyUrl": "https://cloud.sambanova.ai/apis",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "DeepSeek-V3.1",
+          "label": "DeepSeek V3.1",
+          "context": 131072,
+          "inputPrice": 3.0,
+          "outputPrice": 4.5,
+          "tools": true,
+          "vision": false
+        },
+        {
+          "id": "DeepSeek-V3.2",
+          "label": "DeepSeek V3.2",
+          "context": 32768,
+          "inputPrice": 3.0,
+          "outputPrice": 4.5,
+          "tools": true,
+          "vision": false
+        },
+        {
+          "id": "Meta-Llama-3.3-70B-Instruct",
+          "label": "Llama 3.3 70B Instruct",
+          "context": 131072,
+          "inputPrice": 0.6,
+          "outputPrice": 1.2,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "MiniMax-M3",
+          "label": "MiniMax M3",
+          "context": 1048576,
+          "inputPrice": 0.6,
+          "outputPrice": 2.4,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "gemma-4-31B-it",
+          "label": "Gemma 4 31B IT",
+          "context": 131072,
+          "inputPrice": 0.38,
+          "outputPrice": 1.15,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 131072,
+          "inputPrice": 0.22,
+          "outputPrice": 0.59,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "MiniMax-M2.7",
+          "label": "MiniMax M2.7",
+          "context": 192000
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL confirmed by live /v1/models response (public). Preview models (MiniMax-M3, DeepSeek-V3.2, gemma-4-31B-it) may be removed at short notice."
+    },
+    {
+      "id": "together",
+      "name": "Together AI",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.together.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "TOGETHER_API_KEY"
+      ],
+      "docsUrl": "https://docs.together.ai/docs/serverless-models",
+      "keyUrl": "https://api.together.ai/settings/api-keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "moonshotai/Kimi-K3",
+          "label": "Kimi K3",
+          "context": 1048576,
+          "inputPrice": 3.0,
+          "outputPrice": 15.0,
+          "tools": true
+        },
+        {
+          "id": "zai-org/GLM-5.3",
+          "label": "GLM-5.3",
+          "context": 1048575,
+          "inputPrice": 1.4,
+          "outputPrice": 4.4,
+          "tools": true
+        },
+        {
+          "id": "zai-org/GLM-5.3-Flash",
+          "label": "GLM-5.3 Flash",
+          "context": 1048575,
+          "inputPrice": 0.15,
+          "outputPrice": 0.5,
+          "tools": true
+        },
+        {
+          "id": "zai-org/GLM-5.2",
+          "label": "GLM-5.2",
+          "context": 1048575,
+          "inputPrice": 1.4,
+          "outputPrice": 4.4,
+          "tools": true
+        },
+        {
+          "id": "MiniMaxAI/MiniMax-M3",
+          "label": "MiniMax M3",
+          "context": 524288,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "tools": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1000000,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "tools": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "label": "DeepSeek V4 Flash 0731",
+          "context": 1048576,
+          "inputPrice": 0.14,
+          "outputPrice": 0.28,
+          "tools": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Pro-0813",
+          "label": "DeepSeek V4 Pro 0813",
+          "context": 1048576,
+          "inputPrice": 1.32,
+          "outputPrice": 3.96,
+          "tools": true
+        },
+        {
+          "id": "Qwen/Qwen3.8-Flash",
+          "label": "Qwen3.8 Flash",
+          "context": 1000000,
+          "inputPrice": 0.09,
+          "outputPrice": 0.282
+        },
+        {
+          "id": "Qwen/Qwen3.7-Plus",
+          "label": "Qwen3.7 Plus",
+          "context": 1000000,
+          "inputPrice": 0.32,
+          "outputPrice": 1.28
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "GPT-OSS 120B",
+          "context": 131072,
+          "inputPrice": 0.15,
+          "outputPrice": 0.6,
+          "tools": true
+        },
+        {
+          "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          "label": "Llama 3.3 70B Instruct Turbo",
+          "context": 131072,
+          "inputPrice": 1.04,
+          "outputPrice": 1.04,
+          "tools": true
+        },
+        {
+          "id": "thinkingmachines/Inkling",
+          "label": "Inkling",
+          "context": 524288,
+          "inputPrice": 1.0,
+          "outputPrice": 4.05,
+          "tools": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL inferred from live endpoint (https://api.together.ai/v1/models returns 401) rather than quoted from docs page. Model ids from official serverless models page."
+    },
+    {
+      "id": "fireworks",
+      "name": "Fireworks AI",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.fireworks.ai/inference/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "FIREWORKS_API_KEY"
+      ],
+      "docsUrl": "https://docs.fireworks.ai/getting-started/quickstart",
+      "keyUrl": "https://app.fireworks.ai/settings/users/api-keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "accounts/fireworks/models/kimi-k3",
+          "label": "Kimi K3",
+          "inputPrice": 3.0,
+          "outputPrice": 15.0
+        },
+        {
+          "id": "accounts/fireworks/models/deepseek-v4p1-flash",
+          "label": "DeepSeek V4.1 Flash",
+          "inputPrice": 0.3,
+          "outputPrice": 1.2
+        },
+        {
+          "id": "accounts/fireworks/models/glm-5p3",
+          "label": "GLM 5.3",
+          "inputPrice": 1.4,
+          "outputPrice": 4.4
+        },
+        {
+          "id": "accounts/fireworks/models/glm-5p3-flash",
+          "label": "GLM 5.3 Flash",
+          "inputPrice": 0.15,
+          "outputPrice": 0.5
+        },
+        {
+          "id": "accounts/fireworks/models/qwen3p8-max",
+          "label": "Qwen 3.8 Max",
+          "inputPrice": 2.0,
+          "outputPrice": 6.0
+        },
+        {
+          "id": "accounts/fireworks/models/minimax-m3",
+          "label": "MiniMax M3",
+          "inputPrice": 0.3,
+          "outputPrice": 1.2
+        },
+        {
+          "id": "accounts/fireworks/models/gpt-oss-120b",
+          "label": "OpenAI GPT OSS 120B",
+          "inputPrice": 0.15,
+          "outputPrice": 0.6
+        },
+        {
+          "id": "accounts/fireworks/models/ember-1",
+          "label": "Ember-1",
+          "inputPrice": 3.0,
+          "outputPrice": 15.0
+        },
+        {
+          "id": "accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b",
+          "label": "NVIDIA Nemotron 3.5 Lightning 30B A3B",
+          "inputPrice": 0.05,
+          "outputPrice": 0.2
+        },
+        {
+          "id": "accounts/fireworks/models/nemotron-3-ultra-nvfp4",
+          "label": "NVIDIA Nemotron 3 Ultra (Preview)",
+          "inputPrice": 0.6,
+          "outputPrice": 2.4
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Model ids use accounts/fireworks/models/ prefix. Also exposes an Anthropic-compatible endpoint at https://api.fireworks.ai/inference. Context lengths not confirmed. /models path not explicitly confirmed in quickstart. Model ids derived from the official pricing/model pages (accounts/fireworks/models/<slug>); confirm with the live /models list."
+    },
+    {
+      "id": "deepinfra",
+      "name": "DeepInfra",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.deepinfra.com/v1/openai",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "DEEPINFRA_API_KEY"
+      ],
+      "docsUrl": "https://docs.deepinfra.com/chat/overview",
+      "keyUrl": "https://deepinfra.com/dash/api_keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "label": "DeepSeek-V4.1-Flash",
+          "context": 1048576,
+          "inputPrice": 0.2,
+          "outputPrice": 0.6,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Pro-0813",
+          "label": "DeepSeek-V4-Pro-0813",
+          "context": 1048576,
+          "inputPrice": 1.3,
+          "outputPrice": 2.6,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "moonshotai/Kimi-K3",
+          "label": "Kimi-K3",
+          "context": 1048576,
+          "inputPrice": 2.85,
+          "outputPrice": 14.25,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "zai-org/GLM-5.3",
+          "label": "GLM-5.3",
+          "context": 1048576,
+          "inputPrice": 0.9,
+          "outputPrice": 4.0,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "MiniMaxAI/MiniMax-M3",
+          "label": "MiniMax-M3",
+          "context": 524288,
+          "inputPrice": 0.28,
+          "outputPrice": 1.1,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3.8-Flash",
+          "label": "Qwen3.8-Flash",
+          "context": 1000000,
+          "inputPrice": 0.113,
+          "outputPrice": 0.382,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "Qwen/Qwen3.8-27B",
+          "label": "Qwen3.8-27B",
+          "context": 262144,
+          "inputPrice": 0.2,
+          "outputPrice": 2.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 131072,
+          "inputPrice": 0.037,
+          "outputPrice": 0.17,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemma-4-31B-it",
+          "label": "gemma-4-31B-it",
+          "context": 262144,
+          "inputPrice": 0.2,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          "label": "Llama-3.3-70B-Instruct-Turbo",
+          "context": 131072,
+          "inputPrice": 0.1,
+          "outputPrice": 0.32,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "anthropic/claude-sonnet-5-5",
+          "label": "claude-sonnet-5-5",
+          "context": 1000000,
+          "inputPrice": 2.0,
+          "outputPrice": 10.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo",
+          "label": "Qwen3-Coder-480B-A35B-Instruct-Turbo",
+          "context": 262144,
+          "inputPrice": 0.3,
+          "outputPrice": 1.0,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Pro",
+          "label": "DeepSeek V4 Pro",
+          "context": 1000000
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "label": "DeepSeek V4 Flash"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "/models confirmed via live public response. Supports MODEL:VERSION and deploy_id:ID model references."
+    },
+    {
+      "id": "perplexity",
+      "name": "Perplexity (Sonar)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.perplexity.ai",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "PERPLEXITY_API_KEY"
+      ],
+      "docsUrl": "https://docs.perplexity.ai/docs/sonar/models",
+      "keyUrl": "https://www.perplexity.ai/settings/api",
+      "region": "us",
+      "category": "lab",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "sonar",
+          "label": "Sonar"
+        },
+        {
+          "id": "sonar-pro",
+          "label": "Sonar Pro"
+        }
+      ],
+      "status": "deprecated",
+      "verifiedAt": "2026-10-06",
+      "notes": "Sonar Chat Completions is deprecated; per migration docs support ended 2026-09-27. Replacement is the Agent API (input/output typed array, presets fast/low/high/xhigh), which is NOT OpenAI chat-completions shaped and needs a custom adapter. Sonar ids sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research. Context lengths not confirmed."
+    },
+    {
+      "id": "huggingface-inference-providers",
+      "name": "Hugging Face Inference Providers",
+      "adapter": "huggingface",
+      "baseUrl": "https://router.huggingface.co/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "HF_TOKEN"
+      ],
+      "docsUrl": "https://huggingface.co/docs/inference-providers/index",
+      "keyUrl": "https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "Qwen/Qwen3.8-27B",
+          "label": "Qwen3.8 27B",
+          "context": 262144,
+          "inputPrice": 0.2,
+          "outputPrice": 2.5,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1048576,
+          "inputPrice": 0.2,
+          "outputPrice": 0.6,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "zai-org/GLM-5.3",
+          "label": "GLM 5.3",
+          "context": 1048576,
+          "inputPrice": 0.9,
+          "outputPrice": 4.0,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "zai-org/GLM-5.3-Flash",
+          "label": "GLM 5.3 Flash",
+          "context": 1048576,
+          "inputPrice": 0.15,
+          "outputPrice": 0.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "XiaomiMiMo/MiMo-V2.6-Pro-RL",
+          "label": "MiMo V2.6 Pro RL",
+          "context": 1048576,
+          "inputPrice": 0.435,
+          "outputPrice": 0.87,
+          "tools": true,
+          "vision": false
+        },
+        {
+          "id": "moonshotai/Kimi-K3",
+          "label": "Kimi K3",
+          "context": 1048576,
+          "inputPrice": 2.7,
+          "outputPrice": 13.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemma-4-31B-it",
+          "label": "gemma 4 31B it",
+          "context": 262144,
+          "inputPrice": 0.14,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt oss 120b",
+          "context": 131072,
+          "inputPrice": 0.037,
+          "outputPrice": 0.17,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Pro",
+          "label": "DeepSeek V4 Pro",
+          "context": 1048576,
+          "inputPrice": 1.3,
+          "outputPrice": 2.6,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "meta-llama/Llama-3.3-70B-Instruct",
+          "label": "Llama 3.3 70B Instruct",
+          "context": 12288,
+          "inputPrice": 0.135,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": false
+        },
+        {
+          "id": "MiniMaxAI/MiniMax-M3",
+          "label": "MiniMax M3",
+          "context": 524288,
+          "inputPrice": 0.28,
+          "outputPrice": 1.1,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3-Coder-Next",
+          "label": "Qwen3 Coder Next",
+          "context": 262144,
+          "inputPrice": 0.2,
+          "outputPrice": 1.5,
+          "tools": true,
+          "vision": false
+        },
+        {
+          "id": "moonshotai/Kimi-K2.7-Code",
+          "label": "Kimi K2.7 Code",
+          "context": 262144,
+          "inputPrice": 0.68,
+          "outputPrice": 3.4,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-R1",
+          "label": "DeepSeek R1"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "OpenAI-compatible router is chat-only. Append :fastest/:cheapest/:preferred or :provider to model id. Token needs fine-grained 'Make calls to Inference Providers' permission. Embeddings/image need HF clients, not this endpoint."
+    },
+    {
+      "id": "replicate",
+      "name": "Replicate",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.replicate.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "REPLICATE_API_TOKEN"
+      ],
+      "docsUrl": "https://replicate.com/docs/reference/http",
+      "keyUrl": "https://replicate.com/account/api-tokens",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "requires custom adapter: docs show only native POST /v1/predictions (owner/name model ids, Bearer auth); no OpenAI-compatible /chat/completions endpoint could be confirmed. Base URL is native API root."
+    },
+    {
+      "id": "novita",
+      "name": "Novita AI",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.novita.ai/openai",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "NOVITA_API_KEY"
+      ],
+      "docsUrl": "https://docs.novita.ai/guides/llm-api",
+      "keyUrl": "https://novita.ai/settings/key-management",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "deepseek/deepseek-v4.1-flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1000000
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL and example model id confirmed in docs. Only one model id confirmed with exact id; use /models to list others. Capability flags (tools/vision/json) and keyUrl not verified from docs."
+    },
+    {
+      "id": "hyperbolic",
+      "name": "Hyperbolic",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.hyperbolic.xyz/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "HYPERBOLIC_API_KEY"
+      ],
+      "docsUrl": "https://www.hyperbolic.ai/docs/inference/overview",
+      "keyUrl": "https://app.hyperbolic.xyz/settings",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "meta-llama/Meta-Llama-3.3-70B-Instruct",
+          "label": "Llama 3.3 70B Instruct"
+        },
+        {
+          "id": "Qwen/Qwen2.5-72B-Instruct",
+          "label": "Qwen2.5 72B Instruct"
+        }
+      ],
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Endpoint https://api.hyperbolic.xyz/v1/chat/completions seen via search snippets only; docs moved to hyperbolic.ai/docs (docs pages did not yield details). Model ids from search results, not confirmed; several models announced for sunset (GPT-OSS, Qwen3-Next). Use /models. Env var and keyUrl are conventional guesses."
+    },
+    {
+      "id": "nebius-token-factory",
+      "name": "Nebius Token Factory",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.tokenfactory.nebius.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "NEBIUS_API_KEY"
+      ],
+      "docsUrl": "https://docs.tokenfactory.nebius.com/",
+      "keyUrl": "https://tokenfactory.nebius.com/",
+      "region": "eu",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1048576,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "vision": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "label": "DeepSeek V4 Flash 0731",
+          "context": 1048576,
+          "inputPrice": 0.14,
+          "outputPrice": 0.28,
+          "vision": false
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Pro",
+          "label": "DeepSeek V4 Pro",
+          "context": 1024000,
+          "inputPrice": 1.75,
+          "outputPrice": 3.5,
+          "vision": false
+        },
+        {
+          "id": "MiniMaxAI/MiniMax-M3",
+          "label": "MiniMax M3",
+          "context": 1048576,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "vision": false
+        },
+        {
+          "id": "moonshotai/Kimi-K3",
+          "label": "Kimi K3",
+          "context": 1048576,
+          "inputPrice": 3.0,
+          "outputPrice": 15.0,
+          "vision": true
+        },
+        {
+          "id": "moonshotai/Kimi-K2.6",
+          "label": "Kimi K2.6",
+          "context": 262144,
+          "inputPrice": 0.95,
+          "outputPrice": 4.0,
+          "vision": true
+        },
+        {
+          "id": "moonshotai/Kimi-K2.7-Code",
+          "label": "Kimi K2.7 Code",
+          "context": 262144,
+          "inputPrice": 0.95,
+          "outputPrice": 4.0,
+          "vision": false
+        },
+        {
+          "id": "Qwen/Qwen3.5-397B-A17B",
+          "label": "Qwen3.5 397B A17B",
+          "context": 262144,
+          "inputPrice": 0.6,
+          "outputPrice": 3.6,
+          "vision": false
+        },
+        {
+          "id": "Qwen/Qwen3.8-27B",
+          "label": "Qwen3.8 27B",
+          "context": 262144,
+          "inputPrice": 0.45,
+          "outputPrice": 3.0,
+          "vision": true
+        },
+        {
+          "id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "label": "Qwen3 235B A22B Instruct 2507",
+          "context": 262144,
+          "inputPrice": 0.2,
+          "outputPrice": 0.6,
+          "vision": false
+        },
+        {
+          "id": "zai-org/GLM-5.3",
+          "label": "GLM-5.3",
+          "context": 1048576,
+          "inputPrice": 1.4,
+          "outputPrice": 4.4,
+          "vision": false
+        },
+        {
+          "id": "zai-org/GLM-5.3-Flash",
+          "label": "GLM-5.3 Flash",
+          "context": 1048576,
+          "inputPrice": 0.15,
+          "outputPrice": 0.5,
+          "vision": true
+        },
+        {
+          "id": "zai-org/GLM-5.1",
+          "label": "GLM-5.1",
+          "context": 204800,
+          "inputPrice": 1.4,
+          "outputPrice": 4.4,
+          "vision": false
+        },
+        {
+          "id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+          "label": "Nemotron 3 Ultra 550B A55B",
+          "context": 1048576,
+          "inputPrice": 1.0,
+          "outputPrice": 3.0,
+          "vision": false
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 131072,
+          "inputPrice": 0.15,
+          "outputPrice": 0.6,
+          "vision": false
+        },
+        {
+          "id": "meta-llama/Meta-Llama-3.1-70B-Instruct",
+          "label": "Llama 3.1 70B Instruct"
+        },
+        {
+          "id": "meta-llama/Meta-Llama-3.1-8B-Instruct-fast",
+          "label": "Llama 3.1 8B Instruct (fast)",
+          "context": 131072
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL confirmed (docs show trailing slash; omitted). Formerly Nebius AI Studio. Model ids from docs examples may be dated; use /models?verbose=true. Docs show DeepSeek-R1-0528 in examples. Capability flags not individually verified."
+    },
+    {
+      "id": "lambda-inference",
+      "name": "Lambda Inference",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.lambda.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "LAMBDA_API_KEY"
+      ],
+      "docsUrl": "https://docs.lambda.ai/public-cloud/lambda-inference-api",
+      "keyUrl": "https://cloud.lambda.ai/api-keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "deprecated",
+      "verifiedAt": "2026-10-06",
+      "notes": "Lambda states the Inference API is winding down in favor of self-hosting on Lambda GPU instances (lambda.ai/inference); search reports announcement dated 2026-05-29. Not recommended for new setups."
+    },
+    {
+      "id": "nvidia-nim",
+      "name": "NVIDIA NIM (build.nvidia.com)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://integrate.api.nvidia.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "NVIDIA_API_KEY"
+      ],
+      "docsUrl": "https://docs.api.nvidia.com/nim/reference/llm-apis",
+      "keyUrl": "https://build.nvidia.com/settings/api-keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "moonshotai/kimi-k3",
+          "label": "Kimi K3",
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "moonshotai/kimi-k2.6",
+          "label": "Kimi K2.6",
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "z-ai/glm-5.3",
+          "label": "GLM-5.3",
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "z-ai/glm-5.3-flash",
+          "label": "GLM-5.3 Flash",
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "nvidia/nemotron-3-ultra-550b-a55b",
+          "label": "Nemotron 3 Ultra 550B A55B",
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b",
+          "label": "Nemotron 3 Super 120B A12B",
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "label": "Nemotron 3.5 Lightning 30B A3B",
+          "vision": false
+        },
+        {
+          "id": "deepseek-ai/deepseek-v4.1-flash",
+          "label": "DeepSeek V4.1 Flash"
+        },
+        {
+          "id": "google/gemma-4-31b-it",
+          "label": "Gemma 4 31B IT",
+          "vision": true
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "gpt-oss-20b",
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+          "label": "Llama 3.1 Nemotron Ultra 253B v1",
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "mistralai/mistral-large-2-instruct",
+          "label": "Mistral Large 2 Instruct",
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "GPT-OSS 120B"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Endpoint POST /v1/chat/completions confirmed. Docs list gpt-oss 20b/120b among hosted models (vendor-prefixed ids assumed standard). Catalog changes frequently (Nemotron 3, DeepSeek V4, Kimi K3 listed at build.nvidia.com); use /models. Keys start with nvapi-; keyUrl not verified."
+    },
+    {
+      "id": "cloudflare-workers-ai",
+      "name": "Cloudflare Workers AI",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+      "baseUrlParams": [
+        {
+          "name": "account_id",
+          "label": "Account ID"
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID"
+      ],
+      "docsUrl": "https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/",
+      "keyUrl": "https://dash.cloudflare.com/profile/api-tokens",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "@cf/openai/gpt-oss-120b",
+          "label": "GPT-OSS 120B"
+        },
+        {
+          "id": "@cf/openai/gpt-oss-20b",
+          "label": "GPT-OSS 20B"
+        },
+        {
+          "id": "@cf/kimi-k2.6",
+          "label": "Kimi K2.6",
+          "context": 262144
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL, chat/embeddings/responses endpoints confirmed. API key is a Cloudflare API token with Workers AI permission. /v1/models not confirmed in OpenAI-compat docs (modelsEndpoint null); Responses API only for gpt-oss, non-streaming. Catalog has ~69 models."
+    },
+    {
+      "id": "github-models",
+      "name": "GitHub Models",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://models.github.ai/inference",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "GITHUB_TOKEN"
+      ],
+      "docsUrl": "https://docs.github.com/en/rest/models/inference",
+      "keyUrl": null,
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "deprecated",
+      "verifiedAt": "2026-10-06",
+      "notes": "GitHub docs state GitHub Models (playground, catalog, inference API, BYOK) fully retired as of 2026-07-30. Suggested alternatives: Azure AI Foundry, GitHub Copilot. Base URL is the historical one."
+    },
+    {
+      "id": "ibm-watsonx-ai",
+      "name": "IBM watsonx.ai",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://{region}.ml.cloud.ibm.com/ml/v1",
+      "baseUrlParams": [
+        {
+          "name": "region",
+          "label": "Region (us-south, eu-de, eu-gb, jp-tok, au-syd, ca-tor)"
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "WATSONX_API_KEY",
+        "WATSONX_PROJECT_ID"
+      ],
+      "docsUrl": "https://cloud.ibm.com/apidocs/watsonx-ai",
+      "keyUrl": "https://cloud.ibm.com/iam/apikeys",
+      "region": "global",
+      "category": "enterprise",
+      "modelsEndpoint": "/foundation_model_specs",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": false,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "ibm/granite-4-h-small",
+          "label": "Granite 4 H Small",
+          "context": 131072
+        },
+        {
+          "id": "ibm/granite-8b-code-instruct",
+          "label": "Granite 8B Code Instruct",
+          "context": 128000
+        }
+      ],
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "requires custom adapter: native chat is POST /ml/v1/text/chat (and /text/chat_stream) with required ?version=YYYY-MM-DD query param and project_id/space_id in body; auth is an IBM Cloud IAM bearer token obtained by exchanging the API key (not the raw key). No OpenAI-compatible /chat/completions confirmed. Regional hosts: us-south, eu-de, eu-gb, jp-tok, au-syd, ca-tor (.ml.cloud.ibm.com), Mumbai ap-south-1.aws.wxai.ibm.com. Model ids from docs table; some models deprecated."
+    },
+    {
+      "id": "databricks",
+      "name": "Databricks Model Serving",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://{workspace_host}/serving-endpoints",
+      "baseUrlParams": [
+        {
+          "name": "workspace_host",
+          "label": "Workspace host (e.g. dbc-xxxx.cloud.databricks.com)"
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "DATABRICKS_TOKEN"
+      ],
+      "docsUrl": "https://docs.databricks.com/aws/en/machine-learning/foundation-model-apis/supported-models",
+      "keyUrl": "https://docs.databricks.com/aws/en/dev-tools/auth/pat",
+      "region": "global",
+      "category": "enterprise",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "databricks-claude-opus-5-5",
+          "label": "Claude Opus 5.5"
+        },
+        {
+          "id": "databricks-gpt-5-5",
+          "label": "GPT-5.5"
+        },
+        {
+          "id": "databricks-gemini-3-5-flash",
+          "label": "Gemini 3.5 Flash"
+        },
+        {
+          "id": "databricks-meta-llama-3-3-70b-instruct",
+          "label": "Llama 3.3 70B Instruct",
+          "context": 128000
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Model IDs verified from supported-models page. Base URL /serving-endpoints is the documented OpenAI-client pattern (not spelled out on fetched page); endpoint availability varies by cloud/region. Auth is a PAT or OAuth token. Model list is via workspace API, not /models."
+    },
+    {
+      "id": "snowflake-cortex",
+      "name": "Snowflake Cortex",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://{account_identifier}.snowflakecomputing.com/api/v2/cortex/v1",
+      "baseUrlParams": [
+        {
+          "name": "account_identifier",
+          "label": "Account identifier (org-account)"
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "SNOWFLAKE_PAT"
+      ],
+      "docsUrl": "https://docs.snowflake.com/user-guide/snowflake-cortex/open_ai_sdk",
+      "keyUrl": "https://docs.snowflake.com/en/user-guide/programmatic-access-tokens",
+      "region": "global",
+      "category": "enterprise",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "claude-sonnet-4-5",
+          "label": "Claude Sonnet 4.5"
+        },
+        {
+          "id": "claude-haiku-4-5",
+          "label": "Claude Haiku 4.5"
+        },
+        {
+          "id": "gpt-5",
+          "label": "GPT-5"
+        },
+        {
+          "id": "llama3.1-70b",
+          "label": "Llama 3.1 70B"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Auth via PAT, JWT or OAuth bearer token. Model availability varies by region; model names summarized from docs (llama ids not fully confirmed verbatim, check region table). Also has /messages Anthropic-compatible endpoint. No documented models list endpoint."
+    },
+    {
+      "id": "writer",
+      "name": "Writer (Palmyra)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.writer.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "WRITER_API_KEY"
+      ],
+      "docsUrl": "https://dev.writer.com/api-reference/completion-api/chat-completion",
+      "keyUrl": "https://app.writer.com/aistudio",
+      "region": "us",
+      "category": "enterprise",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "palmyra-x6",
+          "label": "Palmyra X6",
+          "context": 1000000
+        },
+        {
+          "id": "palmyra-x5",
+          "label": "Palmyra X5",
+          "context": 1000000
+        }
+      ],
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "requires custom adapter: documented chat endpoint is POST https://api.writer.com/v1/chat (not /chat/completions); docs do not claim OpenAI compatibility. Request shape is OpenAI-like (messages, tools, stream). /models endpoint and keyUrl not confirmed. Palmyra X5/X4 retire 2026-12-14."
+    },
+    {
+      "id": "upstage",
+      "name": "Upstage (Solar)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.upstage.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "UPSTAGE_API_KEY"
+      ],
+      "docsUrl": "https://console.upstage.ai/docs/getting-started",
+      "keyUrl": "https://console.upstage.ai/api-keys",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "solar-pro4",
+          "label": "Solar Pro 4"
+        },
+        {
+          "id": "solar-mini4",
+          "label": "Solar Mini 4"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "OpenAI-compatible /chat/completions confirmed. Context windows, vision, embeddings flag and keyUrl not confirmed from fetched pages. Also lists syn-pro model. reasoning_effort param supported."
+    },
+    {
+      "id": "reka",
+      "name": "Reka",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.reka.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "REKA_API_KEY"
+      ],
+      "docsUrl": "https://docs.reka.ai/quickstart",
+      "keyUrl": "https://developer.reka.ai/keys",
+      "region": "us",
+      "category": "lab",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": false,
+        "vision": true,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "reka-flash-3",
+          "label": "Reka Flash 3"
+        },
+        {
+          "id": "reka-edge-2603",
+          "label": "Reka Edge (multimodal)"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Docs state any OpenAI SDK works with base URL and key change. tools/jsonMode/listModels not confirmed; conservatively false."
+    },
+    {
+      "id": "scaleway",
+      "name": "Scaleway Generative APIs",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.scaleway.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "SCW_SECRET_KEY"
+      ],
+      "docsUrl": "https://www.scaleway.com/en/docs/generative-apis/quickstart/",
+      "keyUrl": "https://console.scaleway.com/iam/api-keys",
+      "region": "eu",
+      "category": "enterprise",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "glm-5.2",
+          "label": "GLM 5.2",
+          "context": 256000
+        },
+        {
+          "id": "qwen3.8-27b",
+          "label": "Qwen3.8 27B",
+          "context": 256000
+        },
+        {
+          "id": "qwen3.5-397b-a17b",
+          "label": "Qwen3.5 397B A17B",
+          "context": 250000
+        },
+        {
+          "id": "deepseek-v4-flash-0731",
+          "label": "DeepSeek V4 Flash 0731",
+          "context": 256000
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Endpoints /chat/completions, /responses, /embeddings, /models, /rerank. Hosted in France/EU. Model IDs from official supported-models page; catalog changes often, prefer /models."
+    },
+    {
+      "id": "ovhcloud",
+      "name": "OVHcloud AI Endpoints",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "OVH_AI_ENDPOINTS_ACCESS_TOKEN"
+      ],
+      "docsUrl": "https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-getting-started",
+      "keyUrl": "https://www.ovh.com/manager/#/public-cloud/",
+      "region": "eu",
+      "category": "enterprise",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "gpt-oss-20b",
+          "label": "GPT-OSS 20B"
+        },
+        {
+          "id": "Meta-Llama-3_3-70B-Instruct",
+          "label": "Llama 3.3 70B Instruct"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL from third-party integration docs (not OVH page fetched). Key created in Manager under Public Cloud > AI & ML > AI Endpoints; project needs payment method. Anonymous use allowed at 2 req/min/IP. Model IDs are case/underscore sensitive; catalog changes, use /models. /models existence not directly confirmed."
+    },
+    {
+      "id": "alibaba-qwen",
+      "name": "Alibaba Cloud Model Studio (Qwen)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://{workspace_id}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+      "baseUrlParams": [
+        {
+          "name": "workspace_id",
+          "label": "Workspace ID"
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "DASHSCOPE_API_KEY"
+      ],
+      "docsUrl": "https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope",
+      "keyUrl": "https://modelstudio.console.alibabacloud.com/?tab=playground#/api-key",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": false,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "qwen3.8-max",
+          "label": "Qwen3.8 Max",
+          "context": 1000000,
+          "inputPrice": 2.0,
+          "outputPrice": 6.0,
+          "tools": true
+        },
+        {
+          "id": "qwen3.7-max",
+          "label": "Qwen3.7 Max",
+          "context": 1000000,
+          "inputPrice": 2.5,
+          "outputPrice": 7.5,
+          "tools": true
+        },
+        {
+          "id": "qwen3-max",
+          "label": "Qwen3 Max",
+          "context": 256000,
+          "inputPrice": 3.0,
+          "outputPrice": 15.0,
+          "tools": true,
+          "vision": false
+        },
+        {
+          "id": "qwen3.7-plus",
+          "label": "Qwen3.7 Plus",
+          "context": 256000,
+          "inputPrice": 0.4,
+          "outputPrice": 1.6,
+          "tools": true
+        },
+        {
+          "id": "qwen3.6-plus",
+          "label": "Qwen3.6 Plus",
+          "context": 256000,
+          "inputPrice": 0.5,
+          "outputPrice": 3.0,
+          "tools": true
+        },
+        {
+          "id": "qwen-plus",
+          "label": "Qwen Plus",
+          "context": 256000,
+          "inputPrice": 0.4,
+          "outputPrice": 1.2,
+          "tools": true
+        },
+        {
+          "id": "qwen3.8-flash",
+          "label": "Qwen3.8 Flash",
+          "context": 1000000,
+          "inputPrice": 0.15,
+          "outputPrice": 0.47,
+          "tools": true
+        },
+        {
+          "id": "qwen3.7-flash",
+          "label": "Qwen3.7 Flash",
+          "context": 256000,
+          "inputPrice": 0.2,
+          "outputPrice": 0.8,
+          "tools": true
+        },
+        {
+          "id": "qwen3-coder-plus",
+          "label": "Qwen3 Coder Plus",
+          "context": 256000,
+          "inputPrice": 1.0,
+          "outputPrice": 5.0,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "qwen3-coder-flash",
+          "label": "Qwen3 Coder Flash",
+          "context": 256000,
+          "inputPrice": 0.3,
+          "outputPrice": 1.5,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "qwen3-vl-plus",
+          "label": "Qwen3 VL Plus",
+          "context": 256000,
+          "inputPrice": 0.2,
+          "outputPrice": 1.6,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "qwen3-vl-flash",
+          "label": "Qwen3 VL Flash",
+          "context": 256000,
+          "inputPrice": 0.05,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Current docs show workspace-specific Singapore URL. Legacy shared URL https://dashscope-intl.aliyuncs.com/compatible-mode/v1 is still cited by third parties and may still work. API keys are region-bound (Singapore key for intl endpoint; Beijing keys fail with 401). Other regions: us, Frankfurt, Tokyo, Hong Kong, Beijing (cn-beijing). Context windows not shown."
+    },
+    {
+      "id": "moonshot",
+      "name": "Moonshot AI (Kimi)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.moonshot.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "MOONSHOT_API_KEY"
+      ],
+      "docsUrl": "https://platform.kimi.ai/docs/guide/start-using-kimi-api",
+      "keyUrl": "https://platform.kimi.ai/console/api-keys",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "kimi-k3",
+          "label": "Kimi K3",
+          "context": 1048576,
+          "inputPrice": 3.0,
+          "outputPrice": 15.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "kimi-k2.7-code",
+          "label": "Kimi K2.7 Code",
+          "context": 262144,
+          "inputPrice": 0.95,
+          "outputPrice": 4.0,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "kimi-k2.7-code-highspeed",
+          "label": "Kimi K2.7 Code High-speed",
+          "context": 262144,
+          "inputPrice": 1.9,
+          "outputPrice": 8.0,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "kimi-k2.6",
+          "label": "Kimi K2.6",
+          "context": 262144,
+          "inputPrice": 0.95,
+          "outputPrice": 4.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Base URL, key URL, context windows and OpenAI+Anthropic compatibility confirmed. Exact API model ID strings were inferred from display names (docs page summary gave names, not literal IDs); verify. China endpoint is api.moonshot.cn/v1. Docs moved to platform.kimi.ai."
+    },
+    {
+      "id": "zhipu-zai",
+      "name": "Zhipu AI / Z.ai (GLM)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.z.ai/api/paas/v4",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "ZAI_API_KEY"
+      ],
+      "docsUrl": "https://docs.z.ai/guides/overview/quick-start",
+      "keyUrl": "https://z.ai/manage-apikey/apikey-list",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "glm-5.3",
+          "label": "GLM-5.3",
+          "inputPrice": 1.4,
+          "outputPrice": 4.4,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-5.3-flash",
+          "label": "GLM-5.3 Flash",
+          "inputPrice": 0.15,
+          "outputPrice": 0.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "glm-5.3-flashx",
+          "label": "GLM-5.3 FlashX",
+          "inputPrice": 0.37,
+          "outputPrice": 1.25,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "glm-5.2",
+          "label": "GLM-5.2",
+          "inputPrice": 1.4,
+          "outputPrice": 4.4,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-5.1",
+          "label": "GLM-5.1",
+          "inputPrice": 1.4,
+          "outputPrice": 4.4,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-5",
+          "label": "GLM-5",
+          "inputPrice": 1.0,
+          "outputPrice": 3.2,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-4.7",
+          "label": "GLM-4.7",
+          "inputPrice": 0.6,
+          "outputPrice": 2.2,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-4.7-flashx",
+          "label": "GLM-4.7 FlashX",
+          "inputPrice": 0.07,
+          "outputPrice": 0.4,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-4.7-flash",
+          "label": "GLM-4.7 Flash",
+          "inputPrice": 0.0,
+          "outputPrice": 0.0,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-4.6",
+          "label": "GLM-4.6",
+          "inputPrice": 0.6,
+          "outputPrice": 2.2,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-4.5-air",
+          "label": "GLM-4.5 Air",
+          "inputPrice": 0.2,
+          "outputPrice": 1.1,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "glm-4.6v",
+          "label": "GLM-4.6V",
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL confirmed; chat at /chat/completions. GLM-5.3 text-only, reasoning always on, 1M context/128K output. Model code casing (lowercase) assumed; keyUrl and /models not confirmed from docs. China endpoint: https://open.bigmodel.cn/api/paas/v4. Separate coding-plan endpoint exists at /api/coding/paas/v4."
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.minimax.io/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "MINIMAX_API_KEY"
+      ],
+      "docsUrl": "https://platform.minimax.io/docs/guides/text-generation",
+      "keyUrl": "https://platform.minimax.io/user-center/basic-information/interface-key",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "MiniMax-M3",
+          "label": "MiniMax M3",
+          "context": 1048576,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "MiniMax-M2.7",
+          "label": "MiniMax M2.7",
+          "context": 204800,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "MiniMax-M2.7-highspeed",
+          "label": "MiniMax M2.7 Highspeed",
+          "context": 204800,
+          "inputPrice": 0.6,
+          "outputPrice": 2.4,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Also offers Anthropic-compatible endpoint https://api.minimax.io/anthropic. China mainland endpoint is https://api.minimaxi.com/v1 (not verified here). MiniMax-M3.1-Flash-Preview exists but only via M Plan/MiniMax Code. Reasoning on by default. keyUrl and /models listing not verified in docs fetched."
+    },
+    {
+      "id": "baidu-qianfan",
+      "name": "Baidu Qianfan (ERNIE)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://qianfan.baidubce.com/v2",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "QIANFAN_API_KEY"
+      ],
+      "docsUrl": "https://cloud.baidu.com/doc/qianfan-docs/s/Mm8r1mejk",
+      "keyUrl": "https://console.bce.baidu.com/iam/#/iam/apikey/list",
+      "region": "cn",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "ernie-5.0",
+          "label": "ERNIE 5.0"
+        },
+        {
+          "id": "ernie-4.5-turbo-128k",
+          "label": "ERNIE 4.5 Turbo 128K",
+          "context": 131072
+        },
+        {
+          "id": "ernie-4.5-turbo-32k",
+          "label": "ERNIE 4.5 Turbo 32K",
+          "context": 32768
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Base URL and Bearer auth (key format bce-v3/ALTAK-...) confirmed in official docs; ERNIE model IDs taken from secondary sources, not the official model list. Qianfan also hosts third-party models (e.g. deepseek-v3.1-250821). Some requests accept an 'appid' header. keyUrl and modelsEndpoint unverified."
+    },
+    {
+      "id": "01-ai",
+      "name": "01.AI (Yi)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.lingyiwanwu.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "YI_API_KEY"
+      ],
+      "docsUrl": "https://platform.01.ai/docs",
+      "keyUrl": "https://platform.01.ai/apikeys",
+      "region": "cn",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "yi-lightning",
+          "label": "Yi Lightning",
+          "context": 16384
+        },
+        {
+          "id": "yi-large",
+          "label": "Yi Large",
+          "context": 32768
+        }
+      ],
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Base URL api.lingyiwanwu.com/v1 and yi-lightning seen only in third-party sources (Portkey, LangChain); official docs page did not render details. 01.AI pivoted away from public API LLM business so service may be deprecated or changed. Verify before shipping. Context values and other model IDs unconfirmed."
+    },
+    {
+      "id": "tencent-hunyuan",
+      "name": "Tencent Hunyuan",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.hunyuan.cloud.tencent.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "HUNYUAN_API_KEY"
+      ],
+      "docsUrl": "https://cloud.tencent.com/document/product/1729/111007",
+      "keyUrl": "https://console.cloud.tencent.com/hunyuan/start",
+      "region": "cn",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "hunyuan-turbos-latest",
+          "label": "Hunyuan TurboS (latest)"
+        },
+        {
+          "id": "hunyuan-t1-latest",
+          "label": "Hunyuan T1 (latest)"
+        },
+        {
+          "id": "hunyuan-lite",
+          "label": "Hunyuan Lite"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Official docs list models hunyuan-turbos-latest, hunyuan-t1-latest, hunyuan-lite, hunyuan-vision, hunyuan-embedding. Docs note service is migrating to TokenHub (existing services continue). stop param stops AFTER the match (differs from OpenAI). Default concurrency 5. Context windows not confirmed. /models listing unverified."
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (local)",
+      "adapter": "openai-compatible",
+      "baseUrl": "http://localhost:11434/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "none",
+        "optional": true
+      },
+      "envVars": [],
+      "docsUrl": "https://github.com/ollama/ollama/blob/main/docs/openai.md",
+      "keyUrl": null,
+      "region": "local",
+      "category": "local",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "active",
+      "verifiedAt": null,
+      "notes": "OpenAI-compatible at /v1; default port 11434. API key not required (any dummy value accepted; bearer optional if behind a proxy). Models listed via /v1/models. Not re-verified against docs this session."
+    },
+    {
+      "id": "lm-studio",
+      "name": "LM Studio (local)",
+      "adapter": "openai-compatible",
+      "baseUrl": "http://localhost:1234/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "none",
+        "optional": true
+      },
+      "envVars": [],
+      "docsUrl": "https://lmstudio.ai/docs/app/api/endpoints/openai",
+      "keyUrl": null,
+      "region": "local",
+      "category": "local",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "active",
+      "verifiedAt": null,
+      "notes": "Local server default port 1234, started from LM Studio Developer tab. No key required (bearer optional/ignored). Not re-verified this session."
+    },
+    {
+      "id": "vllm",
+      "name": "vLLM (local server)",
+      "adapter": "openai-compatible",
+      "baseUrl": "http://localhost:8000/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "none",
+        "optional": true
+      },
+      "envVars": [],
+      "docsUrl": "https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html",
+      "keyUrl": null,
+      "region": "local",
+      "category": "local",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "active",
+      "verifiedAt": null,
+      "notes": "`vllm serve <model>` default port 8000. Auth none unless started with --api-key (then bearer). Embeddings only for embedding models; vision for multimodal models; tools need --enable-auto-tool-choice. Not re-verified this session."
+    },
+    {
+      "id": "llama-cpp-server",
+      "name": "llama.cpp server (llama-server)",
+      "adapter": "openai-compatible",
+      "baseUrl": "http://localhost:8080/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "none",
+        "optional": true
+      },
+      "envVars": [],
+      "docsUrl": "https://github.com/ggml-org/llama.cpp/tree/master/tools/server",
+      "keyUrl": null,
+      "region": "local",
+      "category": "local",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": true
+      },
+      "fallbackModels": [],
+      "status": "active",
+      "verifiedAt": null,
+      "notes": "llama-server default port 8080. Auth none unless --api-key (then bearer). Serves one loaded model; /v1/models returns it. FIM via /infill (non-OpenAI path). Tools require --jinja. Not re-verified this session."
+    },
+    {
+      "id": "localai",
+      "name": "LocalAI (local)",
+      "adapter": "openai-compatible",
+      "baseUrl": "http://localhost:8080/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "none",
+        "optional": true
+      },
+      "envVars": [],
+      "docsUrl": "https://localai.io/docs/",
+      "keyUrl": null,
+      "region": "local",
+      "category": "local",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "active",
+      "verifiedAt": null,
+      "notes": "Default port 8080. Auth none unless API keys configured (then bearer). Not re-verified this session."
+    },
+    {
+      "id": "jan",
+      "name": "Jan (local)",
+      "adapter": "openai-compatible",
+      "baseUrl": "http://localhost:1337/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "none",
+        "optional": true
+      },
+      "envVars": [],
+      "docsUrl": "https://jan.ai/docs/desktop/api-server",
+      "keyUrl": null,
+      "region": "local",
+      "category": "local",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [],
+      "status": "active",
+      "verifiedAt": null,
+      "notes": "Jan local API server default port 1337; requires enabling server in settings. Jan's API server typically requires an API key (bearer) set in its settings - treat as optional/configurable. Not re-verified this session."
+    },
+    {
+      "id": "chutes",
+      "name": "Chutes",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://llm.chutes.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "CHUTES_API_KEY"
+      ],
+      "docsUrl": "https://docs.chutes.ai",
+      "keyUrl": "https://chutes.ai/app/api",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "unsloth/Mistral-Nemo-Instruct-2407-TEE",
+          "label": "Mistral Nemo 12B (TEE)",
+          "context": 131072,
+          "inputPrice": 0.0245,
+          "outputPrice": 0.0978,
+          "vision": false
+        },
+        {
+          "id": "Nemotron-3-Nano-Omni-30B-TEE",
+          "label": "Nemotron 3 Nano Omni 30B (TEE)",
+          "context": 131072,
+          "inputPrice": 0.0245,
+          "outputPrice": 0.0978,
+          "vision": false
+        },
+        {
+          "id": "Qwen/Qwen3-32B-TEE",
+          "label": "Qwen3 32B (TEE)",
+          "context": 40960,
+          "inputPrice": 0.104,
+          "outputPrice": 0.416,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemma-4-31B-turbo-TEE",
+          "label": "Gemma 4 31B turbo (TEE)",
+          "context": 131072,
+          "inputPrice": 0.12,
+          "outputPrice": 0.37,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3.8-27B-TEE",
+          "label": "Qwen3.8 27B (TEE)",
+          "context": 262144,
+          "inputPrice": 0.24,
+          "outputPrice": 2.2,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE",
+          "label": "Qwen3 235B Thinking 2507 (TEE)",
+          "context": 262144,
+          "inputPrice": 0.2989,
+          "outputPrice": 1.1957,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Flash-0731-TEE",
+          "label": "DeepSeek V4 Flash 0731 (TEE)",
+          "context": 1048576,
+          "inputPrice": 0.44,
+          "outputPrice": 1.32,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Verified via public https://llm.chutes.ai/v1/models (14 models listed, prices in USD/M). Pay-per-token with Chutes credits; subscription plans also exist. Cheapest: Mistral Nemo / Nemotron Nano at $0.0245 in / $0.0978 out. Model IDs carry -TEE suffix."
+    },
+    {
+      "id": "siliconflow",
+      "name": "SiliconFlow (International)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.siliconflow.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "SILICONFLOW_API_KEY"
+      ],
+      "docsUrl": "https://docs.siliconflow.com",
+      "keyUrl": "https://cloud.siliconflow.com/account/ak",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "gpt-oss 20B",
+          "context": 131072,
+          "inputPrice": 0.04,
+          "outputPrice": 0.18,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss 120B",
+          "context": 131072,
+          "inputPrice": 0.05,
+          "outputPrice": 0.45,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "Qwen/Qwen3.5-9B",
+          "label": "Qwen3.5 9B",
+          "context": 262144,
+          "inputPrice": 0.1,
+          "outputPrice": 0.15,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "zai-org/GLM-5.3-Flash",
+          "label": "GLM-5.3 Flash",
+          "context": 1049000,
+          "inputPrice": 0.15,
+          "outputPrice": 0.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1049000,
+          "inputPrice": 0.15,
+          "outputPrice": 0.6,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Prices from siliconflow.com/pricing; /v1/models exists but requires API key (401 without) so exact model IDs follow SiliconFlow HF-style naming and are NOT verified. New accounts get ~$1 free credits. Mainland site is siliconflow.cn (separate, CNY). Model ids follow Hugging Face naming but could not be checked without a key; the live /models list replaces them once connected."
+    },
+    {
+      "id": "featherless",
+      "name": "Featherless AI",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.featherless.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "FEATHERLESS_API_KEY"
+      ],
+      "docsUrl": "https://featherless.ai/docs",
+      "keyUrl": "https://featherless.ai/account/api-keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "meta-llama/Llama-3.2-1B-Instruct",
+          "label": "Llama 3.2 1B Instruct",
+          "context": 32768,
+          "inputPrice": 0.027,
+          "outputPrice": 0.201,
+          "tools": false,
+          "vision": false
+        },
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "gpt-oss 20B",
+          "context": 131072,
+          "inputPrice": 0.04,
+          "outputPrice": 0.15,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemma-3-1b-it",
+          "label": "Gemma 3 1B IT",
+          "context": 32768,
+          "inputPrice": 0.04,
+          "outputPrice": 0.08,
+          "tools": false,
+          "vision": false
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Public /models lists ~22k HF models with per-token prices (shown prices are those; Developer plan $50/mo is billed per token, Chat plan $25/mo flat unlimited tokens, 32K ctx, 4 concurrency units). Catalog is huge; only 3 cheap useful chat models listed. Tool support varies per model."
+    },
+    {
+      "id": "inference-net",
+      "name": "Inference.net",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.inference.net/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "INFERENCE_API_KEY"
+      ],
+      "docsUrl": "https://docs.inference.net",
+      "keyUrl": "https://inference.net/dashboard/api-keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "llama-3.2-1b-instruct",
+          "label": "Llama 3.2 1B Instruct",
+          "context": 60000,
+          "inputPrice": 0.027,
+          "outputPrice": 0.201,
+          "tools": false,
+          "vision": false
+        },
+        {
+          "id": "inference-net/schematron-v2-turbo",
+          "label": "Schematron v2 Turbo (HTML->JSON extraction)",
+          "context": 128000,
+          "inputPrice": 0.03,
+          "outputPrice": 0.15,
+          "tools": false,
+          "vision": false
+        },
+        {
+          "id": "gemma-3-4b-it",
+          "label": "Gemma 3 4B IT",
+          "context": 131072,
+          "inputPrice": 0.05,
+          "outputPrice": 0.1,
+          "tools": false,
+          "vision": true
+        },
+        {
+          "id": "llama-3.2-3b-instruct",
+          "label": "Llama 3.2 3B Instruct",
+          "context": 131072,
+          "inputPrice": 0.05,
+          "outputPrice": 0.33,
+          "tools": false,
+          "vision": false
+        },
+        {
+          "id": "gpt-5-nano",
+          "label": "GPT-5 nano",
+          "context": 400000,
+          "inputPrice": 0.05,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "gemma-3-27b-it",
+          "label": "Gemma 3 27B IT",
+          "context": 131072,
+          "inputPrice": 0.09,
+          "outputPrice": 0.25,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "glm-5.3-flash",
+          "label": "GLM-5.3 Flash",
+          "context": 1048576,
+          "inputPrice": 0.1,
+          "outputPrice": 0.45,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "llama-3.3-70b-instruct",
+          "label": "Llama 3.3 70B Instruct",
+          "context": 131072,
+          "inputPrice": 0.13,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": false
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Verified via public /v1/models (65 models, USD per token converted to per 1M). Also proxies closed models (OpenAI, Gemini, Claude) at provider-like prices. Cheapest chat: Llama 3.2 1B at $0.027/$0.201."
+    },
+    {
+      "id": "parasail",
+      "name": "Parasail",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.parasail.io/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "PARASAIL_API_KEY"
+      ],
+      "docsUrl": "https://docs.parasail.io",
+      "keyUrl": "https://www.saas.parasail.io/keys",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "openai/gpt-oss-20b",
+          "label": "gpt-oss 20B",
+          "context": 131072,
+          "inputPrice": 0.04,
+          "outputPrice": 0.2,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemma-3-27b-it",
+          "label": "Gemma 3 27B",
+          "inputPrice": 0.08,
+          "outputPrice": 0.45,
+          "tools": false,
+          "vision": true
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss 120B",
+          "context": 131072,
+          "inputPrice": 0.1,
+          "outputPrice": 0.75,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Flash",
+          "label": "DeepSeek V4 Flash",
+          "inputPrice": 0.14,
+          "outputPrice": 0.28,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemma-4-31B-it",
+          "label": "Gemma 4 31B",
+          "inputPrice": 0.15,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "zai-org/GLM-5.3-Flash",
+          "label": "GLM-5.3 Flash",
+          "inputPrice": 0.15,
+          "outputPrice": 0.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Prices from parasail.io/pricing (serverless, pay as you go, no minimums). /v1/models requires API key (401), so exact model IDs are best-guess HF names and NOT verified; fetch the live list. Context lengths unknown where null. Model ids follow Hugging Face naming but could not be checked without a key; the live /models list replaces them once connected."
+    },
+    {
+      "id": "friendli",
+      "name": "Friendli AI (Serverless)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.friendli.ai/serverless/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "FRIENDLI_TOKEN"
+      ],
+      "docsUrl": "https://friendli.ai/docs/guides/serverless_endpoints/introduction",
+      "keyUrl": "https://friendli.ai/suite/~/settings/tokens",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "google/gemma-4-31B-it",
+          "label": "Gemma 4 31B IT",
+          "context": 262144,
+          "inputPrice": 0.14,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true
+        },
+        {
+          "id": "zai-org/GLM-5.3-Flash",
+          "label": "GLM-5.3 Flash",
+          "context": 1048576,
+          "inputPrice": 0.15,
+          "outputPrice": 0.5,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "MiniMaxAI/MiniMax-M2.5",
+          "label": "MiniMax M2.5",
+          "context": 196608,
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek-ai/DeepSeek-V3.2",
+          "label": "DeepSeek V3.2",
+          "context": 163840,
+          "inputPrice": 0.5,
+          "outputPrice": 1.5,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "zai-org/GLM-5.3",
+          "label": "GLM-5.3",
+          "context": 1048576,
+          "inputPrice": 1.26,
+          "outputPrice": 3.96,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Verified via public https://api.friendli.ai/serverless/v1/models (7 models, prices converted to per 1M). Pay-per-token; small catalog. Rest not listed: GLM-5.1/5.2 at $1.40/$4.40."
+    },
+    {
+      "id": "stepfun",
+      "name": "StepFun (international)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.stepfun.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "STEPFUN_API_KEY"
+      ],
+      "docsUrl": "https://platform.stepfun.ai/docs/en/guides/developer/openai.md",
+      "keyUrl": "https://platform.stepfun.ai/interface-key",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "step-3.5-flash",
+          "label": "Step 3.5 Flash",
+          "inputPrice": 0.1,
+          "outputPrice": 0.3,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "step-3.5-flash-2603",
+          "label": "Step 3.5 Flash 2603",
+          "inputPrice": 0.1,
+          "outputPrice": 0.3,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "step-3.7-flash",
+          "label": "Step 3.7 Flash",
+          "context": 256000,
+          "inputPrice": 0.2,
+          "outputPrice": 1.15,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "step-5-preview",
+          "label": "Step 5 Preview",
+          "context": 1000000,
+          "inputPrice": 1.0,
+          "outputPrice": 2.7,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Prices from platform.stepfun.ai pricing page (cache-hit input cheaper: 0.02-0.05). /models requires key (401 without). Context for 3.5-flash not confirmed."
+    },
+    {
+      "id": "byteplus-modelark",
+      "name": "BytePlus ModelArk (Seed / Doubao)",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://ark.ap-southeast.bytepluses.com/api/v3",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "ARK_API_KEY"
+      ],
+      "docsUrl": "https://docs.byteplus.com/en/docs/ModelArk/1099320",
+      "keyUrl": "https://console.byteplus.com/ark/region:ark+ap-southeast-1/apiKey",
+      "region": "global",
+      "category": "asia",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "seed-2-0-mini",
+          "label": "Seed 2.0 Mini",
+          "context": 256000,
+          "inputPrice": 0.1,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "seed-2-0-lite-260228",
+          "label": "Seed 2.0 Lite",
+          "context": 256000,
+          "inputPrice": 0.25,
+          "outputPrice": 2.0,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "unverified",
+      "verifiedAt": "2026-10-06",
+      "notes": "International endpoint confirmed (401 without key on /models). Prices/IDs from third-party sources (apiyi, pricepertoken), not official docs (docs pages not scrapeable). Lite is tiered: >128K ctx 0.50/4.00. Older seed-1-6-flash ~0.075/0.30. Some models need endpoint IDs (ep-...) or activation in console. China endpoint (Volcengine): https://ark.cn-beijing.volces.com/api/v3."
+    },
+    {
+      "id": "avian",
+      "name": "Avian.io",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.avian.io/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "AVIAN_API_KEY"
+      ],
+      "docsUrl": "https://avian.io/docs",
+      "keyUrl": "https://avian.io/dashboard",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "deepseek/deepseek-v4.1-flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1048576,
+          "inputPrice": 0.1275,
+          "outputPrice": 0.51,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "z-ai/glm-5.3-flash",
+          "label": "GLM 5.3 Flash",
+          "context": 1048576,
+          "inputPrice": 0.1275,
+          "outputPrice": 0.425,
+          "tools": true,
+          "reasoning": false
+        },
+        {
+          "id": "deepseek/deepseek-v4-flash",
+          "label": "DeepSeek V4 Flash",
+          "context": 1000000,
+          "inputPrice": 0.14,
+          "outputPrice": 0.28,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "xiaomi/mimo-v2.6-flash",
+          "label": "MiMo V2.6 Flash",
+          "context": 1048576,
+          "inputPrice": 0.14,
+          "outputPrice": 0.28,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek/deepseek-v3.2",
+          "label": "DeepSeek V3.2",
+          "context": 163840,
+          "inputPrice": 0.23,
+          "outputPrice": 0.33,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "minimax/minimax-m3",
+          "label": "MiniMax M3",
+          "context": 524288,
+          "inputPrice": 0.255,
+          "outputPrice": 1.02,
+          "tools": true,
+          "reasoning": false
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Public /models listing verified live with pricing. No free tier found. Tools/vision flags are assumed, not in listing."
+    },
+    {
+      "id": "aimlapi",
+      "name": "AI/ML API",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.aimlapi.com/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "AIMLAPI_API_KEY"
+      ],
+      "docsUrl": "https://docs.aimlapi.com",
+      "keyUrl": "https://aimlapi.com/app/keys",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "deepseek/deepseek-v4.1-flash",
+          "label": "DeepSeek V4.1 Flash",
+          "context": 1048576,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "z-ai/glm-5.3-flash",
+          "label": "GLM 5.3 Flash",
+          "context": 1048576,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "stepfun/step-3.7-flash",
+          "label": "Step 3.7 Flash",
+          "context": 256000,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "nvidia/nemotron-3-nano-30b-a3b",
+          "label": "Nemotron 3 Nano 30B",
+          "context": 262144,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "xiaomi/mimo-v2.6-flash",
+          "label": "MiMo V2.6 Flash",
+          "context": 1048576,
+          "tools": true,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemini-3.1-flash-lite",
+          "label": "Gemini 3.1 Flash Lite",
+          "context": 1000000,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Public /models lists 380 chat models (verified live) but exposes no prices; prices left null. Free tier limited/trial only, unverified. Models also accept short aliases."
+    },
+    {
+      "id": "requesty",
+      "name": "Requesty",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://router.requesty.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "REQUESTY_API_KEY"
+      ],
+      "docsUrl": "https://docs.requesty.ai",
+      "keyUrl": "https://app.requesty.ai/api-keys",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "nvidia/nemotron-3-nano-30b-a3b",
+          "label": "Nemotron 3 Nano 30B",
+          "context": 262144,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemma-4-31b-it",
+          "label": "Gemma 4 31B IT",
+          "context": 262144,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "runware/gpt-oss-120b",
+          "label": "GPT-OSS 120B (Runware)",
+          "context": 131072,
+          "inputPrice": 0.032,
+          "outputPrice": 0.14,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "openai/gpt-5-nano",
+          "label": "GPT-5 Nano",
+          "context": 400000,
+          "inputPrice": 0.05,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "google/gemini-2.5-flash-lite:flex",
+          "label": "Gemini 2.5 Flash Lite (flex)",
+          "context": 1048576,
+          "inputPrice": 0.05,
+          "outputPrice": 0.2,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        },
+        {
+          "id": "deepseek/deepseek-chat",
+          "label": "DeepSeek Chat",
+          "context": 1000000,
+          "inputPrice": 0.14,
+          "outputPrice": 0.28,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Public /models (759 entries, provider/model IDs) verified live. Router passes through provider prices, no markup. Zero-priced entries (nemotron, gemma-4) look free but may be listing artifacts/limited. EU base: https://router.eu.requesty.ai/v1."
+    },
+    {
+      "id": "venice",
+      "name": "Venice.ai",
+      "adapter": "openai-compatible",
+      "baseUrl": "https://api.venice.ai/api/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "VENICE_API_KEY"
+      ],
+      "docsUrl": "https://docs.venice.ai",
+      "keyUrl": "https://venice.ai/settings/api",
+      "region": "us",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": true,
+        "jsonMode": true,
+        "embeddings": true,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "e2ee-qwen-2-5-7b-p",
+          "label": "Qwen 2.5 7B (E2EE)",
+          "context": 32000,
+          "inputPrice": 0.05,
+          "outputPrice": 0.13,
+          "tools": false,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "zai-org-glm-4.7-flash",
+          "label": "GLM 4.7 Flash",
+          "context": 128000,
+          "inputPrice": 0.06,
+          "outputPrice": 0.4,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "openai-gpt-oss-120b",
+          "label": "GPT-OSS 120B",
+          "context": 128000,
+          "inputPrice": 0.07,
+          "outputPrice": 0.3,
+          "tools": true,
+          "vision": false,
+          "reasoning": true
+        },
+        {
+          "id": "nvidia-nemotron-3-nano-30b-a3b",
+          "label": "Nemotron 3 Nano 30B",
+          "context": 128000,
+          "inputPrice": 0.075,
+          "outputPrice": 0.3,
+          "tools": true,
+          "vision": false,
+          "reasoning": false
+        },
+        {
+          "id": "mistral-small-3-2-24b-instruct",
+          "label": "Mistral Small 3.2 24B",
+          "context": 256000,
+          "inputPrice": 0.09375,
+          "outputPrice": 0.25,
+          "tools": true,
+          "vision": true,
+          "reasoning": false
+        },
+        {
+          "id": "qwen3-5-9b",
+          "label": "Qwen 3.5 9B",
+          "context": 256000,
+          "inputPrice": 0.1,
+          "outputPrice": 0.15,
+          "tools": true,
+          "vision": true,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-06",
+      "notes": "Public /models verified live with USD pricing. Also supports Venice DIEM credits. Venice adds extra params via venice_parameters (web search, etc.)."
+    }
+  ]
+}

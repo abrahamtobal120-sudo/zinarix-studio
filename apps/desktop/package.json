@@ -1,0 +1,176 @@
+{
+  "name": "@omni/desktop",
+  "productName": "Zinarix Studio",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Zinarix Studio — editor de código con cualquier modelo de IA",
+  "license": "MIT",
+  "author": {
+    "name": "Abraham Tobal",
+    "email": "abrahamtobal120@gmail.com"
+  },
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "node build.mjs && vite build",
+    "start": "electron .",
+    "dev": "node build.mjs && vite build && electron .",
+    "dist": "pnpm build && electron-builder --publish never",
+    "typecheck": "tsc -p tsconfig.json",
+    "install:linux": "bash scripts/install-linux.sh",
+    "smoke": "node scripts/smoke.mjs /tmp"
+  },
+  "dependencies": {
+    "@lydell/node-pty": "1.2.0-beta.15",
+    "@napi-rs/keyring": "^1.2.0"
+  },
+  "devDependencies": {
+    "@omni/catalog": "workspace:*",
+    "@omni/core": "workspace:*",
+    "@omni/providers": "workspace:*",
+    "@omni/security": "workspace:*",
+    "@omni/shared": "workspace:*",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "electron": "44.5.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "monaco-editor": "0.57.0",
+    "playwright": "^1.63.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "vite": "^8.3.2",
+    "zod": "^4.6.5"
+  },
+  "build": {
+    "appId": "dev.zinarix.studio",
+    "productName": "Zinarix Studio",
+    "executableName": "zinarix-studio",
+    "copyright": "Copyright © 2026 Abraham Tobal",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node",
+      "**/node_modules/@lydell/**",
+      "**/node_modules/@napi-rs/**"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "abrahamtobal120-sudo",
+        "repo": "zinarix-studio",
+        "releaseType": "release"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "pacman",
+        "rpm"
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Editor de código con cualquier modelo de IA",
+      "description": "Zinarix Studio: editor de código con más de 60 proveedores de IA, modelos locales y un agente con aprobación.",
+      "maintainer": "Abraham Tobal <abrahamtobal120@gmail.com>",
+      "executableArgs": [],
+      "artifactName": "Zinarix-Studio-${version}-${arch}.${ext}",
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "Zinarix Studio",
+          "Keywords": "code;editor;ia;ai;ide;"
+        }
+      }
+    },
+    "deb": {
+      "depends": [
+        "libsecret-1-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libasound2t64 | libasound2"
+      ],
+      "artifactName": "zinarix-studio_${version}_${arch}.${ext}"
+    },
+    "pacman": {
+      "depends": [
+        "libsecret",
+        "nss",
+        "alsa-lib",
+        "gtk3"
+      ],
+      "artifactName": "zinarix-studio-${version}-${arch}.${ext}"
+    },
+    "rpm": {
+      "depends": [
+        "libsecret"
+      ],
+      "artifactName": "zinarix-studio-${version}.${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "artifactName": "Zinarix-Studio-${version}-${arch}.${ext}",
+      "hardenedRuntime": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "Zinarix Studio"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "Zinarix-Studio-${version}-${arch}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "Zinarix Studio",
+      "artifactName": "Zinarix-Studio-Setup-${version}.${ext}"
+    }
+  },
+  "homepage": "https://github.com/abrahamtobal120-sudo/zinarix-studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abrahamtobal120-sudo/zinarix-studio.git"
+  }
+}

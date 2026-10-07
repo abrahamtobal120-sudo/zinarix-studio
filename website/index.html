@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zinarix Studio — El editor de código con cualquier IA</title>
+    <meta
+      name="description"
+      content="Zinarix Studio: editor de código gratis y de código abierto con más de 60 proveedores de IA y 300+ modelos. Usa tus propias llaves o modelos locales, con un agente que lee tu proyecto y usa la terminal con tu aprobación."
+    />
+    <meta name="theme-color" content="#070a18" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Zinarix Studio — El editor de código con cualquier IA" />
+    <meta property="og:description" content="62 proveedores, 300+ modelos, agente con aprobación y consumo de créditos a la vista. Gratis para Windows, macOS y Linux." />
+    <meta property="og:image" content="assets/screenshot-agent.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true">
+      <span class="blob b1"></span>
+      <span class="blob b2"></span>
+      <span class="blob b3"></span>
+      <div class="grid-overlay"></div>
+    </div>
+
+    <header class="nav" id="nav">
+      <a class="brand" href="#top" aria-label="Zinarix Studio, inicio">
+        <img src="assets/logo.svg" alt="" width="34" height="34" />
+        <span>Zinarix <b>Studio</b></span>
+      </a>
+      <nav aria-label="Principal">
+        <a href="#funciones">Funciones</a>
+        <a href="#galeria">Vistazo</a>
+        <a href="#modelos">Modelos</a>
+        <a href="#faq">Preguntas</a>
+        <a class="nav-gh" href="https://github.com/abrahamtobal120-sudo/zinarix-studio" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <a class="btn btn-sm btn-primary" href="#descargar">Descargar</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <!-- HERO -->
+      <section class="hero">
+        <div class="hero-copy reveal">
+          <a class="badge" href="#funciones">
+            <span class="badge-dot"></span> Nuevo · Modo agente y panel de consumo
+            <span class="badge-arrow">→</span>
+          </a>
+          <h1>
+            Programa con <span class="shine">cualquier IA</span>.<br />
+            En un solo editor.
+          </h1>
+          <p class="lead">
+            Zinarix Studio conecta <b>62 proveedores</b> y <b>300+ modelos</b> —de los más potentes a los de centavos, o
+            locales y gratis con Ollama— con un agente que entiende tu proyecto y trabaja <b>con tu aprobación</b>.
+          </p>
+          <div class="cta">
+            <a id="primary-download" class="btn btn-primary btn-lg" href="#descargar">
+              <span class="os-glyph" id="primary-glyph">⬇</span>
+              <span id="primary-label">Descargar gratis</span>
+            </a>
+            <a class="btn btn-glass btn-lg" href="#galeria">Ver en acción</a>
+          </div>
+          <ul class="trust">
+            <li>✓ Gratis y de código abierto</li>
+            <li>✓ Windows · macOS · Linux</li>
+            <li>✓ Tus llaves, en tu equipo</li>
+          </ul>
+        </div>
+        <div class="hero-visual reveal" style="--d: 0.15s">
+          <img class="hero-logo" src="assets/logo.svg" alt="" aria-hidden="true" />
+          <div class="window tilt" id="hero-window">
+            <div class="window-bar"><i></i><i></i><i></i><span>tienda-api — Zinarix Studio</span></div>
+            <img src="assets/screenshot-agent.png" alt="Zinarix Studio: el agente editó un archivo y corrió las pruebas" width="1600" height="932" />
+          </div>
+        </div>
+      </section>
+
+      <!-- STATS -->
+      <section class="stats reveal" aria-label="Cifras">
+        <div><strong data-count="62">62</strong><span>proveedores de IA</span></div>
+        <div><strong data-count="311" data-suffix="+">311+</strong><span>modelos con precio y contexto</span></div>
+        <div><strong>$0</strong><span>para empezar (modelos locales)</span></div>
+        <div><strong>3</strong><span>sistemas: Windows, macOS, Linux</span></div>
+      </section>
+
+      <!-- PROVIDER MARQUEE -->
+      <section class="marquee" aria-label="Proveedores compatibles">
+        <div class="marquee-track" id="marquee"></div>
+      </section>
+
+      <!-- FEATURES (BENTO) -->
+      <section id="funciones" class="section">
+        <div class="section-head reveal">
+          <span class="eyebrow">Funciones</span>
+          <h2>Todo lo que necesitas para programar con IA</h2>
+          <p>Un editor completo con el motor de VS Code, más la libertad de elegir el modelo correcto para cada tarea.</p>
+        </div>
+        <div class="bento">
+          <article class="card span-2 reveal glow-card">
+            <div class="card-copy">
+              <span class="icon">🤖</span>
+              <h3>Un agente que trabaja en tu proyecto</h3>
+              <p>
+                Lee y busca archivos, propone cambios con vista de diferencias y ejecuta comandos en la terminal. Cada edición y
+                cada comando <b>esperan tu aprobación</b>, y con un clic reviertes todo.
+              </p>
+            </div>
+            <img class="card-shot" src="assets/screenshot-approval.png" alt="El agente pide aprobación antes de editar" loading="lazy" />
+          </article>
+          <article class="card reveal glow-card" style="--d: 0.05s">
+            <span class="icon">⚡</span>
+            <h3>Cualquier modelo, un clic</h3>
+            <p>Elige el proveedor y luego el modelo, con precio, contexto y capacidades. Uno para el chat, otro para el agente y otro para editar.</p>
+          </article>
+          <article class="card reveal glow-card" style="--d: 0.1s">
+            <span class="icon">📊</span>
+            <h3>Consumo a la vista</h3>
+            <p>Lo que gastas hoy y en el mes por proveedor, gráfica de 30 días y presupuestos con aviso al 80 %.</p>
+          </article>
+          <article class="card reveal glow-card">
+            <span class="icon">🏠</span>
+            <h3>Local y privado</h3>
+            <p>Detecta Ollama, LM Studio y vLLM solo. El modo 100 % local bloquea cualquier llamada a la nube.</p>
+          </article>
+          <article class="card reveal glow-card" style="--d: 0.05s">
+            <span class="icon">🔐</span>
+            <h3>Tus llaves, seguras</h3>
+            <p>Las API keys viven en el llavero del sistema. Nunca en archivos ni logs, y los secretos de tu código se ocultan antes de enviarse.</p>
+          </article>
+          <article class="card reveal glow-card" style="--d: 0.1s">
+            <span class="icon">⌨️</span>
+            <h3>Un editor de verdad</h3>
+            <p>Monaco, terminal integrada, búsqueda global, paleta de comandos, arrastrar y soltar carpetas y atajos familiares.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- GALLERY -->
+      <section id="galeria" class="section">
+        <div class="section-head reveal">
+          <span class="eyebrow">Vistazo</span>
+          <h2>Míralo en acción</h2>
+        </div>
+        <div class="gallery reveal">
+          <div class="tabs" role="tablist">
+            <button role="tab" aria-selected="true" data-shot="assets/screenshot-agent.png" data-caption="El agente agregó la validación, corrió las pruebas y te deja revertir con un clic.">🤖 Agente</button>
+            <button role="tab" aria-selected="false" data-shot="assets/screenshot-models.png" data-caption="Elige primero el proveedor y luego el modelo: 62 proveedores, 300+ modelos.">⚡ Modelos</button>
+            <button role="tab" aria-selected="false" data-shot="assets/screenshot-usage.png" data-caption="Créditos consumidos por proveedor, hoy y en el mes, con presupuestos.">📊 Consumo</button>
+          </div>
+          <div class="window big">
+            <div class="window-bar"><i></i><i></i><i></i><span>Zinarix Studio</span></div>
+            <img id="gallery-img" src="assets/screenshot-agent.png" alt="Captura de Zinarix Studio" loading="lazy" />
+          </div>
+          <p class="caption" id="gallery-caption">El agente agregó la validación, corrió las pruebas y te deja revertir con un clic.</p>
+        </div>
+      </section>
+
+      <!-- HOW -->
+      <section class="section">
+        <div class="section-head reveal">
+          <span class="eyebrow">Cómo funciona</span>
+          <h2>Listo en un minuto</h2>
+        </div>
+        <ol class="steps">
+          <li class="reveal"><span>1</span><h3>Descarga e instala</h3><p>Un instalador para tu sistema. Sin cuentas ni registros.</p></li>
+          <li class="reveal" style="--d: 0.08s"><span>2</span><h3>Conecta una IA</h3><p>Pega la llave de tu proveedor favorito o usa Ollama gratis y sin internet.</p></li>
+          <li class="reveal" style="--d: 0.16s"><span>3</span><h3>Arrastra tu proyecto</h3><p>Suelta la carpeta en la ventana y pídele al agente lo que necesitas.</p></li>
+        </ol>
+      </section>
+
+      <!-- MODELS -->
+      <section id="modelos" class="section split">
+        <div class="reveal">
+          <span class="eyebrow">Modelos</span>
+          <h2>Del más potente al más barato</h2>
+          <p class="muted">
+            Usa el mejor modelo para cada tarea: uno de razonamiento para el agente, uno rápido y de centavos para chatear, uno local
+            cuando trabajas con código privado. Filtra por herramientas, visión, razonamiento, contexto o precio.
+          </p>
+          <ul class="price-list">
+            <li><span>Modelos locales (Ollama, LM Studio)</span><b>Gratis</b></li>
+            <li><span>Modelos pequeños (Chutes, Featherless, Requesty)</span><b>desde $0.02 / 1M</b></li>
+            <li><span>Modelos rápidos (DeepSeek, Groq, Gemini Flash)</span><b>desde $0.10 / 1M</b></li>
+            <li><span>Modelos frontera (Claude, GPT, Gemini Pro)</span><b>tú eliges</b></li>
+          </ul>
+        </div>
+        <div class="window reveal" style="--d: 0.1s">
+          <div class="window-bar"><i></i><i></i><i></i><span>Seleccionar modelo</span></div>
+          <img src="assets/screenshot-models.png" alt="Selector de modelos agrupado por proveedor" loading="lazy" />
+        </div>
+      </section>
+
+      <!-- DOWNLOAD -->
+      <section id="descargar" class="section download">
+        <div class="section-head reveal">
+          <span class="eyebrow">Descargar</span>
+          <h2>Zinarix Studio para tu sistema</h2>
+          <p class="muted" id="release-info">Buscando la versión más reciente…</p>
+        </div>
+        <div class="os-grid">
+          <div class="os reveal glow-card" data-os="windows">
+            <div class="os-icon">⊞</div>
+            <h3>Windows</h3>
+            <p class="muted">Windows 10 y 11 · 64 bits</p>
+            <a class="btn btn-primary" data-asset="win-exe" href="#">Descargar instalador (.exe)</a>
+            <a class="btn btn-glass" data-asset="win-zip" href="#">Versión portable (.zip)</a>
+          </div>
+          <div class="os reveal glow-card" data-os="mac" style="--d: 0.06s">
+            <div class="os-icon"></div>
+            <h3>macOS</h3>
+            <p class="muted">Apple Silicon e Intel</p>
+            <a class="btn btn-primary" data-asset="mac-arm64" href="#">Apple Silicon (.dmg)</a>
+            <a class="btn btn-glass" data-asset="mac-x64" href="#">Intel (.dmg)</a>
+          </div>
+          <div class="os reveal glow-card" data-os="linux" style="--d: 0.12s">
+            <div class="os-icon">🐧</div>
+            <h3>Linux</h3>
+            <p class="muted">Ubuntu · Debian · Arch · Fedora</p>
+            <a class="btn btn-primary" data-asset="deb" href="#">Ubuntu / Debian (.deb)</a>
+            <div class="btn-row">
+              <a class="btn btn-glass" data-asset="pacman" href="#">Arch</a>
+              <a class="btn btn-glass" data-asset="rpm" href="#">Fedora</a>
+              <a class="btn btn-glass" data-asset="appimage" href="#">AppImage</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="install reveal">
+          <div class="tabs small" role="tablist" id="install-tabs">
+            <button role="tab" aria-selected="true" data-panel="i-deb">Ubuntu / Debian</button>
+            <button role="tab" aria-selected="false" data-panel="i-arch">Arch</button>
+            <button role="tab" aria-selected="false" data-panel="i-rpm">Fedora</button>
+            <button role="tab" aria-selected="false" data-panel="i-appimage">AppImage</button>
+            <button role="tab" aria-selected="false" data-panel="i-mac">macOS</button>
+            <button role="tab" aria-selected="false" data-panel="i-win">Windows</button>
+          </div>
+          <div class="panel" id="i-deb"><pre><code>sudo apt install ./zinarix-studio_*_amd64.deb</code></pre></div>
+          <div class="panel" id="i-arch" hidden><pre><code>sudo pacman -U ./zinarix-studio-*.pacman</code></pre></div>
+          <div class="panel" id="i-rpm" hidden><pre><code>sudo dnf install ./zinarix-studio-*.x86_64.rpm</code></pre></div>
+          <div class="panel" id="i-appimage" hidden><pre><code>chmod +x Zinarix-Studio-*.AppImage
+./Zinarix-Studio-*.AppImage</code></pre></div>
+          <div class="panel" id="i-mac" hidden>
+            <p>Abre el <b>.dmg</b> y arrastra la app a <b>Aplicaciones</b>. Como todavía no está firmada por Apple, la primera vez haz clic derecho → <b>Abrir</b>, o ejecuta:</p>
+            <pre><code>xattr -dr com.apple.quarantine "/Applications/Zinarix Studio.app"</code></pre>
+          </div>
+          <div class="panel" id="i-win" hidden>
+            <p>Ejecuta el instalador. Si Windows SmartScreen muestra un aviso, pulsa <b>Más información → Ejecutar de todas formas</b> (el instalador aún no tiene certificado de firma).</p>
+          </div>
+        </div>
+        <p class="muted small center">
+          ¿Prefieres la terminal? Incluye la CLI <code>omni</code>.
+          <a id="all-releases" href="https://github.com/abrahamtobal120-sudo/zinarix-studio/releases">Todas las versiones →</a>
+        </p>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq" class="section faq">
+        <div class="section-head reveal">
+          <span class="eyebrow">Preguntas</span>
+          <h2>Preguntas frecuentes</h2>
+        </div>
+        <details class="reveal" open>
+          <summary>¿Es gratis?</summary>
+          <p>Sí. Zinarix Studio es gratis y de código abierto (MIT). Solo pagas a los proveedores de IA que tú elijas, con tus propias llaves — o nada si usas modelos locales.</p>
+        </details>
+        <details class="reveal">
+          <summary>¿Dónde se guardan mis API keys?</summary>
+          <p>En el llavero de tu sistema operativo (Keychain, Credential Manager o libsecret). No hay servidores intermedios: la app habla directamente con el proveedor que elijas.</p>
+        </details>
+        <details class="reveal">
+          <summary>¿El agente puede romper algo?</summary>
+          <p>Cada edición y cada comando requieren tu aprobación y ves exactamente qué hará. Los comandos peligrosos se bloquean siempre, y con un clic reviertes todos los cambios del agente.</p>
+        </details>
+        <details class="reveal">
+          <summary>¿Funciona sin internet?</summary>
+          <p>Sí, con modelos locales (Ollama, LM Studio, vLLM, llama.cpp). Activa el modo 100 % local y ninguna petición sale de tu equipo.</p>
+        </details>
+        <details class="reveal">
+          <summary>¿Cómo sé cuánto estoy gastando?</summary>
+          <p>El panel de consumo muestra lo gastado hoy y en el mes por proveedor, con una gráfica de 30 días y presupuestos que te avisan al 80 %.</p>
+        </details>
+      </section>
+
+      <!-- FINAL CTA -->
+      <section class="final reveal">
+        <img src="assets/logo.svg" alt="" width="90" height="90" />
+        <h2>Empieza a programar con cualquier IA</h2>
+        <p>Gratis, sin registro y con tus propias llaves.</p>
+        <a class="btn btn-light btn-lg" href="#descargar">Descargar Zinarix Studio</a>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="brand"><img src="assets/logo.svg" alt="" width="26" height="26" /> Zinarix Studio</div>
+      <span class="muted">Código abierto · Licencia MIT · Hecho con ❤️ en México</span>
+      <a href="https://github.com/abrahamtobal120-sudo/zinarix-studio" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+    <script src="app.js" defer></script>
+  </body>
+</html>

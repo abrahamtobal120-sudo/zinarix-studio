@@ -1,0 +1,44 @@
+name: Release
+
+# Push a tag like v0.3.0 to build installers for Windows, macOS and Linux
+# and attach them to a GitHub release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: --linux AppImage deb pacman rpm
+          - os: macos-latest
+            target: --mac dmg zip --arm64 --x64
+          - os: windows-latest
+            target: --win nsis zip --x64
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Build installers
+        working-directory: apps/desktop
+        shell: bash
+        run: pnpm exec electron-builder ${{ matrix.target }} --publish always

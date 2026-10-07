@@ -1,0 +1,39 @@
+{
+  "name": "zinarix-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Zinarix Studio — IDE multi-IA (monorepo)",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=24.7"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "tsc -b && vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "tsc -b && vitest run --coverage",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "catalog:check": "node scripts/check-catalog.mjs",
+    "catalog:sign": "node scripts/sign-catalog.mjs",
+    "omni": "node apps/cli/dist/index.js",
+    "desktop": "pnpm --filter @omni/desktop build && pnpm --filter @omni/desktop start",
+    "desktop:install": "pnpm --filter @omni/desktop build && bash apps/desktop/scripts/install-linux.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "@types/react": "^19.3.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^9.39.5",
+    "ink-testing-library": "^4.0.0",
+    "prettier": "^3.9.9",
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^4.1.11"
+  }
+}

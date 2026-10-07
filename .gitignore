@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.turbo/
+.env
+.env.*
+*.key
+!catalog/keys/*.pub
+.omni-test-*/
+release/
+apps/desktop/release/
+.vercel/

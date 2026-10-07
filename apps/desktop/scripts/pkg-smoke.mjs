@@ -1,0 +1,14 @@
+import { _electron as electron } from 'playwright';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const home = mkdtempSync(join(tmpdir(), 'zs-pkg-'));
+const app = await electron.launch({ executablePath: process.argv[2], args: [], env: { ...process.env, OMNI_HOME: home, OMNI_NO_KEYCHAIN: '1' } });
+const win = await app.firstWindow();
+const errors = [];
+win.on('pageerror', (e) => errors.push(e.message));
+await win.waitForSelector('.drop-zone', { timeout: 20000 });
+const providers = await win.evaluate(() => window.omni.ai.providers().then((p) => p.length));
+const term = await win.evaluate(() => window.omni.terminal.create(80, 24));
+console.log('packaged app OK · providers:', providers, '· terminal id:', term, '· errors:', errors.length ? errors : 'none');
+await app.close();

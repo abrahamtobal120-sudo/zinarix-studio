@@ -1,0 +1,13 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'catalog'
+allowBuilds:
+  electron: true
+  electron-winstaller: false
+  esbuild: true
+# Install native prebuilds for both CPU architectures so one macOS runner can package
+# Apple Silicon and Intel builds (node-pty, keyring).
+supportedArchitectures:
+  os: [current]
+  cpu: [x64, arm64]

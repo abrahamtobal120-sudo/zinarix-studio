@@ -1,0 +1,15 @@
+{
+  "name": "@omni/catalog",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Catálogo de respaldo de proveedores de IA (actualizable en caliente con firma Ed25519)",
+  "exports": {
+    "./providers.json": "./providers.json",
+    "./keys/catalog.pub": "./keys/catalog.pub"
+  },
+  "files": [
+    "providers.json",
+    "keys/catalog.pub"
+  ]
+}
