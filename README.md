@@ -4,7 +4,7 @@
 
 **El editor de código que funciona con cualquier IA.** 62 proveedores y 300+ modelos (de los más potentes a los de centavos, o locales y gratis con Ollama), un agente que lee tu proyecto y usa la terminal con tu aprobación, y el consumo de créditos por proveedor a la vista.
 
-**[⬇ Descargar](https://github.com/abrahamtobal120-sudo/zinarix-studio/releases/latest)** · Windows · macOS · Linux (Ubuntu/Debian `.deb`, Arch `.pacman`, Fedora `.rpm`, `.AppImage`)
+**[⬇ Descargar](https://github.com/abrahamtobal120-sudo/zinarix-studio/releases/latest)** · Windows · macOS · Linux (Ubuntu/Debian `.deb`, Arch `.pacman`, Fedora y otras con `.AppImage`)
 
 ![Zinarix Studio](website/assets/screenshot-agent.png)
 

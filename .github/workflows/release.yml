@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: --linux AppImage deb pacman rpm
+            target: --linux AppImage deb pacman
           - os: macos-latest
             target: --mac dmg zip --arm64 --x64
           - os: windows-latest
@@ -35,7 +35,7 @@ jobs:
           cache: pnpm
       - name: Linux packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Build installers

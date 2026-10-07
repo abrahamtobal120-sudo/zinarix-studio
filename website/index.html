@@ -324,12 +324,11 @@
           <div class="os reveal glow-card" data-os="linux" style="--d: 0.12s">
             <div class="os-icon">🐧</div>
             <h3>Linux</h3>
-            <p class="muted">Ubuntu · Debian · Arch · Fedora</p>
+            <p class="muted">Ubuntu · Debian · Arch · Fedora y más</p>
             <a class="btn btn-primary" data-asset="deb" href="#">Ubuntu / Debian (.deb)</a>
             <div class="btn-row">
               <a class="btn btn-glass" data-asset="pacman" href="#">Arch</a>
-              <a class="btn btn-glass" data-asset="rpm" href="#">Fedora</a>
-              <a class="btn btn-glass" data-asset="appimage" href="#">AppImage</a>
+              <a class="btn btn-glass" data-asset="appimage" href="#">Otras (AppImage)</a>
             </div>
           </div>
         </div>
@@ -338,8 +337,9 @@
           <div class="tabs small" role="tablist" id="install-tabs">
             <button role="tab" aria-selected="true" data-panel="i-deb">Ubuntu / Debian</button>
             <button role="tab" aria-selected="false" data-panel="i-arch">Arch</button>
-            <button role="tab" aria-selected="false" data-panel="i-rpm">Fedora</button>
-            <button role="tab" aria-selected="false" data-panel="i-appimage">AppImage</button>
+            <button role="tab" aria-selected="false" data-panel="i-appimage">
+              Fedora / otras (AppImage)
+            </button>
             <button role="tab" aria-selected="false" data-panel="i-mac">macOS</button>
             <button role="tab" aria-selected="false" data-panel="i-win">Windows</button>
           </div>
@@ -348,9 +348,6 @@
           </div>
           <div class="panel" id="i-arch" hidden>
             <pre><code>sudo pacman -U ./zinarix-studio-*.pacman</code></pre>
-          </div>
-          <div class="panel" id="i-rpm" hidden>
-            <pre><code>sudo dnf install ./zinarix-studio-*.x86_64.rpm</code></pre>
           </div>
           <div class="panel" id="i-appimage" hidden>
             <pre><code>chmod +x Zinarix-Studio-*.AppImage
