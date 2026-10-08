@@ -250,11 +250,18 @@ case "$OS" in
     if [ "$DRY_RUN" = 1 ]; then
       printf '%s\n' "  [dry-run] montar $DMG y copiar ${APP}.app a $DEST" >&2
     else
-      MNT="$(mktemp -d)"
-      hdiutil attach -nobrowse -quiet -mountpoint "$MNT" "$FILE"
+      # Mount and locate the .app instead of assuming the volume layout.
+      MNT="$(hdiutil attach -nobrowse -noautoopen "$FILE" | awk -F'\t' '/\/Volumes\//{print $NF}' | tail -1)"
+      [ -n "$MNT" ] && [ -d "$MNT" ] || die "No se pudo montar $DMG."
+      SRC="$(find "$MNT" -maxdepth 2 -name '*.app' -type d -print 2>/dev/null | head -1)"
+      if [ -z "$SRC" ]; then
+        ls -la "$MNT" >&2 || true
+        hdiutil detach -quiet "$MNT" || true
+        die "No se encontró la aplicación dentro de $DMG."
+      fi
       rm -rf "${DEST}/${APP}.app"
-      cp -R "${MNT}/${APP}.app" "$DEST/"
-      hdiutil detach -quiet "$MNT" || true
+      ditto "$SRC" "${DEST}/${APP}.app"
+      hdiutil detach -quiet "$MNT" || hdiutil detach -force -quiet "$MNT" || true
       # Not notarized yet: clear the quarantine flag so Gatekeeper lets it open.
       xattr -dr com.apple.quarantine "${DEST}/${APP}.app" 2>/dev/null || true
     fi
