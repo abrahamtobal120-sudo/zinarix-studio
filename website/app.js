@@ -141,7 +141,7 @@ async function setupMarquee() {
   }
   const chip = ([id, name]) =>
     withLogo.has(id)
-      ? `<span class="chip"><i class="logo"><img src="assets/providers/${id}.svg" alt="" loading="lazy" /></i>${name}</span>`
+      ? `<span class="chip"><i class="logo"><img src="assets/providers/${id}.svg" alt="" /></i>${name}</span>`
       : `<span class="chip"><i style="background:${color(id)}">${name
           .replace(/[^A-Za-z0-9]/g, '')
           .slice(0, 2)
