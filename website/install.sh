@@ -16,6 +16,7 @@
 #   any other Linux (Fedora, openSUSE…) -> AppImage in ~/.local (no sudo)
 #   macOS (Apple Silicon or Intel)    -> .dmg copied to /Applications
 set -euo pipefail
+trap 'printf "\033[31m✗ Falló el paso: %s (línea %s)\033[0m\n" "$BASH_COMMAND" "$LINENO" >&2' ERR
 
 REPO="abrahamtobal120-sudo/zinarix-studio"
 SITE="https://zinarix-studio.vercel.app"
@@ -123,7 +124,10 @@ if [ "${ZINARIX_NO_API:-0}" != 1 ]; then
   JSON="$(curl -fsSL -H 'Accept: application/vnd.github+json' ${AUTH[@]+"${AUTH[@]}"} "$API" 2>/dev/null)" || JSON=""
 fi
 if [ -n "$JSON" ]; then
-  TAG="$(printf '%s' "$JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+  # Parse in-process (no pipes): an early-closing pipe would trip `set -o pipefail`.
+  TAG=""
+  re='"tag_name": *"([^"]+)"'
+  [[ $JSON =~ $re ]] && TAG="${BASH_REMATCH[1]}"
 else
   # API unavailable (rate limit, firewall): resolve the tag from the release page redirect.
   warn "No se pudo usar la API de GitHub; se usará la página de descargas (sin verificación SHA-256)."
@@ -138,10 +142,11 @@ V="${TAG#v}"
 
 # Prints "<digest>" for an asset name from the release JSON (empty if GitHub has none).
 asset_digest() {
-  printf '%s\n' "$JSON" | awk -v want="\"name\": \"$1\"" '
+  [ -n "$JSON" ] || return 0
+  awk -v want="\"name\": \"$1\"" '
     index($0, want) { found = 1; next }
     found && /"name":/ { exit }
-    found && /"digest":/ { gsub(/.*"digest": *"sha256:|".*/, ""); print; exit }'
+    found && /"digest":/ { gsub(/.*"digest": *"sha256:|".*/, ""); print; exit }' <<<"$JSON"
 }
 
 download() { # name -> path of the verified file
