@@ -126,7 +126,10 @@ export function resolveBaseUrl(
 ): string {
   const url = override ?? entry.baseUrl;
   return url.replace(/\{([a-z_]+)\}/g, (_, name: string) => {
-    const v = params[name] ?? entry.baseUrlParams.find((p) => p.name === name)?.default;
+    const spec = entry.baseUrlParams.find((p) => p.name === name);
+    // Empty strings (blank form fields) count as unset so the catalog default applies.
+    const v = params[name]?.trim() || spec?.default;
+    if (!v && spec?.optional) return '';
     if (!v) {
       const label = entry.baseUrlParams.find((p) => p.name === name)?.label ?? name;
       throw new OmniError(
@@ -136,6 +139,17 @@ export function resolveBaseUrl(
     }
     return encodeURIComponent(v).replace(/%2E/g, '.');
   });
+}
+
+/** User params merged over catalog defaults; blank values are dropped. */
+export function resolveParams(
+  entry: CatalogEntry,
+  params: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const p of entry.baseUrlParams) if (p.default) out[p.name] = p.default;
+  for (const [k, v] of Object.entries(params)) if (v.trim()) out[k] = v.trim();
+  return out;
 }
 
 export function isLocalProvider(entry: CatalogEntry, baseUrl: string): boolean {

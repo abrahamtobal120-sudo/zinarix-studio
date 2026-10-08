@@ -3,6 +3,7 @@ import type { ChatContext, ChatEventView, ToolDecision, ToolPreview } from '../.
 import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import {
+  BROWSER_TAB,
   api,
   getEditor,
   getState,
@@ -85,6 +86,15 @@ const TOOL_ICON: Record<string, string> = {
   edit_file: '✏️',
   write_file: '📝',
   run_command: '⌨️',
+  tree: '🌳',
+  glob: '🧭',
+  read_many_files: '📚',
+  browser_open: '🌐',
+  browser_read: '👀',
+  browser_click: '👆',
+  browser_type: '⌨️',
+  browser_scroll: '↕️',
+  browser_back: '↩️',
 };
 
 function toolTitle(step: ToolStep): string {
@@ -94,6 +104,21 @@ function toolTitle(step: ToolStep): string {
       return String(a.command ?? '');
     case 'search':
       return `"${String(a.query ?? '')}"`;
+    case 'glob':
+      return String(a.pattern ?? '');
+    case 'read_many_files':
+      return Array.isArray(a.paths) ? a.paths.join(', ') : String(a.pattern ?? '');
+    case 'browser_open':
+      return String(a.url ?? '');
+    case 'browser_click':
+      return `[${String(a.ref ?? '')}]`;
+    case 'browser_type':
+      return `[${String(a.ref ?? '')}] "${String(a.text ?? '')}"`;
+    case 'browser_scroll':
+      return String(a.direction ?? '');
+    case 'browser_read':
+    case 'browser_back':
+      return '';
     default:
       return String(a.path ?? '.');
   }
@@ -151,6 +176,11 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
       {open && (
         <div className="tool-body">
           {p?.command !== undefined && <pre className="tool-cmd">$ {p.command}</pre>}
+          {p?.url !== undefined && (
+            <div className="tool-web">
+              🌐 <b>{p.action}</b> · <span className="tool-url">{p.url}</span>
+            </div>
+          )}
           {p?.path !== undefined && p.before !== undefined && p.after !== undefined && (
             <DiffView before={p.before} after={p.after} path={p.path} />
           )}
@@ -567,7 +597,7 @@ export function ChatPanel() {
               checked={includeFile}
               onChange={(e) => setIncludeFile(e.target.checked)}
             />
-            📎 {active ? active.split('/').pop() : t('includeFile')}
+            📎 {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
           </label>
           <button
             className="model-chip"

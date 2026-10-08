@@ -15,6 +15,11 @@ export interface ProviderConfig {
   entry: CatalogEntry;
   /** Base URL with {placeholders} already resolved. */
   baseUrl: string;
+  /**
+   * Catalog `baseUrlParams` as configured by the user (catalog defaults filled in, empty
+   * values dropped). Adapters that build URLs themselves (google-vertex) read these.
+   */
+  params?: Record<string, string>;
   apiKey?: Secret;
   extraHeaders?: Record<string, string>;
   timeoutMs?: number;

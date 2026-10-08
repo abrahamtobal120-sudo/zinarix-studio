@@ -16,6 +16,7 @@ import { OmniError, t } from '@omni/shared';
 import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact } from '@omni/security';
 import { Agent } from './agent.js';
+import type { BrowserController } from './browser.js';
 import type { Workspace } from './workspace.js';
 import { isAdapterImplemented } from '@omni/providers';
 import type {
@@ -84,9 +85,10 @@ export class AiService {
   constructor(
     private readonly workspace: () => Workspace | undefined,
     home = omniHome(),
+    browser?: BrowserController,
   ) {
     this.core = OmniCore.open({ home, askPassword: vaultPassword(home) });
-    this.agent = new Agent(this.core, workspace);
+    this.agent = new Agent(this.core, workspace, browser);
   }
 
   async providers(): Promise<ProviderView[]> {
@@ -107,6 +109,7 @@ export class AiService {
         name: bp.name,
         label: bp.label,
         value: this.core.config.providers[p.id]?.params[bp.name] ?? '',
+        placeholder: bp.default ?? (bp.optional ? '' : undefined),
       })),
       implemented: isAdapterImplemented(p.adapter),
       models: p.fallbackModels,

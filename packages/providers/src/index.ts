@@ -2,6 +2,7 @@ import { OmniError } from '@omni/shared';
 import type { AdapterId } from '@omni/shared';
 import { anthropic } from './adapters/anthropic.js';
 import { googleGemini } from './adapters/google-gemini.js';
+import { googleVertex } from './adapters/google-vertex.js';
 import { openAiCompatible } from './adapters/openai-compatible.js';
 import { openAiResponses } from './adapters/openai-responses.js';
 import type { ProviderAdapter } from './types.js';
@@ -13,7 +14,19 @@ export * from './models.js';
 export { openAiCompatible, toOpenAiMessages, normalizeStop } from './adapters/openai-compatible.js';
 export { openAiResponses, toResponsesInput } from './adapters/openai-responses.js';
 export { anthropic, toAnthropic } from './adapters/anthropic.js';
-export { googleGemini, toGemini } from './adapters/google-gemini.js';
+export { googleGemini, toGemini, geminiBody, readGeminiStream } from './adapters/google-gemini.js';
+export {
+  googleVertex,
+  parseVertexCredential,
+  vertexUrl,
+  vertexHost,
+  vertexModelId,
+  vertexAccessToken,
+  resolveVertexAuth,
+  serviceAccountAssertion,
+  clearVertexTokenCache,
+} from './adapters/google-vertex.js';
+export type { VertexCredential, VertexUrlOptions } from './adapters/google-vertex.js';
 
 /**
  * Adapter registry. Azure OpenAI (v1 API), Cohere (compatibility API) and Hugging Face
@@ -26,6 +39,7 @@ const ADAPTERS: Partial<Record<AdapterId, ProviderAdapter>> = {
   'openai-responses': openAiResponses,
   anthropic,
   'google-gemini': googleGemini,
+  'google-vertex': googleVertex,
   'azure-openai': openAiCompatible,
   cohere: openAiCompatible,
   huggingface: openAiCompatible,

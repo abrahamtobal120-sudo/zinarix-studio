@@ -4,7 +4,7 @@ import { createLogger, redactWithReport } from '@omni/security';
 import type { Logger } from '@omni/security';
 import { getAdapter, isAdapterImplemented } from '@omni/providers';
 import type { ConnectionTest, FetchLike, ProviderConfig } from '@omni/providers';
-import { isLocalProvider, loadCatalog, resolveBaseUrl } from './catalog.js';
+import { isLocalProvider, loadCatalog, resolveBaseUrl, resolveParams } from './catalog.js';
 import type { LoadedCatalog } from './catalog.js';
 import { loadConfig, saveConfig } from './config.js';
 import type { OmniConfig, Role } from './config.js';
@@ -172,6 +172,7 @@ export class OmniCore {
     return {
       entry,
       baseUrl,
+      params: resolveParams(entry, userCfg?.params ?? {}),
       apiKey: key?.secret,
       extraHeaders: userCfg?.headers,
       fetch: this.fetchImpl,

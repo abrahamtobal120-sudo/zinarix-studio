@@ -184,6 +184,7 @@ function Providers({ focus }: { focus?: string }) {
                   {bp.label}
                   <input
                     value={params[bp.name] ?? ''}
+                    placeholder={bp.placeholder}
                     onChange={(e) => setParams({ ...params, [bp.name]: e.target.value })}
                   />
                 </label>
@@ -191,15 +192,32 @@ function Providers({ focus }: { focus?: string }) {
               {p.needsKey || p.category === 'local' ? (
                 <label className="field">
                   {t('apiKey')} {!p.needsKey && <span className="dim">(opcional)</span>}
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={key}
-                    placeholder={
-                      p.store && p.store !== 'none' ? t('keyStored', { store: p.store }) : 'sk-…'
-                    }
-                    onChange={(e) => setKey(e.target.value)}
-                  />
+                  {p.adapter === 'google-vertex' ? (
+                    // Accepts an API key, a pasted service-account JSON or an access token.
+                    <textarea
+                      className="secret-area"
+                      autoComplete="off"
+                      spellCheck={false}
+                      rows={4}
+                      value={key}
+                      placeholder={
+                        p.store && p.store !== 'none'
+                          ? t('keyStored', { store: p.store })
+                          : t('vertexKeyHint')
+                      }
+                      onChange={(e) => setKey(e.target.value)}
+                    />
+                  ) : (
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      value={key}
+                      placeholder={
+                        p.store && p.store !== 'none' ? t('keyStored', { store: p.store }) : 'sk-…'
+                      }
+                      onChange={(e) => setKey(e.target.value)}
+                    />
+                  )}
                 </label>
               ) : null}
               <div className="row">

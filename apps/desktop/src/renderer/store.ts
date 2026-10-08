@@ -156,6 +156,17 @@ export async function openFile(
   }
 }
 
+/** Pseudo-path of the built-in browser tab (never a real file: real paths have no "::"). */
+export const BROWSER_TAB = '::browser';
+
+export function openBrowserTab(): void {
+  if (!state.tabs.some((x) => x.path === BROWSER_TAB))
+    setState((s) => ({
+      tabs: [...s.tabs, { path: BROWSER_TAB, name: t('browser'), dirty: false }],
+    }));
+  activate(BROWSER_TAB);
+}
+
 export function activate(path: string | null): void {
   const prev = state.active && docs.get(state.active);
   if (prev && editor) prev.viewState = editor.saveViewState();
@@ -232,7 +243,10 @@ export async function reloadFromDisk(path: string): Promise<void> {
 export function resetDocs(): void {
   for (const d of docs.values()) d.model.dispose();
   docs.clear();
-  setState({ tabs: [], active: null });
+  setState((s) => {
+    const tabs = s.tabs.filter((x) => x.path === BROWSER_TAB);
+    return { tabs, active: tabs[0]?.path ?? null };
+  });
 }
 
 /** Opens a folder or file dropped onto the window. */

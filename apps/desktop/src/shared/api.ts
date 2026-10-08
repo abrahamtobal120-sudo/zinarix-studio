@@ -43,7 +43,7 @@ export interface ProviderView {
   keyUrl: string | null;
   docsUrl: string | null;
   notes: string | null;
-  params: { name: string; label: string; value: string }[];
+  params: { name: string; label: string; value: string; placeholder?: string }[];
   implemented: boolean;
   /** Catalog models (shown even before the provider is connected). */
   models: CatalogModelView[];
@@ -121,6 +121,17 @@ export interface ToolPreview {
   before?: string;
   after?: string;
   command?: string;
+  /** Browser tools: the page address and what the AI wants to do there. */
+  url?: string;
+  action?: string;
+}
+
+export interface BrowserStateView {
+  url: string;
+  title: string;
+  loading: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
 }
 
 export interface ChatRequestView {
@@ -176,7 +187,10 @@ export type AppEvent =
   | { type: 'term:exit'; id: number; code: number }
   | { type: 'fs:changed' }
   | { type: 'workspace'; workspace: WorkspaceInfo | null }
-  | { type: 'command'; command: string };
+  | { type: 'command'; command: string }
+  | { type: 'browser:state'; state: BrowserStateView }
+  /** The agent started using the browser: the UI should show the browser tab. */
+  | { type: 'browser:show' };
 
 export interface OmniApi {
   workspace: {
@@ -233,6 +247,15 @@ export interface OmniApi {
     /** Undo every file change the agent made in a conversation. Returns restored paths. */
     revert(conversationId: string): Promise<string[]>;
   };
+  browser: {
+    /** Screen area (CSS px, window coordinates) where the page is drawn; null hides it. */
+    setBounds(rect: { x: number; y: number; width: number; height: number } | null): Promise<void>;
+    navigate(url: string): Promise<BrowserStateView>;
+    back(): Promise<void>;
+    forward(): Promise<void>;
+    reload(): Promise<void>;
+    state(): Promise<BrowserStateView>;
+  };
   terminal: {
     create(cols: number, rows: number): Promise<number>;
     write(id: number, data: string): Promise<void>;
@@ -286,6 +309,12 @@ export const CHANNELS = [
   'ai:abort',
   'ai:toolDecision',
   'ai:revert',
+  'browser:setBounds',
+  'browser:navigate',
+  'browser:back',
+  'browser:forward',
+  'browser:reload',
+  'browser:state',
   'terminal:create',
   'terminal:write',
   'terminal:resize',

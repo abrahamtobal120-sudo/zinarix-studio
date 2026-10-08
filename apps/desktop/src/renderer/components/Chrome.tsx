@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import { runCommand } from '../commands';
 import { t } from '../i18n';
-import { api, getState, openDropped, setState, useStore } from '../store';
+import {
+  BROWSER_TAB,
+  activate,
+  api,
+  getState,
+  openBrowserTab,
+  openDropped,
+  setState,
+  useStore,
+} from '../store';
 
 export function ActivityBar() {
   const sidebar = useStore((s) => s.sidebar);
   const panelOpen = useStore((s) => s.panelOpen);
   const chatOpen = useStore((s) => s.chatOpen);
+  const browserActive = useStore((s) => s.active === BROWSER_TAB);
   const item = (active: boolean, title: string, icon: string, onClick: () => void) => (
     <button
       className={`activity ${active ? 'active' : ''}`}
@@ -27,6 +37,12 @@ export function ActivityBar() {
       )}
       {item(chatOpen, t('chat'), '✨', () => setState({ chatOpen: !chatOpen }))}
       {item(panelOpen, t('terminal'), '⌨', () => setState({ panelOpen: !panelOpen }))}
+      {item(browserActive, t('browser'), '🌐', () => {
+        if (browserActive) {
+          const other = getState().tabs.find((x) => x.path !== BROWSER_TAB);
+          activate(other?.path ?? null);
+        } else openBrowserTab();
+      })}
       <div className="spacer" />
       {item(false, t('usageTitle'), '📊', () => setState({ modal: { kind: 'usage' } }))}
       {item(false, t('providers'), '🔑', () => setState({ modal: { kind: 'providers' } }))}
@@ -43,7 +59,7 @@ export function StatusBar() {
   const workspace = useStore((s) => s.workspace);
   const settings = useStore((s) => s.settings);
   const cursor = useStore((s) => s.cursor);
-  const active = useStore((s) => s.active);
+  const active = useStore((s) => (s.active === BROWSER_TAB ? null : s.active));
   const tabs = useStore((s) => s.tabs);
   const dirty = tabs.filter((x) => x.dirty).length;
   const [provider, ...rest] = (settings.defaultModel ?? '').split('/');

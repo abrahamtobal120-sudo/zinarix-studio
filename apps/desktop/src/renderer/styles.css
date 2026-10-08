@@ -1979,3 +1979,115 @@ button.link {
   width: 22px;
   text-align: center;
 }
+
+/* ---------- built-in browser ---------- */
+.browser-pane {
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.browser-bar button {
+  background: transparent;
+  color: var(--fg);
+  width: 28px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 15px;
+}
+.browser-bar button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.browser-bar button:disabled {
+  opacity: 0.35;
+}
+.browser-bar input {
+  flex: 1;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg-strong);
+  font-size: 13px;
+}
+.browser-bar input:focus {
+  outline: none;
+  border-color: var(--focus);
+}
+.browser-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--fg-dim);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: browser-spin 0.8s linear infinite;
+  margin: 0 4px;
+}
+@keyframes browser-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.browser-host {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: var(--bg);
+}
+.browser-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--fg-dim);
+}
+.browser-empty-icon {
+  font-size: 46px;
+}
+.browser-empty h3 {
+  color: var(--fg-strong);
+  font-weight: 400;
+  margin: 10px 0 6px;
+}
+.browser-empty p {
+  max-width: 460px;
+  line-height: 1.5;
+  margin: 0;
+}
+.tool-web {
+  padding: 6px 8px;
+  font-size: 12px;
+  word-break: break-all;
+}
+.tool-url {
+  color: var(--focus);
+  font-family: var(--mono, monospace);
+}
+/* Multi-line secret (service-account JSON): blurred until focused. */
+.secret-area {
+  width: 100%;
+  resize: vertical;
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+.secret-area:not(:focus):not(:placeholder-shown) {
+  filter: blur(4px);
+}

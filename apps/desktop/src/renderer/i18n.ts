@@ -154,6 +154,14 @@ const es = {
   shortcuts: 'Atajos de teclado',
   lightTheme: 'Tema claro',
   darkTheme: 'Tema oscuro',
+  browser: 'Navegador',
+  browserUrl: 'Escribe una dirección o busca en la web',
+  browserEmpty: 'Navegador integrado',
+  browserEmptyHint:
+    'Escribe una dirección arriba, o pídele al agente que abra una página: puede leerla, hacer clic y escribir (te pide permiso por sitio). Nunca escribe contraseñas ni datos de pago.',
+  openBrowser: 'Abrir navegador',
+  vertexKeyHint:
+    'Llave de API de Vertex AI, o pega aquí el JSON completo de la cuenta de servicio (rol Vertex AI User)',
 } as const;
 
 type Key = keyof typeof es;
@@ -314,6 +322,14 @@ const en: Record<Key, string> = {
   shortcuts: 'Keyboard shortcuts',
   lightTheme: 'Light theme',
   darkTheme: 'Dark theme',
+  browser: 'Browser',
+  browserUrl: 'Type an address or search the web',
+  browserEmpty: 'Built-in browser',
+  browserEmptyHint:
+    'Type an address above, or ask the agent to open a page: it can read it, click and type (asking permission per site). It never types passwords or payment data.',
+  openBrowser: 'Open browser',
+  vertexKeyHint:
+    'Vertex AI API key, or paste the full service-account JSON here (Vertex AI User role)',
 };
 
 const dict: Record<Key, string> = navigator.language.toLowerCase().startsWith('en') ? en : es;

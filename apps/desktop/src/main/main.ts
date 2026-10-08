@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { AppEvent, Channel, WorkspaceInfo } from '../shared/api.js';
 import { EVENT_CHANNEL } from '../shared/api.js';
 import { AiService } from './ai.js';
+import { BrowserController } from './browser.js';
 import { Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
 
@@ -34,6 +35,12 @@ let win: BrowserWindow | undefined;
 let ai: AiService;
 let workspace: Workspace | undefined;
 let allowClose = false;
+// The AI-controlled browser (a sandboxed WebContentsView drawn over the "Navegador" tab).
+const browser = new BrowserController(
+  () => win,
+  (state) => send({ type: 'browser:state', state }),
+  () => send({ type: 'browser:show' }),
+);
 const terminals = new Terminals(
   (id, data) => send({ type: 'term:data', id, data }),
   (id, code) => send({ type: 'term:exit', id, code }),
@@ -273,6 +280,32 @@ function registerIpc(): void {
   );
   handle('ai:revert', z.tuple([str]), (c) => ai.revert(c));
 
+  const rect = z
+    .object({
+      x: z.number().min(0).max(1e5),
+      y: z.number().min(0).max(1e5),
+      width: z.number().min(0).max(1e5),
+      height: z.number().min(0).max(1e5),
+    })
+    .nullable();
+  handle('browser:setBounds', z.tuple([rect]), (r) => {
+    // The renderer measures in CSS px; the view is placed in window DIPs (differ when zoomed).
+    const f = win?.webContents.getZoomFactor() ?? 1;
+    browser.setBounds(
+      r && {
+        x: Math.round(r.x * f),
+        y: Math.round(r.y * f),
+        width: Math.round(r.width * f),
+        height: Math.round(r.height * f),
+      },
+    );
+  });
+  handle('browser:navigate', z.tuple([str]), (u) => browser.navigate(u));
+  handle('browser:back', z.tuple([]), () => browser.back());
+  handle('browser:forward', z.tuple([]), () => browser.forward());
+  handle('browser:reload', z.tuple([]), () => browser.reload());
+  handle('browser:state', z.tuple([]), () => browser.state());
+
   handle('terminal:create', z.tuple([dim, dim]), (cols, rows) =>
     terminals.create(workspace?.root ?? app.getPath('home'), cols, rows),
   );
@@ -461,6 +494,7 @@ async function createWindow(): Promise<void> {
     send({ type: 'command', command: 'app.requestClose' });
   });
   win.on('closed', () => {
+    browser.destroy();
     win = undefined;
   });
   await win.loadURL('app://zinarix/index.html').catch((e: unknown) => {
@@ -484,7 +518,7 @@ app.on('web-contents-created', (_e, contents) => {
 
 app.whenReady().then(async () => {
   if (!isPrimary) return;
-  ai = new AiService(() => workspace);
+  ai = new AiService(() => workspace, undefined, browser);
   registerProtocol();
   registerIpc();
   buildMenu();

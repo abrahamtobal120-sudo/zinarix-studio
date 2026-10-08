@@ -11,6 +11,7 @@ import {
   api,
   applyTheme,
   getState,
+  openBrowserTab,
   openDropped,
   refreshModels,
   refreshSettings,
@@ -120,6 +121,7 @@ export function App() {
       }
       if (ev.type === 'fs:changed') setState((s) => ({ fsVersion: s.fsVersion + 1 }));
       if (ev.type === 'command') void runCommand(ev.command);
+      if (ev.type === 'browser:show') openBrowserTab();
     });
   }, []);
 

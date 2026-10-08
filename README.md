@@ -27,7 +27,9 @@ El script descarga la última versión desde GitHub Releases y verifica su SHA-2
 ## Funciones
 
 - **Cualquier modelo, un clic** — selector por proveedor con precio, contexto y capacidades; un modelo distinto para chat, agente y edición (Ctrl+K).
-- **Modo agente** — lee/busca archivos, edita con vista de diferencias y ejecuta comandos; todo lo que modifica pide aprobación y es reversible.
+- **Modo agente** — lee muchos archivos a la vez (`tree`, `glob`, `read_many_files`, en paralelo), busca, edita con vista de diferencias y ejecuta comandos; todo lo que modifica pide aprobación y es reversible.
+- **Navegador que controla la IA** — pestaña 🌐 con un navegador aislado: el agente abre páginas, las lee, hace clic y escribe (permiso por sitio; nunca escribe contraseñas ni datos de pago).
+- **Google Cloud Vertex AI** — con llave de API de Vertex, JSON de cuenta de servicio o token de `gcloud`.
 - **Consumo de créditos** — gasto de hoy y del mes por proveedor, gráfica de 30 días y presupuestos con aviso al 80 %.
 - **Local y privado** — detecta Ollama / LM Studio / vLLM; modo 100 % local.
 - **Llaves seguras** — en el llavero del sistema, nunca en archivos ni logs; redacción automática de secretos.

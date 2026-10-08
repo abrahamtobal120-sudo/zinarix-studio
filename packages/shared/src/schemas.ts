@@ -6,6 +6,7 @@ export const AdapterId = z.enum([
   'openai-responses',
   'anthropic',
   'google-gemini',
+  'google-vertex',
   'aws-bedrock',
   'azure-openai',
   'cohere',
@@ -56,7 +57,15 @@ export const CatalogEntry = z.object({
     .url()
     .or(z.string().regex(/^https?:\/\/.*\{[a-z_]+\}/)),
   baseUrlParams: z
-    .array(z.object({ name: z.string(), label: z.string(), default: z.string().optional() }))
+    .array(
+      z.object({
+        name: z.string(),
+        label: z.string(),
+        default: z.string().optional(),
+        /** May be left empty (a `{placeholder}` for it then resolves to ""). */
+        optional: z.boolean().optional(),
+      }),
+    )
     .default([]),
   auth: AuthSpec,
   envVars: z.array(z.string()).default([]),

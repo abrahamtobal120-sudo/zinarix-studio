@@ -1,6 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { monaco } from '../monaco';
-import { activate, attachEditor, closeTab, getDoc, setState, useStore } from '../store';
+import {
+  BROWSER_TAB,
+  activate,
+  attachEditor,
+  closeTab,
+  getDoc,
+  setState,
+  useStore,
+} from '../store';
+import { BrowserPane } from './Browser';
 import { Welcome } from './Chrome';
 
 export function EditorArea() {
@@ -52,7 +61,9 @@ export function EditorArea() {
     if (doc) ed.focus();
   }, [active, tabs.length]);
 
-  const showEditor = Boolean(activeTab && !activeTab.notice);
+  const isBrowser = active === BROWSER_TAB;
+  const hasBrowserTab = tabs.some((x) => x.path === BROWSER_TAB);
+  const showEditor = Boolean(activeTab && !activeTab.notice && !isBrowser);
   return (
     <div className="editor-area">
       {tabs.length > 0 && (
@@ -72,7 +83,10 @@ export function EditorArea() {
                 }
               }}
             >
-              <span className="tab-name">{tab.name}</span>
+              <span className="tab-name">
+                {tab.path === BROWSER_TAB ? '🌐 ' : ''}
+                {tab.name}
+              </span>
               <button
                 className={`tab-close ${tab.dirty ? 'dirty' : ''}`}
                 aria-label="Cerrar"
@@ -87,9 +101,12 @@ export function EditorArea() {
           ))}
         </div>
       )}
-      {activeTab && <div className="breadcrumbs">{activeTab.path.split('/').join(' › ')}</div>}
+      {activeTab && !isBrowser && (
+        <div className="breadcrumbs">{activeTab.path.split('/').join(' › ')}</div>
+      )}
       <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />
       {activeTab?.notice && <div className="notice-pane">{activeTab.notice}</div>}
+      {hasBrowserTab && <BrowserPane visible={isBrowser} />}
       {!activeTab && <Welcome />}
     </div>
   );

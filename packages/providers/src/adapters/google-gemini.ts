@@ -22,7 +22,14 @@ function parseArgs(json: string): unknown {
   }
 }
 
-export function toGemini(messages: ChatMessage[]): {
+/**
+ * Maps chat messages to Gemini `contents`. `rawTag` is the adapter id whose native parts
+ * (thought signatures included) are replayed verbatim; Vertex AI uses its own tag.
+ */
+export function toGemini(
+  messages: ChatMessage[],
+  rawTag = 'google-gemini',
+): {
   systemInstruction?: { parts: Part[] };
   contents: Content[];
 } {
@@ -54,7 +61,7 @@ export function toGemini(messages: ChatMessage[]): {
         break;
       case 'assistant':
         for (const c of m.toolCalls ?? []) toolNames.set(c.id, c.name);
-        if (m.raw?.adapter === 'google-gemini' && Array.isArray(m.raw.content)) {
+        if (m.raw?.adapter === rawTag && Array.isArray(m.raw.content)) {
           push('model', m.raw.content as Part[]);
           break;
         }
@@ -105,19 +112,16 @@ interface GeminiChunk {
   promptFeedback?: { blockReason?: string };
 }
 
-async function* chat(
-  cfg: ProviderConfig,
-  req: ChatRequest,
-  signal: AbortSignal,
-): AsyncGenerator<ChatChunk> {
-  const { systemInstruction, contents } = toGemini(req.messages);
+/** Request body for `:generateContent` / `:streamGenerateContent` (AI Studio and Vertex AI). */
+export function geminiBody(req: ChatRequest, rawTag = 'google-gemini'): Record<string, unknown> {
+  const { systemInstruction, contents } = toGemini(req.messages, rawTag);
   const generationConfig: Record<string, unknown> = {
     ...(req.maxTokens ? { maxOutputTokens: req.maxTokens } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
     ...(req.jsonMode ? { responseMimeType: 'application/json' } : {}),
     ...(req.reasoning ? { thinkingConfig: { includeThoughts: true } } : {}),
   };
-  const body = {
+  return {
     contents,
     ...(systemInstruction ? { systemInstruction } : {}),
     ...(Object.keys(generationConfig).length ? { generationConfig } : {}),
@@ -135,14 +139,15 @@ async function* chat(
         }
       : {}),
   };
-  const res = await request(cfg, {
-    method: 'POST',
-    path: `/${modelPath(req.model)}:streamGenerateContent`,
-    query: { alt: 'sse' },
-    body,
-    signal,
-  });
+}
 
+/** Turns a Gemini SSE response (`alt=sse`) into ChatChunks. Shared with Vertex AI. */
+export async function* readGeminiStream(
+  cfg: ProviderConfig,
+  res: Response,
+  signal: AbortSignal,
+  rawTag = 'google-gemini',
+): AsyncGenerator<ChatChunk> {
   let stop: string | undefined;
   let sawTool = false;
   let usage: GeminiChunk['usageMetadata'];
@@ -183,8 +188,23 @@ async function* chat(
       cachedTokens: usage.cachedContentTokenCount,
     };
   }
-  if (rawParts.length) yield { type: 'raw', adapter: 'google-gemini', content: rawParts };
+  if (rawParts.length) yield { type: 'raw', adapter: rawTag, content: rawParts };
   yield { type: 'done', stopReason: sawTool ? 'tool_use' : normalizeStop(stop) };
+}
+
+async function* chat(
+  cfg: ProviderConfig,
+  req: ChatRequest,
+  signal: AbortSignal,
+): AsyncGenerator<ChatChunk> {
+  const res = await request(cfg, {
+    method: 'POST',
+    path: `/${modelPath(req.model)}:streamGenerateContent`,
+    query: { alt: 'sse' },
+    body: geminiBody(req),
+    signal,
+  });
+  yield* readGeminiStream(cfg, res, signal);
 }
 
 interface GeminiModel {

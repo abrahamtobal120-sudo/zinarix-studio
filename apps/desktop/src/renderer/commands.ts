@@ -7,6 +7,7 @@ import {
   dirtyCount,
   getEditor,
   getState,
+  openBrowserTab,
   openFile,
   refreshSettings,
   save,
@@ -97,6 +98,11 @@ export function commands(): Command[] {
       label: `Alternar ${t('chat').toLowerCase()}`,
       keys: `${mod}+Alt+I`,
       run: () => setState((s) => ({ chatOpen: !s.chatOpen })),
+    },
+    {
+      id: 'view.browser',
+      label: t('openBrowser'),
+      run: () => openBrowserTab(),
     },
     {
       id: 'view.toggleTheme',
