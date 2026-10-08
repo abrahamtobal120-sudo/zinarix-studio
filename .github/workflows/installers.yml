@@ -1,0 +1,72 @@
+name: Installers
+
+# Runs the one-line terminal installers for real on every supported system against the
+# latest GitHub release, checks the app is installed, then uninstalls it.
+on:
+  push:
+    branches: [main]
+    paths: ['website/install.sh', 'website/install.ps1', '.github/workflows/installers.yml']
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install (PowerShell)
+        shell: pwsh
+        run: Get-Content website/install.ps1 -Raw | Invoke-Expression
+      - name: Check installed
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Zinarix Studio.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw 'Zinarix Studio.exe not found' }
+          Write-Host "Installed at $($exe.FullName)"
+      - name: Uninstall
+        shell: pwsh
+        run: |
+          $env:ZINARIX_UNINSTALL = '1'
+          Get-Content website/install.ps1 -Raw | Invoke-Expression
+          Start-Sleep -Seconds 5
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Zinarix Studio.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($exe) { throw 'still installed' }
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash website/install.sh
+      - run: test -d "/Applications/Zinarix Studio.app" && test -x "$HOME/.local/bin/zinarix-studio"
+      - run: bash website/install.sh --uninstall && test ! -d "/Applications/Zinarix Studio.app"
+
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash website/install.sh
+      - run: dpkg -s zinarix-studio && test -e "/opt/Zinarix Studio/zinarix-studio"
+      - run: bash website/install.sh --uninstall && ! dpkg -s zinarix-studio
+
+  arch:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pacman -Sy --noconfirm curl
+      - run: bash website/install.sh
+      - run: pacman -Q zinarix-studio
+      - run: bash website/install.sh --uninstall && ! pacman -Q zinarix-studio
+
+  fedora-appimage:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash website/install.sh
+      - run: test -x "$HOME/.local/share/zinarix-studio/Zinarix-Studio.AppImage" && test -x "$HOME/.local/bin/zinarix-studio"
+      - run: bash website/install.sh --uninstall && test ! -e "$HOME/.local/share/zinarix-studio"

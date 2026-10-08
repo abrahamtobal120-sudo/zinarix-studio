@@ -20,7 +20,7 @@ const OS_LABEL = {
   mac: 'Descargar para macOS',
   linux: 'Descargar para Linux',
 };
-const OS_GLYPH = { windows: '⊞', mac: '', linux: '🐧' };
+const OS_GLYPH = { windows: '⊞', mac: '🍎', linux: '🐧' };
 const OS_BEST = { windows: 'win-exe', mac: 'mac-arm64', linux: 'deb' };
 
 function detectOs() {
@@ -210,6 +210,40 @@ function setupTabs() {
   if (preferred) document.querySelector(`#install-tabs [data-panel="${preferred}"]`)?.click();
 }
 
+// ---------- terminal install: OS tabs + copy buttons ----------
+function setupTerminalInstall() {
+  const tabs = [...document.querySelectorAll('#cli-tabs button')];
+  const show = (b) =>
+    tabs.forEach((x) => {
+      x.setAttribute('aria-selected', String(x === b));
+      document.getElementById(x.dataset.panel).hidden = x !== b;
+    });
+  tabs.forEach((b) => b.addEventListener('click', () => show(b)));
+  const os = detectOs();
+  const preferred = { windows: 'c-win', mac: 'c-mac', linux: 'c-linux' }[os];
+  const tab = preferred && tabs.find((b) => b.dataset.panel === preferred);
+  if (tab) show(tab);
+  document.querySelectorAll('.cmd .copy').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const text = btn.parentElement.querySelector('code').textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const r = document.createRange();
+        r.selectNodeContents(btn.parentElement.querySelector('code'));
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+      }
+      btn.textContent = '¡Copiado!';
+      btn.classList.add('done');
+      setTimeout(() => {
+        btn.textContent = 'Copiar';
+        btn.classList.remove('done');
+      }, 1600);
+    });
+  });
+}
+
 // ---------- hero tilt, sticky nav, card glow ----------
 function setupMotion() {
   const nav = document.getElementById('nav');
@@ -235,5 +269,6 @@ function setupMotion() {
 setupMarquee();
 setupReveal();
 setupTabs();
+setupTerminalInstall();
 setupMotion();
 setupDownloads();

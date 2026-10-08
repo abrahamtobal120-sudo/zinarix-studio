@@ -11,7 +11,20 @@ permissions:
   contents: write
 
 jobs:
+  # Create the release once, before the three builds run in parallel; otherwise each
+  # build races to create its own release for the same tag.
+  create-release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Create release
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "${GITHUB_REF_NAME#v}" --notes "Zinarix Studio ${GITHUB_REF_NAME#v}"
+
   build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:

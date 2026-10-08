@@ -90,6 +90,7 @@
             <li>✓ Gratis y de código abierto</li>
             <li>✓ Windows · macOS · Linux</li>
             <li>✓ Tus llaves, en tu equipo</li>
+            <li><a href="#terminal">⌨️ Instalar con la terminal</a></li>
           </ul>
         </div>
         <div class="hero-visual reveal" style="--d: 0.15s">
@@ -315,7 +316,7 @@
             <a class="btn btn-glass" data-asset="win-zip" href="#">Versión portable (.zip)</a>
           </div>
           <div class="os reveal glow-card" data-os="mac" style="--d: 0.06s">
-            <div class="os-icon"></div>
+            <div class="os-icon">🍎</div>
             <h3>macOS</h3>
             <p class="muted">Apple Silicon e Intel</p>
             <a class="btn btn-primary" data-asset="mac-arm64" href="#">Apple Silicon (.dmg)</a>
@@ -331,6 +332,86 @@
               <a class="btn btn-glass" data-asset="appimage" href="#">Otras (AppImage)</a>
             </div>
           </div>
+        </div>
+
+        <div class="term-install reveal" id="terminal">
+          <h3>⌨️ Instalar desde la terminal</h3>
+          <p class="muted">
+            Un solo comando descarga la última versión, verifica su firma SHA-256 e instala el
+            paquete correcto para tu sistema.
+          </p>
+          <div class="tabs small" role="tablist" id="cli-tabs">
+            <button role="tab" aria-selected="true" data-panel="c-linux">🐧 Linux</button>
+            <button role="tab" aria-selected="false" data-panel="c-mac">🍎 macOS</button>
+            <button role="tab" aria-selected="false" data-panel="c-win">⊞ Windows</button>
+          </div>
+          <div class="cmd-panel" id="c-linux">
+            <div class="cmd">
+              <code>curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash</code>
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <p class="muted small">
+              Ubuntu, Debian, Mint y Pop!_OS instalan el <b>.deb</b>; Arch, Manjaro y EndeavourOS el
+              paquete <b>pacman</b>; Fedora, openSUSE y el resto usan el <b>AppImage</b> en tu
+              carpeta personal (sin sudo).
+            </p>
+            <div class="cmd small-cmd">
+              <code
+                >curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s --
+                --appimage</code
+              >
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <p class="muted small">Forzar el AppImage sin permisos de administrador.</p>
+          </div>
+          <div class="cmd-panel" id="c-mac" hidden>
+            <div class="cmd">
+              <code>curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash</code>
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <p class="muted small">
+              Elige solo Apple Silicon o Intel, copia la app a <b>Aplicaciones</b> y la deja lista
+              para abrir.
+            </p>
+          </div>
+          <div class="cmd-panel" id="c-win" hidden>
+            <div class="cmd">
+              <code>irm https://zinarix-studio.vercel.app/install.ps1 | iex</code>
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <p class="muted small">
+              Pégalo en <b>PowerShell</b>. Instala para tu usuario, sin ventanas.
+            </p>
+          </div>
+          <details class="uninstall">
+            <summary>Desinstalar o instalar otra versión</summary>
+            <div class="cmd small-cmd">
+              <code
+                >curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s --
+                --uninstall</code
+              >
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <div class="cmd small-cmd">
+              <code
+                >$env:ZINARIX_UNINSTALL='1'; irm https://zinarix-studio.vercel.app/install.ps1 |
+                iex</code
+              >
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <div class="cmd small-cmd">
+              <code
+                >curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s -- --version
+                0.3.2</code
+              >
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <p class="muted small">
+              Tus chats y llaves se conservan en <code>~/.omni</code>. ¿Quieres revisar el script
+              antes? <a href="install.sh" target="_blank" rel="noopener">install.sh</a> ·
+              <a href="install.ps1" target="_blank" rel="noopener">install.ps1</a>
+            </p>
+          </details>
         </div>
 
         <div class="install reveal">

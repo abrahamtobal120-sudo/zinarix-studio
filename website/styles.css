@@ -948,3 +948,83 @@ pre {
   height: 68%;
   object-fit: contain;
 }
+
+/* ---------- terminal install ---------- */
+.term-install {
+  max-width: 860px;
+  margin: 40px auto 10px;
+  padding: 28px 28px 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(20, 28, 70, 0.75), rgba(12, 16, 40, 0.7));
+  backdrop-filter: blur(14px);
+  text-align: center;
+  box-shadow: 0 30px 80px -50px rgba(47, 107, 255, 0.9);
+}
+.term-install h3 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+.term-install > p {
+  margin: 0 0 18px;
+}
+.cmd-panel {
+  text-align: left;
+}
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 18px;
+  border-radius: 12px;
+  background: rgba(3, 5, 16, 0.85);
+  border: 1px solid var(--line-strong);
+  margin: 6px 0;
+}
+.cmd code {
+  flex: 1;
+  font-size: 15px;
+  color: #c3ecff;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 8px 0;
+  user-select: all;
+}
+.cmd code::before {
+  content: '$ ';
+  color: #4ade80;
+}
+#c-win .cmd code::before,
+.cmd code[data-ps]::before {
+  content: 'PS> ';
+}
+.small-cmd code {
+  font-size: 13px;
+}
+.copy {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--grad);
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.copy.done {
+  background: #16a34a;
+}
+.uninstall {
+  margin-top: 14px;
+  text-align: left;
+}
+.uninstall summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+}
+.trust a {
+  color: var(--cyan);
+}

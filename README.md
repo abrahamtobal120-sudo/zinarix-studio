@@ -6,6 +6,22 @@
 
 **[⬇ Descargar](https://github.com/abrahamtobal120-sudo/zinarix-studio/releases/latest)** · Windows · macOS · Linux (Ubuntu/Debian `.deb`, Arch `.pacman`, Fedora y otras con `.AppImage`)
 
+### Instalar desde la terminal
+
+**Linux** (Ubuntu/Debian → `.deb`, Arch → `pacman`, otras → AppImage) y **macOS**:
+
+```bash
+curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash
+```
+
+**Windows** (PowerShell):
+
+```powershell
+irm https://zinarix-studio.vercel.app/install.ps1 | iex
+```
+
+El script descarga la última versión desde GitHub Releases y verifica su SHA-256 antes de instalar. Opciones: `bash -s -- --appimage` (Linux sin sudo), `--version X.Y.Z`, `--uninstall`, `--dry-run`. En Windows: `$env:ZINARIX_UNINSTALL='1'` para desinstalar.
+
 ![Zinarix Studio](website/assets/screenshot-agent.png)
 
 ## Funciones
