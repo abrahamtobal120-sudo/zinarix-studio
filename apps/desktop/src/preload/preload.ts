@@ -54,6 +54,7 @@ const api: OmniApi = {
     forward: call('browser:forward') as OmniApi['browser']['forward'],
     reload: call('browser:reload') as OmniApi['browser']['reload'],
     state: call('browser:state') as OmniApi['browser']['state'],
+    home: call('browser:home') as OmniApi['browser']['home'],
   },
   terminal: {
     create: call('terminal:create') as OmniApi['terminal']['create'],

@@ -158,7 +158,13 @@ const es = {
   browserUrl: 'Escribe una dirección o busca en la web',
   browserEmpty: 'Navegador integrado',
   browserEmptyHint:
-    'Escribe una dirección arriba, o pídele al agente que abra una página: puede leerla, hacer clic y escribir (te pide permiso por sitio). Nunca escribe contraseñas ni datos de pago.',
+    'Navegador aislado: sin acceso a tus archivos ni a tus otras sesiones. La IA te pide permiso por sitio y nunca escribe contraseñas ni datos de pago.',
+  browserAiDriving: 'La IA está navegando',
+  browserExternal: 'Abrir en tu navegador',
+  browserAskAgent: 'Pídele al agente',
+  browserIdea1: 'Abre localhost:3000 y dime si hay errores en la página',
+  browserIdea2: 'Busca la documentación oficial de la librería que usa este proyecto',
+  browserIdea3: 'Prueba el formulario de mi app y revisa que funcione',
   openBrowser: 'Abrir navegador',
   vertexKeyHint:
     'Llave de API de Vertex AI, o pega aquí el JSON completo de la cuenta de servicio (rol Vertex AI User)',
@@ -326,7 +332,13 @@ const en: Record<Key, string> = {
   browserUrl: 'Type an address or search the web',
   browserEmpty: 'Built-in browser',
   browserEmptyHint:
-    'Type an address above, or ask the agent to open a page: it can read it, click and type (asking permission per site). It never types passwords or payment data.',
+    'Isolated browser: no access to your files or your other sessions. The AI asks permission per site and never types passwords or payment data.',
+  browserAiDriving: 'AI is browsing',
+  browserExternal: 'Open in your browser',
+  browserAskAgent: 'Ask the agent',
+  browserIdea1: 'Open localhost:3000 and tell me if the page has errors',
+  browserIdea2: 'Find the official docs for the library this project uses',
+  browserIdea3: 'Test my app form and check that it works',
   openBrowser: 'Open browser',
   vertexKeyHint:
     'Vertex AI API key, or paste the full service-account JSON here (Vertex AI User role)',

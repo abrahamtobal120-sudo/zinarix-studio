@@ -305,6 +305,7 @@ function registerIpc(): void {
   handle('browser:forward', z.tuple([]), () => browser.forward());
   handle('browser:reload', z.tuple([]), () => browser.reload());
   handle('browser:state', z.tuple([]), () => browser.state());
+  handle('browser:home', z.tuple([]), () => browser.home());
 
   handle('terminal:create', z.tuple([dim, dim]), (cols, rows) =>
     terminals.create(workspace?.root ?? app.getPath('home'), cols, rows),

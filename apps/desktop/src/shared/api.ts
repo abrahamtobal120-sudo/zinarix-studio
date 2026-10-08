@@ -254,6 +254,8 @@ export interface OmniApi {
     back(): Promise<void>;
     forward(): Promise<void>;
     reload(): Promise<void>;
+    /** Leaves the current page and shows the start page. */
+    home(): Promise<void>;
     state(): Promise<BrowserStateView>;
   };
   terminal: {
@@ -315,6 +317,7 @@ export const CHANNELS = [
   'browser:forward',
   'browser:reload',
   'browser:state',
+  'browser:home',
   'terminal:create',
   'terminal:write',
   'terminal:resize',

@@ -130,6 +130,7 @@ export class BrowserController {
       },
     });
     view.setBackgroundColor('#ffffff');
+    view.setBorderRadius(10);
     const wc = view.webContents;
     wc.setWindowOpenHandler(({ url }) => {
       // Popups open in the same view.
@@ -161,8 +162,9 @@ export class BrowserController {
     const wc = this.view?.webContents;
     if (!wc || wc.isDestroyed())
       return { url: '', title: '', loading: false, canGoBack: false, canGoForward: false };
+    const url = wc.getURL();
     return {
-      url: wc.getURL(),
+      url: url === 'about:blank' ? '' : url,
       title: wc.getTitle(),
       loading: wc.isLoading(),
       canGoBack: wc.navigationHistory.canGoBack(),
@@ -190,6 +192,11 @@ export class BrowserController {
     ]);
     await this.settle();
     return this.state();
+  }
+
+  /** Back to the start page (shown by the UI when no page is open). */
+  home(): void {
+    void this.ensure().webContents.loadURL('about:blank');
   }
 
   back(): void {
