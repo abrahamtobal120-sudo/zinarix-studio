@@ -212,3 +212,34 @@ describe('usage reports', () => {
     expect(days[1]!.tokens).toBe(17);
   });
 });
+
+describe('saved conversations', () => {
+  it('keeps display data, filters by project and survives reopening', () => {
+    const c = open();
+    const a = c.history.create('Arreglar login', 'openai/x', '/proj/a');
+    c.history.create('Otra cosa', 'openai/x', '/proj/b');
+    c.history.append(a.id, { role: 'user', content: 'arregla el login' }, undefined, {
+      context: ['file:src/login.ts'],
+    });
+    c.history.append(a.id, { role: 'assistant', content: 'Listo' }, 'openai/x', {
+      parts: [
+        {
+          kind: 'tool',
+          name: 'read_file',
+          summary: 'ok',
+          output: 'token ghp' + '_abcdefghijklmnopqrstuvwxyz0123456789',
+        },
+      ],
+    });
+    expect(c.history.list(50, '/proj/a').map((x) => x.title)).toEqual(['Arreglar login']);
+    expect(c.history.list(50).length).toBe(2);
+    expect(c.history.search('login', 50, '/proj/b')).toEqual([]);
+    const home = c.paths.home;
+    c.close();
+    core = OmniCore.open({ home, env: { OMNI_NO_KEYCHAIN: '1' } });
+    const got = core.history.get(a.id)!;
+    expect(got.conversation).toMatchObject({ project: '/proj/a', messageCount: 2 });
+    expect(got.messages[0]!.display).toEqual({ context: ['file:src/login.ts'] });
+    expect(JSON.stringify(got.messages[1]!.display)).not.toContain('ghp_');
+  });
+});

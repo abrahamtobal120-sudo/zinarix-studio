@@ -1856,3 +1856,126 @@ button.link {
 .provider-row .dot {
   margin-left: auto;
 }
+
+/* ---------- chat history ---------- */
+.sidebar-actions button.on {
+  background: var(--sel);
+  color: var(--fg-strong);
+}
+.chat-history {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.ch-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 8px;
+}
+.ch-back {
+  background: transparent;
+  padding: 2px 8px;
+  font-size: 15px;
+}
+.ch-title {
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+.ch-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.ch-tools input {
+  width: 100%;
+}
+.ch-scope {
+  display: flex;
+  gap: 4px;
+}
+.ch-scope button {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ch-scope button.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.ch-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px 10px;
+}
+.ch-group {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fg-dim);
+  padding: 10px 8px 4px;
+}
+.ch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+.ch-item:hover {
+  background: var(--hover);
+}
+.ch-item.active {
+  background: var(--sel);
+}
+.ch-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.ch-name {
+  color: var(--fg-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ch-meta {
+  font-size: 11px;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ch-actions {
+  display: none;
+  gap: 2px;
+}
+.ch-item:hover .ch-actions,
+.ch-item.active .ch-actions {
+  display: flex;
+}
+.ch-actions button {
+  background: transparent;
+  padding: 2px 5px;
+  font-size: 12px;
+}
+.ch-actions button:hover {
+  background: var(--bg-4);
+}
+.ch-empty {
+  padding: 30px 14px;
+  text-align: center;
+}
+.ch-dot {
+  width: 22px;
+  text-align: center;
+}

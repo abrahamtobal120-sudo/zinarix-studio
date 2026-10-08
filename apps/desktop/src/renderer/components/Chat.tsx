@@ -14,6 +14,7 @@ import {
   useStore,
 } from '../store';
 import { ProviderLogo } from './ProviderLogo';
+import { ChatHistory } from './ChatHistory';
 import { Markdown } from './Markdown';
 
 interface ToolStep {
@@ -42,6 +43,35 @@ interface Turn {
 
 /** Lets other parts of the UI (Ctrl+L, palette) push a prompt into the chat. */
 export let askInChat: (prompt: string, context?: ChatContext[]) => void = () => {};
+
+const LAST_KEY = 'zs.lastConversation';
+function remember(id: string | undefined): void {
+  try {
+    if (id) localStorage.setItem(LAST_KEY, id);
+    else localStorage.removeItem(LAST_KEY);
+  } catch {
+    // storage unavailable: the conversation is still saved, just not reopened automatically
+  }
+}
+
+interface SavedDisplay {
+  parts?: Part[];
+  model?: string;
+  reasoning?: string;
+  notices?: string[];
+  meta?: { usd: number | null; inputTokens: number; outputTokens: number; latencyMs: number };
+  error?: string;
+  context?: string[];
+}
+
+function metaLine(m: {
+  usd: number | null;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+}): string {
+  return `${m.inputTokens}→${m.outputTokens} tok · ${fmtUsd(m.usd)} · ${(m.latencyMs / 1000).toFixed(1)}s`;
+}
 
 function fmtUsd(n: number | null): string {
   if (n === null) return '–';
@@ -154,6 +184,48 @@ export function ChatPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [changed, setChanged] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const loadConversation = async (id: string) => {
+    const data = await api().ai.conversation(id);
+    if (!data) {
+      remember(undefined);
+      return;
+    }
+    if (busy) void api().ai.abort(busy);
+    setTurns(
+      data.messages.map((m): Turn => {
+        const d = (m.display ?? {}) as SavedDisplay;
+        if (m.role === 'user') return { role: 'user', content: m.content, context: d.context };
+        return {
+          role: 'assistant',
+          content: m.content,
+          parts: d.parts?.length ? d.parts : m.content ? [{ kind: 'text', text: m.content }] : [],
+          model: d.model ?? m.model ?? undefined,
+          meta: d.meta ? metaLine(d.meta) : undefined,
+          error: d.error,
+          notices: d.notices,
+          reasoning: d.reasoning,
+        };
+      }),
+    );
+    setConversationId(data.conversation.id);
+    setChanged([]);
+    setShowHistory(false);
+    remember(data.conversation.id);
+    stick.current = true;
+  };
+
+  // Reopen the last conversation when the app starts.
+  useEffect(() => {
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(LAST_KEY);
+    } catch {
+      last = null;
+    }
+    if (last) void loadConversation(last);
+  }, []);
   const scroller = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -182,6 +254,7 @@ export function ChatPanel() {
 
   const send = async (prompt: string, extra: ChatContext[] = []) => {
     if (!prompt.trim() || busy) return;
+    setShowHistory(false);
     const context = [...extra, ...(includeFile ? currentFileContext() : [])];
     const history = turns
       .filter((x) => !x.error)
@@ -224,6 +297,10 @@ export function ChatPanel() {
       if (ev.type !== 'chat' || ev.requestId !== requestId) return;
       const e: ChatEventView = ev.event;
       switch (e.type) {
+        case 'conversation':
+          setConversationId(e.id);
+          remember(e.id);
+          break;
         case 'start':
           if (e.conversationId) setConversationId(e.conversationId);
           update((turn) => ({ ...turn, model: `${e.provider}/${e.model}` }));
@@ -262,7 +339,7 @@ export function ChatPanel() {
         case 'cost':
           update((turn) => ({
             ...turn,
-            meta: `${e.inputTokens}→${e.outputTokens} tok · ${fmtUsd(e.usd)} · ${(e.latencyMs / 1000).toFixed(1)}s`,
+            meta: metaLine(e),
           }));
           finish();
           break;
@@ -312,12 +389,21 @@ export function ChatPanel() {
         <span className="panel-title">{t('chat').toUpperCase()}</span>
         <span className="sidebar-actions">
           <button
+            title={t('histTitle')}
+            className={showHistory ? 'on' : ''}
+            onClick={() => setShowHistory((v) => !v)}
+          >
+            🕘
+          </button>
+          <button
             title={t('newChat')}
             onClick={() => {
               if (busy) void api().ai.abort(busy);
               setTurns([]);
               setConversationId(undefined);
               setChanged([]);
+              setShowHistory(false);
+              remember(undefined);
             }}
           >
             ＋
@@ -327,7 +413,22 @@ export function ChatPanel() {
           </button>
         </span>
       </div>
+      {showHistory && (
+        <ChatHistory
+          current={conversationId}
+          onOpen={(id) => void loadConversation(id)}
+          onClose={() => setShowHistory(false)}
+          onDeleted={(id) => {
+            if (id === conversationId) {
+              setTurns([]);
+              setConversationId(undefined);
+              remember(undefined);
+            }
+          }}
+        />
+      )}
       <div
+        style={{ display: showHistory ? 'none' : undefined }}
         className="chat-scroll"
         ref={scroller}
         onScroll={(e) => {

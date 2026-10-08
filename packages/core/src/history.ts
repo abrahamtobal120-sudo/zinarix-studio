@@ -9,6 +9,9 @@ export interface Conversation {
   createdAt: number;
   updatedAt: number;
   model: string | null;
+  /** Workspace folder the conversation was started in, if any. */
+  project: string | null;
+  messageCount?: number;
 }
 
 export interface StoredMessage {
@@ -16,13 +19,18 @@ export interface StoredMessage {
   message: ChatMessage;
   model: string | null;
   ts: number;
+  /** UI-only rendering data stored with the message (never sent to a provider). */
+  display: unknown;
 }
+
+const CONV_COLUMNS = `c.id, c.title, c.created_at AS createdAt, c.updated_at AS updatedAt, c.model, c.project,
+  (SELECT COUNT(*) FROM messages m2 WHERE m2.conversation_id = c.id) AS messageCount`;
 
 /** Conversation history. Messages are stored redacted: history never holds a credential. */
 export class History {
   constructor(private readonly db: Db) {}
 
-  create(title: string, model?: string): Conversation {
+  create(title: string, model?: string, project?: string): Conversation {
     const now = Date.now();
     const c: Conversation = {
       id: randomUUID(),
@@ -30,63 +38,75 @@ export class History {
       createdAt: now,
       updatedAt: now,
       model: model ?? null,
+      project: project ?? null,
     };
     this.db
       .prepare(
-        'INSERT INTO conversations (id, title, created_at, updated_at, model) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO conversations (id, title, created_at, updated_at, model, project) VALUES (?, ?, ?, ?, ?, ?)',
       )
-      .run(c.id, c.title, c.createdAt, c.updatedAt, c.model);
+      .run(c.id, c.title, c.createdAt, c.updatedAt, c.model, c.project);
     return c;
   }
 
-  append(conversationId: string, message: ChatMessage, model?: string): void {
+  append(conversationId: string, message: ChatMessage, model?: string, display?: unknown): void {
     const now = Date.now();
     this.db
       .prepare(
-        'INSERT INTO messages (conversation_id, ts, role, content_json, model) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO messages (conversation_id, ts, role, content_json, model, display_json) VALUES (?, ?, ?, ?, ?, ?)',
       )
-      .run(conversationId, now, message.role, JSON.stringify(redactDeep(message)), model ?? null);
+      .run(
+        conversationId,
+        now,
+        message.role,
+        JSON.stringify(redactDeep(message)),
+        model ?? null,
+        display === undefined ? null : JSON.stringify(redactDeep(display)),
+      );
     this.db
       .prepare('UPDATE conversations SET updated_at = ?, model = COALESCE(?, model) WHERE id = ?')
       .run(now, model ?? null, conversationId);
   }
 
-  list(limit = 50): Conversation[] {
+  /** Most recent first; `project` restricts to conversations started in that folder. */
+  list(limit = 50, project?: string): Conversation[] {
     return this.db
       .prepare(
-        'SELECT id, title, created_at AS createdAt, updated_at AS updatedAt, model FROM conversations ORDER BY updated_at DESC LIMIT ?',
+        `SELECT ${CONV_COLUMNS} FROM conversations c ${project ? 'WHERE c.project = ?' : ''}
+         ORDER BY c.updated_at DESC LIMIT ?`,
       )
-      .all(limit) as unknown as Conversation[];
+      .all(...(project ? [project, limit] : [limit])) as unknown as Conversation[];
   }
 
-  search(query: string, limit = 50): Conversation[] {
+  search(query: string, limit = 50, project?: string): Conversation[] {
     const like = `%${query.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
     return this.db
       .prepare(
-        `SELECT DISTINCT c.id, c.title, c.created_at AS createdAt, c.updated_at AS updatedAt, c.model
+        `SELECT DISTINCT ${CONV_COLUMNS}
          FROM conversations c LEFT JOIN messages m ON m.conversation_id = c.id
-         WHERE c.title LIKE ? ESCAPE '\\' OR m.content_json LIKE ? ESCAPE '\\'
+         WHERE (c.title LIKE ? ESCAPE '\\' OR m.content_json LIKE ? ESCAPE '\\')
+         ${project ? 'AND c.project = ?' : ''}
          ORDER BY c.updated_at DESC LIMIT ?`,
       )
-      .all(like, like, limit) as unknown as Conversation[];
+      .all(
+        ...(project ? [like, like, project, limit] : [like, like, limit]),
+      ) as unknown as Conversation[];
   }
 
   get(id: string): { conversation: Conversation; messages: StoredMessage[] } | undefined {
     const conversation = this.db
-      .prepare(
-        'SELECT id, title, created_at AS createdAt, updated_at AS updatedAt, model FROM conversations WHERE id = ? OR id LIKE ?',
-      )
+      .prepare(`SELECT ${CONV_COLUMNS} FROM conversations c WHERE c.id = ? OR c.id LIKE ?`)
       .get(id, `${id}%`) as unknown as Conversation | undefined;
     if (!conversation) return undefined;
     const rows = this.db
       .prepare(
-        'SELECT role, content_json, model, ts FROM messages WHERE conversation_id = ? ORDER BY id',
+        'SELECT role, content_json, model, ts, display_json FROM messages WHERE conversation_id = ? ORDER BY id',
       )
       .all(conversation.id) as {
       role: ChatMessage['role'];
       content_json: string;
       model: string | null;
       ts: number;
+      display_json: string | null;
     }[];
     return {
       conversation,
@@ -95,6 +115,7 @@ export class History {
         message: JSON.parse(r.content_json) as ChatMessage,
         model: r.model,
         ts: r.ts,
+        display: r.display_json ? (JSON.parse(r.display_json) as unknown) : null,
       })),
     };
   }

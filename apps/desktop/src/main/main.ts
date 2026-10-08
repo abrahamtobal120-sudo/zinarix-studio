@@ -228,6 +228,31 @@ function registerIpc(): void {
   );
   handle('ai:abort', z.tuple([str]), (r) => ai.abort(r));
   handle('ai:usage', z.tuple([]), () => ai.usage());
+  handle('ai:conversations', z.tuple([z.string().max(500), z.boolean()]), (q, p) =>
+    ai.conversations(q, p),
+  );
+  handle('ai:conversation', z.tuple([str]), (id) => ai.conversation(id));
+  handle('ai:renameConversation', z.tuple([str, z.string().max(200)]), (id, t) =>
+    ai.renameConversation(id, t),
+  );
+  handle('ai:deleteConversation', z.tuple([str]), (id) => ai.deleteConversation(id));
+  handle('ai:exportConversation', z.tuple([str]), async (id) => {
+    const md = ai.exportMarkdown(id);
+    if (!md) return null;
+    const title =
+      md
+        .split('\n')[0]!
+        .replace(/^#\s*/, '')
+        .replace(/[\\/:*?"<>|]+/g, '-')
+        .slice(0, 60) || 'conversacion';
+    const r = await dialog.showSaveDialog(win!, {
+      defaultPath: join(workspace?.root ?? app.getPath('documents'), `${title}.md`),
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    writeFileSync(r.filePath, md, 'utf8');
+    return r.filePath;
+  });
   handle(
     'ai:setBudget',
     z.tuple([

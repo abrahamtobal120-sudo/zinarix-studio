@@ -63,6 +63,25 @@ export interface CatalogModelView {
 
 export type AiRole = 'chat' | 'agent' | 'inline';
 
+export interface ConversationView {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  model: string | null;
+  project: string | null;
+  messageCount: number;
+}
+
+export interface SavedMessageView {
+  role: 'user' | 'assistant';
+  content: string;
+  model: string | null;
+  ts: number;
+  /** Rendering data saved with the turn (tool cards, cost, errors, attached context). */
+  display: unknown;
+}
+
 export interface UsageRowView {
   provider: string;
   name: string;
@@ -126,6 +145,7 @@ export interface EditRequestView {
 
 export type ChatEventView =
   | { type: 'start'; provider: string; model: string; conversationId?: string }
+  | { type: 'conversation'; id: string }
   | { type: 'text'; delta: string }
   | { type: 'reasoning'; delta: string }
   | { type: 'notice'; message: string; kind: string }
@@ -191,6 +211,14 @@ export interface OmniApi {
       detected: string[];
     }>;
     setRole(role: AiRole, ref: string | null): Promise<void>;
+    conversations(query: string, onlyProject: boolean): Promise<ConversationView[]>;
+    conversation(
+      id: string,
+    ): Promise<{ conversation: ConversationView; messages: SavedMessageView[] } | null>;
+    renameConversation(id: string, title: string): Promise<void>;
+    deleteConversation(id: string): Promise<void>;
+    /** Asks where to save and writes the conversation as Markdown. Returns the path or null. */
+    exportConversation(id: string): Promise<string | null>;
     usage(): Promise<UsageReport>;
     /** Monthly/daily USD budget for a provider; null removes it. */
     setBudget(provider: string, budget: { daily?: number; monthly?: number } | null): Promise<void>;
@@ -244,6 +272,11 @@ export const CHANNELS = [
   'ai:settings',
   'ai:setDefaultModel',
   'ai:setRole',
+  'ai:conversations',
+  'ai:conversation',
+  'ai:renameConversation',
+  'ai:deleteConversation',
+  'ai:exportConversation',
   'ai:usage',
   'ai:setBudget',
   'ai:setLocalOnly',

@@ -25,6 +25,8 @@ import type {
   ProviderView,
   ToolDecision,
   UsageReport,
+  ConversationView,
+  SavedMessageView,
 } from '../shared/api.js';
 
 const CHAT_SYSTEM =
@@ -79,7 +81,10 @@ export class AiService {
   private readonly decisions = new Map<string, (d: ToolDecision) => void>();
   readonly agent: Agent;
 
-  constructor(workspace: () => Workspace | undefined, home = omniHome()) {
+  constructor(
+    private readonly workspace: () => Workspace | undefined,
+    home = omniHome(),
+  ) {
     this.core = OmniCore.open({ home, askPassword: vaultPassword(home) });
     this.agent = new Agent(this.core, workspace);
   }
@@ -255,6 +260,24 @@ export class AiService {
     });
   }
 
+  private newConversation(req: ChatRequestView, requestId: string, emit: Emit): string {
+    let id = req.conversationId;
+    if (!id || !this.core.history.get(id)) {
+      id = this.core.history.create(
+        req.prompt.split('\n')[0]!.slice(0, 80) || 'chat',
+        req.model,
+        this.workspace()?.root,
+      ).id;
+    }
+    // Tell the UI right away, so the conversation is known even if the request fails.
+    emit(requestId, { type: 'conversation', id });
+    this.core.history.append(id, { role: 'user', content: req.prompt }, undefined, {
+      context: req.context.map((c) => c.source),
+      agent: Boolean(req.agent),
+    });
+    return id;
+  }
+
   async chat(requestId: string, req: ChatRequestView, emit: Emit): Promise<void> {
     if (req.agent) return this.agentChat(requestId, req, emit);
     const [system, user] = buildContextMessages(req.prompt, req.context, CHAT_SYSTEM) as [
@@ -266,54 +289,41 @@ export class AiService {
       ...req.history.filter((m) => m.role !== 'system'),
       user,
     ];
-    let conversationId = req.conversationId;
-    if (!conversationId || !this.core.history.get(conversationId)) {
-      conversationId = this.core.history.create(req.prompt.split('\n')[0] ?? 'chat', req.model).id;
-    }
-    this.core.history.append(conversationId, { role: 'user', content: req.prompt });
-    let answer = '';
-    let ref = req.model;
+    const conversationId = this.newConversation(req, requestId, emit);
+    const rec = new TurnRecorder();
+    const send: Emit = (rid, ev) => {
+      rec.add(ev);
+      emit(rid, ev);
+    };
     await this.run(requestId, { model: req.model, messages, role: 'chat' }, (ev) => {
       if (ev.type === 'start') {
-        ref = `${ev.provider}/${ev.model}`;
-        emit(requestId, { ...ev, conversationId });
+        send(requestId, { ...ev, conversationId });
         return;
       }
-      if (ev.type === 'text') answer += ev.delta;
-      forward(requestId, ev, emit);
+      forward(requestId, ev, send);
     });
-    if (answer)
-      this.core.history.append(conversationId, { role: 'assistant', content: answer }, ref);
+    rec.save(this.core, conversationId);
   }
 
   /** Agent mode: multi-step tool use over the open workspace, with approvals. */
   private async agentChat(requestId: string, req: ChatRequestView, emit: Emit): Promise<void> {
-    let conversationId = req.conversationId;
-    if (!conversationId || !this.core.history.get(conversationId)) {
-      conversationId = this.core.history.create(
-        req.prompt.split('\n')[0] ?? 'agente',
-        req.model,
-      ).id;
-    }
-    this.core.history.append(conversationId, { role: 'user', content: req.prompt });
+    const convId = this.newConversation(req, requestId, emit);
     const userMessage = buildContextMessages(req.prompt, req.context).at(-1)!;
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
-    let ref = req.model;
-    const convId = conversationId;
+    const rec = new TurnRecorder();
+    const send = (ev: ChatEventView) => {
+      rec.add(ev);
+      emit(requestId, ev);
+    };
     try {
-      const answer = await this.agent.run({
+      await this.agent.run({
         conversationId: convId,
         model: req.model,
         userMessage,
         fallbackHistory: req.history.filter((m) => m.role !== 'system'),
         signal: ctrl.signal,
-        emit: (ev) => {
-          if (ev.type === 'start') {
-            ref = `${ev.provider}/${ev.model}`;
-            emit(requestId, { ...ev, conversationId: convId });
-          } else emit(requestId, ev);
-        },
+        emit: (ev) => send(ev.type === 'start' ? { ...ev, conversationId: convId } : ev),
         ask: (toolCallId) =>
           new Promise<ToolDecision>((resolve) => {
             const key = `${requestId}:${toolCallId}`;
@@ -324,13 +334,58 @@ export class AiService {
             });
           }),
       });
-      if (answer) this.core.history.append(convId, { role: 'assistant', content: answer }, ref);
     } catch (e) {
       const d = describeError(e);
-      emit(requestId, { type: 'error', code: d.code, message: d.message });
+      send({ type: 'error', code: d.code, message: d.message });
     } finally {
       this.running.delete(requestId);
+      rec.save(this.core, convId);
     }
+  }
+
+  conversations(query: string, onlyProject: boolean): ConversationView[] {
+    const project = onlyProject ? this.workspace()?.root : undefined;
+    const list = query.trim()
+      ? this.core.history.search(query.trim(), 200, project)
+      : this.core.history.list(200, project);
+    return list
+      .filter((c) => (c.messageCount ?? 0) > 0)
+      .map((c) => ({ ...c, messageCount: c.messageCount ?? 0 }));
+  }
+
+  conversation(
+    id: string,
+  ): { conversation: ConversationView; messages: SavedMessageView[] } | null {
+    const data = this.core.history.get(id);
+    if (!data) return null;
+    return {
+      conversation: { ...data.conversation, messageCount: data.conversation.messageCount ?? 0 },
+      messages: data.messages
+        .filter((m) => m.message.role === 'user' || m.message.role === 'assistant')
+        .map((m) => ({
+          role: m.message.role as 'user' | 'assistant',
+          content:
+            typeof m.message.content === 'string'
+              ? m.message.content
+              : m.message.content.map((p) => (p.type === 'text' ? p.text : '[imagen]')).join('\n'),
+          model: m.model,
+          ts: m.ts,
+          display: m.display,
+        })),
+    };
+  }
+
+  renameConversation(id: string, title: string): void {
+    this.core.history.rename(id, title.trim().slice(0, 120) || 'Sin título');
+  }
+
+  deleteConversation(id: string): void {
+    this.core.history.delete(id);
+    this.agent.forget(id);
+  }
+
+  exportMarkdown(id: string): string | undefined {
+    return this.core.history.exportMarkdown(id);
   }
 
   toolDecision(requestId: string, toolCallId: string, decision: ToolDecision): void {
@@ -411,5 +466,106 @@ function forward(requestId: string, ev: OmniEvent, emit: Emit): void {
     case 'start':
       emit(requestId, ev);
       break;
+  }
+}
+
+/** Display data of an assistant turn, as the chat panel renders it. Saved with the message. */
+export interface TurnDisplay {
+  parts: (
+    | { kind: 'text'; text: string }
+    | {
+        kind: 'tool';
+        id: string;
+        name: string;
+        args: Record<string, unknown>;
+        status: 'ok' | 'error';
+        summary?: string;
+        output?: string;
+        preview?: { path?: string; command?: string };
+      }
+  )[];
+  model?: string;
+  reasoning?: string;
+  notices?: string[];
+  meta?: { usd: number | null; inputTokens: number; outputTokens: number; latencyMs: number };
+  error?: string;
+}
+
+const MAX_SAVED_OUTPUT = 8000;
+
+/** Mirrors the chat events of one turn so the whole turn can be restored later. */
+export class TurnRecorder {
+  private readonly d: TurnDisplay = { parts: [] };
+  private text = '';
+
+  add(ev: ChatEventView): void {
+    const d = this.d;
+    switch (ev.type) {
+      case 'start':
+        d.model = `${ev.provider}/${ev.model}`;
+        break;
+      case 'text': {
+        this.text += ev.delta;
+        const last = d.parts[d.parts.length - 1];
+        if (last?.kind === 'text') last.text += ev.delta;
+        else d.parts.push({ kind: 'text', text: ev.delta });
+        break;
+      }
+      case 'reasoning':
+        d.reasoning = ((d.reasoning ?? '') + ev.delta).slice(-20000);
+        break;
+      case 'notice':
+        (d.notices ??= []).push(ev.message);
+        break;
+      case 'tool_call':
+        d.parts.push({ kind: 'tool', id: ev.id, name: ev.name, args: ev.args, status: 'error' });
+        break;
+      case 'tool_approval': {
+        const step = this.step(ev.id);
+        if (step) step.preview = { path: ev.preview.path, command: ev.preview.command };
+        break;
+      }
+      case 'tool_output': {
+        const step = this.step(ev.id);
+        if (step) step.output = ((step.output ?? '') + ev.chunk).slice(-MAX_SAVED_OUTPUT);
+        break;
+      }
+      case 'tool_result': {
+        const step = this.step(ev.id);
+        if (step) {
+          step.status = ev.ok ? 'ok' : 'error';
+          step.summary = ev.summary;
+        }
+        break;
+      }
+      case 'cost':
+        d.meta = {
+          usd: ev.usd,
+          inputTokens: ev.inputTokens,
+          outputTokens: ev.outputTokens,
+          latencyMs: ev.latencyMs,
+        };
+        break;
+      case 'error':
+        d.error = ev.message;
+        break;
+    }
+  }
+
+  private step(id: string) {
+    return this.d.parts.find(
+      (p): p is Extract<TurnDisplay['parts'][number], { kind: 'tool' }> =>
+        p.kind === 'tool' && p.id === id,
+    );
+  }
+
+  save(core: OmniCore, conversationId: string): void {
+    if (!this.text && !this.d.parts.length && !this.d.error) return;
+    core.history.append(
+      conversationId,
+      { role: 'assistant', content: this.text.trim() },
+      this.d.model,
+      this.d,
+    );
   }
 }

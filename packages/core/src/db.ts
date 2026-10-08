@@ -50,6 +50,11 @@ const MIGRATIONS: string[] = [
      model TEXT,
      detail_json TEXT
    );`,
+  // 2: conversations belong to a project folder; messages can carry UI-only display data
+  // (agent tool cards, cost line, errors) that is never sent to a provider.
+  `ALTER TABLE conversations ADD COLUMN project TEXT;
+   ALTER TABLE messages ADD COLUMN display_json TEXT;
+   CREATE INDEX conversations_project ON conversations (project, updated_at);`,
 ];
 
 export type Db = DatabaseSync;
