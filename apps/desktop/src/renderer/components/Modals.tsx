@@ -18,6 +18,8 @@ import {
 } from '../store';
 import { ModelPicker } from './ModelPicker';
 import { UsagePanel } from './Usage';
+import { fileIcon } from './icons';
+import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
 import { ProviderLogo } from './ProviderLogo';
 import type { PickItem } from './QuickPick';
@@ -70,6 +72,16 @@ function QuickOpen() {
       placeholder={t('quickOpen')}
       items={items}
       limit={100}
+      renderItem={(it, q) => {
+        const dir = it.id.includes('/') ? it.id.slice(0, it.id.lastIndexOf('/')) : '';
+        return (
+          <span className="qo-row">
+            <span className="qo-icon">{fileIcon(it.id)}</span>
+            <span className="qo-name">{q ? fuzzyMarks(q, it.label) : it.label}</span>
+            <span className="qo-dir">{dir}</span>
+          </span>
+        );
+      }}
       onClose={close}
       onPick={(it) => {
         close();

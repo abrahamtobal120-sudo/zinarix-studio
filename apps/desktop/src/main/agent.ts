@@ -9,6 +9,9 @@ import { redact } from '@omni/security';
 import type { ChatEventView, ToolDecision } from '../shared/api.js';
 import type { BrowserController, PageSnapshot } from './browser.js';
 import { normalizeUrl } from './browser.js';
+import { globToRegExp } from '../shared/glob.js';
+
+export { globToRegExp };
 import type { Workspace } from './workspace.js';
 
 const MAX_STEPS = 60;
@@ -210,35 +213,6 @@ const NEEDS_APPROVAL = new Set(['edit_file', 'write_file', 'run_command']);
 const BROWSER_APPROVAL = new Set(['browser_open', 'browser_click', 'browser_type']);
 /** Safe to run concurrently when the model asks for several in one turn. */
 const READ_ONLY = new Set(['tree', 'glob', 'list_dir', 'read_file', 'read_many_files', 'search']);
-
-/** Converts a glob (*, **, ?, {a,b}) to an anchored RegExp over "/"-separated paths. */
-export function globToRegExp(glob: string): RegExp {
-  let re = '';
-  let inBraces = 0;
-  const g = glob.replace(/^\.\//, '');
-  for (let i = 0; i < g.length; i++) {
-    const c = g[i]!;
-    if (c === '*') {
-      if (g[i + 1] === '*') {
-        i++;
-        if (g[i + 1] === '/') {
-          i++;
-          re += '(?:.*/)?';
-        } else re += '.*';
-      } else re += '[^/]*';
-    } else if (c === '?') re += '[^/]';
-    else if (c === '{') {
-      inBraces++;
-      re += '(?:';
-    } else if (c === '}' && inBraces) {
-      inBraces--;
-      re += ')';
-    } else if (c === ',' && inBraces) re += '|';
-    else re += c.replace(/[.+^$()|[\]\\]/g, '\\$&');
-  }
-  // A pattern without a slash matches the file name anywhere ("*.ts" == "**/*.ts").
-  return new RegExp(g.includes('/') ? `^${re}$` : `^(?:.*/)?${re}$`, 'i');
-}
 
 function hostOf(url: string): string {
   try {

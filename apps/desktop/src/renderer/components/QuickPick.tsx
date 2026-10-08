@@ -36,6 +36,7 @@ export function QuickPick({
   footer,
   initial = '',
   limit = 200,
+  renderItem,
 }: {
   placeholder: string;
   items: PickItem[];
@@ -44,6 +45,8 @@ export function QuickPick({
   footer?: ReactNode;
   initial?: string;
   limit?: number;
+  /** Custom row renderer that can use the current query (e.g. to highlight matches). */
+  renderItem?: (item: PickItem, query: string) => ReactNode;
 }) {
   const [query, setQuery] = useState(initial);
   const [index, setIndex] = useState(0);
@@ -100,7 +103,7 @@ export function QuickPick({
                 onMouseEnter={() => setIndex(i)}
                 onClick={() => onPick(it)}
               >
-                {it.render ?? (
+                {renderItem?.(it, query) ?? it.render ?? (
                   <>
                     <span className="pick-label">{it.label}</span>
                     {it.detail && <span className="pick-detail">{it.detail}</span>}

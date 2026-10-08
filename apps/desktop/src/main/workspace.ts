@@ -86,8 +86,13 @@ export class Workspace {
     await rename(this.resolve(from), dest);
   }
 
-  /** Lists files for quick open (Ctrl+P), skipping heavy folders. */
+  /**
+   * Lists project files (quick open, search by name, agent tree/glob). Uses ripgrep when
+   * installed so .gitignore is respected; otherwise walks the folder skipping heavy dirs.
+   */
   async listFiles(limit = 20000): Promise<string[]> {
+    const rg = await rgFiles(this.root, limit).catch(() => undefined);
+    if (rg) return rg.map((p) => p.split(sep).join('/')).sort();
     const out: string[] = [];
     const walk = async (dir: string): Promise<void> => {
       if (out.length >= limit) return;
@@ -161,6 +166,26 @@ function gitBranch(cwd: string): Promise<string | null> {
       res(err ? null : stdout.trim() || null),
     ),
   );
+}
+
+function rgFiles(cwd: string, limit: number): Promise<string[]> {
+  return new Promise((res, rej) => {
+    const child = spawn('rg', ['--files', '--hidden', '--glob', '!.git'], { cwd });
+    const files: string[] = [];
+    let buf = '';
+    child.on('error', rej);
+    child.stdout.on('data', (d: Buffer) => {
+      buf += d.toString('utf8');
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const l of lines) if (l && files.length < limit) files.push(l.replace(/^\.[\\/]/, ''));
+      if (files.length >= limit) child.kill();
+    });
+    // rg exits 1 when there are no files: still a valid (empty) answer.
+    child.on('close', (code) =>
+      code === 0 || code === 1 || files.length ? res(files) : rej(new Error(`rg ${code}`)),
+    );
+  });
 }
 
 function ripgrep(
