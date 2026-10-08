@@ -119,3 +119,7 @@ Requires Node ≥ 24.7 and pnpm. `pnpm install && pnpm build && pnpm test`. Set 
 See [docs/en/architecture.md](docs/en/architecture.md) and [docs/en/adding-a-provider.md](docs/en/adding-a-provider.md).
 
 License: MIT.
+
+## Créditos
+
+Logos de proveedores: [Lobe Icons](https://github.com/lobehub/lobe-icons) (MIT). Las marcas pertenecen a sus respectivos dueños.
