@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { UsageReport, UsageRowView } from '../../shared/api';
 import { t } from '../i18n';
+import { ProviderLogo } from './ProviderLogo';
 import { api, refreshSettings, setState } from '../store';
 
 const COLORS = [
@@ -181,7 +182,10 @@ export function UsagePanel() {
                 return (
                   <tr key={r.provider}>
                     <td>
-                      <i className="usage-dot" style={{ background: color(r.provider) }} /> {r.name}
+                      <span className="usage-prov">
+                        <i className="usage-dot" style={{ background: color(r.provider) }} />
+                        <ProviderLogo id={r.provider} name={r.name} size={22} /> {r.name}
+                      </span>
                     </td>
                     <td className="num">{r.requests}</td>
                     <td className="num">{tokens(r.inputTokens)}</td>

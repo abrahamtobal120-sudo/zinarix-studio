@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AiRole, ProviderView } from '../../shared/api';
 import { t } from '../i18n';
 import { api, refreshModels, refreshSettings, setState, toast, useStore } from '../store';
+import { ProviderLogo } from './ProviderLogo';
 import { fuzzy } from './QuickPick';
 
 interface Row {
@@ -48,23 +49,6 @@ export function pushRecent(ref: string): void {
 function fmtCtx(n: number | null): string {
   if (!n) return '—';
   return n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(2)}M` : `${Math.round(n / 1000)}k`;
-}
-const AVATAR_COLORS = [
-  '#2563eb',
-  '#7c3aed',
-  '#db2777',
-  '#ea580c',
-  '#059669',
-  '#0891b2',
-  '#4f46e5',
-  '#b45309',
-  '#be123c',
-  '#0d9488',
-];
-function avatarColor(id: string): string {
-  let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
 }
 
 function fmtPrice(n: number | null): string {
@@ -397,12 +381,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
                   onMouseEnter={() => setIndex(i)}
                   onClick={() => setProvider(p.id)}
                 >
-                  <span className="mp-avatar" style={{ background: avatarColor(p.id) }}>
-                    {p.name
-                      .replace(/[^A-Za-z0-9]/g, '')
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </span>
+                  <ProviderLogo id={p.id} name={p.name} size={44} />
                   <span className="mp-card-body">
                     <span className="mp-card-name">{p.name}</span>
                     <span className="mp-card-meta">
@@ -446,6 +425,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
               {provider && (
                 <div className="mp-crumb">
                   <button onClick={() => setProvider(null)}>← {t('providersTitle')}</button>
+                  <ProviderLogo id={provider} name={openProvider?.name} size={30} />
                   <span className="mp-crumb-name">{openProvider?.name ?? provider}</span>
                   <span className="dim">{t('nModels', { n: visible.length })}</span>
                   <span className="spacer" />
@@ -484,14 +464,17 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
                   >
                     {favs.has(r.ref) ? '★' : '☆'}
                   </button>
-                  <span className="mp-name">
-                    <span className="mp-label">
-                      {r.label}
-                      {r.ref === effective && <span className="mp-badge cur">{t('inUse')}</span>}
-                      {r.local && <span className="mp-badge local">{t('fLocal')}</span>}
-                    </span>
-                    <span className="mp-id">
-                      {r.providerName} · {r.id}
+                  <span className="mp-name-row">
+                    <ProviderLogo id={r.provider} name={r.providerName} size={26} />
+                    <span className="mp-name">
+                      <span className="mp-label">
+                        {r.label}
+                        {r.ref === effective && <span className="mp-badge cur">{t('inUse')}</span>}
+                        {r.local && <span className="mp-badge local">{t('fLocal')}</span>}
+                      </span>
+                      <span className="mp-id">
+                        {r.providerName} · {r.id}
+                      </span>
                     </span>
                   </span>
                   <span className="num">{fmtCtx(r.context)}</span>

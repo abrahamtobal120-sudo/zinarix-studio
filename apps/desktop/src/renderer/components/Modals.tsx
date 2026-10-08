@@ -19,6 +19,7 @@ import {
 import { ModelPicker } from './ModelPicker';
 import { UsagePanel } from './Usage';
 import { QuickPick } from './QuickPick';
+import { ProviderLogo } from './ProviderLogo';
 import type { PickItem } from './QuickPick';
 
 const close = () => setState({ modal: null });
@@ -147,8 +148,9 @@ function Providers({ focus }: { focus?: string }) {
                 className={`provider-row ${x.id === selected ? 'active' : ''}`}
                 onClick={() => setSelected(x.id)}
               >
-                <span className={`dot ${x.connected ? 'on' : ''}`} />
+                <ProviderLogo id={x.id} name={x.name} size={22} />
                 <span className="provider-name">{x.name}</span>
+                <span className={`dot ${x.connected ? 'on' : ''}`} />
                 {x.status !== 'active' && <span className={`badge ${x.status}`}>{x.status}</span>}
               </div>
             ))}
@@ -168,7 +170,8 @@ function Providers({ focus }: { focus?: string }) {
             </div>
           ) : (
             <>
-              <h2>
+              <h2 className="provider-title">
+                <ProviderLogo id={p.id} name={p.name} size={40} />
                 {p.name} {p.connected && <span className="badge ok">{t('connected')}</span>}
               </h2>
               <div className="dim">

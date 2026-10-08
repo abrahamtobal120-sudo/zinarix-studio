@@ -25,6 +25,7 @@
     "desktop:install": "pnpm --filter @omni/desktop build && bash apps/desktop/scripts/install-linux.sh"
   },
   "devDependencies": {
+    "@lobehub/icons-static-svg": "1.95.1",
     "@types/node": "^24.19.1",
     "@types/react": "^19.3.0",
     "@vitest/coverage-v8": "^4.1.11",

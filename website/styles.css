@@ -466,8 +466,8 @@ h1 {
   white-space: nowrap;
 }
 .chip i {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   display: grid;
   place-items: center;
@@ -937,4 +937,14 @@ pre {
   .tilt {
     transform: none;
   }
+}
+
+.chip i.logo {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.chip i.logo img {
+  width: 68%;
+  height: 68%;
+  object-fit: contain;
 }

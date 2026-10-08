@@ -72,43 +72,47 @@ async function setupDownloads() {
 }
 
 // ---------- provider marquee ----------
+// [catalog id, display name]; logos live in assets/providers/<id>.svg (Lobe Icons, MIT).
 const PROVIDERS = [
-  'OpenAI',
-  'Anthropic',
-  'Google Gemini',
-  'DeepSeek',
-  'xAI Grok',
-  'Mistral',
-  'Meta',
-  'Cohere',
-  'OpenRouter',
-  'Groq',
-  'Cerebras',
-  'Together AI',
-  'Fireworks',
-  'DeepInfra',
-  'Hugging Face',
-  'NVIDIA NIM',
-  'Qwen',
-  'Kimi',
-  'Z.ai GLM',
-  'MiniMax',
-  'SiliconFlow',
-  'Chutes',
-  'Featherless',
-  'StepFun',
-  'Venice',
-  'Requesty',
-  'Azure OpenAI',
-  'Ollama',
-  'LM Studio',
-  'vLLM',
-  'llama.cpp',
-  'Nebius',
-  'SambaNova',
-  'Cloudflare',
-  'Scaleway',
-  'Upstage',
+  ['openai', 'OpenAI'],
+  ['anthropic', 'Anthropic'],
+  ['google-gemini', 'Google Gemini'],
+  ['deepseek', 'DeepSeek'],
+  ['xai', 'xAI Grok'],
+  ['mistral', 'Mistral'],
+  ['meta-llama', 'Meta'],
+  ['cohere', 'Cohere'],
+  ['openrouter', 'OpenRouter'],
+  ['groq', 'Groq'],
+  ['cerebras', 'Cerebras'],
+  ['together', 'Together AI'],
+  ['fireworks', 'Fireworks'],
+  ['deepinfra', 'DeepInfra'],
+  ['huggingface-inference-providers', 'Hugging Face'],
+  ['nvidia-nim', 'NVIDIA NIM'],
+  ['alibaba-qwen', 'Qwen'],
+  ['moonshot', 'Kimi'],
+  ['zhipu-zai', 'GLM'],
+  ['minimax', 'MiniMax'],
+  ['siliconflow', 'SiliconFlow'],
+  ['chutes', 'Chutes'],
+  ['featherless', 'Featherless'],
+  ['stepfun', 'StepFun'],
+  ['venice', 'Venice'],
+  ['byteplus-modelark', 'Doubao'],
+  ['azure-openai', 'Azure OpenAI'],
+  ['amazon-bedrock', 'Bedrock'],
+  ['google-vertex', 'Vertex AI'],
+  ['ollama', 'Ollama'],
+  ['lm-studio', 'LM Studio'],
+  ['vllm', 'vLLM'],
+  ['nebius-token-factory', 'Nebius'],
+  ['sambanova', 'SambaNova'],
+  ['cloudflare-workers-ai', 'Cloudflare'],
+  ['upstage', 'Upstage'],
+  ['perplexity', 'Perplexity'],
+  ['hyperbolic', 'Hyperbolic'],
+  ['novita', 'Novita'],
 ];
 const COLORS = [
   '#2563eb',
@@ -127,15 +131,22 @@ function color(name) {
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return COLORS[h % COLORS.length];
 }
-function setupMarquee() {
+async function setupMarquee() {
   const track = document.getElementById('marquee');
-  const html = PROVIDERS.map(
-    (p) =>
-      `<span class="chip"><i style="background:${color(p)}">${p
-        .replace(/[^A-Za-z0-9]/g, '')
-        .slice(0, 2)
-        .toUpperCase()}</i>${p}</span>`,
-  ).join('');
+  let withLogo = new Set();
+  try {
+    withLogo = new Set(await (await fetch('assets/providers/index.json')).json());
+  } catch {
+    // no index: initials only
+  }
+  const chip = ([id, name]) =>
+    withLogo.has(id)
+      ? `<span class="chip"><i class="logo"><img src="assets/providers/${id}.svg" alt="" loading="lazy" /></i>${name}</span>`
+      : `<span class="chip"><i style="background:${color(id)}">${name
+          .replace(/[^A-Za-z0-9]/g, '')
+          .slice(0, 2)
+          .toUpperCase()}</i>${name}</span>`;
+  const html = PROVIDERS.map(chip).join('');
   track.innerHTML = html + html; // doubled for a seamless loop
 }
 

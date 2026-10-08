@@ -13,6 +13,7 @@ import {
   toast,
   useStore,
 } from '../store';
+import { ProviderLogo } from './ProviderLogo';
 import { Markdown } from './Markdown';
 
 interface ToolStep {
@@ -376,7 +377,15 @@ export function ChatPanel() {
                 </>
               ) : (
                 <>
-                  <div className="turn-model">{turn.model ?? settings.defaultModel ?? ''}</div>
+                  <div className="turn-model">
+                    {(turn.model ?? settings.defaultModel) && (
+                      <ProviderLogo
+                        id={(turn.model ?? settings.defaultModel ?? '').split('/')[0]!}
+                        size={16}
+                      />
+                    )}
+                    {turn.model ?? settings.defaultModel ?? ''}
+                  </div>
                   {turn.notices?.map((n, j) => (
                     <div key={j} className="turn-notice">
                       ⚠ {n}
