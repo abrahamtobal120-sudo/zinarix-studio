@@ -88,10 +88,13 @@ if [ "$UNINSTALL" = 1 ]; then
     done
   else
     if command -v dpkg >/dev/null 2>&1 && dpkg -s zinarix-studio >/dev/null 2>&1; then
-      run $SUDO apt-get remove -y zinarix-studio && ok "Paquete .deb eliminado"
+      run $SUDO apt-get purge -y zinarix-studio && ok "Paquete .deb eliminado"
     fi
-    if command -v pacman >/dev/null 2>&1 && pacman -Q zinarix-studio >/dev/null 2>&1; then
-      run $SUDO pacman -R --noconfirm zinarix-studio && ok "Paquete pacman eliminado"
+    if command -v pacman >/dev/null 2>&1; then
+      # Look the package up by the file it owns: early builds were named "Zinarix Studio".
+      PKG="$(pacman -Qqo "/opt/${APP}/zinarix-studio" 2>/dev/null || true)"
+      [ -z "$PKG" ] && pacman -Q zinarix-studio >/dev/null 2>&1 && PKG="zinarix-studio"
+      if [ -n "$PKG" ]; then run $SUDO pacman -R --noconfirm "$PKG" && ok "Paquete pacman eliminado"; fi
     fi
     if [ -f "$APPIMAGE_PATH" ]; then
       run rm -rf "$(dirname "$APPIMAGE_PATH")" "${DATA_DIR}/applications/zinarix-studio.desktop" \
@@ -112,9 +115,25 @@ else
   API="https://api.github.com/repos/${REPO}/releases/latest"
 fi
 say "Buscando la versión ${VERSION:-más reciente} de ${B}${APP}${N}…"
-JSON="$(curl -fsSL -H 'Accept: application/vnd.github+json' "$API")" || die "No se pudo consultar GitHub ($API)."
-TAG="$(printf '%s' "$JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
-[ -n "$TAG" ] || die "No se encontró la versión."
+AUTH=()
+TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+[ -n "$TOKEN" ] && AUTH=(-H "Authorization: Bearer ${TOKEN}")
+JSON=""
+if [ "${ZINARIX_NO_API:-0}" != 1 ]; then
+  JSON="$(curl -fsSL -H 'Accept: application/vnd.github+json' ${AUTH[@]+"${AUTH[@]}"} "$API" 2>/dev/null)" || JSON=""
+fi
+if [ -n "$JSON" ]; then
+  TAG="$(printf '%s' "$JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+else
+  # API unavailable (rate limit, firewall): resolve the tag from the release page redirect.
+  warn "No se pudo usar la API de GitHub; se usará la página de descargas (sin verificación SHA-256)."
+  if [ -n "$VERSION" ]; then
+    TAG="v${VERSION#v}"
+  else
+    TAG="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" | sed -E 's#.*/tag/##')"
+  fi
+fi
+[ -n "$TAG" ] && [ "$TAG" != "latest" ] || die "No se encontró la versión."
 V="${TAG#v}"
 
 # Prints "<digest>" for an asset name from the release JSON (empty if GitHub has none).

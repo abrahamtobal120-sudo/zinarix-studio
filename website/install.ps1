@@ -40,12 +40,30 @@ $api = if ($env:ZINARIX_VERSION) {
   "https://api.github.com/repos/$Repo/releases/latest"
 }
 Say "Buscando la versión $(if ($env:ZINARIX_VERSION) { $env:ZINARIX_VERSION } else { 'más reciente' }) de $App…"
-$release = Invoke-RestMethod -Uri $api -Headers @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'zinarix-installer' }
-$asset = $release.assets | Where-Object { $_.name -match '^Zinarix-Studio-Setup-.*\.exe$' } | Select-Object -First 1
-if (-not $asset) { Fail "La versión $($release.tag_name) no tiene instalador para Windows." }
+$headers = @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'zinarix-installer' }
+$token = if ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } else { $env:GH_TOKEN }
+if ($token) { $headers.Authorization = "Bearer $token" }
+$release = $null
+try { $release = Invoke-RestMethod -Uri $api -Headers $headers } catch { $release = $null }
+if ($release) {
+  $asset = $release.assets | Where-Object { $_.name -match '^Zinarix-Studio-Setup-.*\.exe$' } | Select-Object -First 1
+  if (-not $asset) { Fail "La versión $($release.tag_name) no tiene instalador para Windows." }
+} else {
+  # API unavailable (rate limit, proxy): resolve the version from the release page redirect.
+  Write-Host '! No se pudo usar la API de GitHub; se usará la página de descargas (sin verificación SHA-256).' -ForegroundColor Yellow
+  $tag = if ($env:ZINARIX_VERSION) { "v$($env:ZINARIX_VERSION.TrimStart('v'))" } else {
+    $r = Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest" -UseBasicParsing
+    $final = if ($r.BaseResponse.ResponseUri) { $r.BaseResponse.ResponseUri.AbsoluteUri } else { $r.BaseResponse.RequestMessage.RequestUri.AbsoluteUri }
+    ($final -split '/tag/')[-1]
+  }
+  $v = $tag.TrimStart('v')
+  $name = "Zinarix-Studio-Setup-$v.exe"
+  $release = [pscustomobject]@{ tag_name = $tag }
+  $asset = [pscustomobject]@{ name = $name; size = 0; digest = $null; browser_download_url = "https://github.com/$Repo/releases/download/$tag/$name" }
+}
 
 $dest = Join-Path $env:TEMP $asset.name
-Say "Descargando $($asset.name) ($([math]::Round($asset.size / 1MB)) MB)…"
+Say "Descargando $($asset.name)$(if ($asset.size) { " ($([math]::Round($asset.size / 1MB)) MB)" })…"
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $dest -UseBasicParsing
 
 if ($asset.digest -and $asset.digest.StartsWith('sha256:')) {

@@ -98,7 +98,8 @@
         "libxss1",
         "libasound2t64 | libasound2"
       ],
-      "artifactName": "zinarix-studio_${version}_${arch}.${ext}"
+      "artifactName": "zinarix-studio_${version}_${arch}.${ext}",
+      "packageName": "zinarix-studio"
     },
     "pacman": {
       "depends": [
@@ -107,7 +108,8 @@
         "alsa-lib",
         "gtk3"
       ],
-      "artifactName": "zinarix-studio-${version}-${arch}.${ext}"
+      "artifactName": "zinarix-studio-${version}-${arch}.${ext}",
+      "packageName": "zinarix-studio"
     },
     "mac": {
       "target": [
