@@ -18,6 +18,7 @@ import {
 } from '../store';
 import { ModelPicker } from './ModelPicker';
 import { UsagePanel } from './Usage';
+import { SecurityCenter } from './SecurityCenter';
 import { fileIcon } from './icons';
 import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
@@ -38,6 +39,7 @@ export function Modals() {
       {modal?.kind === 'aiEdit' && <AiEdit />}
       {modal?.kind === 'shortcuts' && <Shortcuts />}
       {modal?.kind === 'usage' && <UsagePanel />}
+      {modal?.kind === 'security' && <SecurityCenter />}
       {inputBox && <InputBox />}
     </>
   );

@@ -100,6 +100,11 @@ export function commands(): Command[] {
       run: () => setState((s) => ({ chatOpen: !s.chatOpen })),
     },
     {
+      id: 'security.center',
+      label: t('securityTitle'),
+      run: () => setState({ modal: { kind: 'security' } }),
+    },
+    {
       id: 'view.browser',
       label: t('openBrowser'),
       run: () => openBrowserTab(),

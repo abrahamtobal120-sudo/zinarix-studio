@@ -44,6 +44,7 @@ export function ActivityBar() {
         } else openBrowserTab();
       })}
       <div className="spacer" />
+      {item(false, t('securityTitle'), '🛡️', () => setState({ modal: { kind: 'security' } }))}
       {item(false, t('usageTitle'), '📊', () => setState({ modal: { kind: 'usage' } }))}
       {item(false, t('providers'), '🔑', () => setState({ modal: { kind: 'providers' } }))}
       {item(false, 'Paleta de comandos', '⚙', () => setState({ modal: { kind: 'palette' } }))}

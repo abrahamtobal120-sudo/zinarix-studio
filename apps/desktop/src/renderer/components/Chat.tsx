@@ -43,6 +43,8 @@ interface Turn {
 }
 
 /** Lets other parts of the UI (Ctrl+L, palette) push a prompt into the chat. */
+/** Sends a task to the chat in agent mode (used by the security center and similar). */
+export let askAgent: (prompt: string) => void = () => {};
 export let askInChat: (prompt: string, context?: ChatContext[]) => void = () => {};
 
 const LAST_KEY = 'zs.lastConversation';
@@ -101,6 +103,12 @@ const TOOL_ICON: Record<string, string> = {
   read_system_file: '📄',
   write_system_file: '🛠️',
   set_env_var: '🔧',
+  security_scan_project: '🛡️',
+  audit_dependencies: '📦',
+  security_check_system: '💻',
+  port_scan: '📡',
+  check_site_security: '🔒',
+  file_hash: '🧾',
 };
 
 function toolTitle(step: ToolStep): string {
@@ -126,7 +134,10 @@ function toolTitle(step: ToolStep): string {
     case 'browser_back':
       return '';
     case 'network_status':
+    case 'port_scan':
       return String(a.target ?? '');
+    case 'check_site_security':
+      return String(a.url ?? '');
     case 'http_request':
       return `${String(a.method ?? 'GET')} ${String(a.url ?? '')}`;
     case 'sql_query':
@@ -319,7 +330,7 @@ export function ChatPanel() {
     return out;
   };
 
-  const send = async (prompt: string, extra: ChatContext[] = []) => {
+  const send = async (prompt: string, extra: ChatContext[] = [], forceAgent = false) => {
     if (!prompt.trim() || busy) return;
     setShowHistory(false);
     const context = [...extra, ...(includeFile ? currentFileContext() : [])];
@@ -327,7 +338,8 @@ export function ChatPanel() {
       .filter((x) => !x.error)
       .map((x) => ({ role: x.role, content: x.content }));
     const requestId = newRequestId();
-    const useAgent = agentMode && Boolean(getState().workspace);
+    // Agent mode also works without a folder (system, network, browser and security tools).
+    const useAgent = forceAgent || agentMode;
     stick.current = true;
     setTurns((x) => [
       ...x,
@@ -427,6 +439,12 @@ export function ChatPanel() {
       context,
       conversationId,
     });
+  };
+
+  askAgent = (prompt) => {
+    setState({ chatOpen: true });
+    setAgentMode(true);
+    void send(prompt, [], true);
   };
 
   askInChat = (prompt, context) => {

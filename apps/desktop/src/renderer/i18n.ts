@@ -182,6 +182,13 @@ const es = {
   collapseAll: 'Contraer todo',
   clear: 'Limpiar',
   riskHigh: 'RIESGO ALTO',
+  securityTitle: 'Centro de seguridad',
+  securityIntro:
+    'Elige una revisión: el agente la hace, te explica cada problema en palabras sencillas y te ofrece corregirlo. Todo lo que sale de tu proyecto te pide permiso antes.',
+  securityRun: 'Revisar',
+  securityNeedsFolder: 'Abre una carpeta',
+  securityLegal:
+    'Seguridad defensiva: revisa solo tus propios proyectos, equipos, redes y sitios (o con autorización por escrito). Escanear o atacar sistemas ajenos puede ser un delito.',
   riskMedium: 'Atención',
   browser: 'Navegador',
   browserUrl: 'Escribe una dirección o busca en la web',
@@ -385,6 +392,13 @@ const en: Record<Key, string> = {
   collapseAll: 'Collapse all',
   clear: 'Clear',
   riskHigh: 'HIGH RISK',
+  securityTitle: 'Security center',
+  securityIntro:
+    'Pick a check: the agent runs it, explains each problem in plain words and offers to fix it. Anything outside your project asks for permission first.',
+  securityRun: 'Check',
+  securityNeedsFolder: 'Open a folder',
+  securityLegal:
+    'Defensive security: only check your own projects, computers, networks and sites (or with written authorization). Scanning or attacking other systems may be a crime.',
   riskMedium: 'Heads up',
   browser: 'Browser',
   browserUrl: 'Type an address or search the web',

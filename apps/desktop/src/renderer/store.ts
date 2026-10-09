@@ -26,7 +26,8 @@ export type Modal =
   | { kind: 'providers'; focus?: string }
   | { kind: 'aiEdit' }
   | { kind: 'shortcuts' }
-  | { kind: 'usage' };
+  | { kind: 'usage' }
+  | { kind: 'security' };
 
 export interface State {
   workspace: WorkspaceInfo | null;

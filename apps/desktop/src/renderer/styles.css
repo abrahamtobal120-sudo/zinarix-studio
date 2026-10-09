@@ -2710,3 +2710,89 @@ button.link {
 .tool-warning.high .tool-risk {
   background: var(--danger);
 }
+/* Security center */
+.security {
+  width: min(900px, 95vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 20px 24px;
+  position: relative;
+}
+.security h2 {
+  margin: 0 0 4px;
+  font-weight: 500;
+  color: var(--fg-strong);
+}
+.sec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.sec-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.sec-card:hover {
+  border-color: #2fbf71;
+  transform: translateY(-1px);
+}
+.sec-card.disabled {
+  opacity: 0.55;
+}
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg-strong);
+}
+.sec-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-size: 18px;
+  background: linear-gradient(135deg, rgba(47, 191, 113, 0.25), rgba(47, 123, 255, 0.25));
+}
+.sec-card p {
+  flex: 1;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+}
+.sec-card > button {
+  align-self: flex-start;
+}
+.sec-input {
+  display: flex;
+  gap: 6px;
+}
+.sec-input input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--fg-strong);
+}
+.sec-legal {
+  margin: 16px 0 0;
+  font-size: 11.5px;
+  color: var(--fg-dim);
+}
