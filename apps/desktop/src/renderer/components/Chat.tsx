@@ -48,6 +48,21 @@ export let askAgent: (prompt: string) => void = () => {};
 export let askInChat: (prompt: string, context?: ChatContext[]) => void = () => {};
 
 const LAST_KEY = 'zs.lastConversation';
+const AGENT_KEY = 'zs.agentMode';
+function savedAgentMode(): boolean {
+  try {
+    return localStorage.getItem(AGENT_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+function saveAgentMode(on: boolean): void {
+  try {
+    localStorage.setItem(AGENT_KEY, on ? 'on' : 'off');
+  } catch {
+    // storage unavailable: the mode just resets to agent on the next start
+  }
+}
 function remember(id: string | undefined): void {
   try {
     if (id) localStorage.setItem(LAST_KEY, id);
@@ -258,7 +273,11 @@ export function ChatPanel() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [includeFile, setIncludeFile] = useState(true);
-  const [agentMode, setAgentMode] = useState(true);
+  const [agentMode, setAgentModeState] = useState(savedAgentMode);
+  const setAgentMode = (on: boolean) => {
+    setAgentModeState(on);
+    saveAgentMode(on);
+  };
   const [busy, setBusy] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [changed, setChanged] = useState<string[]>([]);

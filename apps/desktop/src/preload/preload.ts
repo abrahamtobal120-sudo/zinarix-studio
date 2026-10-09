@@ -47,6 +47,10 @@ const api: OmniApi = {
     toolDecision: call('ai:toolDecision') as OmniApi['ai']['toolDecision'],
     revert: call('ai:revert') as OmniApi['ai']['revert'],
   },
+  security: {
+    scan: call('security:scan') as OmniApi['security']['scan'],
+    scanAbort: call('security:scanAbort') as OmniApi['security']['scanAbort'],
+  },
   browser: {
     setBounds: call('browser:setBounds') as OmniApi['browser']['setBounds'],
     navigate: call('browser:navigate') as OmniApi['browser']['navigate'],

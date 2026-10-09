@@ -182,6 +182,24 @@ const es = {
   collapseAll: 'Contraer todo',
   clear: 'Limpiar',
   riskHigh: 'RIESGO ALTO',
+  scannerTitle: 'Escáner de puertos',
+  scannerIntro:
+    'Estilo nmap: descubre puertos abiertos, servicios y versiones. Tu red local funciona directo; para un objetivo público confirma que es tuyo o que tienes autorización.',
+  scannerTarget: 'Objetivo',
+  scannerService: 'Detectar servicio y versión',
+  scannerAuthorize:
+    'Confirmo que este objetivo es mío o que tengo autorización por escrito para escanearlo. Escanear equipos ajenos sin permiso es delito.',
+  scannerRun: 'Escanear',
+  scannerStop: 'Detener',
+  scannerSummary: '{open} puertos abiertos en {hosts} equipo(s) · {ports} puertos revisados',
+  scannerNoneOpen: 'No se encontraron puertos abiertos.',
+  scannerPort: 'Puerto',
+  scannerServiceCol: 'Servicio',
+  scannerVersion: 'Versión / banner',
+  scannerRisky: 'Servicio potencialmente riesgoso si está expuesto',
+  scannerExplain: 'Pedir a la IA que explique los riesgos',
+  scannerLegal:
+    'Escanea solo equipos tuyos o con autorización por escrito. El escaneo no autorizado de sistemas ajenos puede ser un delito.',
   securityTitle: 'Centro de seguridad',
   securityIntro:
     'Elige una revisión: el agente la hace, te explica cada problema en palabras sencillas y te ofrece corregirlo. Todo lo que sale de tu proyecto te pide permiso antes.',
@@ -392,6 +410,24 @@ const en: Record<Key, string> = {
   collapseAll: 'Collapse all',
   clear: 'Clear',
   riskHigh: 'HIGH RISK',
+  scannerTitle: 'Port scanner',
+  scannerIntro:
+    'nmap-style: discover open ports, services and versions. Your local network works directly; for a public target, confirm it is yours or you are authorized.',
+  scannerTarget: 'Target',
+  scannerService: 'Detect service and version',
+  scannerAuthorize:
+    'I confirm this target is mine or I have written authorization to scan it. Scanning other people systems without permission is a crime.',
+  scannerRun: 'Scan',
+  scannerStop: 'Stop',
+  scannerSummary: '{open} open ports on {hosts} host(s) · {ports} ports checked',
+  scannerNoneOpen: 'No open ports found.',
+  scannerPort: 'Port',
+  scannerServiceCol: 'Service',
+  scannerVersion: 'Version / banner',
+  scannerRisky: 'Service potentially risky if exposed',
+  scannerExplain: 'Ask the AI to explain the risks',
+  scannerLegal:
+    'Only scan systems you own or are authorized to test. Unauthorized scanning of third-party systems may be a crime.',
   securityTitle: 'Security center',
   securityIntro:
     'Pick a check: the agent runs it, explains each problem in plain words and offers to fix it. Anything outside your project asks for permission first.',

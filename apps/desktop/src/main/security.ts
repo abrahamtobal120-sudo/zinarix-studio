@@ -922,7 +922,16 @@ export function parsePorts(spec: string | undefined): number[] {
   return [...out];
 }
 
-export async function resolveScanTargets(target: string): Promise<string[]> {
+/**
+ * Resolves a scan target to a list of IPs. Public hosts are refused unless `allowPublic`
+ * is set — which only the user can set, by attesting in the scanner UI that the target is
+ * theirs or authorized. The AI's own port_scan tool never passes it, so the model cannot
+ * self-authorize scanning a third party.
+ */
+export async function resolveScanTargets(
+  target: string,
+  opts: { allowPublic?: boolean } = {},
+): Promise<{ ips: string[]; public: boolean }> {
   const t = target
     .trim()
     .replace(/^https?:\/\//, '')
@@ -932,18 +941,138 @@ export async function resolveScanTargets(target: string): Promise<string[]> {
     if (Number(cidr[2]) < 24)
       throw new Error('Solo se permiten rangos /24 o más pequeños (máximo 256 direcciones).');
     const ip = `${cidr[1]}.1`;
-    if (!isPrivateIp(ip)) throw new Error('Solo se pueden escanear redes privadas (tu red local).');
-    return Array.from({ length: 254 }, (_, i) => `${cidr[1]}.${i + 1}`);
+    const isPub = !isPrivateIp(ip);
+    if (isPub && !opts.allowPublic)
+      throw new Error('Solo se pueden escanear rangos de tu red privada.');
+    return { ips: Array.from({ length: 254 }, (_, i) => `${cidr[1]}.${i + 1}`), public: isPub };
   }
   const host = t.split(':')[0]!;
   const ips = isIP(host) ? [host] : (await dns.lookup(host, { all: true })).map((x) => x.address);
   const ip = ips[0];
   if (!ip) throw new Error(`No se pudo resolver ${host}`);
-  if (!isPrivateIp(ip))
+  const isPub = !isPrivateIp(ip);
+  if (isPub && !opts.allowPublic)
     throw new Error(
-      'Por seguridad y por ley, solo se escanean tus propios equipos: localhost o direcciones de tu red local (192.168.x.x, 10.x.x.x, 172.16–31.x.x). Para revisar un sitio público usa check_site_security.',
+      'Por seguridad y por ley, la IA solo escanea tus equipos (localhost o tu red local). Para un objetivo público, usa el Escáner del Centro de seguridad y confirma que es tuyo o que tienes autorización.',
     );
-  return [ip];
+  return { ips: [ip], public: isPub };
+}
+
+/** A short, polite service/version probe: read the banner, or ask HTTP if the port is silent. */
+function grabBanner(host: string, port: number, timeout: number): Promise<string> {
+  return new Promise((res) => {
+    const s = connect({ host, port, timeout });
+    let data = '';
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      s.destroy();
+      const line =
+        data
+          .replace(/\r/g, '')
+          .split('\n')
+          .find((l) => l.trim()) ?? '';
+      if (/^HTTP\//.test(line)) {
+        const server = /server:\s*(.+)/i.exec(data)?.[1]?.trim();
+        res(server ? `HTTP · ${server}` : 'HTTP');
+      } else res(line.trim().slice(0, 80));
+    };
+    s.once('connect', () => {
+      // Many services greet on connect; web servers stay silent until asked. Wait briefly,
+      // then send a harmless HTTP HEAD if nothing arrived.
+      setTimeout(() => {
+        if (!data && !s.destroyed) s.write(`HEAD / HTTP/1.0\r\nHost: ${host}\r\n\r\n`);
+      }, 350);
+    });
+    s.on('data', (d) => {
+      data += d.toString('latin1');
+      if (data.length > 2048 || /\r?\n\r?\n/.test(data)) finish();
+    });
+    s.once('error', () => {
+      if (!settled) {
+        settled = true;
+        res('');
+      }
+    });
+    s.once('timeout', finish);
+    setTimeout(finish, timeout);
+  });
+}
+
+export interface ScanHit {
+  port: number;
+  service: string;
+  banner?: string;
+  risky: boolean;
+}
+export interface ScanHostResult {
+  host: string;
+  reverse?: string;
+  openPorts: ScanHit[];
+}
+
+/**
+ * nmap-style scan with service/version detection, used by the Scanner UI. Reports progress
+ * and returns structured results. Public targets require `authorized` (set by the user).
+ */
+export async function runScan(
+  o: {
+    target: string;
+    ports?: string;
+    serviceDetection?: boolean;
+    authorized?: boolean;
+  },
+  signal: AbortSignal,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ hosts: ScanHostResult[]; public: boolean; scannedPorts: number }> {
+  const { ips, public: isPub } = await resolveScanTargets(o.target, { allowPublic: o.authorized });
+  const sweep = ips.length > 1;
+  const ports = sweep
+    ? [21, 22, 23, 80, 139, 443, 445, 554, 3389, 5000, 8080, 9100, 62078]
+    : parsePorts(o.ports);
+  const jobs: [string, number][] = ips.flatMap((h) => ports.map((p) => [h, p] as [string, number]));
+  const open = new Map<string, number[]>();
+  let i = 0;
+  let done = 0;
+  const worker = async () => {
+    while (i < jobs.length && !signal.aborted) {
+      const [h, p] = jobs[i++]!;
+      if (await probe(h, p, sweep ? 450 : 800)) open.set(h, [...(open.get(h) ?? []), p]);
+      if (onProgress && ++done % 20 === 0) onProgress(done, jobs.length);
+    }
+  };
+  await Promise.all(Array.from({ length: sweep ? 128 : 100 }, worker));
+  onProgress?.(jobs.length, jobs.length);
+  const hosts: ScanHostResult[] = [];
+  for (const [host, list] of [...open].sort()) {
+    const sorted = list.sort((a, b) => a - b);
+    const banners = new Map<number, string>();
+    if (o.serviceDetection !== false && !signal.aborted)
+      await Promise.all(
+        sorted.map(async (p) => {
+          const b = await grabBanner(host, p, 2000);
+          if (b) banners.set(p, redact(b));
+        }),
+      );
+    let reverse: string | undefined;
+    try {
+      reverse = (await dns.reverse(host))[0];
+    } catch {
+      // no PTR
+    }
+    hosts.push({
+      host,
+      reverse,
+      openPorts: sorted.map((p) => ({
+        port: p,
+        service: SERVICE[p] ?? 'desconocido',
+        banner: banners.get(p),
+        risky: RISKY_PORTS.has(p),
+      })),
+    });
+  }
+  return { hosts, public: isPub, scannedPorts: ports.length };
 }
 
 function probe(host: string, port: number, timeout: number): Promise<boolean> {
@@ -964,7 +1093,7 @@ export async function portScan(
   portsSpec: string | undefined,
   signal: AbortSignal,
 ): Promise<string> {
-  const hosts = await resolveScanTargets(target);
+  const { ips: hosts } = await resolveScanTargets(target);
   const sweep = hosts.length > 1;
   const ports = sweep
     ? [22, 80, 443, 445, 554, 3389, 5000, 8080, 9100, 62078]

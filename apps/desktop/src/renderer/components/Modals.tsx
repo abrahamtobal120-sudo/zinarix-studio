@@ -19,6 +19,7 @@ import {
 import { ModelPicker } from './ModelPicker';
 import { UsagePanel } from './Usage';
 import { SecurityCenter } from './SecurityCenter';
+import { Scanner } from './Scanner';
 import { fileIcon } from './icons';
 import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
@@ -40,6 +41,7 @@ export function Modals() {
       {modal?.kind === 'shortcuts' && <Shortcuts />}
       {modal?.kind === 'usage' && <UsagePanel />}
       {modal?.kind === 'security' && <SecurityCenter />}
+      {modal?.kind === 'scanner' && <Scanner />}
       {inputBox && <InputBox />}
     </>
   );

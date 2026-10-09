@@ -9,6 +9,7 @@ import type { AppEvent, Channel, WorkspaceInfo } from '../shared/api.js';
 import { EVENT_CHANNEL } from '../shared/api.js';
 import { AiService } from './ai.js';
 import { BrowserController } from './browser.js';
+import { runScan } from './security.js';
 import { Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
 
@@ -288,6 +289,34 @@ function registerIpc(): void {
       height: z.number().min(0).max(1e5),
     })
     .nullable();
+  const scans = new Map<string, AbortController>();
+  handle(
+    'security:scan',
+    z.tuple([
+      str,
+      z.object({
+        target: z.string().min(1).max(200),
+        ports: z.string().max(200).optional(),
+        serviceDetection: z.boolean().optional(),
+        authorized: z.boolean().optional(),
+      }),
+    ]),
+    async (requestId, opts) => {
+      const ac = new AbortController();
+      scans.set(requestId, ac);
+      try {
+        return await runScan(opts, ac.signal, (done, total) =>
+          send({ type: 'scan:progress', requestId, done, total }),
+        );
+      } finally {
+        scans.delete(requestId);
+      }
+    },
+  );
+  handle('security:scanAbort', z.tuple([str]), (requestId) => {
+    scans.get(requestId)?.abort();
+  });
+
   handle('browser:setBounds', z.tuple([rect]), (r) => {
     // The renderer measures in CSS px; the view is placed in window DIPs (differ when zoomed).
     const f = win?.webContents.getZoomFactor() ?? 1;

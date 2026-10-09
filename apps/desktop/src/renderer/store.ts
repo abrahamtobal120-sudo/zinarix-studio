@@ -27,7 +27,8 @@ export type Modal =
   | { kind: 'aiEdit' }
   | { kind: 'shortcuts' }
   | { kind: 'usage' }
-  | { kind: 'security' };
+  | { kind: 'security' }
+  | { kind: 'scanner' };
 
 export interface State {
   workspace: WorkspaceInfo | null;

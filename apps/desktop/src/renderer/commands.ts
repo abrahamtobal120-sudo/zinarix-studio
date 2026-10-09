@@ -100,6 +100,11 @@ export function commands(): Command[] {
       run: () => setState((s) => ({ chatOpen: !s.chatOpen })),
     },
     {
+      id: 'security.scanner',
+      label: t('scannerTitle'),
+      run: () => setState({ modal: { kind: 'scanner' } }),
+    },
+    {
       id: 'security.center',
       label: t('securityTitle'),
       run: () => setState({ modal: { kind: 'security' } }),

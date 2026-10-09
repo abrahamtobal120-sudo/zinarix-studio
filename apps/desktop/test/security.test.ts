@@ -94,13 +94,15 @@ describe('port scan limits', () => {
     expect(isPrivateIp('127.0.0.1')).toBe(true);
     expect(isPrivateIp('8.8.8.8')).toBe(false);
     expect(isPrivateIp('172.32.0.1')).toBe(false);
-    await expect(resolveScanTargets('8.8.8.8')).rejects.toThrow(/propios equipos/);
+    await expect(resolveScanTargets('8.8.8.8')).rejects.toThrow(/tus equipos|autoriz/);
     await expect(resolveScanTargets('192.168.0.0/16')).rejects.toThrow(/\/24/);
-    await expect(resolveScanTargets('203.0.113.0/24')).rejects.toThrow(/privadas/);
-    expect(await resolveScanTargets('192.168.1.0/24')).toHaveLength(254);
-    expect(await resolveScanTargets('localhost')).toEqual([
+    await expect(resolveScanTargets('203.0.113.0/24')).rejects.toThrow(/privada/);
+    expect((await resolveScanTargets('192.168.1.0/24')).ips).toHaveLength(254);
+    expect((await resolveScanTargets('localhost')).ips).toEqual([
       expect.stringMatching(/^(127\.0\.0\.1|::1)$/),
     ]);
+    // Public target allowed only with explicit authorization.
+    expect((await resolveScanTargets('8.8.8.8', { allowPublic: true })).public).toBe(true);
     expect(['4.17.9', '4.17.21', '4.17.16'].sort(compareVersions)).toEqual([
       '4.17.9',
       '4.17.16',

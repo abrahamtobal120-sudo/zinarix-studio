@@ -131,6 +131,23 @@ export interface ToolPreview {
   noAlways?: boolean;
 }
 
+export interface ScanHitView {
+  port: number;
+  service: string;
+  banner?: string;
+  risky: boolean;
+}
+export interface ScanHostView {
+  host: string;
+  reverse?: string;
+  openPorts: ScanHitView[];
+}
+export interface ScanResultView {
+  hosts: ScanHostView[];
+  public: boolean;
+  scannedPorts: number;
+}
+
 export interface BrowserStateView {
   url: string;
   title: string;
@@ -195,7 +212,8 @@ export type AppEvent =
   | { type: 'command'; command: string }
   | { type: 'browser:state'; state: BrowserStateView }
   /** The agent started using the browser: the UI should show the browser tab. */
-  | { type: 'browser:show' };
+  | { type: 'browser:show' }
+  | { type: 'scan:progress'; requestId: string; done: number; total: number };
 
 export interface OmniApi {
   workspace: {
@@ -251,6 +269,17 @@ export interface OmniApi {
     toolDecision(requestId: string, toolCallId: string, decision: ToolDecision): Promise<void>;
     /** Undo every file change the agent made in a conversation. Returns restored paths. */
     revert(conversationId: string): Promise<string[]>;
+  };
+  security: {
+    /**
+     * nmap-style scan. `authorized` (a public target is yours or you have written
+     * permission) is set by the user in the scanner UI, never by the AI.
+     */
+    scan(
+      requestId: string,
+      opts: { target: string; ports?: string; serviceDetection?: boolean; authorized?: boolean },
+    ): Promise<ScanResultView>;
+    scanAbort(requestId: string): Promise<void>;
   };
   browser: {
     /** Screen area (CSS px, window coordinates) where the page is drawn; null hides it. */
@@ -316,6 +345,8 @@ export const CHANNELS = [
   'ai:abort',
   'ai:toolDecision',
   'ai:revert',
+  'security:scan',
+  'security:scanAbort',
   'browser:setBounds',
   'browser:navigate',
   'browser:back',

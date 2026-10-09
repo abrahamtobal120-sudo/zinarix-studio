@@ -9,6 +9,7 @@ interface Check {
   desc: string;
   prompt: string;
   needsProject?: boolean;
+  opensScanner?: boolean;
   input?: { placeholder: string; build: (v: string) => string };
 }
 
@@ -38,10 +39,10 @@ const CHECKS: Check[] = [
   },
   {
     icon: '📡',
-    title: 'Mi red local',
-    desc: 'Descubre qué dispositivos de tu red tienen servicios expuestos (cámaras, impresoras, bases de datos…). Solo tu red.',
-    prompt:
-      'Averigua mi red local con network_status y luego escanea mi red privada (/24) con port_scan para ver qué dispositivos tienen puertos abiertos. Dime cuáles son riesgosos y cómo protegerlos.',
+    title: 'Escáner de puertos (nmap)',
+    desc: 'Escáner con interfaz: elige objetivo y puertos, descubre servicios y versiones. Tu red local directo; otros objetivos piden que confirmes autorización.',
+    prompt: '',
+    opensScanner: true,
   },
   {
     icon: '🌐',
@@ -94,7 +95,14 @@ export function SecurityCenter() {
                   <strong>{c.title}</strong>
                 </div>
                 <p>{c.desc}</p>
-                {c.input ? (
+                {c.opensScanner ? (
+                  <button
+                    className="primary"
+                    onClick={() => setState({ modal: { kind: 'scanner' } })}
+                  >
+                    {t('securityRun')}
+                  </button>
+                ) : c.input ? (
                   <form
                     className="sec-input"
                     onSubmit={(e) => {
