@@ -243,3 +243,38 @@ describe('saved conversations', () => {
     expect(JSON.stringify(got.messages[1]!.display)).not.toContain('ghp_');
   });
 });
+
+describe('catalog resilience', () => {
+  it('keeps the valid providers when one entry is unknown to this build', async () => {
+    const { parseCatalog } = await import('../src/catalog.js');
+    const good = {
+      id: 'good',
+      name: 'Good',
+      adapter: 'openai-compatible',
+      baseUrl: 'https://example.com/v1',
+      auth: { type: 'bearer' },
+      region: 'global',
+      category: 'aggregator',
+      modelsEndpoint: '/models',
+      supports: {
+        listModels: true,
+        streaming: true,
+        tools: true,
+        vision: false,
+        jsonMode: false,
+        embeddings: false,
+        fim: false,
+      },
+      status: 'active',
+      verifiedAt: null,
+    };
+    const text = JSON.stringify({
+      schemaVersion: 1,
+      generatedAt: '2026-10-08',
+      providers: [good, { ...good, id: 'future', adapter: 'some-future-adapter' }],
+    });
+    const cat = parseCatalog(text, 'test');
+    expect(cat.providers.map((p) => p.id)).toEqual(['good']);
+    expect(() => parseCatalog('{"schemaVersion":1,"providers":[]}', 'test')).toThrow();
+  });
+});

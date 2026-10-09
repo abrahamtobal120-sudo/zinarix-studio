@@ -2,8 +2,7 @@ import { createPublicKey, verify } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { Catalog, OmniError } from '@omni/shared';
-import type { CatalogEntry } from '@omni/shared';
+import { Catalog, CatalogEntry, OmniError } from '@omni/shared';
 import type { OmniConfig } from './config.js';
 import type { OmniPaths } from './paths.js';
 
@@ -31,11 +30,25 @@ export function parseCatalog(text: string, source: string): Catalog {
     throw new OmniError('config', `${source}: invalid JSON (${(e as Error).message})`);
   }
   const res = Catalog.safeParse(raw);
-  if (!res.success) {
-    const issues = res.error.issues.slice(0, 5).map((i) => `${i.path.join('.')}: ${i.message}`);
-    throw new OmniError('config', `${source}: invalid catalog: ${issues.join('; ')}`);
+  if (res.success) return res.data;
+  // One provider this build does not understand (e.g. a newer adapter) must not take every
+  // other provider down with it: keep the entries that are valid, drop the rest.
+  const list = (raw as { providers?: unknown } | null)?.providers;
+  if (Array.isArray(list)) {
+    const kept: CatalogEntry[] = [];
+    const seen = new Set<string>();
+    for (const p of list) {
+      const e = CatalogEntry.safeParse(p);
+      if (e.success && !seen.has(e.data.id)) {
+        seen.add(e.data.id);
+        kept.push(e.data);
+      }
+    }
+    const partial = Catalog.safeParse({ ...(raw as object), providers: kept });
+    if (partial.success && kept.length) return partial.data;
   }
-  return res.data;
+  const issues = res.error.issues.slice(0, 5).map((i) => `${i.path.join('.')}: ${i.message}`);
+  throw new OmniError('config', `${source}: invalid catalog: ${issues.join('; ')}`);
 }
 
 /** Ed25519 detached signature over the exact bytes of providers.json (base64). */
