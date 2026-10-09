@@ -38,13 +38,19 @@ describe('agent safety', () => {
       'browser_type',
       'edit_file',
       'glob',
+      'http_request',
       'list_dir',
+      'network_status',
       'read_file',
       'read_many_files',
+      'read_system_file',
       'run_command',
       'search',
+      'set_env_var',
+      'sql_query',
       'tree',
       'write_file',
+      'write_system_file',
     ]);
     for (const t of TOOLS) expect(t.parameters).toMatchObject({ type: 'object' });
   });
@@ -114,5 +120,57 @@ describe('reading many files', () => {
     compactToolResults(msgs);
     expect(msgs[1]!.content).toBe(big);
     expect(msgs[0]!.content.length).toBeLessThan(500);
+  });
+});
+
+describe('actions beyond the project', () => {
+  it('never touches credential stores', async () => {
+    const { deniedPath } = await import('../src/main/system.js');
+    const { homedir } = await import('node:os');
+    const { join } = await import('node:path');
+    const h = homedir();
+    for (const p of [
+      join(h, '.ssh', 'id_ed25519'),
+      join(h, '.omni', 'config.json'),
+      join(h, '.aws', 'credentials'),
+      join(h, '.config', 'google-chrome', 'Default', 'Cookies'),
+      join(h, '.gnupg', 'private-keys-v1.d'),
+      '/etc/shadow',
+    ])
+      expect(deniedPath(p, 'read'), p).not.toBeNull();
+    expect(deniedPath(join(h, '.bashrc'), 'write')).toBeNull();
+    expect(deniedPath(join(h, '.ssh', 'config'), 'read')).toBeNull();
+    expect(deniedPath('/etc/hosts', 'read')).toBeNull();
+    expect(deniedPath('/usr/bin/ls', 'write')).not.toBeNull();
+  });
+
+  it('treats anything but a single read as a SQL write', async () => {
+    const { isWriteSql } = await import('../src/main/system.js');
+    expect(isWriteSql('SELECT * FROM users;')).toBe(false);
+    expect(isWriteSql("select 'drop table' as x")).toBe(false);
+    expect(isWriteSql('WITH a AS (SELECT 1) SELECT * FROM a')).toBe(false);
+    expect(isWriteSql('select 1; drop table users')).toBe(true);
+    expect(isWriteSql('WITH a AS (SELECT 1) DELETE FROM users')).toBe(true);
+    expect(isWriteSql('UPDATE users SET a = 1')).toBe(true);
+    expect(isWriteSql('select * into backup from users')).toBe(true);
+  });
+
+  it('writes and replaces a permanent variable in the shell profile', async () => {
+    const { profileWithVar } = await import('../src/main/system.js');
+    const a = profileWithVar('alias ll="ls -l"', 'MY_URL', "it's", false);
+    expect(a).toBe(`alias ll="ls -l"\nexport MY_URL='it'\\''s' # zinarix\n`);
+    expect(profileWithVar(a, 'MY_URL', 'x', false)).toBe(
+      `alias ll="ls -l"\nexport MY_URL='x' # zinarix\n`,
+    );
+  });
+
+  it('warns about admin commands and commands outside the project', async () => {
+    const { commandWarning } = await import('../src/main/system.js');
+    expect(commandWarning({ command: 'ls' }, '/p')).toBeNull();
+    expect(commandWarning({ command: 'ls', cwd: '/p/sub' }, '/p')).toBeNull();
+    expect(commandWarning({ command: 'ls', cwd: '/etc' }, '/p')?.risk).toBe('high');
+    expect(commandWarning({ command: 'pacman -Syu', admin: true }, '/p')?.warning).toMatch(
+      /ADMINISTRADOR/,
+    );
   });
 });

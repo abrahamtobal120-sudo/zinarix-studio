@@ -2673,3 +2673,40 @@ button.link {
   color: #4daafc;
   font-weight: 700;
 }
+/* Approvals for actions beyond the project */
+.tool-card.risk-high.approval {
+  border-left-color: var(--danger);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.tool-warning {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 6px 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg-strong);
+}
+.tool-warning.medium {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.tool-warning.high {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.tool-risk {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--warn);
+}
+.tool-warning.high .tool-risk {
+  background: var(--danger);
+}

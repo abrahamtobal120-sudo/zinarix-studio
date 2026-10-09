@@ -95,6 +95,12 @@ const TOOL_ICON: Record<string, string> = {
   browser_type: '⌨️',
   browser_scroll: '↕️',
   browser_back: '↩️',
+  network_status: '📡',
+  http_request: '🔌',
+  sql_query: '🗄️',
+  read_system_file: '📄',
+  write_system_file: '🛠️',
+  set_env_var: '🔧',
 };
 
 function toolTitle(step: ToolStep): string {
@@ -119,6 +125,14 @@ function toolTitle(step: ToolStep): string {
     case 'browser_read':
     case 'browser_back':
       return '';
+    case 'network_status':
+      return String(a.target ?? '');
+    case 'http_request':
+      return `${String(a.method ?? 'GET')} ${String(a.url ?? '')}`;
+    case 'sql_query':
+      return String(a.query ?? '');
+    case 'set_env_var':
+      return `${String(a.name ?? '')} (${a.scope === 'user' ? 'permanente' : 'sesión'})`;
     default:
       return String(a.path ?? '.');
   }
@@ -161,7 +175,7 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
   const statusIcon = { running: '⏳', approval: '⏸', ok: '✓', error: '✗' }[step.status];
   const p = step.preview;
   return (
-    <div className={`tool-card ${step.status}`}>
+    <div className={`tool-card ${step.status} ${p?.risk ? `risk-${p.risk}` : ''}`}>
       <div className="tool-head" onClick={() => setOpen(!open)}>
         <span>{icon}</span>
         <span className="tool-name">{step.name}</span>
@@ -175,7 +189,30 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
       </div>
       {open && (
         <div className="tool-body">
-          {p?.command !== undefined && <pre className="tool-cmd">$ {p.command}</pre>}
+          {p?.warning && step.status === 'approval' && (
+            <div className={`tool-warning ${p.risk ?? 'medium'}`}>
+              <span className="tool-risk">
+                {p.risk === 'high' ? t('riskHigh') : t('riskMedium')}
+              </span>
+              <span>{p.warning}</span>
+            </div>
+          )}
+          {p?.action && p.url === undefined && (
+            <div className="tool-web">
+              <b>{p.action}</b>
+              {p.path && p.before === undefined ? (
+                <>
+                  {' '}
+                  · <span className="tool-url">{p.path}</span>
+                </>
+              ) : null}
+            </div>
+          )}
+          {p?.command !== undefined && (
+            <pre className="tool-cmd">
+              {step.name === 'run_command' ? `$ ${p.command}` : p.command}
+            </pre>
+          )}
           {p?.url !== undefined && (
             <div className="tool-web">
               🌐 <b>{p.action}</b> · <span className="tool-url">{p.url}</span>
@@ -192,7 +229,7 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
           <button className="primary" onClick={() => onDecide('approve')}>
             ✓ {t('approve')}
           </button>
-          <button onClick={() => onDecide('always')}>{t('approveAlways')}</button>
+          {!p?.noAlways && <button onClick={() => onDecide('always')}>{t('approveAlways')}</button>}
           <button className="danger" onClick={() => onDecide('deny')}>
             ✗ {t('reject')}
           </button>

@@ -124,6 +124,11 @@ export interface ToolPreview {
   /** Browser tools: the page address and what the AI wants to do there. */
   url?: string;
   action?: string;
+  /** Actions beyond the project: how risky, and what the user should know before approving. */
+  risk?: 'medium' | 'high';
+  warning?: string;
+  /** High-risk: approved one at a time ("always" is not offered). */
+  noAlways?: boolean;
 }
 
 export interface BrowserStateView {
