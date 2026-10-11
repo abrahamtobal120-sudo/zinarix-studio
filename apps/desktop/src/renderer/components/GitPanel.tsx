@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useCallback, useEffect, useState } from 'react';
 import type {
   GitBranchView,
@@ -157,7 +158,7 @@ export function GitPanel() {
         <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
           {(isStaged ? f.index : f.work) !== 'D' && (
             <button title={t('gitOpenFile')} onClick={() => void openFile(f.path)}>
-              📄
+              <Icon name="file" size={15} />
             </button>
           )}
           {!isStaged && (
@@ -168,7 +169,7 @@ export function GitPanel() {
                 void act('discard', () => api().git.discard([f.path]));
               }}
             >
-              ↶
+              <Icon name="undo" size={15} />
             </button>
           )}
           <button
@@ -202,7 +203,7 @@ export function GitPanel() {
         <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
         <span className="sidebar-actions">
           <button title={t('gitRefresh')} onClick={() => void refresh()}>
-            ⟳
+            <Icon name="refresh" size={15} />
           </button>
           {hasRemote && (
             <>
@@ -211,14 +212,14 @@ export function GitPanel() {
                 disabled={busy !== null}
                 onClick={() => void sync('pull')}
               >
-                ⇣
+                <Icon name="pull" size={15} />
               </button>
               <button
                 title={t('gitPush')}
                 disabled={busy !== null}
                 onClick={() => void sync('push')}
               >
-                ⇡
+                <Icon name="push" size={15} />
               </button>
             </>
           )}
@@ -226,13 +227,13 @@ export function GitPanel() {
             title={t('gitStash')}
             onClick={() => void act('stash', () => api().git.stash('push'), t('gitStashed'))}
           >
-            📥
+            <Icon name="stash" size={15} />
           </button>
           <button
             title={t('gitStashPop')}
             onClick={() => void act('stash', () => api().git.stash('pop'), t('gitStashPopped'))}
           >
-            📤
+            <Icon name="download" size={15} />
           </button>
         </span>
       </div>
@@ -243,7 +244,7 @@ export function GitPanel() {
           title={t('gitBranches')}
           onClick={() => setView(view === 'branches' ? 'changes' : 'branches')}
         >
-          ⎇ {st?.branch ?? '—'}
+          <Icon name="branch" size={13} /> {st?.branch ?? '—'}
         </button>
         {st?.ahead || st?.behind ? (
           <span className="git-track" title={st?.upstream ?? ''}>
@@ -264,7 +265,9 @@ export function GitPanel() {
       {/* Remote / GitHub connector */}
       {!hasRemote && st?.isRepo && (
         <div className="git-connect">
-          <div className="git-connect-title">☁ {t('gitNoRemote')}</div>
+          <div className="git-connect-title">
+            <Icon name="cloud" size={15} /> {t('gitNoRemote')}
+          </div>
           <div className="git-connect-actions">
             <button className="primary" onClick={() => setState({ modal: { kind: 'publish' } })}>
               {t('ghPublish')}
@@ -328,14 +331,15 @@ export function GitPanel() {
                 onClick={() => void commit()}
                 title="Ctrl+Enter"
               >
-                ✓ {staged.length || amend ? t('gitCommit') : t('gitCommitAll')}
+                <Icon name="check" size={14} />{' '}
+                {staged.length || amend ? t('gitCommit') : t('gitCommitAll')}
               </button>
               <button
                 disabled={busy !== null || !st?.files.length}
                 onClick={() => void generate()}
                 title={t('gitAiMessageTitle')}
               >
-                {busy === 'ai' ? '…' : '✨'} {t('gitAiMessage')}
+                {busy === 'ai' ? '…' : <Icon name="sparkles" size={14} />} {t('gitAiMessage')}
               </button>
               <label className="check" title={t('gitAmendTitle')}>
                 <input
@@ -349,7 +353,11 @@ export function GitPanel() {
             </div>
           </div>
           <div className="tree git-list">
-            {busy && <div className="git-busy">⏳ {busy}…</div>}
+            {busy && (
+              <div className="git-busy">
+                <Icon name="clock" size={13} className="spin-slow" /> {busy}…
+              </div>
+            )}
             {staged.length > 0 && (
               <>
                 <div className="git-group">
@@ -379,7 +387,7 @@ export function GitPanel() {
                       void act('discard', () => api().git.discard(unstaged.map((f) => f.path)));
                     }}
                   >
-                    ↶
+                    <Icon name="undo" size={15} />
                   </button>
                   <button
                     title={t('gitStageAll')}
@@ -391,7 +399,11 @@ export function GitPanel() {
               )}
             </div>
             {unstaged.map((f) => row(f, false))}
-            {st && st.files.length === 0 && <div className="git-clean">✓ {t('gitClean')}</div>}
+            {st && st.files.length === 0 && (
+              <div className="git-clean">
+                <Icon name="check" size={14} /> {t('gitClean')}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -448,7 +460,7 @@ export function GitPanel() {
                   });
               }}
             >
-              ＋
+              <Icon name="plus" size={15} />
             </button>
           </div>
           {branches.map((b) => (
@@ -467,7 +479,9 @@ export function GitPanel() {
                 );
               }}
             >
-              <span className="git-icon">{b.remote ? '☁' : '⎇'}</span>
+              <span className="git-icon">
+                <Icon name={b.remote ? 'cloud' : 'branch'} size={14} />
+              </span>
               <span className="git-name">{b.name}</span>
               <span className="git-dir">{b.upstream ?? ''}</span>
               {!b.current && !b.remote && (
@@ -487,7 +501,7 @@ export function GitPanel() {
                       });
                     }}
                   >
-                    🗑
+                    <Icon name="trash" size={14} />
                   </button>
                 </span>
               )}

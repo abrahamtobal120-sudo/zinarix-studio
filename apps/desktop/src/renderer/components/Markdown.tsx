@@ -2,6 +2,8 @@ import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { t } from '../i18n';
 import { getEditor, setState, toast } from '../store';
+import { fileIcon } from './icons';
+import { Icon } from './Icon';
 import { runInTerminal } from './Terminal';
 
 /**
@@ -106,6 +108,28 @@ function inline(text: string): ReactNode {
   return out;
 }
 
+/** Fence names → file extension, so the code header shows the right file badge. */
+const LANG_EXT: Record<string, string> = {
+  typescript: 'ts',
+  javascript: 'js',
+  python: 'py',
+  rust: 'rs',
+  golang: 'go',
+  ruby: 'rb',
+  csharp: 'cs',
+  'c++': 'cpp',
+  bash: 'sh',
+  shell: 'sh',
+  zsh: 'sh',
+  console: 'sh',
+  powershell: 'ps1',
+  markdown: 'md',
+  yaml: 'yml',
+  dockerfile: 'dockerfile',
+  text: 'txt',
+  '': 'txt',
+};
+
 const SHELL = /^(bash|sh|shell|zsh|console|terminal|powershell|ps1|cmd)$/i;
 
 function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boolean }) {
@@ -131,7 +155,10 @@ function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boo
   return (
     <div className="code-block">
       <div className="code-head">
-        <span>{lang || 'text'}</span>
+        <span className="code-lang">
+          {fileIcon(`x.${LANG_EXT[lang.toLowerCase()] ?? lang.toLowerCase()}`)}
+          {lang || 'text'}
+        </span>
         {done && (
           <span className="code-actions">
             <button
@@ -141,10 +168,17 @@ function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boo
                 setTimeout(() => setCopied(false), 1200);
               }}
             >
+              <Icon name={copied ? 'check' : 'copy'} size={12} />
               {copied ? t('copied') : t('copy')}
             </button>
-            <button onClick={() => insert(false)}>{t('insert')}</button>
-            <button onClick={() => insert(true)}>{t('replaceSel')}</button>
+            <button onClick={() => insert(false)}>
+              <Icon name="insert" size={12} />
+              {t('insert')}
+            </button>
+            <button onClick={() => insert(true)}>
+              <Icon name="replace" size={12} />
+              {t('replaceSel')}
+            </button>
             {SHELL.test(lang) && (
               <button
                 onClick={() => {
@@ -153,7 +187,8 @@ function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boo
                   setTimeout(() => void runInTerminal(code), 300);
                 }}
               >
-                ▶ {t('runInTerminal')}
+                <Icon name="play" size={12} />
+                {t('runInTerminal')}
               </button>
             )}
           </span>

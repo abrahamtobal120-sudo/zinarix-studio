@@ -3,6 +3,7 @@ import type { BrowserStateView } from '../../shared/api';
 import { BROWSER_TAB, api, setState, toast, useStore } from '../store';
 import { t } from '../i18n';
 import { askInChat } from './Chat';
+import { Icon as UiIcon } from './Icon';
 
 const EMPTY: BrowserStateView = {
   url: '',
@@ -271,14 +272,18 @@ export function BrowserPane({ visible }: { visible: boolean }) {
                 ))}
               </div>
               <div className="browser-ask">
-                <span className="browser-ask-title">✨ {t('browserAskAgent')}</span>
+                <span className="browser-ask-title">
+                  <UiIcon name="sparkles" size={14} /> {t('browserAskAgent')}
+                </span>
                 {[t('browserIdea1'), t('browserIdea2'), t('browserIdea3')].map((idea) => (
                   <button key={idea} className="browser-chip" onClick={() => askInChat(idea)}>
                     {idea}
                   </button>
                 ))}
               </div>
-              <p className="browser-safety">🔒 {t('browserEmptyHint')}</p>
+              <p className="browser-safety">
+                <UiIcon name="lock" size={13} /> {t('browserEmptyHint')}
+              </p>
             </div>
           )}
         </div>

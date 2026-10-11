@@ -6,6 +6,7 @@ import { t } from '../i18n';
 import { api, getState, openFile, reloadFromDisk, toast, useStore } from '../store';
 import { fileIcon } from './icons';
 import { fuzzy } from './QuickPick';
+import { Icon } from './Icon';
 
 type Mode = 'content' | 'name';
 
@@ -282,7 +283,7 @@ export function SearchView() {
             </button>
           )}
           <button title={t('refresh')} onClick={() => setNonce((n) => n + 1)}>
-            ⟳
+            <Icon name="refresh" size={14} />
           </button>
           <button
             title={t('clear')}
@@ -292,7 +293,7 @@ export function SearchView() {
               input.current?.focus();
             }}
           >
-            ✕
+            <Icon name="x" size={14} />
           </button>
         </span>
       </div>
@@ -323,7 +324,9 @@ export function SearchView() {
             </button>
           )}
           <div className={`sx-field ${reError ? 'error' : ''}`}>
-            <span className="sx-icon">⌕</span>
+            <span className="sx-icon">
+              <Icon name="search" size={14} />
+            </span>
             <input
               ref={input}
               value={query}
@@ -365,7 +368,9 @@ export function SearchView() {
         {mode === 'content' && showReplace && (
           <div className="sx-row sx-indent">
             <div className="sx-field">
-              <span className="sx-icon">⇄</span>
+              <span className="sx-icon">
+                <Icon name="replace" size={14} />
+              </span>
               <input
                 value={replace}
                 placeholder={t('replacePlaceholder')}
@@ -378,14 +383,14 @@ export function SearchView() {
                 disabled={!grouped.length}
                 onClick={() => void replaceIn(grouped.map(([p]) => p))}
               >
-                ⇶
+                <Icon name="replace" size={14} />
               </button>
             </div>
           </div>
         )}
         {reError && <div className="sx-error">{reError}</div>}
         <button className="sx-filters-btn" onClick={() => setShowFilters(!showFilters)}>
-          {showFilters ? '▾' : '▸'} {t('searchFilters')}
+          <Icon name={showFilters ? 'chevronDown' : 'chevron'} size={12} /> {t('searchFilters')}
           {(include || exclude) && <span className="sx-dot" />}
         </button>
         {showFilters && (
@@ -435,7 +440,9 @@ export function SearchView() {
       <div className="sx-results" ref={list}>
         {!query && workspace && (
           <div className="sx-empty">
-            <div className="sx-empty-icon">{mode === 'content' ? '🔎' : '📄'}</div>
+            <div className="sx-empty-icon">
+              <Icon name={mode === 'content' ? 'search' : 'file'} size={34} />
+            </div>
             <p>{mode === 'content' ? t('searchHelpContent') : t('searchHelpName')}</p>
             <p className="dim">
               <kbd>↑</kbd> <kbd>↓</kbd> {t('navigate')} · <kbd>Enter</kbd> {t('openKey')}
@@ -488,7 +495,7 @@ export function SearchView() {
                         void replaceIn([path]);
                       }}
                     >
-                      ⇄
+                      <Icon name="replace" size={14} />
                     </button>
                   )}
                   <span className="sx-count">{l.length}</span>

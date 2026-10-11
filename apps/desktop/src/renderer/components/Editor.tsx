@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useEffect, useRef } from 'react';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
@@ -108,7 +109,7 @@ export function EditorArea() {
               }}
             >
               <span className="tab-name">
-                {tab.path === SECURITY_TAB && '🛡️ '}
+                {tab.path === SECURITY_TAB && <Icon name="shield" size={13} />}
                 {tab.path === BROWSER_TAB && (
                   <svg
                     className="tab-globe"
@@ -135,7 +136,7 @@ export function EditorArea() {
                   closeTab(tab.path);
                 }}
               >
-                {tab.dirty ? '●' : '×'}
+                {tab.dirty ? '●' : <Icon name="x" size={13} />}
               </button>
             </div>
           ))}

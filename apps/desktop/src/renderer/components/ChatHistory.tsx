@@ -3,6 +3,7 @@ import type { ConversationView } from '../../shared/api';
 import { t } from '../i18n';
 import { api, askText, toast, useStore } from '../store';
 import { ProviderLogo } from './ProviderLogo';
+import { Icon } from './Icon';
 
 function bucket(ts: number): string {
   const day = 86_400_000;
@@ -91,7 +92,7 @@ export function ChatHistory({
     <div className="chat-history">
       <div className="ch-head">
         <button className="ch-back" onClick={onClose} title={t('histBack')}>
-          ←
+          <Icon name="back" size={15} />
         </button>
         <span className="ch-title">{t('histTitle')}</span>
       </div>
@@ -110,7 +111,7 @@ export function ChatHistory({
               onClick={() => setOnlyProject(true)}
               title={workspace.root}
             >
-              📁 {workspace.name}
+              <Icon name="folder" size={13} /> {workspace.name}
             </button>
             <button className={!onlyProject ? 'on' : ''} onClick={() => setOnlyProject(false)}>
               {t('histAll')}
@@ -135,7 +136,9 @@ export function ChatHistory({
                 {c.model ? (
                   <ProviderLogo id={c.model.split('/')[0]!} size={22} />
                 ) : (
-                  <span className="ch-dot">💬</span>
+                  <span className="ch-dot">
+                    <Icon name="sparkles" size={13} />
+                  </span>
                 )}
                 <span className="ch-main">
                   <span className="ch-name">{c.title}</span>
@@ -146,13 +149,13 @@ export function ChatHistory({
                 </span>
                 <span className="ch-actions" onClick={(e) => e.stopPropagation()}>
                   <button title={t('histRename')} onClick={() => void rename(c)}>
-                    ✏️
+                    <Icon name="edit" size={13} />
                   </button>
                   <button title={t('histExport')} onClick={() => void exportMd(c)}>
                     ⤓
                   </button>
                   <button title={t('histDelete')} onClick={() => void remove(c)}>
-                    🗑
+                    <Icon name="trash" size={13} />
                   </button>
                 </span>
               </div>

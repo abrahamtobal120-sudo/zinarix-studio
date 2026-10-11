@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 import type { ChatContext } from '../../shared/api';
 import { t } from '../i18n';
 import { api, attachToChat, getState, setState, toast, useStore } from '../store';
+import { Icon } from './Icon';
 
 interface Term {
   id: number;
@@ -251,7 +252,7 @@ export function TerminalPanel() {
                 title={t('termKill')}
                 onClick={(e) => (e.stopPropagation(), kill(id))}
               >
-                ×
+                <Icon name="x" size={12} />
               </button>
             </span>
           ))}
@@ -264,13 +265,13 @@ export function TerminalPanel() {
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => sendTerminalToChat(active)}
           >
-            💬 {t('termToChat')}
+            <Icon name="sparkles" size={13} /> {t('termToChat')}
           </button>
           <button title={t('termNew')} onClick={() => void create()}>
-            ＋
+            <Icon name="plus" size={15} />
           </button>
           <button title={t('termHide')} onClick={() => setState({ panelOpen: false })}>
-            ⌄
+            <Icon name="chevronDown" size={14} />
           </button>
         </span>
       </div>

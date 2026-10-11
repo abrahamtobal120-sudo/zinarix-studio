@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ChatContext,
@@ -24,7 +24,7 @@ import {
 } from '../store';
 import { runCommand } from '../commands';
 import { fileIcon } from './icons';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory } from './ChatHistory';
 import { Markdown } from './Markdown';
@@ -162,34 +162,41 @@ function fmtUsd(n: number | null): string {
   return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
 }
 
-const TOOL_ICON: Record<string, string> = {
-  list_dir: '📂',
-  read_file: '📖',
-  search: '🔍',
-  edit_file: '✏️',
-  write_file: '📝',
-  run_command: '⌨️',
-  tree: '🌳',
-  glob: '🧭',
-  read_many_files: '📚',
-  browser_open: '🌐',
-  browser_read: '👀',
-  browser_click: '👆',
-  browser_type: '⌨️',
-  browser_scroll: '↕️',
-  browser_back: '↩️',
-  network_status: '📡',
-  http_request: '🔌',
-  sql_query: '🗄️',
-  read_system_file: '📄',
-  write_system_file: '🛠️',
-  set_env_var: '🔧',
-  security_scan_project: '🛡️',
-  audit_dependencies: '📦',
-  security_check_system: '💻',
-  port_scan: '📡',
-  check_site_security: '🔒',
-  file_hash: '🧾',
+const TOOL_ICON: Record<string, IconName> = {
+  list_dir: 'folder',
+  read_file: 'file',
+  search: 'search',
+  edit_file: 'edit',
+  write_file: 'filePlus',
+  run_command: 'terminal',
+  tree: 'tree',
+  glob: 'filter',
+  read_many_files: 'books',
+  browser_open: 'globe',
+  browser_read: 'eye',
+  browser_click: 'pointer',
+  browser_type: 'keyboard',
+  browser_scroll: 'arrowsV',
+  browser_back: 'back',
+  network_status: 'wifi',
+  http_request: 'plug',
+  sql_query: 'database',
+  read_system_file: 'file',
+  write_system_file: 'wrench',
+  set_env_var: 'settings',
+  security_scan_project: 'shield',
+  audit_dependencies: 'package',
+  security_check_system: 'monitor',
+  port_scan: 'wifi',
+  check_site_security: 'lock',
+  file_hash: 'hash',
+};
+
+const STATUS_ICON: Record<ToolStep['status'], IconName> = {
+  running: 'clock',
+  approval: 'pause',
+  ok: 'check',
+  error: 'x',
 };
 
 function toolTitle(step: ToolStep): string {
@@ -263,20 +270,25 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
   useEffect(() => {
     if (step.status === 'approval') setOpen(true);
   }, [step.status]);
-  const icon = TOOL_ICON[step.name] ?? '🛠';
-  const statusIcon = { running: '⏳', approval: '⏸', ok: '✓', error: '✗' }[step.status];
+  const icon = TOOL_ICON[step.name] ?? 'wrench';
   const p = step.preview;
   return (
     <div className={`tool-card ${step.status} ${p?.risk ? `risk-${p.risk}` : ''}`}>
       <div className="tool-head" onClick={() => setOpen(!open)}>
-        <span>{icon}</span>
+        <span className="tool-icon">
+          <Icon name={icon} size={14} />
+        </span>
         <span className="tool-name">{step.name}</span>
         <span className="tool-arg" title={toolTitle(step)}>
           {toolTitle(step)}
         </span>
         <span className="tool-status">
           {step.summary ? `${step.summary} ` : ''}
-          {statusIcon}
+          <Icon
+            name={STATUS_ICON[step.status]}
+            size={13}
+            className={step.status === 'running' ? 'spin-slow' : undefined}
+          />
         </span>
       </div>
       {open && (
@@ -307,7 +319,8 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
           )}
           {p?.url !== undefined && (
             <div className="tool-web">
-              🌐 <b>{p.action}</b> · <span className="tool-url">{p.url}</span>
+              <Icon name="globe" size={13} /> <b>{p.action}</b> ·{' '}
+              <span className="tool-url">{p.url}</span>
             </div>
           )}
           {p?.path !== undefined && p.before !== undefined && p.after !== undefined && (
@@ -319,7 +332,7 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
       {step.status === 'approval' && (
         <div className="tool-actions">
           <button className="primary" onClick={() => onDecide('approve')}>
-            ✓ {t('approve')}
+            <Icon name="check" size={14} /> {t('approve')}
           </button>
           {!p?.noAlways && (
             // "Always" for run_command only covers this exact command (approvalKey in main/agent.ts).
@@ -333,7 +346,7 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
             </button>
           )}
           <button className="danger" onClick={() => onDecide('deny')}>
-            ✗ {t('reject')}
+            <Icon name="x" size={14} /> {t('reject')}
           </button>
         </div>
       )}
@@ -458,6 +471,14 @@ export function ChatPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
+  const [atBottom, setAtBottom] = useState(true);
+  // The input grows with its content (up to ~12 lines) instead of scrolling inside 3 rows.
+  useLayoutEffect(() => {
+    const el = textarea.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+  }, [input]);
 
   useEffect(() => {
     if (stick.current) scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
@@ -688,6 +709,41 @@ export function ChatPanel() {
     setTimeout(() => textarea.current?.focus(), 30);
   };
 
+  const continueLast = () => {
+    if (busy) return;
+    void send(t('chatContinuePrompt'));
+  };
+
+  const quoteTurn = (turn: Turn) => {
+    const text = turn.content.trim().split('\n').slice(0, 12).join('\n');
+    const quoted = text
+      .split('\n')
+      .map((l) => `> ${l}`)
+      .join('\n');
+    setInput((cur) => `${quoted}\n\n${cur}`);
+    setTimeout(() => {
+      const el = textarea.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }, 20);
+  };
+
+  const attachFile = () => {
+    const el = textarea.current;
+    const caret = el?.selectionStart ?? input.length;
+    const before = input.slice(0, caret);
+    const pad = before && !/\s$/.test(before) ? ' ' : '';
+    const next = `${before}${pad}@${input.slice(caret)}`;
+    setInput(next);
+    const at = before.length + pad.length + 1;
+    setTimeout(() => {
+      el?.focus();
+      el?.setSelectionRange(at, at);
+      updateSuggest(next, at);
+    }, 10);
+  };
+
   const copyTurn = (turn: Turn) => {
     void navigator.clipboard.writeText(turn.content);
     toast(t('copied'));
@@ -798,6 +854,11 @@ export function ChatPanel() {
   };
 
   const onInputKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape' && busy && !suggest) {
+      e.preventDefault();
+      void api().ai.abort(busy);
+      return;
+    }
     if (suggest) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
@@ -910,6 +971,7 @@ export function ChatPanel() {
         onScroll={(e) => {
           const el = e.currentTarget;
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          if (stick.current !== atBottom) setAtBottom(stick.current);
         }}
       >
         {turns.length === 0 && (
@@ -966,15 +1028,21 @@ export function ChatPanel() {
                   {!busy && i === lastUserIndex() && (
                     <div className="turn-actions user">
                       <button title={t('chatEdit')} onClick={() => void editLast()}>
-                        ✎ {t('chatEdit')}
+                        <Icon name="edit" size={13} /> {t('chatEdit')}
                       </button>
                     </div>
                   )}
                   {turn.context && turn.context.length > 0 && (
                     <div className="turn-context">
-                      {turn.context
-                        .map((c) => `${c.startsWith('terminal:') ? '⌨' : '📎'} ${contextLabel(c)}`)
-                        .join('  ')}
+                      {turn.context.map((c) => (
+                        <span key={c} className="turn-context-item">
+                          <Icon
+                            name={c.startsWith('terminal:') ? 'terminal' : 'paperclip'}
+                            size={11}
+                          />
+                          {contextLabel(c)}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </>
@@ -991,12 +1059,14 @@ export function ChatPanel() {
                   </div>
                   {turn.notices?.map((n, j) => (
                     <div key={j} className="turn-notice">
-                      ⚠ {n}
+                      <Icon name="warning" size={13} /> {n}
                     </div>
                   ))}
                   {turn.reasoning && (
                     <details className="turn-reasoning">
-                      <summary>💭</summary>
+                      <summary>
+                        <Icon name="brain" size={13} /> {t('thinking')}
+                      </summary>
                       {turn.reasoning}
                     </details>
                   )}
@@ -1012,11 +1082,15 @@ export function ChatPanel() {
                     ),
                   )}
                   {busy !== null && last && !turn.content && !turn.parts?.length && !turn.error && (
-                    <div className="typing">●●●</div>
+                    <div className="typing">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
                   )}
                   {turn.error && (
                     <div className="turn-error">
-                      ✗ {turn.error}
+                      <Icon name="warning" size={14} /> {turn.error}
                       {/key|llave|401/i.test(turn.error) && (
                         <button onClick={() => setState({ modal: { kind: 'providers' } })}>
                           {t('providers')}
@@ -1032,12 +1106,22 @@ export function ChatPanel() {
                     <div className="turn-actions">
                       {turn.content && (
                         <button title={t('copy')} onClick={() => copyTurn(turn)}>
-                          ⧉ {t('copy')}
+                          <Icon name="copy" size={13} /> {t('copy')}
+                        </button>
+                      )}
+                      {turn.content && (
+                        <button title={t('chatQuote')} onClick={() => quoteTurn(turn)}>
+                          <Icon name="quote" size={13} /> {t('chatQuote')}
                         </button>
                       )}
                       {last && (
                         <button title={t('chatRegenerate')} onClick={() => void regenerate()}>
-                          ↻ {t('chatRegenerate')}
+                          <Icon name="refresh" size={13} /> {t('chatRegenerate')}
+                        </button>
+                      )}
+                      {last && turn.content && !turn.error && (
+                        <button title={t('chatContinue')} onClick={continueLast}>
+                          <Icon name="continue" size={13} /> {t('chatContinue')}
                         </button>
                       )}
                     </div>
@@ -1048,10 +1132,29 @@ export function ChatPanel() {
           );
         })}
       </div>
+      {!atBottom && turns.length > 0 && !showHistory && (
+        <button
+          className="chat-to-bottom"
+          title={t('chatScrollBottom')}
+          aria-label={t('chatScrollBottom')}
+          onClick={() => {
+            stick.current = true;
+            setAtBottom(true);
+            scroller.current?.scrollTo({
+              top: scroller.current.scrollHeight,
+              behavior: 'smooth',
+            });
+          }}
+        >
+          <Icon name="arrowDown" size={15} />
+        </button>
+      )}
       {changed.length > 0 && !busy && (
         <div className="agent-changes">
-          ✏️ {t('agentChanged', { n: changed.length })}
-          <button onClick={() => void revert()}>↶ {t('revert')}</button>
+          <Icon name="edit" size={14} /> {t('agentChanged', { n: changed.length })}
+          <button onClick={() => void revert()}>
+            <Icon name="undo" size={13} /> {t('revert')}
+          </button>
         </div>
       )}
       <div className="chat-input">
@@ -1059,7 +1162,11 @@ export function ChatPanel() {
           <div className="chat-attachments">
             {attachments.map((c) => (
               <span key={c.source} className="chat-attachment" title={c.content.slice(-600)}>
-                {c.source.startsWith('terminal:') ? '⌨' : '📎'} {contextLabel(c.source)}
+                <Icon
+                  name={c.source.startsWith('terminal:') ? 'terminal' : 'paperclip'}
+                  size={12}
+                />{' '}
+                {contextLabel(c.source)}
                 <button
                   aria-label={t('removeAttachment')}
                   title={t('removeAttachment')}
@@ -1069,7 +1176,7 @@ export function ChatPanel() {
                     }))
                   }
                 >
-                  ×
+                  <Icon name="x" size={11} />
                 </button>
               </span>
             ))}
@@ -1085,7 +1192,7 @@ export function ChatPanel() {
                   setTermMenu(null);
                 }}
               >
-                ＋ {t('termOpenNew')}
+                <Icon name="plus" size={13} /> {t('termOpenNew')}
               </button>
             ) : (
               termMenu.flatMap((term) => [
@@ -1097,7 +1204,7 @@ export function ChatPanel() {
                     textarea.current?.focus();
                   }}
                 >
-                  ⌨ {t('termSession', { n: term.n })}
+                  <Icon name="terminal" size={13} /> {t('termSession', { n: term.n })}
                 </button>,
                 term.hasSelection && (
                   <button
@@ -1108,7 +1215,7 @@ export function ChatPanel() {
                       textarea.current?.focus();
                     }}
                   >
-                    ✂ {t('termSelection', { n: term.n })}
+                    <Icon name="scissors" size={13} /> {t('termSelection', { n: term.n })}
                   </button>
                 ),
               ])
@@ -1132,7 +1239,7 @@ export function ChatPanel() {
                 }}
               >
                 <span className="chat-suggest-label">
-                  {suggest.kind === 'file' ? `${fileIcon(it.id)} ` : ''}
+                  {suggest.kind === 'file' ? fileIcon(it.id) : null}
                   {it.label}
                 </span>
                 {it.hint && <span className="chat-suggest-hint">{it.hint}</span>}
@@ -1153,7 +1260,10 @@ export function ChatPanel() {
           onKeyDown={onInputKey}
         />
         <div className="chat-input-bar">
-          <label className="check agent-toggle" title={t('agentTitle')}>
+          <label
+            className={`check agent-toggle pill ${agentMode ? 'on' : ''}`}
+            title={t('agentTitle')}
+          >
             <input
               type="checkbox"
               checked={agentMode}
@@ -1161,22 +1271,30 @@ export function ChatPanel() {
             />
             <Icon name="bot" size={14} /> {t('agent')}
           </label>
-          <label className="check">
+          <label className={`check pill ${includeFile ? 'on' : ''}`} title={t('includeFile')}>
             <input
               type="checkbox"
               checked={includeFile}
               onChange={(e) => setIncludeFile(e.target.checked)}
             />
-            <Icon name="paperclip" size={14} />{' '}
+            <Icon name="file" size={14} />
             {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
           </label>
+          <button
+            className="term-pick"
+            title={t('chatAttach')}
+            aria-label={t('chatAttach')}
+            onClick={attachFile}
+          >
+            <Icon name="paperclip" size={15} />
+          </button>
           {rulesFile && (
             <button
               className="rules-chip"
               title={t('rulesActive', { file: rulesFile })}
               onClick={() => void runCommand('ai.rules')}
             >
-              📜
+              <Icon name="scroll" size={15} />
             </button>
           )}
           <button
@@ -1194,13 +1312,19 @@ export function ChatPanel() {
             }
             title={t('pickModel')}
           >
-            {(agentMode ? settings.roles.agent : undefined) ??
-              settings.defaultModel ??
-              t('noModel')}{' '}
-            ▾
+            <span className="model-chip-label">
+              {(agentMode ? settings.roles.agent : undefined) ??
+                settings.defaultModel ??
+                t('noModel')}
+            </span>
+            <Icon name="chevronDown" size={12} />
           </button>
           {busy ? (
-            <button className="danger" onClick={() => void api().ai.abort(busy)}>
+            <button
+              className="danger stop-btn"
+              title={t('chatStopHint')}
+              onClick={() => void api().ai.abort(busy)}
+            >
               <Icon name="stop" size={13} /> {t('stop')}
             </button>
           ) : (

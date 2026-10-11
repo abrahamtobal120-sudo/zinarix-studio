@@ -29,14 +29,80 @@ const PATHS = {
   branch:
     'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9',
   bot: 'M12 4v3M6 7h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM9 12v1M15 12v1M9.5 16h5',
+  file: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5',
+  filePlus: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M12 11v6M9 14h6',
+  folderPlus:
+    'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9 13h6',
+  commit: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM3 12h5M16 12h5',
+  pull: 'M12 4v12M7 11l5 5 5-5M5 20h14',
+  push: 'M12 20V8M7 13l5-5 5 5M5 4h14',
+  sync: 'M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4',
+  stash: 'M4 7h16v4H4zM5 11v8h14v-8M10 15h4',
+  github:
+    'M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21',
+  play: 'M8 5.5v13l10-6.5z',
+  arrowDown: 'M12 5v14M6 13l6 6 6-6',
+  chevron: 'M9 6l6 6-6 6',
+  chevronDown: 'M6 9l6 6 6-6',
+  refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
+  copy: 'M9 9h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
+  check: 'M5 12.5l4.5 4.5L19 7',
+  x: 'M6 6l12 12M18 6L6 18',
+  edit: 'M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16zM13.5 6.5l4 4',
+  undo: 'M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+  insert: 'M12 4v10M8 10l4 4 4-4M4 20h16',
+  replace: 'M4 7h12l-3-3M20 17H8l3 3',
+  quote: 'M7 7h4v4c0 3-1.5 5-4 6M15 7h4v4c0 3-1.5 5-4 6',
+  continue: 'M5 5v14M10 7l8 5-8 5z',
+  warning: 'M12 4l9 16H3zM12 10v4M12 17h.01',
+  info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01',
+  brain:
+    'M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a2 2 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1',
+  clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
+  pause: 'M8 5v14M16 5v14',
+  scroll: 'M8 4h11v13a3 3 0 0 1-3 3H7M8 4a2 2 0 0 0-2 2v12a2 2 0 0 1-4 0v-2h4M11 9h5M11 13h5',
+  scissors:
+    'M6 4a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM6 15a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM8 8l12 10M8 16L20 6',
+  tree: 'M12 3v18M12 8h6M12 14h6M6 3v6h6',
+  books: 'M4 4h4v16H4zM10 4h4v16h-4zM15.5 5l3.8-1 2.7 15.5-3.8 1z',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  pointer: 'M5 3l14 7-6 2-2 6z',
+  keyboard:
+    'M3 6h18a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10',
+  arrowsV: 'M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4',
+  back: 'M19 12H5M11 6l-6 6 6 6',
+  wifi: 'M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01',
+  plug: 'M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0zM12 17v5',
+  database:
+    'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  wrench:
+    'M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3zM14.7 6.3L17 4a4 4 0 0 1 3 3l-2.3 2.3',
+  package: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5M8 5.2l8 4.6',
+  monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
+  hash: 'M5 9h14M5 15h14M10 3L8 21M16 3l-2 18',
+  trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
+  download: 'M12 4v12M7 11l5 5 5-5M5 20h14',
+  external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
+  filter: 'M4 5h16l-6 8v6l-4-2v-4z',
+  star: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z',
+  cloud: 'M7 18a5 5 0 0 1-.6-10A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z',
+  cpu: 'M7 7h10v10H7zM10 10h4v4h-4zM9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4',
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+export function Icon({
+  name,
+  size = 18,
+  className,
+}: {
+  name: IconName;
+  size?: number;
+  className?: string;
+}) {
   return (
     <svg
-      className="icon"
+      className={className ? `icon ${className}` : 'icon'}
       width={size}
       height={size}
       viewBox="0 0 24 24"

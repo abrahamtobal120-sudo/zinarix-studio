@@ -3,6 +3,7 @@ import type { UsageReport, UsageRowView } from '../../shared/api';
 import { t } from '../i18n';
 import { ProviderLogo } from './ProviderLogo';
 import { api, refreshSettings, setState } from '../store';
+import { Icon } from './Icon';
 
 const COLORS = [
   '#3b82f6',
@@ -98,9 +99,11 @@ export function UsagePanel() {
     <div className="modal-backdrop" onMouseDown={close}>
       <div className="usage" onMouseDown={(e) => e.stopPropagation()}>
         <button className="modal-x" onClick={close} aria-label={t('close')}>
-          ×
+          <Icon name="x" size={15} />
         </button>
-        <h2>📊 {t('usageTitle')}</h2>
+        <h2>
+          <Icon name="chart" size={20} /> {t('usageTitle')}
+        </h2>
         <div className="usage-cards">
           <div className="usage-card">
             <span className="dim">{t('usageToday')}</span>

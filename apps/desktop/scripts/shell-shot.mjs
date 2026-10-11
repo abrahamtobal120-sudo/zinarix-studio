@@ -31,5 +31,19 @@ await app.evaluate(({ BrowserWindow }) =>
 );
 await win.waitForTimeout(500);
 await win.screenshot({ path: join(out, 'shell-palette.png') });
+await win.keyboard.press('Escape');
+// source control and search sidebars
+for (const [label, file] of [
+  ['Control de código', 'shell-git.png'],
+  ['Buscar', 'shell-search.png'],
+]) {
+  await win
+    .locator(`.activity[aria-label^="${label}"]`)
+    .first()
+    .click()
+    .catch(() => {});
+  await win.waitForTimeout(900);
+  await win.screenshot({ path: join(out, file) });
+}
 await app.close();
 console.log('done');

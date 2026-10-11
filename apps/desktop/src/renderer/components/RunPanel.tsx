@@ -3,6 +3,7 @@ import { t } from '../i18n';
 import { api, openFile, setState, toast, useStore } from '../store';
 import { fileIcon } from './icons';
 import { runInTerminal } from './Terminal';
+import { Icon } from './Icon';
 
 export interface RunTask {
   /** Short name shown on the row ("dev", "make build", "docker compose up"). */
@@ -268,14 +269,14 @@ export function RunPanel() {
         <span>{t('runTitle').toUpperCase()}</span>
         <span className="sidebar-actions">
           <button title={t('refresh')} onClick={() => void detect()}>
-            ⟳
+            <Icon name="refresh" size={14} />
           </button>
         </span>
       </div>
       <div className="run-body">
         <p className="dim small">{t('runHint')}</p>
         <button className="primary run-main" disabled={busy} onClick={() => void detectAndRun()}>
-          ▶ {t('runAndRun')}
+          <Icon name="play" size={14} /> {t('runAndRun')}
         </button>
         {busy && <p className="dim small">{t('runDetecting')}</p>}
         {!busy && detection && tasks.length === 0 && <p className="dim small">{t('runNone')}</p>}
@@ -289,7 +290,7 @@ export function RunPanel() {
                   title={`${t('runRun')}: ${task.command}`}
                   onClick={() => runTask(task)}
                 >
-                  ▶
+                  <Icon name="play" size={14} />
                 </button>
                 <span className="run-label" onClick={() => runTask(task)}>
                   {task.label}

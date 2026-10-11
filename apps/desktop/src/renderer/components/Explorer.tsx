@@ -2,7 +2,8 @@ import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 import type { DirEntry } from '../../shared/api';
 import { t } from '../i18n';
 import { api, askText, closeTab, getState, openFile, renamePath, toast, useStore } from '../store';
-import { fileIcon } from './icons';
+import { fileIcon, folderIcon } from './icons';
+import { Icon } from './Icon';
 
 interface Menu {
   x: number;
@@ -151,9 +152,11 @@ export function Explorer() {
             setMenu({ x: ev.clientX, y: ev.clientY, entry: e });
           }}
         >
-          <span className="twisty">{e.dir ? (open.has(e.path) ? '▾' : '▸') : ''}</span>
+          <span className={`twisty ${open.has(e.path) ? 'open' : ''}`}>
+            {e.dir && <Icon name="chevron" size={12} />}
+          </span>
           <span className="file-icon">
-            {e.dir ? (open.has(e.path) ? '📂' : '📁') : fileIcon(e.name)}
+            {e.dir ? folderIcon(e.name, open.has(e.path)) : fileIcon(e.name)}
           </span>
           <span className="tree-label">{e.name}</span>
         </div>
@@ -173,13 +176,13 @@ export function Explorer() {
         <span>{workspace.name.toUpperCase()}</span>
         <span className="sidebar-actions">
           <button title={t('newFile')} onClick={() => void create('file', null)}>
-            ＋
+            <Icon name="filePlus" size={15} />
           </button>
           <button title={t('newFolder')} onClick={() => void create('dir', null)}>
-            🗀
+            <Icon name="folderPlus" size={15} />
           </button>
           <button title={t('refresh')} onClick={() => open.forEach((d) => void load(d))}>
-            ⟳
+            <Icon name="refresh" size={15} />
           </button>
         </span>
       </div>
