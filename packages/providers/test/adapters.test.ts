@@ -3,6 +3,7 @@ import type { CatalogEntry, ChatChunk } from '@omni/shared';
 import { Secret } from '@omni/security';
 import {
   anthropic,
+  geminiBody,
   getAdapter,
   googleGemini,
   openAiCompatible,
@@ -476,6 +477,45 @@ describe('google-gemini', () => {
     expect(contents[2]!.parts[0]).toEqual({
       functionResponse: { id: 'c', name: 'grep', response: { content: 'ok' } },
     });
+  });
+
+  it('strips JSON Schema fields Gemini rejects from function declarations', () => {
+    const body = geminiBody({
+      model: 'm1',
+      messages: [{ role: 'user', content: 'hola' }],
+      tools: [
+        {
+          name: 'write_file',
+          description: 'escribe',
+          parameters: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              path: { type: 'string', description: 'ruta' },
+              mode: { type: ['string', 'null'], const: 'overwrite' },
+              value: { type: 'object', additionalProperties: true },
+              lines: { type: 'array', items: { type: 'string', examples: ['a'] } },
+            },
+            required: ['path', 'missing'],
+          },
+        },
+        { name: 'list_dir', description: 'lista', parameters: { type: 'object' } },
+      ],
+    });
+    const [decl, noParams] = (body.tools as { functionDeclarations: Record<string, unknown>[] }[])[0]!
+      .functionDeclarations;
+    expect(decl!.parameters).toEqual({
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'ruta' },
+        mode: { type: 'string', nullable: true, enum: ['overwrite'] },
+        value: {},
+        lines: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['path'],
+    });
+    expect(noParams).toEqual({ name: 'list_dir', description: 'lista' });
   });
 });
 

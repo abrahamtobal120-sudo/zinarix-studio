@@ -92,6 +92,75 @@ export function toGemini(
   };
 }
 
+// Scalar Schema fields Gemini accepts, copied verbatim. Anything else (additionalProperties,
+// $schema, $defs, exclusiveMinimum, …) makes the API reject the whole request with HTTP 400.
+const SCHEMA_SCALAR_KEYS = [
+  'format',
+  'title',
+  'description',
+  'enum',
+  'minimum',
+  'maximum',
+  'minLength',
+  'maxLength',
+  'pattern',
+  'minItems',
+  'maxItems',
+  'minProperties',
+  'maxProperties',
+  'example',
+  'default',
+  'propertyOrdering',
+] as const;
+
+/**
+ * Converts a JSON Schema to the OpenAPI subset Gemini's `Schema` accepts, dropping unsupported
+ * fields instead of forwarding them. Returns undefined for non-object inputs (e.g. `true`).
+ */
+export function toGeminiSchema(schema: unknown): Record<string, unknown> | undefined {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return undefined;
+  const src = schema as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  let type = src.type;
+  if (Array.isArray(type)) {
+    if (type.includes('null')) out.nullable = true;
+    type = type.find((t) => t !== 'null');
+  }
+  if (typeof type === 'string') out.type = type;
+  if (src.nullable === true) out.nullable = true;
+  for (const key of SCHEMA_SCALAR_KEYS) {
+    if (src[key] !== undefined) out[key] = src[key];
+  }
+  if (src.const !== undefined && out.enum === undefined) out.enum = [src.const];
+  const variants = src.anyOf ?? src.oneOf;
+  if (Array.isArray(variants)) {
+    const anyOf = variants.map(toGeminiSchema).filter((v) => v !== undefined);
+    if (anyOf.length) out.anyOf = anyOf;
+  }
+  if (src.items !== undefined) {
+    const items = toGeminiSchema(Array.isArray(src.items) ? src.items[0] : src.items);
+    if (items) out.items = items;
+  }
+  if (src.properties && typeof src.properties === 'object' && !Array.isArray(src.properties)) {
+    const props: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(src.properties)) {
+      const p = toGeminiSchema(v);
+      if (p) props[k] = p;
+    }
+    if (Object.keys(props).length) {
+      out.properties = props;
+      if (Array.isArray(src.required)) {
+        const required = src.required.filter((r) => typeof r === 'string' && r in props);
+        if (required.length) out.required = required;
+      }
+    }
+  }
+  // Gemini rejects OBJECT schemas with empty `properties` in function declarations; leaving the
+  // type unspecified (free-form value) is accepted.
+  if (out.type === 'object' && !out.properties && !out.anyOf) delete out.type;
+  return out;
+}
+
 interface GeminiChunk {
   candidates?: {
     content?: {
@@ -129,11 +198,15 @@ export function geminiBody(req: ChatRequest, rawTag = 'google-gemini'): Record<s
       ? {
           tools: [
             {
-              functionDeclarations: req.tools.map((t) => ({
-                name: t.name,
-                description: t.description,
-                parameters: t.parameters,
-              })),
+              functionDeclarations: req.tools.map((t) => {
+                const parameters = toGeminiSchema(t.parameters);
+                return {
+                  name: t.name,
+                  description: t.description,
+                  // Parameterless declarations omit the field; Gemini rejects empty objects.
+                  ...(parameters?.properties || parameters?.anyOf ? { parameters } : {}),
+                };
+              }),
             },
           ],
         }

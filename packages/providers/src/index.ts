@@ -14,7 +14,13 @@ export * from './models.js';
 export { openAiCompatible, toOpenAiMessages, normalizeStop } from './adapters/openai-compatible.js';
 export { openAiResponses, toResponsesInput } from './adapters/openai-responses.js';
 export { anthropic, toAnthropic } from './adapters/anthropic.js';
-export { googleGemini, toGemini, geminiBody, readGeminiStream } from './adapters/google-gemini.js';
+export {
+  googleGemini,
+  toGemini,
+  toGeminiSchema,
+  geminiBody,
+  readGeminiStream,
+} from './adapters/google-gemini.js';
 export {
   googleVertex,
   parseVertexCredential,
