@@ -1,5 +1,21 @@
 import { z } from 'zod';
 
+/**
+ * Coding-agent CLIs Zinarix can drive (they run with the user's own login/subscription).
+ * Each profile knows the CLI's flags and its streaming output format.
+ */
+export const CliProfile = z.enum([
+  'claude',
+  'codex',
+  'gemini',
+  'qwen',
+  'cursor',
+  'copilot',
+  'opencode',
+  'amp',
+]);
+export type CliProfile = z.infer<typeof CliProfile>;
+
 /** Families of provider APIs. Most providers are configured purely by catalog on top of these. */
 export const AdapterId = z.enum([
   'openai-compatible',
@@ -11,6 +27,7 @@ export const AdapterId = z.enum([
   'azure-openai',
   'cohere',
   'huggingface',
+  'cli-agent',
 ]);
 export type AdapterId = z.infer<typeof AdapterId>;
 
@@ -83,10 +100,15 @@ export const CatalogEntry = z.object({
   docsUrl: z.string().url().nullable().optional(),
   keyUrl: z.string().url().nullable().optional(),
   region: z.enum(['us', 'eu', 'cn', 'global', 'local']),
-  category: z.enum(['lab', 'aggregator', 'enterprise', 'asia', 'local', 'custom']),
+  category: z.enum(['lab', 'aggregator', 'enterprise', 'asia', 'local', 'custom', 'cli']),
   modelsEndpoint: z.string().nullable(),
   supports: Supports,
   fallbackModels: z.array(CatalogModel).default([]),
+  /**
+   * For the "cli-agent" adapter: which CLI to run. The executable comes from the signed
+   * catalog; the user may only point it at another path through the `command` param.
+   */
+  cli: z.object({ profile: CliProfile, command: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/) }).optional(),
   status: z.enum(['active', 'deprecated', 'unverified']),
   verifiedAt: z.string().nullable(),
   notes: z.string().optional(),
@@ -183,6 +205,8 @@ export interface ChatRequest {
   /** Ask the model to reason more (maps to effort / reasoning params where supported). */
   reasoning?: 'low' | 'medium' | 'high';
   jsonMode?: boolean;
+  /** Project folder the request is about. Only CLI agents use it (as their working directory). */
+  cwd?: string;
 }
 
 export interface FimRequest {
