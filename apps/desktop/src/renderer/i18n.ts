@@ -91,6 +91,11 @@ const es = {
   agentHint:
     '🤖 Modo agente activo: la IA puede leer tu proyecto, editar archivos y ejecutar comandos en la terminal (siempre con tu aprobación).',
   chatHint: 'Chat simple: la IA solo ve lo que adjuntas.',
+  chatTry: 'Prueba con',
+  chatSuggest1: 'Explícame cómo está organizado este proyecto',
+  chatSuggest2: 'Busca errores en el archivo abierto',
+  chatSuggest3: 'Escribe pruebas para el archivo abierto',
+  chatSuggest4: 'Corre las pruebas y arregla lo que falle',
   agentPlaceholder: 'Pide una tarea… ej. "corre las pruebas y arregla lo que falle"',
   agentOff: 'Desactivar modo agente',
   approve: 'Aprobar',
@@ -616,6 +621,11 @@ const en: Record<Key, string> = {
   agentHint:
     '🤖 Agent mode on: the AI can read your project, edit files and run terminal commands (always with your approval).',
   chatHint: 'Plain chat: the AI only sees what you attach.',
+  chatTry: 'Try',
+  chatSuggest1: 'Explain how this project is organized',
+  chatSuggest2: 'Look for bugs in the open file',
+  chatSuggest3: 'Write tests for the open file',
+  chatSuggest4: 'Run the tests and fix what fails',
   agentPlaceholder: 'Ask for a task… e.g. "run the tests and fix what fails"',
   agentOff: 'Turn off agent mode',
   approve: 'Approve',

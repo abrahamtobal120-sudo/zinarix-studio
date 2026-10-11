@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { runCommand } from '../commands';
 import { t } from '../i18n';
+import { Icon, type IconName } from './Icon';
 import {
   BROWSER_TAB,
   SECURITY_TAB,
@@ -24,7 +25,7 @@ export function ActivityBar() {
   const item = (
     active: boolean,
     title: string,
-    icon: string,
+    icon: IconName,
     onClick: () => void,
     badge?: number,
   ) => (
@@ -34,42 +35,42 @@ export function ActivityBar() {
       aria-label={title}
       onClick={onClick}
     >
-      {icon}
+      <Icon name={icon} size={21} />
       {badge ? <span className="activity-badge">{badge > 99 ? '99+' : badge}</span> : null}
     </button>
   );
   return (
     <nav className="activity-bar">
-      {item(sidebar === 'explorer', t('explorer'), '🗂', () =>
+      {item(sidebar === 'explorer', t('explorer'), 'files', () =>
         setState({ sidebar: sidebar === 'explorer' ? null : 'explorer' }),
       )}
-      {item(sidebar === 'search', t('search'), '🔍', () =>
+      {item(sidebar === 'search', t('search'), 'search', () =>
         setState({ sidebar: sidebar === 'search' ? null : 'search' }),
       )}
       {item(
         sidebar === 'git',
         t('gitTitle'),
-        '⎇',
+        'git',
         () => setState({ sidebar: sidebar === 'git' ? null : 'git' }),
         gitChanges,
       )}
-      {item(sidebar === 'run', t('runTitle'), '▶', () =>
+      {item(sidebar === 'run', t('runTitle'), 'run', () =>
         setState({ sidebar: sidebar === 'run' ? null : 'run' }),
       )}
-      {item(chatOpen, t('chat'), '✨', () => setState({ chatOpen: !chatOpen }))}
-      {item(panelOpen, t('terminal'), '⌨', () => setState({ panelOpen: !panelOpen }))}
-      {item(browserActive, t('browser'), '🌐', () => {
+      {item(chatOpen, t('chat'), 'sparkles', () => setState({ chatOpen: !chatOpen }))}
+      {item(panelOpen, t('terminal'), 'terminal', () => setState({ panelOpen: !panelOpen }))}
+      {item(browserActive, t('browser'), 'globe', () => {
         if (browserActive) {
           const other = getState().tabs.find((x) => x.path !== BROWSER_TAB);
           activate(other?.path ?? null);
         } else openBrowserTab();
       })}
       <div className="spacer" />
-      {item(active === '::security', t('securityTitle'), '🛡️', () => openSecurityTab())}
-      {item(false, t('usageTitle'), '📊', () => setState({ modal: { kind: 'usage' } }))}
-      {item(false, t('providers'), '🔑', () => setState({ modal: { kind: 'providers' } }))}
-      {item(false, t('cmdPalette'), '☰', () => setState({ modal: { kind: 'palette' } }))}
-      {item(false, t('settings'), '⚙', () => setState({ modal: { kind: 'settings' } }))}
+      {item(active === '::security', t('securityTitle'), 'shield', () => openSecurityTab())}
+      {item(false, t('usageTitle'), 'chart', () => setState({ modal: { kind: 'usage' } }))}
+      {item(false, t('providers'), 'key', () => setState({ modal: { kind: 'providers' } }))}
+      {item(false, t('cmdPalette'), 'menu', () => setState({ modal: { kind: 'palette' } }))}
+      {item(false, t('settings'), 'settings', () => setState({ modal: { kind: 'settings' } }))}
     </nav>
   );
 }
@@ -93,7 +94,7 @@ export function StatusBar() {
   return (
     <footer className="status-bar">
       <span className="status-item" onClick={() => void api().workspace.openDialog()}>
-        📁 {workspace?.name ?? t('openFolder')}
+        <Icon name="folder" size={13} /> {workspace?.name ?? t('openFolder')}
       </span>
       {workspace?.branch && (
         <span
@@ -101,7 +102,7 @@ export function StatusBar() {
           title={t('gitTitle')}
           onClick={() => setState({ sidebar: 'git' })}
         >
-          ⎇ {workspace.branch}
+          <Icon name="branch" size={13} /> {workspace.branch}
           {gitChanges > 0 ? ` · ${gitChanges}✎` : ''}
         </span>
       )}
@@ -126,7 +127,7 @@ export function StatusBar() {
       )}
       {settings.localOnly && (
         <span className="status-item local" onClick={() => void runCommand('ai.toggleLocal')}>
-          🔒 {t('localOnly')}
+          <Icon name="lock" size={13} /> {t('localOnly')}
         </span>
       )}
       <span
@@ -134,14 +135,15 @@ export function StatusBar() {
         title={t('pickModel')}
         onClick={() => setState({ modal: { kind: 'models' } })}
       >
-        ⚡ {settings.defaultModel ? `${provider} · ${rest.join('/')}` : t('noModel')}
+        <Icon name="bolt" size={13} />{' '}
+        {settings.defaultModel ? `${provider} · ${rest.join('/')}` : t('noModel')}
       </span>
       <span
         className="status-item"
         title={t('usageTitle')}
         onClick={() => setState({ modal: { kind: 'usage' } })}
       >
-        📊 {usd(settings.todayUsd)} {t('today')}
+        <Icon name="chart" size={13} /> {usd(settings.todayUsd)} {t('today')}
       </span>
     </footer>
   );
@@ -195,8 +197,14 @@ export function Welcome() {
       ) : (
         <>
           <div className="welcome-actions">
-            <button className="big" onClick={() => setState({ modal: { kind: 'providers' } })}>
-              🔑 {t('connectProvider')}
+            <button
+              className="primary big"
+              onClick={() => setState({ modal: { kind: 'providers' } })}
+            >
+              <Icon name="key" size={16} /> {t('connectProvider')}
+            </button>
+            <button className="big" onClick={() => setState({ chatOpen: true })}>
+              <Icon name="sparkles" size={16} /> {t('chat')}
             </button>
           </div>
           <div className="welcome-keys">

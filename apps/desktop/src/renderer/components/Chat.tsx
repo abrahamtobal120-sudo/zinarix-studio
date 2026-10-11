@@ -24,6 +24,7 @@ import {
 } from '../store';
 import { runCommand } from '../commands';
 import { fileIcon } from './icons';
+import { Icon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory } from './ChatHistory';
 import { Markdown } from './Markdown';
@@ -877,13 +878,13 @@ export function ChatPanel() {
             className={showHistory ? 'on' : ''}
             onClick={() => setShowHistory((v) => !v)}
           >
-            🕘
+            <Icon name="history" size={15} />
           </button>
           <button title={t('newChat')} onClick={newChat}>
-            ＋
+            <Icon name="plus" size={15} />
           </button>
           <button title={t('close')} onClick={() => setState({ chatOpen: false })}>
-            ×
+            <Icon name="close" size={15} />
           </button>
         </span>
       </div>
@@ -927,6 +928,24 @@ export function ChatPanel() {
             ) : (
               <div className="dim chat-hints">
                 <p>{agentMode ? t('agentHint') : t('chatHint')}</p>
+                <div className="chat-suggestions">
+                  <div className="chat-suggestions-title">{t('chatTry')}</div>
+                  {(['chatSuggest1', 'chatSuggest2', 'chatSuggest3', 'chatSuggest4'] as const)
+                    .filter((k) => agentMode || k !== 'chatSuggest4')
+                    .map((k) => (
+                      <button
+                        key={k}
+                        className="chat-suggestion"
+                        onClick={() => {
+                          setInput(t(k));
+                          textarea.current?.focus();
+                        }}
+                      >
+                        <Icon name="sparkles" size={13} />
+                        {t(k)}
+                      </button>
+                    ))}
+                </div>
                 <p>{t('chatTips')}</p>
                 <p>
                   Ctrl+L · {t('includeFile')}
@@ -1140,7 +1159,7 @@ export function ChatPanel() {
               checked={agentMode}
               onChange={(e) => setAgentMode(e.target.checked)}
             />
-            🤖 {t('agent')}
+            <Icon name="bot" size={14} /> {t('agent')}
           </label>
           <label className="check">
             <input
@@ -1148,7 +1167,8 @@ export function ChatPanel() {
               checked={includeFile}
               onChange={(e) => setIncludeFile(e.target.checked)}
             />
-            📎 {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
+            <Icon name="paperclip" size={14} />{' '}
+            {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
           </label>
           {rulesFile && (
             <button
@@ -1165,7 +1185,7 @@ export function ChatPanel() {
             aria-label={t('termPick')}
             onClick={() => setTermMenu((m) => (m ? null : listTerminals()))}
           >
-            ⌨
+            <Icon name="terminal" size={15} />
           </button>
           <button
             className="model-chip"
@@ -1181,11 +1201,17 @@ export function ChatPanel() {
           </button>
           {busy ? (
             <button className="danger" onClick={() => void api().ai.abort(busy)}>
-              ■ {t('stop')}
+              <Icon name="stop" size={13} /> {t('stop')}
             </button>
           ) : (
-            <button className="primary" disabled={!input.trim()} onClick={() => void submit()}>
-              {t('send')} ⏎
+            <button
+              className="primary send-btn"
+              disabled={!input.trim()}
+              title={`${t('send')} (Enter)`}
+              aria-label={t('send')}
+              onClick={() => void submit()}
+            >
+              <Icon name="send" size={16} />
             </button>
           )}
         </div>

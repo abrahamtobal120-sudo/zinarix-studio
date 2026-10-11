@@ -341,8 +341,12 @@ kbd {
   gap: 2px;
 }
 .sidebar-actions button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 22px;
   background: transparent;
-  padding: 2px 6px;
+  padding: 2px 5px;
   font-size: 14px;
   color: var(--fg-dim);
 }
@@ -1211,10 +1215,13 @@ button.big {
   flex-shrink: 0;
 }
 .send-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  padding: 0;
   margin-left: auto;
+  border-radius: 8px;
 }
 .chat-input-bar {
   display: flex;
@@ -1335,11 +1342,13 @@ button.big {
   height: 100%;
   display: flex;
   align-items: center;
+  gap: 5px;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.12s ease;
 }
 .status-item:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--status-fg) 12%, transparent);
 }
 .status-item.local {
   background: #16825d;
@@ -1354,14 +1363,21 @@ button.big {
   justify-content: center;
   align-items: flex-start;
   padding-top: 8vh;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.12s ease-out;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 .quick-pick {
   width: min(640px, 90vw);
   background: var(--bg-2);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -1389,14 +1405,15 @@ button.big {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 4px 8px;
-  border-radius: 3px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
 }
 .pick-item.active {
-  background: var(--sel);
+  background: var(--sel-soft);
   color: var(--fg-strong);
+  box-shadow: inset 2px 0 0 var(--brand);
 }
 .pick-label {
   overflow: hidden;
@@ -1610,6 +1627,40 @@ button.big {
 .chat-hints p {
   max-width: 300px;
   margin: 10px auto;
+}
+.chat-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 320px;
+  margin: 18px auto 14px;
+  text-align: left;
+}
+.chat-suggestions-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fg-dim);
+  padding-left: 2px;
+}
+.chat-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  padding: 8px 11px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+}
+.chat-suggestion .icon {
+  flex-shrink: 0;
+  color: var(--brand);
+}
+.chat-suggestion:hover {
+  background: var(--sel-soft);
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
 }
 .tool-card {
   border: 1px solid var(--border);
