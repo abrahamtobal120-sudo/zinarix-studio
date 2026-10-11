@@ -39,7 +39,7 @@ console.log(`deprecated: ${by('deprecated').join(', ') || '-'}`);
 
 // Warning only: many providers publish prices only through their live models endpoint.
 const unpriced = res.data.providers
-  .filter((p) => p.category !== 'local' && p.status !== 'deprecated')
+  .filter((p) => p.category !== 'local' && p.category !== 'cli' && p.status !== 'deprecated')
   .map((p) => [p.id, p.fallbackModels.filter((m) => m.inputPrice == null || m.outputPrice == null)])
   .filter(([, models]) => models.length);
 if (unpriced.length) {

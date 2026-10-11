@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-07",
+  "generatedAt": "2026-10-11",
   "providers": [
     {
       "id": "openai",
@@ -4521,6 +4521,501 @@
       "status": "active",
       "verifiedAt": "2026-10-06",
       "notes": "Public /models verified live with USD pricing. Also supports Venice DIEM credits. Venice adds extra params via venice_parameters (web search, etc.)."
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code (CLI)",
+      "adapter": "cli-agent",
+      "baseUrl": "https://api.anthropic.com",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "claude",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://docs.claude.com/en/docs/claude-code/overview",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        },
+        {
+          "id": "opus",
+          "label": "Claude Opus",
+          "tools": true,
+          "vision": null,
+          "reasoning": true
+        },
+        {
+          "id": "sonnet",
+          "label": "Claude Sonnet",
+          "tools": true,
+          "vision": null,
+          "reasoning": true
+        },
+        {
+          "id": "haiku",
+          "label": "Claude Haiku",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        }
+      ],
+      "cli": {
+        "profile": "claude",
+        "command": "claude"
+      },
+      "status": "active",
+      "verifiedAt": "2026-10-11",
+      "notes": "Runs the local `claude` CLI (claude -p --output-format stream-json) with the user's Claude subscription or key. Its own tools act on the open folder; Zinarix shows them as activity."
+    },
+    {
+      "id": "codex-cli",
+      "name": "OpenAI Codex (CLI)",
+      "adapter": "cli-agent",
+      "baseUrl": "https://api.openai.com",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "codex",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://developers.openai.com/codex/cli",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        },
+        {
+          "id": "gpt-5.3-codex",
+          "label": "GPT-5.3 Codex",
+          "tools": true,
+          "vision": null,
+          "reasoning": true
+        },
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "tools": true,
+          "vision": null,
+          "reasoning": true
+        }
+      ],
+      "cli": {
+        "profile": "codex",
+        "command": "codex"
+      },
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Runs the local `codex exec --json` with the user's ChatGPT plan or key. Sandbox: read-only in chat, workspace-write (edit) or danger-full-access (full) in agent mode."
+    },
+    {
+      "id": "gemini-cli",
+      "name": "Gemini CLI",
+      "adapter": "cli-agent",
+      "baseUrl": "https://generativelanguage.googleapis.com",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "gemini",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://github.com/google-gemini/gemini-cli",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "label": "Gemini 2.5 Pro",
+          "tools": true,
+          "vision": null,
+          "reasoning": true
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "label": "Gemini 2.5 Flash",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        }
+      ],
+      "cli": {
+        "profile": "gemini",
+        "command": "gemini"
+      },
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Runs the local `gemini --output-format stream-json` with the user's Google login or key. Approval mode: default / auto_edit / yolo."
+    },
+    {
+      "id": "qwen-code",
+      "name": "Qwen Code (CLI)",
+      "adapter": "cli-agent",
+      "baseUrl": "https://dashscope-intl.aliyuncs.com",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "qwen",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://github.com/QwenLM/qwen-code",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        },
+        {
+          "id": "qwen3-coder-plus",
+          "label": "Qwen3 Coder Plus",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        }
+      ],
+      "cli": {
+        "profile": "qwen",
+        "command": "qwen"
+      },
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Runs the local `qwen` CLI (Gemini CLI fork) with --output-format stream-json."
+    },
+    {
+      "id": "cursor-agent",
+      "name": "Cursor Agent (CLI)",
+      "adapter": "cli-agent",
+      "baseUrl": "https://api2.cursor.sh",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "cursor-agent",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://docs.cursor.com/en/cli/overview",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        },
+        {
+          "id": "auto",
+          "label": "Auto",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        }
+      ],
+      "cli": {
+        "profile": "cursor",
+        "command": "cursor-agent"
+      },
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Runs the local `cursor-agent -p --output-format stream-json` with the user's Cursor plan. The prompt goes as an argument (not usable through .cmd shims on Windows)."
+    },
+    {
+      "id": "copilot-cli",
+      "name": "GitHub Copilot (CLI)",
+      "adapter": "cli-agent",
+      "baseUrl": "https://api.githubcopilot.com",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "copilot",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        }
+      ],
+      "cli": {
+        "profile": "copilot",
+        "command": "copilot"
+      },
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Runs the local `copilot -p` with the user's Copilot plan; plain-text output. The prompt goes as an argument (not usable through .cmd shims on Windows)."
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode (CLI)",
+      "adapter": "cli-agent",
+      "baseUrl": "https://opencode.ai",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "opencode",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://opencode.ai/docs/cli/",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        }
+      ],
+      "cli": {
+        "profile": "opencode",
+        "command": "opencode"
+      },
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Runs the local `opencode run`; model ids are provider/model as configured in OpenCode. Permissions follow OpenCode's own config."
+    },
+    {
+      "id": "amp-cli",
+      "name": "Amp (CLI)",
+      "adapter": "cli-agent",
+      "baseUrl": "https://ampcode.com",
+      "baseUrlParams": [
+        {
+          "name": "mode",
+          "label": "Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)",
+          "default": "edit",
+          "optional": true
+        },
+        {
+          "name": "command",
+          "label": "Ruta del programa (si no está en el PATH)",
+          "default": "amp",
+          "optional": true
+        }
+      ],
+      "auth": {
+        "type": "none"
+      },
+      "envVars": [],
+      "docsUrl": "https://ampcode.com/manual",
+      "keyUrl": null,
+      "region": "global",
+      "category": "cli",
+      "modelsEndpoint": null,
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": false,
+        "vision": false,
+        "jsonMode": false,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "default",
+          "label": "Modelo por defecto del CLI",
+          "tools": true,
+          "vision": null,
+          "reasoning": null
+        }
+      ],
+      "cli": {
+        "profile": "amp",
+        "command": "amp"
+      },
+      "status": "unverified",
+      "verifiedAt": null,
+      "notes": "Runs the local `amp --execute --stream-json` (Claude Code compatible events)."
     }
   ]
 }

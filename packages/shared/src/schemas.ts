@@ -108,7 +108,9 @@ export const CatalogEntry = z.object({
    * For the "cli-agent" adapter: which CLI to run. The executable comes from the signed
    * catalog; the user may only point it at another path through the `command` param.
    */
-  cli: z.object({ profile: CliProfile, command: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/) }).optional(),
+  cli: z
+    .object({ profile: CliProfile, command: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/) })
+    .optional(),
   status: z.enum(['active', 'deprecated', 'unverified']),
   verifiedAt: z.string().nullable(),
   notes: z.string().optional(),

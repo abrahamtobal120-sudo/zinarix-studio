@@ -366,7 +366,8 @@ export class AiService {
       rec.add(ev);
       emit(rid, ev);
     };
-    await this.run(requestId, { model: req.model, messages, role: 'chat' }, (ev) => {
+    const cwd = this.workspace()?.root;
+    await this.run(requestId, { model: req.model, messages, role: 'chat', cwd }, (ev) => {
       if (ev.type === 'start') {
         send(requestId, { ...ev, conversationId });
         return;

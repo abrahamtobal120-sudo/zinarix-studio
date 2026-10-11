@@ -369,8 +369,10 @@ export class OmniCore {
         let unpriced: string | undefined;
         // Local servers are free: catalog "local" entries, or keyless endpoints on loopback.
         // A keyed endpoint on loopback may be a proxy to a paid cloud, so it still counts.
+        // CLI agents bill the user's own subscription, outside Zinarix's per-token prices.
         const free =
           cfg.entry.category === 'local' ||
+          cfg.entry.category === 'cli' ||
           (!cfg.apiKey && isLocalProvider(cfg.entry, cfg.baseUrl));
         if (this.budgetsFor(ref.provider).length && !free) {
           // Prices come from the model cache: warm it before deciding the model is unpriced.
@@ -395,6 +397,7 @@ export class OmniCore {
           temperature: req.temperature,
           reasoning: req.reasoning,
           jsonMode: req.jsonMode,
+          cwd: req.cwd,
         };
         for await (const chunk of adapter.chat(cfg, chatReq, signal)) {
           if (chunk.type === 'usage') {

@@ -215,14 +215,26 @@ function Providers({ focus }: { focus?: string }) {
               </div>
               {p.notes && <p className="provider-notes">{p.notes}</p>}
               {!p.implemented && <p className="err">{t('notImplemented')}</p>}
+              {p.adapter === 'cli-agent' && <p className="provider-notes">{t('cliHint')}</p>}
               {p.params.map((bp) => (
                 <label key={bp.name} className="field">
                   {bp.label}
-                  <input
-                    value={params[bp.name] ?? ''}
-                    placeholder={bp.placeholder}
-                    onChange={(e) => setParams({ ...params, [bp.name]: e.target.value })}
-                  />
+                  {p.adapter === 'cli-agent' && bp.name === 'mode' ? (
+                    <select
+                      value={params[bp.name] || 'edit'}
+                      onChange={(e) => setParams({ ...params, [bp.name]: e.target.value })}
+                    >
+                      <option value="read">{t('cliModeRead')}</option>
+                      <option value="edit">{t('cliModeEdit')}</option>
+                      <option value="full">{t('cliModeFull')}</option>
+                    </select>
+                  ) : (
+                    <input
+                      value={params[bp.name] ?? ''}
+                      placeholder={bp.placeholder}
+                      onChange={(e) => setParams({ ...params, [bp.name]: e.target.value })}
+                    />
+                  )}
                 </label>
               ))}
               {p.needsKey || p.category === 'local' ? (

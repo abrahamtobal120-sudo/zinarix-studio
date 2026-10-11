@@ -587,7 +587,14 @@ export class Agent {
       let raw: { adapter: string; content: unknown } | undefined;
       const calls = new Map<string, ToolCall>();
       for await (const ev of this.core.stream(
-        { model: opts.model, messages: s.messages, tools: TOOLS, role: 'agent' },
+        // cwd: CLI agents (Claude Code, Codex…) work in the open folder with their own tools.
+        {
+          model: opts.model,
+          messages: s.messages,
+          tools: TOOLS,
+          role: 'agent',
+          cwd: this.workspace()?.root,
+        },
         opts.signal,
       )) {
         switch (ev.type) {
