@@ -41,7 +41,7 @@ export function registerAuth(program: Command): void {
       {},
     )
     .option('--base-url <url>', 'sobrescribe la URL base del catálogo')
-    .option('--file-vault', 'guardar en ~/.omni/vault.enc en lugar del keychain')
+    .option('--file-vault', 'guardar en la bóveda cifrada (vault.enc) en lugar del keychain')
     .option('--no-test', 'no probar la conexión')
     .action(
       async (
@@ -103,7 +103,7 @@ export function registerAuth(program: Command): void {
             c.green(
               t('auth.saved', {
                 provider: entry.name,
-                store: keyStore === 'keychain' ? 'keychain' : '~/.omni/vault.enc',
+                store: keyStore === 'keychain' ? 'keychain' : core.paths.vault,
               }),
             ),
           );

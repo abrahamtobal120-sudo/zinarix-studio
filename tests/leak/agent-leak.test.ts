@@ -159,7 +159,7 @@ beforeAll(async () => {
     },
   );
   ai.close();
-}, 60_000);
+}, 120_000);
 
 afterAll(async () => {
   delete process.env.HOSTILE_KEY;

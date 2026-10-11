@@ -132,7 +132,10 @@ export function registerProviders(program: Command): void {
       '--auth-header <name>',
       'header donde va la llave (ej. x-api-key) en vez de Authorization: Bearer',
     )
-    .option('--file-vault', 'guardar la llave en ~/.omni/vault.enc en lugar del keychain')
+    .option(
+      '--file-vault',
+      'guardar la llave en la bóveda cifrada (vault.enc) en lugar del keychain',
+    )
     .option('--models-endpoint <path>', 'ruta para listar modelos', '/models')
     .option('--no-auth', 'el endpoint no requiere llave')
     .option('--local', 'el endpoint corre en esta máquina o red privada')
@@ -242,7 +245,7 @@ export function registerProviders(program: Command): void {
             c.green(
               t('auth.saved', {
                 provider: entry.name,
-                store: keyStore === 'keychain' ? 'keychain' : '~/.omni/vault.enc',
+                store: keyStore === 'keychain' ? 'keychain' : core.paths.vault,
               }),
             ),
           );
