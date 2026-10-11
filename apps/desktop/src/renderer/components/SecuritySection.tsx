@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FindingView, ScanResultView, SecKind, SecReportView } from '../../shared/api';
 import { t } from '../i18n';
-import { api, newRequestId, useStore } from '../store';
+import { api, newRequestId, toast, useStore } from '../store';
 import { askAgent } from './Chat';
 
 type Sev = FindingView['severity'];
@@ -13,15 +13,25 @@ const SEV_COLOR: Record<Sev, string> = {
   bajo: '#5aa9ff',
 };
 const WEIGHT: Record<Sev, number> = { crítico: 22, alto: 9, medio: 3, bajo: 1 };
+const SCAN_KINDS: SecKind[] = ['project', 'deps', 'system', 'site'];
 
 interface Saved {
   report?: SecReportView;
   at?: number;
+  /** Signatures of the previous run, to mark new/resolved findings. */
+  prev?: string[];
 }
 type Store = Partial<Record<SecKind, Saved>>;
+interface HistEntry {
+  kind: string;
+  at: number;
+  c: Record<Sev, number>;
+  score: number;
+}
 
-const LS = 'zs.security.v1';
-const HIST = 'zs.security.history.v1';
+const LS = 'zs.security.v2';
+const HIST = 'zs.security.history.v2';
+const sig = (f: FindingView) => `${f.severity}|${f.title}|${f.where ?? ''}`;
 
 function load<T>(key: string, fb: T): T {
   try {
@@ -35,10 +45,9 @@ function save(key: string, v: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(v));
   } catch {
-    // ignore quota/private mode
+    // ignore
   }
 }
-
 function counts(f: FindingView[]): Record<Sev, number> {
   return {
     crítico: f.filter((x) => x.severity === 'crítico').length,
@@ -47,36 +56,54 @@ function counts(f: FindingView[]): Record<Sev, number> {
     bajo: f.filter((x) => x.severity === 'bajo').length,
   };
 }
+const scoreOf = (f: FindingView[]) =>
+  Math.max(0, 100 - SEV_ORDER.reduce((n, s) => n + counts(f)[s] * WEIGHT[s], 0));
 
-const CATS: { id: SecKind | 'dashboard' | 'network'; icon: string; label: string }[] = [
-  { id: 'dashboard', icon: '🛡️', label: t('secCatDashboard') },
-  { id: 'project', icon: '🔑', label: t('secCatProject') },
-  { id: 'deps', icon: '📦', label: t('secCatDeps') },
-  { id: 'system', icon: '💻', label: t('secCatSystem') },
-  { id: 'network', icon: '📡', label: t('secCatNetwork') },
-  { id: 'site', icon: '🌐', label: t('secCatSite') },
-  { id: 'hash', icon: '🧾', label: t('secCatHash') },
+const CATS: { id: SecKind | 'dashboard' | 'network' | 'history'; icon: string; label: string }[] = [
+  { id: 'dashboard', icon: '🛡️', label: 'Panel' },
+  { id: 'project', icon: '🔑', label: 'Proyecto' },
+  { id: 'deps', icon: '📦', label: 'Dependencias' },
+  { id: 'system', icon: '💻', label: 'Mi equipo' },
+  { id: 'network', icon: '📡', label: 'Red (nmap)' },
+  { id: 'site', icon: '🌐', label: 'Sitios web' },
+  { id: 'hash', icon: '🧾', label: 'Archivos' },
+  { id: 'history', icon: '🕘', label: 'Historial' },
 ];
-
-/** Severity as shown to the user (the values themselves come from main in Spanish). */
-const SEV_LABEL: Record<Sev, string> = {
-  crítico: t('sevCritical'),
-  alto: t('sevHigh'),
-  medio: t('sevMedium'),
-  bajo: t('sevLow'),
-};
+const labelOf = (k: string) => CATS.find((c) => c.id === k)?.label ?? k;
+const iconOf = (k: string) => CATS.find((c) => c.id === k)?.icon ?? '•';
 
 function Badge({ sev, n }: { sev: Sev; n: number }) {
   if (!n) return null;
   return (
     <span className="sv-badge" style={{ background: SEV_COLOR[sev] }}>
-      {n} {SEV_LABEL[sev]}
-      {n === 1 ? '' : t('sevPlural')}
+      {n} {sev}
+      {n === 1 ? '' : 's'}
     </span>
   );
 }
 
-function Findings({ report }: { report: SecReportView }) {
+/** Tiny inline sparkline of the score history (oldest → newest). */
+function Spark({ points }: { points: number[] }) {
+  if (points.length < 2) return null;
+  const w = 120;
+  const h = 32;
+  const max = 100;
+  const step = w / (points.length - 1);
+  const d = points
+    .map(
+      (p, i) => `${i === 0 ? 'M' : 'L'}${(i * step).toFixed(1)},${(h - (p / max) * h).toFixed(1)}`,
+    )
+    .join(' ');
+  const last = points[points.length - 1]!;
+  const col = last >= 85 ? 'var(--ok)' : last >= 60 ? 'var(--warn)' : 'var(--danger)';
+  return (
+    <svg className="sv-spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <path d={d} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Findings({ report, kind }: { report: SecReportView; kind: SecKind }) {
   const [filter, setFilter] = useState<Sev | 'all'>('all');
   const c = counts(report.findings);
   const shown = report.findings
@@ -107,7 +134,7 @@ function Findings({ report }: { report: SecReportView }) {
                   style={{ borderColor: SEV_COLOR[sev] }}
                   onClick={() => setFilter(sev)}
                 >
-                  {SEV_LABEL[sev]} ({c[sev]})
+                  {sev} ({c[sev]})
                 </button>
               ) : null,
             )}
@@ -121,10 +148,28 @@ function Findings({ report }: { report: SecReportView }) {
               >
                 <div className="sv-finding-head">
                   <span className="sv-sev" style={{ color: SEV_COLOR[f.severity] }}>
-                    {SEV_LABEL[f.severity].toUpperCase()}
+                    {f.severity.toUpperCase()}
                   </span>
+                  {f.category && <span className="sv-cat">{f.category}</span>}
                   <strong>{f.title}</strong>
                   {f.where && <span className="sv-where">{f.where}</span>}
+                  <span className="sv-finding-actions">
+                    <button title={t('secAskAI')} onClick={() => fixOne(kind, f)}>
+                      ✨
+                    </button>
+                    <button
+                      title={t('secCopy')}
+                      onClick={() => {
+                        void navigator.clipboard
+                          ?.writeText(
+                            `[${f.severity}] ${f.title}${f.where ? ` (${f.where})` : ''}${f.fix ? `\n→ ${f.fix}` : ''}`,
+                          )
+                          .then(() => toast(t('secCopied')));
+                      }}
+                    >
+                      📋
+                    </button>
+                  </span>
                 </div>
                 {f.detail && <pre className="sv-detail">{f.detail}</pre>}
                 {f.fix && (
@@ -191,7 +236,7 @@ function ScanTab() {
       <div className="sv-scan-row">
         <input
           value={target}
-          placeholder={t('phNetTarget')}
+          placeholder="localhost · 192.168.1.0/24 · midominio.com"
           onChange={(e) => setTarget(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void run()}
         />
@@ -268,64 +313,139 @@ export function SecuritySection() {
   const [running, setRunning] = useState<SecKind | null>(null);
   const [siteUrl, setSiteUrl] = useState('');
   const [hashPath, setHashPath] = useState('');
-
-  const update = (next: Store) => {
-    setStore(next);
-    save(LS, next);
-  };
+  const [history, setHistory] = useState<HistEntry[]>(() => load<HistEntry[]>(HIST, []));
 
   const run = async (kind: SecKind, extra: { url?: string; path?: string } = {}) => {
     setRunning(kind);
     try {
       const report = await api().security.run(newRequestId(), { kind, ...extra });
-      const next = { ...store, [kind]: { report, at: Date.now() } };
-      update(next);
-      const hist = load<{ kind: string; at: number; c: Record<Sev, number> }[]>(HIST, []);
-      hist.unshift({ kind, at: Date.now(), c: counts(report.findings) });
-      save(HIST, hist.slice(0, 40));
-    } catch (e) {
-      update({
-        ...store,
-        [kind]: {
-          report: {
-            title: '',
-            findings: [],
-            notes: [
-              '⛔ ' +
-                (e instanceof Error ? e.message.replace(/^Error[^:]*: (Error: )?/, '') : String(e)),
-            ],
-          },
-          at: Date.now(),
-        },
+      // Functional updates: sequential "run all" must not overwrite earlier results.
+      setStore((cur) => {
+        const prev = cur[kind]?.report?.findings.map(sig) ?? [];
+        const next = { ...cur, [kind]: { report, at: Date.now(), prev } };
+        save(LS, next);
+        return next;
       });
+      if (kind !== 'hash') {
+        const entry: HistEntry = {
+          kind,
+          at: Date.now(),
+          c: counts(report.findings),
+          score: scoreOf(report.findings),
+        };
+        setHistory((cur) => {
+          const hist = [entry, ...cur].slice(0, 60);
+          save(HIST, hist);
+          return hist;
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.replace(/^Error[^:]*: (Error: )?/, '') : String(e);
+      const next = {
+        ...store,
+        [kind]: { report: { title: '', findings: [], notes: ['⛔ ' + msg] }, at: Date.now() },
+      };
+      setStore(next);
+      save(LS, next);
     } finally {
       setRunning(null);
     }
   };
 
-  const allFindings = SEV_ORDER.length
-    ? (['project', 'deps', 'system', 'site'] as SecKind[]).flatMap(
-        (k) => store[k]?.report?.findings ?? [],
-      )
-    : [];
-  const total = counts(allFindings);
-  const penalty = SEV_ORDER.reduce((n, s) => n + total[s] * WEIGHT[s], 0);
-  const anyRun = Object.values(store).some((x) => x?.at);
-  const score = Math.max(0, 100 - penalty);
-  const scoreColor = score >= 85 ? 'var(--ok)' : score >= 60 ? 'var(--warn)' : 'var(--danger)';
-
   const runAllLocal = async () => {
     for (const k of ['project', 'deps', 'system'] as SecKind[]) await run(k);
   };
 
-  const label = (k: SecKind) => CATS.find((c) => c.id === k)?.label ?? k;
+  const allFindings = SCAN_KINDS.flatMap((k) => store[k]?.report?.findings ?? []);
+  const total = counts(allFindings);
+  const anyRun = Object.values(store).some((x) => x?.at);
+  const score = anyRun ? scoreOf(allFindings) : null;
+  const scoreColor =
+    score === null
+      ? 'var(--border)'
+      : score >= 85
+        ? 'var(--ok)'
+        : score >= 60
+          ? 'var(--warn)'
+          : 'var(--danger)';
+
+  // category breakdown
+  const byCat = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of allFindings)
+      m.set(f.category ?? 'Otro', (m.get(f.category ?? 'Otro') ?? 0) + 1);
+    return [...m].sort((a, b) => b[1] - a[1]);
+  }, [allFindings]);
+  const maxCat = byCat[0]?.[1] ?? 1;
+
+  // top risks (crit + high) across analyses
+  const topRisks = useMemo(
+    () =>
+      SCAN_KINDS.flatMap((k) => (store[k]?.report?.findings ?? []).map((f) => ({ ...f, kind: k })))
+        .filter((f) => f.severity === 'crítico' || f.severity === 'alto')
+        .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity))
+        .slice(0, 8),
+    [store],
+  );
+
+  const scoreTrend = [...history]
+    .filter((h) => h.kind !== 'hash')
+    .slice(0, 20)
+    .reverse()
+    .map((h) => h.score);
+
+  const exportReport = async () => {
+    const lines: string[] = [
+      `# Informe de seguridad — Zinarix Studio`,
+      '',
+      `Fecha: ${new Date().toLocaleString()}`,
+      '',
+    ];
+    if (score !== null) lines.push(`**Puntaje general: ${score}/100**`, '');
+    lines.push(
+      `Resumen: ${total.crítico} críticos · ${total.alto} altos · ${total.medio} medios · ${total.bajo} bajos`,
+      '',
+    );
+    for (const k of SCAN_KINDS) {
+      const r = store[k]?.report;
+      if (!r) continue;
+      lines.push(`## ${iconOf(k)} ${labelOf(k)}`, '');
+      for (const n of r.notes) lines.push(`_${n}_`);
+      if (!r.findings.length) lines.push('', '✓ Sin hallazgos.', '');
+      for (const f of r.findings)
+        lines.push(
+          '',
+          `### [${f.severity.toUpperCase()}] ${f.title}`,
+          f.where ? `- Ubicación: \`${f.where}\`` : '',
+          f.category ? `- Categoría: ${f.category}` : '',
+          f.detail ? `- Detalle: ${f.detail}` : '',
+          f.fix ? `- Solución: ${f.fix}` : '',
+        );
+      lines.push('');
+    }
+    const path = await api().security.saveReport(lines.filter((l) => l !== undefined).join('\n'));
+    if (path) toast(t('secExported'));
+  };
+
+  const diffOf = (kind: SecKind) => {
+    const s = store[kind];
+    if (!s?.report || !s.prev) return null;
+    const now = new Set(s.report.findings.map(sig));
+    const old = new Set(s.prev);
+    const added = [...now].filter((x) => !old.has(x)).length;
+    const resolved = [...old].filter((x) => !now.has(x)).length;
+    return added || resolved ? { added, resolved } : null;
+  };
 
   return (
     <div className="sec-section">
       <nav className="sv-nav">
         <div className="sv-brand">🛡️ {t('securityTitle')}</div>
         {CATS.map((c) => {
-          const saved = c.id !== 'dashboard' && c.id !== 'network' ? store[c.id] : undefined;
+          const saved =
+            c.id !== 'dashboard' && c.id !== 'network' && c.id !== 'history'
+              ? store[c.id]
+              : undefined;
           const cc = saved?.report ? counts(saved.report.findings) : null;
           return (
             <button
@@ -354,10 +474,10 @@ export function SecuritySection() {
             <div className="sv-dash-head">
               <div
                 className="sv-score"
-                style={{ ['--c' as string]: scoreColor, ['--p' as string]: `${score}%` }}
+                style={{ ['--c' as string]: scoreColor, ['--p' as string]: `${score ?? 0}%` }}
               >
                 <div className="sv-score-inner">
-                  <strong style={{ color: scoreColor }}>{anyRun ? score : '—'}</strong>
+                  <strong style={{ color: scoreColor }}>{score ?? '—'}</strong>
                   <span>{t('secScore')}</span>
                 </div>
               </div>
@@ -368,26 +488,70 @@ export function SecuritySection() {
                   {SEV_ORDER.map((s) => (
                     <Badge key={s} sev={s} n={total[s]} />
                   ))}
-                  {anyRun && penalty === 0 && <span className="sv-clean">✓ {t('secClean')}</span>}
+                  {anyRun && total.crítico + total.alto + total.medio + total.bajo === 0 && (
+                    <span className="sv-clean">✓ {t('secClean')}</span>
+                  )}
+                  {scoreTrend.length > 1 && <Spark points={scoreTrend} />}
                 </div>
-                <button
-                  className="primary"
-                  disabled={running !== null}
-                  onClick={() => void runAllLocal()}
-                >
-                  {running ? `${t('secRunning')} ${label(running)}…` : `▶ ${t('secRunAll')}`}
-                </button>
+                <div className="sv-dash-btns">
+                  <button
+                    className="primary"
+                    disabled={running !== null}
+                    onClick={() => void runAllLocal()}
+                  >
+                    {running ? `${t('secRunning')} ${labelOf(running)}…` : `▶ ${t('secRunAll')}`}
+                  </button>
+                  {anyRun && (
+                    <button onClick={() => void exportReport()}>⬇ {t('secExport')}</button>
+                  )}
+                </div>
               </div>
             </div>
+
+            {byCat.length > 0 && (
+              <div className="sv-section-block">
+                <h3>{t('secByCategory')}</h3>
+                <div className="sv-bars">
+                  {byCat.map(([name, n]) => (
+                    <div key={name} className="sv-bar-row">
+                      <span className="sv-bar-label">{name}</span>
+                      <div className="sv-bar-track">
+                        <div className="sv-bar-fill" style={{ width: `${(n / maxCat) * 100}%` }} />
+                      </div>
+                      <span className="sv-bar-n">{n}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {topRisks.length > 0 && (
+              <div className="sv-section-block">
+                <h3>{t('secTopRisks')}</h3>
+                <div className="sv-risks">
+                  {topRisks.map((f, i) => (
+                    <button key={i} className="sv-risk" onClick={() => setCat(f.kind)}>
+                      <span className="sv-sev" style={{ color: SEV_COLOR[f.severity] }}>
+                        {f.severity.toUpperCase()}
+                      </span>
+                      <span className="sv-risk-title">{f.title}</span>
+                      <span className="sv-where">{f.where ?? labelOf(f.kind)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="sv-cards">
-              {(['project', 'deps', 'system', 'site'] as SecKind[]).map((k) => {
+              {SCAN_KINDS.map((k) => {
                 const saved = store[k];
                 const cc = saved?.report ? counts(saved.report.findings) : null;
+                const d = diffOf(k);
                 return (
                   <button key={k} className="sv-card" onClick={() => setCat(k)}>
                     <div className="sv-card-top">
-                      <span>{CATS.find((c) => c.id === k)?.icon}</span>
-                      <strong>{label(k)}</strong>
+                      <span>{iconOf(k)}</span>
+                      <strong>{labelOf(k)}</strong>
                     </div>
                     {cc ? (
                       <div className="sv-card-counts">
@@ -400,6 +564,12 @@ export function SecuritySection() {
                       </div>
                     ) : (
                       <span className="dim">{t('secNotRun')}</span>
+                    )}
+                    {d && (
+                      <span className="sv-diff">
+                        {d.added ? <span className="up">+{d.added} nuevos</span> : null}
+                        {d.resolved ? <span className="down"> −{d.resolved} resueltos</span> : null}
+                      </span>
                     )}
                     {saved?.at && (
                       <span className="sv-when">{new Date(saved.at).toLocaleString()}</span>
@@ -415,11 +585,19 @@ export function SecuritySection() {
           <div className="sv-panel">
             <div className="sv-panel-head">
               <h2>
-                {CATS.find((c) => c.id === cat)?.icon} {label(cat)}
+                {iconOf(cat)} {labelOf(cat)}
               </h2>
               <div className="sv-panel-actions">
                 {(cat === 'project' || cat === 'deps') && !workspace && (
                   <span className="dim">{t('secOpenFolder')}</span>
+                )}
+                {diffOf(cat) && (
+                  <span className="sv-diff">
+                    {diffOf(cat)!.added ? <span className="up">+{diffOf(cat)!.added}</span> : null}
+                    {diffOf(cat)!.resolved ? (
+                      <span className="down"> −{diffOf(cat)!.resolved}</span>
+                    ) : null}
+                  </span>
                 )}
                 <button
                   className="primary"
@@ -442,7 +620,7 @@ export function SecuritySection() {
               </div>
             </div>
             {store[cat]?.report ? (
-              <Findings report={store[cat]!.report!} />
+              <Findings report={store[cat]!.report!} kind={cat} />
             ) : (
               <p className="dim">{t('secPressRun')}</p>
             )}
@@ -458,11 +636,11 @@ export function SecuritySection() {
 
         {cat === 'site' && (
           <div className="sv-panel">
-            <h2>🌐 {label('site')}</h2>
+            <h2>🌐 {labelOf('site')}</h2>
             <div className="sv-scan-row">
               <input
                 value={siteUrl}
-                placeholder={t('phSite')}
+                placeholder="https://misitio.com"
                 onChange={(e) => setSiteUrl(e.target.value)}
                 onKeyDown={(e) =>
                   e.key === 'Enter' && siteUrl.trim() && void run('site', { url: siteUrl.trim() })
@@ -481,18 +659,18 @@ export function SecuritySection() {
                 </button>
               ) : null}
             </div>
-            {store.site?.report && <Findings report={store.site.report} />}
+            {store.site?.report && <Findings report={store.site.report} kind="site" />}
           </div>
         )}
 
         {cat === 'hash' && (
           <div className="sv-panel">
-            <h2>🧾 {label('hash')}</h2>
+            <h2>🧾 {labelOf('hash')}</h2>
             <p className="dim">{t('secHashIntro')}</p>
             <div className="sv-scan-row">
               <input
                 value={hashPath}
-                placeholder={t('phHashFile')}
+                placeholder="~/Descargas/archivo.iso"
                 onChange={(e) => setHashPath(e.target.value)}
                 onKeyDown={(e) =>
                   e.key === 'Enter' &&
@@ -513,6 +691,57 @@ export function SecuritySection() {
             )}
           </div>
         )}
+
+        {cat === 'history' && (
+          <div className="sv-panel">
+            <div className="sv-panel-head">
+              <h2>🕘 {labelOf('history')}</h2>
+              {history.length > 0 && (
+                <button
+                  onClick={() => {
+                    setHistory([]);
+                    save(HIST, []);
+                  }}
+                >
+                  {t('secClearHistory')}
+                </button>
+              )}
+            </div>
+            {history.length === 0 ? (
+              <p className="dim">{t('secNoHistory')}</p>
+            ) : (
+              <div className="sv-history">
+                {history.map((h, i) => (
+                  <div key={i} className="sv-hist-row">
+                    <span
+                      className="sv-hist-score"
+                      style={{
+                        color:
+                          h.score >= 85
+                            ? 'var(--ok)'
+                            : h.score >= 60
+                              ? 'var(--warn)'
+                              : 'var(--danger)',
+                      }}
+                    >
+                      {h.score}
+                    </span>
+                    <span className="sv-hist-kind">
+                      {iconOf(h.kind)} {labelOf(h.kind)}
+                    </span>
+                    <span className="sv-hist-counts">
+                      {SEV_ORDER.map((s) => (h.c[s] ? <Badge key={s} sev={s} n={h.c[s]} /> : null))}
+                      {h.c.crítico + h.c.alto + h.c.medio + h.c.bajo === 0 && (
+                        <span className="sv-clean">✓</span>
+                      )}
+                    </span>
+                    <span className="sv-when">{new Date(h.at).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -521,8 +750,15 @@ export function SecuritySection() {
 function explain(kind: SecKind, report: SecReportView) {
   const lines = report.findings
     .slice(0, 40)
-    .map((f) => `- [${SEV_LABEL[f.severity]}] ${f.title}${f.where ? ` (${f.where})` : ''}`)
+    .map((f) => `- [${f.severity}] ${f.title}${f.where ? ` (${f.where})` : ''}`)
     .join('\n');
-  const label = CATS.find((c) => c.id === kind)?.label ?? kind;
-  askAgent(t('secExplainPrompt', { kind: label, lines }));
+  askAgent(
+    `Analicé "${kind}" en el Centro de seguridad y encontré estos problemas:\n${lines}\n\nExplícame en palabras sencillas qué significan los más graves y ofréceme corregirlos uno por uno.`,
+  );
+}
+
+function fixOne(kind: SecKind, f: FindingView) {
+  askAgent(
+    `En el análisis de seguridad "${kind}" salió este problema:\n- [${f.severity}] ${f.title}${f.where ? ` en ${f.where}` : ''}${f.detail ? `\n  ${f.detail}` : ''}${f.fix ? `\n  Sugerencia: ${f.fix}` : ''}\n\nExplícamelo en palabras sencillas y arréglalo (con mi aprobación).`,
+  );
 }

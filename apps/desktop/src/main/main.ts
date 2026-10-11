@@ -438,6 +438,16 @@ function registerIpc(): void {
   handle('security:scanAbort', z.tuple([str]), (requestId) => {
     scans.get(requestId)?.abort();
   });
+  handle('security:saveReport', z.tuple([z.string().max(5_000_000)]), async (markdown) => {
+    const name = `informe-seguridad-${new Date().toISOString().slice(0, 10)}.md`;
+    const r = await dialog.showSaveDialog(win!, {
+      defaultPath: join(workspace?.root ?? app.getPath('documents'), name),
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    writeFileSync(r.filePath, markdown, 'utf8');
+    return r.filePath;
+  });
   handle(
     'security:run',
     z.tuple([

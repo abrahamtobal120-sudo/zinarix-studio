@@ -78,6 +78,7 @@ const api: OmniApi = {
     scan: call('security:scan') as OmniApi['security']['scan'],
     scanAbort: call('security:scanAbort') as OmniApi['security']['scanAbort'],
     run: call('security:run') as OmniApi['security']['run'],
+    saveReport: call('security:saveReport') as OmniApi['security']['saveReport'],
   },
   browser: {
     setBounds: call('browser:setBounds') as OmniApi['browser']['setBounds'],

@@ -29,13 +29,21 @@ await app.evaluate(({ BrowserWindow }) =>
 await win.waitForSelector('.sec-section', { timeout: 10000 });
 await win.waitForTimeout(400);
 await win.screenshot({ path: join(out, 'secsection-dashboard.png') });
-// Run the project audit
+// Run all local analyses from the dashboard
+await win.locator('.sv-dash .primary', { hasText: 'Ejecutar todo' }).click();
+await win.waitForSelector('.sv-section-block', { timeout: 40000 });
+await win.waitForTimeout(1500);
+await win.screenshot({ path: join(out, 'secsection-dashboard-full.png') });
+// Project findings
 await win.locator('.sv-nav-item', { hasText: 'Proyecto' }).click();
-await win.locator('.sv-panel .primary').click();
 await win.waitForSelector('.sv-finding', { timeout: 20000 });
 await win.waitForTimeout(400);
 await win.screenshot({ path: join(out, 'secsection-project.png') });
 const findings = await win.locator('.sv-finding-head strong').allTextContents();
+// History
+await win.locator('.sv-nav-item', { hasText: 'Historial' }).click();
+await win.waitForTimeout(400);
+await win.screenshot({ path: join(out, 'secsection-history.png') });
 const leaked = await win.evaluate((k) => document.body.innerText.includes(k), key);
 console.log(JSON.stringify({ findings, leaked }));
 await app.close();

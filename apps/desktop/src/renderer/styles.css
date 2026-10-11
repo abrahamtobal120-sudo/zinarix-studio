@@ -3950,3 +3950,142 @@ kbd.custom {
   background: transparent;
   padding: 0 4px;
 }
+/* security section — advanced dashboard */
+.sv-spark {
+  margin-left: 4px;
+}
+.sv-dash-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sv-section-block {
+  margin-top: 26px;
+}
+.sv-section-block h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+.sv-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+}
+.sv-bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 28px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.sv-bar-label {
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sv-bar-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+.sv-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #2f7bff, #8b3dff);
+}
+.sv-bar-n {
+  text-align: right;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.sv-risks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 720px;
+}
+.sv-risk {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.sv-risk:hover {
+  border-color: var(--focus);
+}
+.sv-risk-title {
+  flex: 1;
+  color: var(--fg-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sv-cat {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--bg-4);
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.sv-finding-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+.sv-finding-actions button {
+  background: transparent;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.sv-finding:hover .sv-finding-actions button {
+  opacity: 1;
+}
+.sv-finding-actions button:hover {
+  background: var(--hover);
+}
+.sv-diff {
+  font-size: 11.5px;
+}
+.sv-diff .up {
+  color: var(--danger);
+}
+.sv-diff .down {
+  color: var(--ok);
+}
+.sv-history {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sv-hist-row {
+  display: grid;
+  grid-template-columns: 44px 160px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.sv-hist-score {
+  font-weight: 700;
+  font-size: 16px;
+  text-align: center;
+}
+.sv-hist-counts {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}

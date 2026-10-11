@@ -236,6 +236,7 @@ export interface FindingView {
   where?: string;
   detail?: string;
   fix?: string;
+  category?: string;
 }
 export interface SecReportView {
   title: string;
@@ -427,6 +428,8 @@ export interface OmniApi {
       opts: { target: string; ports?: string; serviceDetection?: boolean; authorized?: boolean },
     ): Promise<ScanResultView>;
     scanAbort(requestId: string): Promise<void>;
+    /** Saves a Markdown report through a native dialog; returns the path or null. */
+    saveReport(markdown: string): Promise<string | null>;
     /** Runs one analysis and returns structured findings for the security section. */
     run(
       requestId: string,
@@ -526,6 +529,7 @@ export const CHANNELS = [
   'app:setPrefs',
   'security:run',
   'security:scan',
+  'security:saveReport',
   'security:scanAbort',
   'browser:setBounds',
   'browser:navigate',

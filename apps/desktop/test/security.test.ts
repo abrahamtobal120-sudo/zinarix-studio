@@ -32,8 +32,22 @@ describe('secret scanning', () => {
       'Llave privada',
     ]);
     expect(f[0]!.where).toBe('src/config.ts:1');
+    expect(f.every((x) => x.category === 'Secreto')).toBe(true);
     expect(JSON.stringify(f)).not.toContain('ABCDEFGHIJKLMNOP');
     expect(mask('abcdefghijkl')).toBe('abc… (12 caracteres)');
+  });
+});
+
+describe('more secret detectors', () => {
+  it('detects an Azure storage key and a service-account JSON', () => {
+    const azure = fake(
+      'DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=',
+      'A'.repeat(64),
+      '==',
+    );
+    const f = scanSecretsInText('a.txt', `${azure}\n{"type": "service_account"}`);
+    expect(f.map((x) => x.title)).toContain('Llave de almacenamiento de Azure');
+    expect(f.map((x) => x.title)).toContain('Credenciales de cuenta de servicio (Google Cloud)');
   });
 });
 
@@ -49,6 +63,9 @@ describe('insecure code patterns', () => {
     expect(titles).toContain('SQL armado con texto (posible inyección SQL)');
     expect(titles).toContain('eval / new Function');
     expect(titles).toContain('Verificación TLS desactivada');
+    expect(scanCodeInText('src/api.ts', code).every((x) => x.category === 'Código inseguro')).toBe(
+      true,
+    );
     expect(titles).toHaveLength(3);
     expect(scanCodeInText('test/api.ts', code)).toEqual([]);
   });

@@ -107,6 +107,8 @@ export interface Finding {
   where?: string;
   detail?: string;
   fix?: string;
+  /** Broad group for filtering/badges: Secreto, Código inseguro, Dependencia, etc. */
+  category?: string;
 }
 
 const SECRET_RULES: { name: string; re: RegExp; severity: Finding['severity'] }[] = [
@@ -140,6 +142,17 @@ const SECRET_RULES: { name: string; re: RegExp; severity: Finding['severity'] }[
   { name: 'Llave de Hugging Face', re: /\bhf_[A-Za-z0-9]{30,}\b/, severity: 'alto' },
   { name: 'Llave de SendGrid', re: /\bSG\.[\w-]{16,}\.[\w-]{20,}\b/, severity: 'alto' },
   { name: 'Llave de Twilio', re: /\bSK[0-9a-fA-F]{32}\b/, severity: 'alto' },
+  {
+    name: 'Llave de almacenamiento de Azure',
+    re: /\bDefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{40,}/,
+    severity: 'crítico',
+  },
+  { name: 'Llave de Mailgun', re: /\bkey-[0-9a-f]{32}\b/, severity: 'alto' },
+  {
+    name: 'Credenciales de cuenta de servicio (Google Cloud)',
+    re: /"type"\s*:\s*"service_account"/,
+    severity: 'alto',
+  },
   {
     name: 'Clave de servicio de Supabase / JWT',
     re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/,
@@ -176,6 +189,7 @@ export function scanSecretsInText(path: string, text: string): Finding[] {
       out.push({
         severity: r.severity,
         title: r.name,
+        category: 'Secreto',
         where: `${path}:${i + 1}`,
         detail: `valor: ${mask(m[0])}`,
         fix: 'Mueve el valor a una variable de entorno o a un gestor de secretos, agrégalo a .gitignore y REVÓCALO/rótalo en el servicio: si ya se subió a git, sigue en el historial.',
@@ -290,6 +304,15 @@ const CODE_RULES: { re: RegExp; ext: RegExp; f: Omit<Finding, 'where'> }[] = [
     },
   },
   {
+    re: /Access-Control-Allow-Credentials["']?\s*[:,]\s*["']?true/i,
+    ext: /\.(m?[jt]sx?|py|php|go|java|cs|conf|ya?ml)$/,
+    f: {
+      severity: 'alto',
+      title: 'CORS con credenciales habilitadas',
+      fix: 'Si permites credenciales, nunca uses origin "*": lista orígenes exactos.',
+    },
+  },
+  {
     re: /\bDEBUG\s*=\s*True\b|app\.run\([^)]*debug\s*=\s*True/,
     ext: /\.py$/,
     f: {
@@ -347,7 +370,12 @@ export function scanCodeInText(path: string, text: string): Finding[] {
     if (line.length > 1000 || /^\s*(\/\/|#|\*|--)/.test(line)) continue;
     for (const r of rules)
       if (r.re.test(line))
-        out.push({ ...r.f, where: `${path}:${i + 1}`, detail: line.trim().slice(0, 140) });
+        out.push({
+          ...r.f,
+          category: 'Código inseguro',
+          where: `${path}:${i + 1}`,
+          detail: line.trim().slice(0, 140),
+        });
   }
   return out;
 }
@@ -638,7 +666,7 @@ export async function auditDependencies(ws: Workspace, signal: AbortSignal): Pro
   }
   return {
     title: '== Vulnerabilidades en dependencias (osv.dev) ==',
-    findings,
+    findings: findings.map((f) => ({ ...f, category: 'Dependencia' })),
     notes: [`Dependencias revisadas: ${deps.length} en ${files.join(', ')}`],
   };
 }
@@ -868,7 +896,11 @@ export async function checkSystem(): Promise<SecReport> {
   // The findings/notes may contain command output, so redact their text fields.
   return {
     title: `== Revisión de seguridad de este equipo (${os}) ==`,
-    findings: findings.map((f) => ({ ...f, detail: f.detail ? redact(f.detail) : f.detail })),
+    findings: findings.map((f) => ({
+      ...f,
+      category: f.category ?? 'Sistema',
+      detail: f.detail ? redact(f.detail) : f.detail,
+    })),
     notes: notes.map((n) => redact(n)),
   };
 }
@@ -1354,7 +1386,11 @@ export async function checkSite(input: string, signal: AbortSignal): Promise<Sec
       // ignore
     }
   }
-  return { title: `== Seguridad del sitio ${url.host} ==`, findings, notes };
+  return {
+    title: `== Seguridad del sitio ${url.host} ==`,
+    findings: findings.map((f) => ({ ...f, category: f.category ?? 'Sitio web' })),
+    notes,
+  };
 }
 
 /**
