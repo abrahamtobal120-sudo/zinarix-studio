@@ -503,8 +503,9 @@ describe('google-gemini', () => {
         { name: 'list_dir', description: 'lista', parameters: { type: 'object' } },
       ],
     });
-    const [decl, noParams] = (body.tools as { functionDeclarations: Record<string, unknown>[] }[])[0]!
-      .functionDeclarations;
+    const [decl, noParams] = (
+      body.tools as { functionDeclarations: Record<string, unknown>[] }[]
+    )[0]!.functionDeclarations;
     expect(decl!.parameters).toEqual({
       type: 'object',
       properties: {
