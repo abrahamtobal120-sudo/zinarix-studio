@@ -1,11 +1,16 @@
 import { inspect } from 'node:util';
 import { registerSecret } from './redact.js';
 
-/** Masks a key for display: `sk-…a9F2`. Short values are fully hidden. */
+/**
+ * Masks a key for display: `sk-…a9F2`. The visible part (prefix + last 4) never exceeds a
+ * quarter of the value, so short keys are fully hidden and medium ones lose the tail.
+ */
 export function maskKey(value: string): string {
-  if (value.length < 12) return '••••';
+  if (value.length < 16) return '••••';
   const prefixMatch = /^[A-Za-z]{2,6}[-_]/.exec(value);
   const prefix = prefixMatch ? prefixMatch[0] : value.slice(0, 2);
+  const secretLen = value.length - prefix.length;
+  if (secretLen < 20) return `${prefix}••••`;
   return `${prefix}…${value.slice(-4)}`;
 }
 

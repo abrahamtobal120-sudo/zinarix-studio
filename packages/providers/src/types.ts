@@ -5,6 +5,7 @@ import type {
   EmbedRequest,
   FimRequest,
   ModelInfo,
+  OmniErrorCode,
 } from '@omni/shared';
 import type { Logger, Secret } from '@omni/security';
 
@@ -33,7 +34,16 @@ export interface ProviderConfig {
 export interface ConnectionTest {
   ok: boolean;
   error?: string;
+  /** Normalized error code when the test failed (auth, network, timeout, ...). */
+  code?: OmniErrorCode;
+  /** HTTP status of the failing response, when there was one. */
+  status?: number;
   models?: number;
+  /**
+   * The key could not be checked: the provider has no models endpoint and no known model
+   * to ping. `ok` is false so nobody reads it as a pass; callers may show it as a warning.
+   */
+  unverified?: boolean;
 }
 
 export interface ProviderAdapter {

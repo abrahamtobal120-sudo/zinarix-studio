@@ -93,9 +93,17 @@ export class History {
   }
 
   get(id: string): { conversation: Conversation; messages: StoredMessage[] } | undefined {
-    const conversation = this.db
-      .prepare(`SELECT ${CONV_COLUMNS} FROM conversations c WHERE c.id = ? OR c.id LIKE ?`)
-      .get(id, `${id}%`) as unknown as Conversation | undefined;
+    // Exact id, or an unambiguous prefix (the CLI shows short ids). Prefixes must look like
+    // the start of a UUID: `%`/`_` would otherwise match an arbitrary conversation.
+    let conversation = this.db
+      .prepare(`SELECT ${CONV_COLUMNS} FROM conversations c WHERE c.id = ?`)
+      .get(id) as unknown as Conversation | undefined;
+    if (!conversation && /^[0-9a-f-]{4,}$/i.test(id)) {
+      const matches = this.db
+        .prepare(`SELECT ${CONV_COLUMNS} FROM conversations c WHERE c.id LIKE ? LIMIT 2`)
+        .all(`${id.toLowerCase()}%`) as unknown as Conversation[];
+      if (matches.length === 1) conversation = matches[0];
+    }
     if (!conversation) return undefined;
     const rows = this.db
       .prepare(

@@ -86,6 +86,11 @@ export function abortError(): OmniError {
   return new OmniError('aborted', 'aborted', { retryable: false });
 }
 
+/** Provider-supplied text that ends up in an error: redacted and bounded (errors.ts contract). */
+export function providerMessage(text: string): string {
+  return redact(text).slice(0, 500);
+}
+
 /** Extracts a human readable message from a provider error body, redacted. */
 export function describeErrorBody(text: string): string {
   let msg = text;
@@ -99,7 +104,7 @@ export function describeErrorBody(text: string): string {
   } catch {
     // not JSON
   }
-  return redact(msg).slice(0, 500);
+  return providerMessage(msg);
 }
 
 export async function errorFromResponse(res: Response, provider: string): Promise<OmniError> {
@@ -143,16 +148,25 @@ export async function request(cfg: ProviderConfig, req: HttpRequest): Promise<Re
 
   for (let attempt = 0; ; attempt++) {
     if (req.signal?.aborted) throw abortError();
-    const timeout = AbortSignal.timeout(timeoutMs);
-    const signal = req.signal ? AbortSignal.any([req.signal, timeout]) : timeout;
+    // The timeout only covers the wait for response headers: it is disarmed as soon as
+    // fetch resolves, so a long stream is bounded by the SSE idle timeout instead of a
+    // total deadline (AbortSignal.timeout would keep running and kill it mid-answer).
+    const timeout = new AbortController();
+    const timer = setTimeout(
+      () => timeout.abort(new DOMException('timeout', 'TimeoutError')),
+      timeoutMs,
+    );
+    const signal = req.signal ? AbortSignal.any([req.signal, timeout.signal]) : timeout.signal;
     let err: OmniError;
     try {
       const res = await fetchImpl(url, { method: req.method ?? 'GET', headers, body, signal });
+      clearTimeout(timer);
       if (res.ok) return res;
       err = await errorFromResponse(res, provider);
     } catch (e) {
+      clearTimeout(timer);
       if (req.signal?.aborted) throw abortError();
-      if (timeout.aborted) {
+      if (timeout.signal.aborted || isTimeoutError(e)) {
         err = new OmniError('timeout', `timeout after ${timeoutMs} ms`, { provider });
       } else if (e instanceof OmniError) {
         throw e;
@@ -184,9 +198,38 @@ export async function request(cfg: ProviderConfig, req: HttpRequest): Promise<Re
   }
 }
 
+export function isTimeoutError(e: unknown): boolean {
+  return e instanceof Error && e.name === 'TimeoutError';
+}
+
+/** Reads a whole (non-streamed) body under the same deadline the headers had. */
+async function readText(res: Response, cfg: ProviderConfig, signal?: AbortSignal): Promise<string> {
+  const ms = cfg.timeoutMs ?? DEFAULT_TIMEOUT;
+  let timer: NodeJS.Timeout | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    return await Promise.race([
+      res.text(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(new OmniError('timeout', `timeout after ${ms} ms`, { provider: cfg.entry.id })),
+          ms,
+        );
+        onAbort = () => reject(abortError());
+        if (signal?.aborted) onAbort();
+        signal?.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+  }
+}
+
 export async function requestJson<T>(cfg: ProviderConfig, req: HttpRequest): Promise<T> {
   const res = await request(cfg, req);
-  const text = await res.text();
+  const text = await readText(res, cfg, req.signal);
   try {
     return JSON.parse(text) as T;
   } catch {

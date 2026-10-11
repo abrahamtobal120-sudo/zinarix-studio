@@ -454,7 +454,9 @@
         "header": "api-key"
       },
       "envVars": [
-        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_API_KEY"
+      ],
+      "envParams": [
         "AZURE_OPENAI_ENDPOINT"
       ],
       "docsUrl": "https://learn.microsoft.com/en-us/azure/foundry/openai/api-version-lifecycle",
@@ -493,8 +495,10 @@
       "envVars": [
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
-        "AWS_REGION",
         "AWS_BEARER_TOKEN_BEDROCK"
+      ],
+      "envParams": [
+        "AWS_REGION"
       ],
       "docsUrl": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards.html",
       "keyUrl": "https://console.aws.amazon.com/bedrock/home#/api-keys/long-term/create",
@@ -2353,7 +2357,9 @@
         "header": "Authorization"
       },
       "envVars": [
-        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_API_TOKEN"
+      ],
+      "envParams": [
         "CLOUDFLARE_ACCOUNT_ID"
       ],
       "docsUrl": "https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/",
@@ -2437,7 +2443,9 @@
         "header": "Authorization"
       },
       "envVars": [
-        "WATSONX_API_KEY",
+        "WATSONX_API_KEY"
+      ],
+      "envParams": [
         "WATSONX_PROJECT_ID"
       ],
       "docsUrl": "https://cloud.ibm.com/apidocs/watsonx-ai",

@@ -5,11 +5,20 @@ import { fileURLToPath } from 'node:url';
 import { BrowserWindow, Menu, app, dialog, ipcMain, protocol, shell } from 'electron';
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
 import { z } from 'zod';
-import type { AppEvent, Channel, WorkspaceInfo } from '../shared/api.js';
-import { EVENT_CHANNEL } from '../shared/api.js';
+import type { AppEvent, Channel, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
+import { DEFAULT_PREFS, EVENT_CHANNEL, THEME_IDS } from '../shared/api.js';
 import { AiService } from './ai.js';
+import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName } from './git.js';
 import { BrowserController } from './browser.js';
-import { runScan } from './security.js';
+import {
+  auditDependencies,
+  checkSite,
+  checkSystem,
+  fileHash,
+  resolveAnyPath,
+  runScan,
+  scanProject,
+} from './security.js';
 import { Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
 
@@ -52,7 +61,8 @@ const terminals = new Terminals(
 interface DesktopState {
   lastFolder?: string;
   recentFolders?: string[];
-  theme?: 'dark' | 'light';
+  theme?: ThemeId;
+  prefs?: Partial<Prefs>;
 }
 const stateFile = () => join(ai.core.paths.home, 'desktop.json');
 function loadState(): DesktopState {
@@ -66,6 +76,11 @@ function saveState(patch: Partial<DesktopState>): void {
   writeFileSync(stateFile(), JSON.stringify({ ...loadState(), ...patch }, null, 2), {
     mode: 0o600,
   });
+}
+
+function prefs(): Prefs {
+  const p = loadState().prefs ?? {};
+  return { ...DEFAULT_PREFS, ...p, keybindings: { ...p.keybindings } };
 }
 
 function send(ev: AppEvent): void {
@@ -109,12 +124,18 @@ function ws(): Workspace {
   return workspace;
 }
 
+function git(): Git {
+  return new Git(ws());
+}
+
 // ---------------- IPC (whitelisted, validated, sender-checked) ----------------
 
 const str = z.string().max(4096);
 const rel = z.string().max(4096);
 const big = z.string().max(50 * 1024 * 1024);
 const id = z.number().int().positive();
+/** Conversation ids are full UUIDs (history lookups also match prefixes for the CLI). */
+const conv = z.string().uuid();
 const dim = z.number().int().min(1).max(1000);
 const message = z.union([
   z.object({ role: z.literal('user'), content: z.string() }),
@@ -198,17 +219,117 @@ function registerIpc(): void {
     (role, ref) => ai.setRole(role, ref),
   );
   handle('ai:setLocalOnly', z.tuple([z.boolean()]), (on) => ai.setLocalOnly(on));
-  handle('ai:setTheme', z.tuple([z.enum(['dark', 'light'])]), (theme) => saveState({ theme }));
+  handle('ai:setTheme', z.tuple([z.enum(THEME_IDS)]), (theme) => saveState({ theme }));
+  handle(
+    'ai:complete',
+    z.tuple([
+      str,
+      z.object({
+        path: rel,
+        language: z.string().max(64),
+        prefix: z.string().max(200_000),
+        suffix: z.string().max(200_000),
+      }),
+    ]),
+    (requestId, req) => ai.complete(requestId, req),
+  );
+  handle('ai:commitMessage', z.tuple([]), async () => {
+    const g = git();
+    const st = await g.status();
+    const staged = st.files.some((f) => !f.untracked && f.index !== ' ');
+    return ai.commitMessage(await g.patch(staged));
+  });
+  handle('ai:rulesFile', z.tuple([]), () => ai.rulesFile());
+  handle('ai:resetContext', z.tuple([conv]), (c) => ai.resetContext(c));
+
+  const paths = z.array(rel).max(5000);
+  handle('git:status', z.tuple([]), () => git().status());
+  handle('git:init', z.tuple([]), async () => {
+    await git().init();
+    send({ type: 'workspace', workspace: await ws().info() });
+  });
+  handle('git:stage', z.tuple([paths]), (p) => git().stage(p));
+  handle('git:unstage', z.tuple([paths]), (p) => git().unstage(p));
+  handle('git:discard', z.tuple([paths]), async (p) => {
+    const st = await git().status();
+    const untracked = new Set(st.files.filter((f) => f.untracked).map((f) => f.path));
+    for (const f of p.filter((x) => untracked.has(x))) await shell.trashItem(ws().resolve(f));
+    await git().discard(p.filter((x) => !untracked.has(x)));
+  });
+  handle('git:diff', z.tuple([rel, z.boolean()]), (p, staged) => git().diff(p, staged));
+  handle('git:commit', z.tuple([z.string().max(20_000), z.boolean()]), (m, amend) =>
+    git().commit(m, amend),
+  );
+  handle('git:log', z.tuple([]), () => git().log());
+  handle('git:show', z.tuple([z.string().max(64)]), (h) => git().show(h));
+  handle('git:branches', z.tuple([]), () => git().branches());
+  handle('git:checkout', z.tuple([z.string().min(1).max(255), z.boolean()]), async (n, c) => {
+    await git().checkout(n, c);
+    send({ type: 'workspace', workspace: await ws().info() });
+  });
+  handle('git:deleteBranch', z.tuple([z.string().min(1).max(255), z.boolean()]), (n, f) =>
+    git().deleteBranch(n, f),
+  );
+  handle('git:sync', z.tuple([z.enum(['pull', 'push', 'fetch'])]), (op) => git().sync(op));
+  handle('git:stash', z.tuple([z.enum(['push', 'pop'])]), (op) => git().stash(op));
+  handle('git:addRemote', z.tuple([z.string().min(1).max(2048)]), (u) => git().addRemote(u));
+
+  handle('github:status', z.tuple([]), () => githubStatus());
+  handle('github:repos', z.tuple([]), () => githubRepos());
+  handle('github:clone', z.tuple([z.string().min(1).max(2048)]), async (spec) => {
+    const r = await dialog.showOpenDialog(win!, {
+      title: 'Carpeta donde clonar el repositorio',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const dest = join(r.filePaths[0], repoName(spec));
+    await cloneRepo(spec, dest, (await githubStatus()).loggedIn);
+    return openFolder(dest);
+  });
+  handle(
+    'github:publish',
+    z.tuple([z.string().min(1).max(200), z.enum(['private', 'public']), z.string().max(300)]),
+    async (name, vis, desc) => {
+      const url = await publishRepo(ws(), name, vis, desc);
+      send({ type: 'workspace', workspace: await ws().info() });
+      return url;
+    },
+  );
+
+  const prefsPatch = z
+    .object({
+      fontSize: z.number().int().min(8).max(40),
+      fontFamily: z.string().max(300),
+      tabSize: z.number().int().min(1).max(16),
+      wordWrap: z.boolean(),
+      minimap: z.boolean(),
+      lineNumbers: z.boolean(),
+      formatOnSave: z.boolean(),
+      autoSave: z.boolean(),
+      inlineCompletions: z.boolean(),
+      projectRules: z.boolean(),
+      keybindings: z.record(z.string().max(100), z.string().max(60)),
+    })
+    .partial();
+  handle('app:prefs', z.tuple([]), () => prefs());
+  handle('app:setPrefs', z.tuple([prefsPatch]), (patch) => {
+    const next = { ...prefs(), ...patch };
+    saveState({ prefs: next });
+    ai.useRules = next.projectRules;
+    return next;
+  });
   handle(
     'ai:chat',
     z.tuple([
       str,
       z.object({
         model: str.optional(),
-        history: z.array(message).max(500),
+        // Long conversations are accepted and trimmed to the recent turns by AiService
+        // (recentHistory); rejecting them here left the chat busy with no error.
+        history: z.array(message).max(20_000),
         prompt: big,
         context: ctx,
-        conversationId: str.optional(),
+        conversationId: conv.optional(),
         agent: z.boolean().optional(),
       }),
     ]),
@@ -239,12 +360,12 @@ function registerIpc(): void {
   handle('ai:conversations', z.tuple([z.string().max(500), z.boolean()]), (q, p) =>
     ai.conversations(q, p),
   );
-  handle('ai:conversation', z.tuple([str]), (id) => ai.conversation(id));
-  handle('ai:renameConversation', z.tuple([str, z.string().max(200)]), (id, t) =>
+  handle('ai:conversation', z.tuple([conv]), (id) => ai.conversation(id));
+  handle('ai:renameConversation', z.tuple([conv, z.string().max(200)]), (id, t) =>
     ai.renameConversation(id, t),
   );
-  handle('ai:deleteConversation', z.tuple([str]), (id) => ai.deleteConversation(id));
-  handle('ai:exportConversation', z.tuple([str]), async (id) => {
+  handle('ai:deleteConversation', z.tuple([conv]), (id) => ai.deleteConversation(id));
+  handle('ai:exportConversation', z.tuple([conv]), async (id) => {
     const md = ai.exportMarkdown(id);
     if (!md) return null;
     const title =
@@ -279,7 +400,7 @@ function registerIpc(): void {
     z.tuple([str, str, z.enum(['approve', 'deny', 'always'])]),
     (r, id, d) => ai.toolDecision(r, id, d),
   );
-  handle('ai:revert', z.tuple([str]), (c) => ai.revert(c));
+  handle('ai:revert', z.tuple([conv]), (c) => ai.revert(c));
 
   const rect = z
     .object({
@@ -309,13 +430,62 @@ function registerIpc(): void {
           send({ type: 'scan:progress', requestId, done, total }),
         );
       } finally {
-        scans.delete(requestId);
+        // Two requests with the same id: only remove our own controller.
+        if (scans.get(requestId) === ac) scans.delete(requestId);
       }
     },
   );
   handle('security:scanAbort', z.tuple([str]), (requestId) => {
     scans.get(requestId)?.abort();
   });
+  handle(
+    'security:run',
+    z.tuple([
+      str,
+      z.object({
+        kind: z.enum(['project', 'deps', 'system', 'site', 'hash']),
+        checks: z.array(z.string()).optional(),
+        url: z.string().max(2048).optional(),
+        path: z.string().max(4096).optional(),
+        expected: z.string().max(256).optional(),
+      }),
+    ]),
+    async (requestId, o) => {
+      const ac = new AbortController();
+      scans.set(requestId, ac);
+      try {
+        switch (o.kind) {
+          case 'project':
+            if (!workspace)
+              return {
+                title: '',
+                findings: [],
+                notes: ['Abre una carpeta para auditar el proyecto.'],
+              };
+            return await scanProject(workspace, o.checks ?? []);
+          case 'deps':
+            if (!workspace)
+              return {
+                title: '',
+                findings: [],
+                notes: ['Abre una carpeta para revisar dependencias.'],
+              };
+            return await auditDependencies(workspace, ac.signal);
+          case 'system':
+            return await checkSystem();
+          case 'site':
+            return await checkSite(o.url ?? '', ac.signal);
+          case 'hash': {
+            const text = await fileHash(resolveAnyPath(o.path ?? '', workspace), o.expected);
+            return { title: 'Hash', findings: [], notes: text.split('\n') };
+          }
+        }
+      } finally {
+        // Two requests with the same id: only remove our own controller.
+        if (scans.get(requestId) === ac) scans.delete(requestId);
+      }
+    },
+  );
 
   handle('browser:setBounds', z.tuple([rect]), (r) => {
     // The renderer measures in CSS px; the view is placed in window DIPs (differ when zoomed).
@@ -329,12 +499,13 @@ function registerIpc(): void {
       },
     );
   });
-  handle('browser:navigate', z.tuple([str]), (u) => browser.navigate(u));
-  handle('browser:back', z.tuple([]), () => browser.back());
-  handle('browser:forward', z.tuple([]), () => browser.forward());
-  handle('browser:reload', z.tuple([]), () => browser.reload());
+  // The user's own navigation lifts the agent's site guard (they are driving now).
+  handle('browser:navigate', z.tuple([str]), (u) => (browser.setGuard(null), browser.navigate(u)));
+  handle('browser:back', z.tuple([]), () => (browser.setGuard(null), browser.back()));
+  handle('browser:forward', z.tuple([]), () => (browser.setGuard(null), browser.forward()));
+  handle('browser:reload', z.tuple([]), () => (browser.setGuard(null), browser.reload()));
   handle('browser:state', z.tuple([]), () => browser.state());
-  handle('browser:home', z.tuple([]), () => browser.home());
+  handle('browser:home', z.tuple([]), () => (browser.setGuard(null), browser.home()));
 
   handle('terminal:create', z.tuple([dim, dim]), (cols, rows) =>
     terminals.create(workspace?.root ?? app.getPath('home'), cols, rows),
@@ -402,12 +573,15 @@ function buildMenu(): void {
       submenu: [
         { label: 'Nuevo archivo', accelerator: 'CmdOrCtrl+N', click: cmd('file.new') },
         { label: 'Abrir carpeta…', accelerator: 'CmdOrCtrl+O', click: cmd('workspace.open') },
+        { label: 'Clonar repositorio…', click: cmd('git.clone') },
         { label: 'Cerrar carpeta', click: cmd('workspace.close') },
         { label: 'Apertura rápida…', accelerator: 'CmdOrCtrl+P', click: cmd('quickOpen') },
         { type: 'separator' },
         { label: 'Guardar', accelerator: 'CmdOrCtrl+S', click: cmd('file.save') },
         { label: 'Guardar todo', accelerator: 'CmdOrCtrl+Alt+S', click: cmd('file.saveAll') },
         { label: 'Cerrar pestaña', accelerator: 'CmdOrCtrl+W', click: cmd('tab.close') },
+        { type: 'separator' },
+        { label: 'Ajustes…', accelerator: 'CmdOrCtrl+,', click: cmd('app.settings') },
         { type: 'separator' },
         { role: 'quit', label: 'Salir' },
       ],
@@ -435,7 +609,17 @@ function buildMenu(): void {
       submenu: [
         { label: 'Paleta de comandos…', accelerator: 'CmdOrCtrl+Shift+P', click: cmd('palette') },
         { label: 'Explorador', accelerator: 'CmdOrCtrl+Shift+E', click: cmd('view.explorer') },
+        {
+          label: 'Control de código (Git)',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: cmd('view.git'),
+        },
         { label: 'Terminal', accelerator: 'Ctrl+`', click: cmd('view.terminal') },
+        {
+          label: 'Enviar terminal al chat',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: cmd('terminal.toChat'),
+        },
         { label: 'Chat de IA', accelerator: 'CmdOrCtrl+Alt+I', click: cmd('view.chat') },
         { label: 'Alternar tema claro/oscuro', click: cmd('view.toggleTheme') },
         { type: 'separator' },
@@ -464,6 +648,8 @@ function buildMenu(): void {
         },
         { label: 'Proveedores y llaves…', click: cmd('ai.providers') },
         { label: 'Alternar modo 100 % local', click: cmd('ai.toggleLocal') },
+        { label: 'Alternar autocompletado con IA', click: cmd('ai.toggleInline') },
+        { label: 'Editar reglas del proyecto', click: cmd('ai.rules') },
       ],
     },
     {
@@ -492,6 +678,7 @@ function iconPath(): string | undefined {
 
 async function createWindow(): Promise<void> {
   const theme = loadState().theme ?? 'dark';
+  const light = theme === 'light' || theme.endsWith('-light');
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -500,7 +687,7 @@ async function createWindow(): Promise<void> {
     title: 'Zinarix Studio',
     icon: iconPath(),
     show: false,
-    backgroundColor: theme === 'dark' ? '#1e1e1e' : '#ffffff',
+    backgroundColor: light ? '#ffffff' : '#1e1e1e',
     webPreferences: {
       preload: join(appRoot, 'dist', 'preload', 'preload.cjs'),
       contextIsolation: true,
@@ -549,6 +736,7 @@ app.on('web-contents-created', (_e, contents) => {
 app.whenReady().then(async () => {
   if (!isPrimary) return;
   ai = new AiService(() => workspace, undefined, browser);
+  ai.useRules = prefs().projectRules;
   registerProtocol();
   registerIpc();
   buildMenu();

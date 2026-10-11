@@ -1,15 +1,17 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 import type { OmniCore } from '@omni/core';
 import { untrusted, UNTRUSTED_NOTE } from '@omni/core';
 import type { ChatMessage, ToolCall, ToolDefinition } from '@omni/shared';
-import { redact, registerSecret } from '@omni/security';
+import { redact, redactDeep, registerSecret } from '@omni/security';
 import type { ChatEventView, ToolDecision } from '../shared/api.js';
 import type { BrowserController, PageSnapshot } from './browser.js';
-import { normalizeUrl } from './browser.js';
+import { normalizeUrl, siteOf } from './browser.js';
 import { globToRegExp } from '../shared/glob.js';
+import { childEnv } from './env.js';
+import { isSecretFile, protectedWrite } from './guard.js';
 
 export { globToRegExp };
 import type { Workspace } from './workspace.js';
@@ -18,6 +20,7 @@ import {
   SYSTEM_TOOLS,
   adminCommand,
   commandWarning,
+  deniedPath,
   expandPath,
   httpRequest,
   isSecretName,
@@ -43,6 +46,7 @@ import {
   fileHash,
   portScan,
   resolveAnyPath,
+  reportText,
   scanProject,
   securityPreview,
 } from './security.js';
@@ -57,6 +61,8 @@ const KEEP_RECENT_TOOL_CHARS = 250_000;
 const MAX_READ = 200_000;
 const MAX_OUTPUT = 30_000;
 const COMMAND_TIMEOUT = 180_000;
+/** Agent conversations whose transcript is kept in memory (least recently used go first). */
+const MAX_SESSIONS = 20;
 
 export const AGENT_SYSTEM = `You are Zinarix Studio's coding agent, working inside the user's project folder (the workspace).
 You can inspect and change the project with tools:
@@ -268,8 +274,63 @@ const READ_ONLY = new Set([
   'read_many_files',
   'search',
   'security_scan_project',
-  'file_hash',
 ]);
+
+/**
+ * What an "always" answer covers: the exact same command, or edits/writes to ordinary
+ * project files. null = must be approved every time.
+ */
+export function approvalKey(name: string, a: Record<string, unknown>): string | null {
+  if (name === 'run_command') return `cmd:${String(a.command ?? '').trim()}`;
+  if (protectedWrite(String(a.path ?? ''))) return null;
+  return name;
+}
+
+/** Tool arguments as shown in the UI: secret values masked, everything redacted. */
+export function viewArgs(name: string, a: Record<string, unknown>): Record<string, unknown> {
+  const out = redactDeep(a);
+  if (name === 'set_env_var' && isSecretName(String(a.name))) out.value = '•••';
+  if (name === 'http_request' && a.headers && typeof a.headers === 'object')
+    out.headers = Object.fromEntries(
+      Object.entries(a.headers as Record<string, unknown>).map(([k, v]) => [
+        k,
+        /authorization|api[-_]?key|token|cookie|secret/i.test(k) ? '•••' : v,
+      ]),
+    );
+  return out;
+}
+
+/** The path (absolute) is inside the open project, symbolic links included. */
+function insideWorkspace(ws: Workspace, abs: string): boolean {
+  try {
+    ws.resolve(relative(ws.root, abs));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A credential store per deniedPath (applies when the workspace is the home folder, e.g.
+ * ~/.gnupg or ~/.kube/config), or a path that escapes the project: never read for the model.
+ */
+function deniedOrEscaping(w: Workspace, rel: string): boolean {
+  try {
+    return deniedPath(w.resolve(rel), 'read') !== null;
+  } catch {
+    return true;
+  }
+}
+
+const SECRET_READ =
+  'Refused: this file holds secrets or credentials (.env, keys, tokens). The agent never reads it; ask the user for the specific non-secret value you need, or read the .env.example file.';
+
+/** A site approved "always" for the browser in this conversation (www. ignored). */
+function browserSiteAllowed(s: Session, site: string): boolean {
+  for (const k of s.alwaysAllow)
+    if (k.startsWith('browser:') && siteOf(`https://${k.slice(8)}`) === site) return true;
+  return false;
+}
 
 function hostOf(url: string): string {
   try {
@@ -294,20 +355,106 @@ function formatSnapshot(p: PageSnapshot): string {
   return `URL: ${p.url}\nTitle: ${p.title}\n\n--- Page text${p.truncated ? ' (truncated; use browser_scroll for more)' : ''} ---\n${p.text}\n\n--- Interactive elements ---\n${els || '(none)'}`;
 }
 
-/** Commands refused outright, even if the user would click approve by mistake. */
+/**
+ * Commands refused outright, even if the user would click approve by mistake.
+ *
+ * This is a heuristic safety belt, NOT a security boundary: a shell has endless ways to
+ * spell the same thing (variables, eval, scripts written first and run later, other
+ * interpreters). The boundary is the approval card, which shows the exact command, and
+ * "always" only ever covers that exact command (approvalKey). The list catches the classic
+ * destructive one-liners a confused model or a prompt injection is most likely to produce.
+ */
 const BLOCKED: RegExp[] = [
-  /\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)[a-z]*\s+(\/|~|\$HOME|\*)(\s|$)/i,
-  /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z|)sh\b/i,
+  // Download piped (or substituted) straight into a shell.
+  /\b(curl|wget|fetch)\b[^|;&]*\|\s*(sudo\s+|doas\s+)?(env\s+)?(\/\S*\/)?(ba|z|da|k|a|c|tc|fi|)sh\b/i,
+  /\b(ba|z|da|k|a|fi|)sh\b[^|;&]*(<\(|\$\(|`)\s*(curl|wget|fetch)\b/i,
   /\bmkfs(\.\w+)?\b/i,
-  /\bdd\b.*\bof=\/dev\//i,
+  /\bwipefs\b/i,
+  /\bdd\b.*\bof=\/dev\/(?!null\b|zero\b|stdout\b|stderr\b)/i,
+  /(^|[^>&0-9])>\s*\/dev\/(sd[a-z]|nvme\d|hd[a-z]|vd[a-z]|xvd[a-z]|mmcblk\d|disk\d)/i,
+  /\bshred\b[^;&|]*\/dev\//i,
   /:\(\)\s*\{\s*:\|:&\s*\};:/,
-  /\bshutdown\b|\breboot\b|\bpoweroff\b/i,
-  /\bchmod\s+(-R\s+)?[0-7]*777\s+\/(\s|$)/i,
+  /\b(shutdown|reboot|poweroff|halt)\b/i,
+  /(^|[;&|(]\s*|\b(sudo|doas)\s+)(tel)?init\s+[06]\b/i,
+  /\bsystemctl\s+(poweroff|reboot|halt|kexec|soft-reboot)\b/i,
+  /\bchmod\s+(-[a-z]*R[a-z]*\s+)?[0-7]*777\s+\/(\s|$)/i,
+  /\bch(own|mod)\s+(-[a-z]*\s+)*-[a-z]*R[a-z]*\s+\S+\s+\/(\s|$)/i,
+  /--no-preserve-root\b/i,
 ];
 
+/** Paths whose recursive deletion wipes the system or the user's home. */
+const ROOT_TARGET =
+  /^(\/+|\/+\*|~\/?\*?|\$\{?HOME\}?\/?\*?|\/+(bin|boot|dev|etc|home|lib|lib32|lib64|opt|root|sbin|srv|sys|usr|var|Users|System|Library|Applications)\/?\*?|[a-z]:[\\/]?\*?)$/i;
+
+/** Splits a command line into simple commands (;, &&, ||, |, newlines) and their words. */
+function simpleCommands(command: string): string[][] {
+  return command
+    .split(/;|&&|\|\||\||\n/)
+    .map((seg) =>
+      seg
+        .trim()
+        .split(/\s+/)
+        .map((w) => w.replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean),
+    )
+    .filter((w) => w.length);
+}
+
+/** Drops wrappers that only change how the next word runs: sudo, env, nice, command… */
+function stripWrappers(words: string[]): string[] {
+  let i = 0;
+  while (i < words.length) {
+    const w = words[i]!;
+    if (/^(sudo|doas|command|builtin|exec|nice|nohup|time|env|xargs|busybox)$/.test(w)) i++;
+    else if (/^-/.test(w) && i > 0) i++;
+    else if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(w)) i++;
+    else break;
+  }
+  return words.slice(i);
+}
+
+function destructive(words: string[], cwdIsRoot: boolean): boolean {
+  const [cmd, ...rest] = stripWrappers(words);
+  if (!cmd) return false;
+  const name = cmd.replace(/^.*\//, '');
+  if (name === 'rm') {
+    let recursive = false;
+    const targets: string[] = [];
+    let opts = true;
+    for (const w of rest) {
+      if (opts && w === '--') opts = false;
+      else if (opts && /^--recursive$/.test(w)) recursive = true;
+      else if (opts && /^-[a-zA-Z]+$/.test(w)) recursive ||= /[rR]/.test(w);
+      else if (!(opts && w.startsWith('--'))) targets.push(w);
+    }
+    return (
+      recursive &&
+      targets.some((t) => ROOT_TARGET.test(t) || (cwdIsRoot && /^(\.|\.\/?\*?|\*)$/.test(t)))
+    );
+  }
+  if (name === 'find') {
+    const start = rest.find((w) => !w.startsWith('-'));
+    const deletes = rest.includes('-delete') || /-exec(dir)?\s+(\S*\/)?rm\b/.test(rest.join(' '));
+    return (
+      deletes && start !== undefined && (ROOT_TARGET.test(start) || (cwdIsRoot && start === '.'))
+    );
+  }
+  return false;
+}
+
 export function blockedReason(command: string): string | null {
-  for (const re of BLOCKED)
-    if (re.test(command)) return 'command blocked by Zinarix Studio safety rules';
+  const reason = 'command blocked by Zinarix Studio safety rules';
+  for (const re of BLOCKED) if (re.test(command)) return reason;
+  // "cd / && rm -rf ." and friends: remember whether an earlier step moved to / or ~.
+  let cwdIsRoot = false;
+  for (const words of simpleCommands(command)) {
+    const w = stripWrappers(words);
+    if (w[0] === 'cd' || w[0] === 'pushd') {
+      cwdIsRoot = w.length === 1 || ROOT_TARGET.test(w[1] ?? '');
+      continue;
+    }
+    if (destructive(words, cwdIsRoot)) return reason;
+  }
   return null;
 }
 
@@ -317,6 +464,10 @@ export interface Checkpoint {
   before: string | null;
   /** A file outside the workspace (absolute path). */
   absolute?: boolean;
+  /** Backup copy of `before` on disk (system files); removed once reverted. */
+  backup?: string | null;
+  /** Project files: the workspace root they belong to (absolute). */
+  root?: string;
 }
 
 interface Session {
@@ -357,6 +508,8 @@ function truncate(text: string, max = MAX_OUTPUT): string {
  */
 export class Agent {
   private readonly sessions = new Map<string, Session>();
+  /** Conversations with a run in progress (never trimmed). */
+  private readonly active = new Set<string>();
 
   constructor(
     private readonly core: OmniCore,
@@ -366,16 +519,38 @@ export class Agent {
 
   session(id: string): Session {
     let s = this.sessions.get(id);
-    if (!s) {
-      s = { messages: [], checkpoints: [], alwaysAllow: new Set(), env: {} };
-      this.sessions.set(id, s);
-    }
+    if (s)
+      this.sessions.delete(id); // re-inserted below: the Map keeps LRU order
+    else s = { messages: [], checkpoints: [], alwaysAllow: new Set(), env: {} };
+    this.sessions.set(id, s);
+    this.trim();
     return s;
+  }
+
+  /**
+   * Keeps memory bounded: beyond MAX_SESSIONS, the least recently used conversations lose
+   * their in-memory transcript (it is rebuilt from the saved history if they continue).
+   * Checkpoints, approvals and session variables are kept while there is something to
+   * revert; otherwise the whole session is dropped.
+   */
+  private trim(): void {
+    let excess = this.sessions.size - MAX_SESSIONS;
+    for (const [id, s] of this.sessions) {
+      if (excess <= 0) break;
+      if (this.active.has(id)) continue;
+      if (s.checkpoints.length) {
+        if (s.messages.length) s.messages = [];
+        else continue;
+      } else this.sessions.delete(id);
+      excess--;
+    }
   }
 
   async run(opts: {
     conversationId: string;
     model?: string;
+    /** Project rules block appended to the system prompt (may change between turns). */
+    rules?: string;
     userMessage: ChatMessage;
     fallbackHistory: ChatMessage[];
     signal: AbortSignal;
@@ -383,10 +558,28 @@ export class Agent {
     ask: Ask;
   }): Promise<string> {
     const s = this.session(opts.conversationId);
+    const system = AGENT_SYSTEM + (opts.rules ?? '');
     if (!s.messages.length)
-      s.messages.push({ role: 'system', content: AGENT_SYSTEM }, ...opts.fallbackHistory);
+      s.messages.push({ role: 'system', content: system }, ...opts.fallbackHistory);
+    else if (s.messages[0]?.role === 'system') s.messages[0] = { role: 'system', content: system };
     s.messages.push(opts.userMessage);
+    this.active.add(opts.conversationId);
+    try {
+      return await this.loop(s, opts);
+    } catch (e) {
+      // The model never answered this message: drop it, so the next turn does not send two
+      // user messages in a row (the user's text is still in the saved history and the UI).
+      if (s.messages.at(-1) === opts.userMessage) s.messages.pop();
+      throw e;
+    } finally {
+      this.active.delete(opts.conversationId);
+    }
+  }
 
+  private async loop(
+    s: Session,
+    opts: { model?: string; signal: AbortSignal; emit: Emit; ask: Ask },
+  ): Promise<string> {
     let finalText = '';
     const totals = { usd: 0 as number | null, inputTokens: 0, outputTokens: 0, latencyMs: 0 };
     for (let step = 0; step < MAX_STEPS; step++) {
@@ -480,7 +673,8 @@ export class Agent {
   ): Promise<{ ok: boolean; content: string }> {
     const a = args(call);
     const ws = this.workspace();
-    opts.emit({ type: 'tool_call', id: call.id, name: call.name, args: a });
+    // The UI (and the saved turn) never gets a raw credential typed into a tool argument.
+    opts.emit({ type: 'tool_call', id: call.id, name: call.name, args: viewArgs(call.name, a) });
     const finish = (ok: boolean, content: string, summary: string) => {
       opts.emit({ type: 'tool_result', id: call.id, ok, summary: redact(summary) });
       return { ok, content: ok ? untrusted(`tool:${call.name}`, content) : content };
@@ -518,10 +712,7 @@ export class Agent {
             type: 'tool_approval',
             id: call.id,
             name: call.name,
-            args:
-              call.name === 'set_env_var' && isSecretName(String(a.name))
-                ? { ...a, value: '•••' }
-                : a,
+            args: viewArgs(call.name, a),
             preview: { ...view, noAlways: !allowKey },
           });
           const decision = await opts.ask(call.id);
@@ -533,13 +724,30 @@ export class Agent {
             );
           if (decision === 'always' && allowKey) s.alwaysAllow.add(allowKey);
         }
-      } else if (ws && NEEDS_APPROVAL.has(call.name) && !s.alwaysAllow.has(call.name)) {
-        const preview = await this.preview(ws, call.name, a);
+      } else if (
+        ws &&
+        NEEDS_APPROVAL.has(call.name) &&
+        !s.alwaysAllow.has(approvalKey(call.name, a) ?? '')
+      ) {
+        // "Always" covers the same command, or ordinary project files; never files that make
+        // other programs run code or hold secrets (a later injection could abuse it).
+        const key = approvalKey(call.name, a);
+        const guarded = call.name === 'run_command' ? null : protectedWrite(String(a.path ?? ''));
+        const preview = {
+          ...(await this.preview(ws, call.name, a)),
+          ...(guarded ? { risk: 'high' as const, warning: guarded, noAlways: true } : {}),
+        };
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));
           if (blocked) return finish(false, `Refused: ${blocked}.`, blocked);
         }
-        opts.emit({ type: 'tool_approval', id: call.id, name: call.name, args: a, preview });
+        opts.emit({
+          type: 'tool_approval',
+          id: call.id,
+          name: call.name,
+          args: viewArgs(call.name, a),
+          preview,
+        });
         const decision = await opts.ask(call.id);
         if (decision === 'deny')
           return finish(
@@ -547,7 +755,7 @@ export class Agent {
             'The user denied this action. Do not retry it; ask what they prefer instead.',
             'rechazado',
           );
-        if (decision === 'always') s.alwaysAllow.add(call.name);
+        if (decision === 'always' && key) s.alwaysAllow.add(key);
       } else if (call.name === 'run_command') {
         const blocked = blockedReason(str(a.command, 'command'));
         if (blocked) return finish(false, `Refused: ${blocked}.`, blocked);
@@ -569,7 +777,7 @@ export class Agent {
               type: 'tool_approval',
               id: call.id,
               name: call.name,
-              args: a,
+              args: viewArgs(call.name, a),
               preview: { url: call.name === 'browser_open' ? normalizeUrl(url) : url, action },
             });
             const decision = await opts.ask(call.id);
@@ -582,6 +790,44 @@ export class Agent {
             if (decision === 'always') s.alwaysAllow.add(key);
           }
         }
+        // From here on the page may only lead to the site this action was approved for, or
+        // to sites approved "always" in this conversation (see BrowserController.setGuard).
+        const here = siteOf(
+          call.name === 'browser_open' ? normalizeUrl(str(a.url, 'url')) : this.browser.state().url,
+        );
+        this.browser.setGuard((site) => site === here || browserSiteAllowed(s, site));
+        this.browser.takeBlocked();
+      }
+
+      // file_hash inside the project is free; outside it, it is an equality oracle on any
+      // file of the user (does ~/.ssh/id_ed25519 match this hash?), so it is approved.
+      if (call.name === 'file_hash') {
+        const abs = resolveAnyPath(str(a.path, 'path'), ws);
+        const key = `hash:${abs}`;
+        const outside = !ws || !insideWorkspace(ws, abs) || isSecretFile(ws.toRel(abs));
+        if (outside && !s.alwaysAllow.has(key)) {
+          opts.emit({
+            type: 'tool_approval',
+            id: call.id,
+            name: call.name,
+            args: viewArgs(call.name, a),
+            preview: {
+              risk: 'medium',
+              warning:
+                'La IA calculará la huella (hash) de un archivo FUERA de tu proyecto. No verá su contenido, pero podrá saber si es igual a otro.',
+              action: 'calcular el hash de un archivo del sistema',
+              path: abs,
+            },
+          });
+          const decision = await opts.ask(call.id);
+          if (decision === 'deny')
+            return finish(
+              false,
+              'The user denied this action. Do not retry it; ask what they prefer instead.',
+              'rechazado',
+            );
+          if (decision === 'always') s.alwaysAllow.add(key);
+        }
       }
 
       switch (call.name) {
@@ -590,15 +836,19 @@ export class Agent {
           const checks = Array.isArray(a.checks) ? a.checks.map(String) : [];
           const r = await scanProject(ws, checks);
           const bad = r.findings.filter((f) => f.severity === 'crítico' || f.severity === 'alto');
-          return finish(true, r.text, `${r.findings.length} hallazgos · ${bad.length} graves`);
+          return finish(
+            true,
+            reportText(r),
+            `${r.findings.length} hallazgos · ${bad.length} graves`,
+          );
         }
         case 'audit_dependencies': {
           if (!ws) break;
-          const text = await auditDependencies(ws, opts.signal);
+          const text = reportText(await auditDependencies(ws, opts.signal));
           return finish(true, text, shortSummary(text));
         }
         case 'security_check_system': {
-          const text = await checkSystem();
+          const text = reportText(await checkSystem());
           return finish(true, text, shortSummary(text));
         }
         case 'port_scan': {
@@ -610,7 +860,7 @@ export class Agent {
           return finish(true, text, shortSummary(text));
         }
         case 'check_site_security': {
-          const text = await checkSite(str(a.url, 'url'), opts.signal);
+          const text = reportText(await checkSite(str(a.url, 'url'), opts.signal));
           return finish(true, text, shortSummary(text));
         }
         case 'file_hash': {
@@ -634,7 +884,11 @@ export class Agent {
           return finish(r.ok, r.text, r.text.split('\n')[1] ?? '');
         }
         case 'sql_query': {
-          const out = await sqlQuery(str(a.database, 'database'), str(a.query, 'query'));
+          const out = await sqlQuery(
+            str(a.database, 'database'),
+            str(a.query, 'query'),
+            ws && ((p) => ws.resolve(p)),
+          );
           return finish(true, out, `${out.split('\n').length} líneas`);
         }
         case 'read_system_file': {
@@ -648,7 +902,7 @@ export class Agent {
             a,
             join(this.core.paths.home, 'backups'),
           );
-          s.checkpoints.push({ path: r.abs, before: r.before, absolute: true });
+          s.checkpoints.push({ path: r.abs, before: r.before, absolute: true, backup: r.backup });
           opts.emit({ type: 'file_changed', path: r.abs });
           return finish(
             true,
@@ -690,47 +944,52 @@ export class Agent {
         }
       }
       const br = this.browser!;
+      const page = (snap: PageSnapshot) => {
+        const blocked = br.takeBlocked();
+        return (
+          formatSnapshot(snap) +
+          (blocked
+            ? `\n\nNOTE: the page tried to go to ${blocked}, a site the user has not approved in this conversation, and was stopped. If you need it, call browser_open with that URL (the user will be asked).`
+            : '')
+        );
+      };
       switch (call.name) {
         case 'browser_open': {
           const st = await br.navigate(str(a.url, 'url'));
           const snap = await br.snapshot();
-          return finish(true, formatSnapshot(snap), st.title || st.url);
+          return finish(true, page(snap), st.title || st.url);
         }
         case 'browser_read': {
           const snap = await br.snapshot();
           return finish(
             true,
-            formatSnapshot(snap),
+            page(snap),
             `${snap.title || snap.url} · ${snap.elements.length} elementos`,
           );
         }
         case 'browser_click': {
           const st = await br.click(Number(a.ref));
           const snap = await br.snapshot();
-          return finish(
-            true,
-            formatSnapshot(snap),
-            `clic [${String(a.ref)}] → ${st.title || st.url}`,
-          );
+          return finish(true, page(snap), `clic [${String(a.ref)}] → ${st.title || st.url}`);
         }
         case 'browser_type': {
           const st = await br.type(Number(a.ref), str(a.text, 'text'), Boolean(a.submit));
           const snap = await br.snapshot();
           return finish(
             true,
-            formatSnapshot(snap),
+            page(snap),
             `[${String(a.ref)}] ← texto${a.submit ? ' ⏎' : ''} · ${st.title || st.url}`,
           );
         }
         case 'browser_scroll': {
           await br.scroll(a.direction === 'up' ? 'up' : 'down');
           const snap = await br.snapshot();
-          return finish(true, formatSnapshot(snap), a.direction === 'up' ? '↑' : '↓');
+          return finish(true, page(snap), a.direction === 'up' ? '↑' : '↓');
         }
         case 'browser_back': {
           br.back();
           const snap = await br.snapshot();
-          return finish(true, formatSnapshot(snap), snap.title || snap.url);
+          return finish(true, page(snap), snap.title || snap.url);
         }
       }
       if (!ws)
@@ -785,6 +1044,10 @@ export class Agent {
               );
               continue;
             }
+            if (isSecretFile(path) || deniedOrEscaping(w, path)) {
+              parts.push(`=== ${path} ===\n(skipped: holds secrets, the agent never reads it)`);
+              continue;
+            }
             try {
               const f = await w.readFile(path);
               if (f.binary || f.tooLarge) {
@@ -821,6 +1084,8 @@ export class Agent {
         }
         case 'read_file': {
           const path = str(a.path, 'path');
+          if (isSecretFile(path) || deniedPath(w.resolve(path), 'read'))
+            return finish(false, SECRET_READ, `${path}: secreto, no se lee`);
           const file = await w.readFile(path);
           if (file.binary)
             return finish(false, 'Binary file: cannot be read as text.', `${path}: binario`);
@@ -841,7 +1106,9 @@ export class Agent {
           );
         }
         case 'search': {
-          const hits = await w.search(str(a.query, 'query'), Boolean(a.regex), false, 300);
+          const hits = (await w.search(str(a.query, 'query'), Boolean(a.regex), false, 300)).filter(
+            (h) => !isSecretFile(h.path) && !deniedOrEscaping(w, h.path),
+          );
           const body = hits.map((h) => `${h.path}:${h.line}: ${h.text.trim()}`).join('\n');
           return finish(
             true,
@@ -854,6 +1121,8 @@ export class Agent {
           const oldS = str(a.old_string, 'old_string');
           const newS = str(a.new_string, 'new_string');
           const abs = w.resolve(path);
+          const denied = deniedPath(abs, 'write');
+          if (denied) return finish(false, denied, `${path}: protegido`);
           const before = await readFile(abs, 'utf8');
           const count = oldS ? before.split(oldS).length - 1 : 0;
           if (count !== 1) {
@@ -865,7 +1134,7 @@ export class Agent {
               `${path}: no aplicado`,
             );
           }
-          s.checkpoints.push({ path, before });
+          s.checkpoints.push({ path, before, root: w.root });
           await writeFile(
             abs,
             before.replace(oldS, () => newS),
@@ -878,8 +1147,10 @@ export class Agent {
           const path = str(a.path, 'path');
           const content = str(a.content, 'content');
           const abs = w.resolve(path);
+          const denied = deniedPath(abs, 'write');
+          if (denied) return finish(false, denied, `${path}: protegido`);
           const before = existsSync(abs) ? await readFile(abs, 'utf8') : null;
-          s.checkpoints.push({ path, before });
+          s.checkpoints.push({ path, before, root: w.root });
           await mkdir(dirname(abs), { recursive: true });
           await writeFile(abs, content, 'utf8');
           opts.emit({ type: 'file_changed', path });
@@ -940,19 +1211,33 @@ export class Agent {
     }
   }
 
-  /** Restores every file the agent changed in this conversation (newest first). */
+  /**
+   * Restores every file the agent changed in this conversation (newest first). Project
+   * files are restored only in the folder they were changed in: with another folder open,
+   * the same relative path is a different file and is never overwritten or deleted.
+   */
   async revert(conversationId: string): Promise<string[]> {
     const s = this.sessions.get(conversationId);
     const ws = this.workspace();
     if (!s) return [];
-    if (!ws && s.checkpoints.some((c) => !c.absolute)) return [];
+    const roots = [...new Set(s.checkpoints.filter((c) => !c.absolute).map((c) => c.root))];
+    if (roots.length) {
+      const where = roots.filter(Boolean).join(', ') || 'otra carpeta';
+      if (!ws)
+        throw new Error(`Abre la carpeta ${where} para revertir los cambios de esta conversación.`);
+      if (roots.some((r) => r !== undefined && r !== ws.root))
+        throw new Error(
+          `Los cambios de esta conversación se hicieron en ${where}, no en la carpeta abierta (${ws.root}). Abre esa carpeta para revertirlos.`,
+        );
+    }
     const restored: string[] = [];
     for (const cp of [...s.checkpoints].reverse()) {
       const abs = cp.absolute ? cp.path : ws!.resolve(cp.path);
       if (cp.before === null) {
-        const { rm } = await import('node:fs/promises');
         await rm(abs, { force: true });
       } else await writeFile(abs, cp.before, 'utf8');
+      // Restored: the backup copy (which may hold secrets) is no longer needed.
+      if (cp.backup) await rm(cp.backup, { force: true });
       if (!restored.includes(cp.path)) restored.push(cp.path);
     }
     s.checkpoints = [];
@@ -963,10 +1248,22 @@ export class Agent {
     return new Set(this.sessions.get(conversationId)?.checkpoints.map((c) => c.path) ?? []).size;
   }
 
+  /**
+   * Drops the model-side transcript but keeps the checkpoints (so "revert" still works):
+   * the next turn is rebuilt from the history the UI sends (used by regenerate / edit).
+   */
+  resetMessages(conversationId: string): void {
+    const s = this.sessions.get(conversationId);
+    if (s) s.messages = [];
+  }
+
   forget(conversationId: string): void {
     this.sessions.delete(conversationId);
   }
 }
+
+/** After SIGTERM, how long a command gets to exit before its process group is killed. */
+const KILL_GRACE_MS = 3000;
 
 export function runCommand(
   command: string,
@@ -978,17 +1275,17 @@ export function runCommand(
 ): Promise<{ code: number; output: string; timedOut: boolean }> {
   return new Promise((resolve) => {
     const isWin = process.platform === 'win32';
-    const env = {
-      ...process.env,
+    // Provider keys the app can read (catalog envVars, OMNI_KEY_*) never reach the command;
+    // variables the user approved with set_env_var (extra.env) do.
+    const env: Record<string, string> = {
+      ...childEnv(process.env),
       CI: '1',
       GIT_TERMINAL_PROMPT: '0',
       PAGER: 'cat',
       GIT_PAGER: 'cat',
       TERM: 'dumb',
       ...extra.env,
-    } as Record<string, string>;
-    for (const k of Object.keys(env))
-      if (k.startsWith('OMNI_KEY_') || k === 'OMNI_VAULT_PASSWORD') delete env[k];
+    };
     // Admin: the OS asks for the password in its own dialog (pkexec / osascript / UAC).
     const elevated = extra.admin ? adminCommand(command) : undefined;
     const child = spawn(
@@ -1003,6 +1300,8 @@ export function runCommand(
     );
     let output = '';
     let timedOut = false;
+    let settled = false;
+    let killTimer: NodeJS.Timeout | undefined;
     const onData = (d: Buffer) => {
       const s = d.toString('utf8');
       if (output.length < 2_000_000) output += s;
@@ -1010,29 +1309,63 @@ export function runCommand(
     };
     child.stdout.on('data', onData);
     child.stderr.on('data', onData);
-    const kill = () => {
+    const done = (code: number, note = '') => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(killTimer);
+      signal.removeEventListener('abort', kill);
+      resolve({ code, output: output + note, timedOut });
+    };
+    /** Signals the whole process group; false = not allowed (a root process from pkexec). */
+    const signalGroup = (sig: NodeJS.Signals): boolean => {
       try {
-        if (!isWin && child.pid) process.kill(-child.pid, 'SIGTERM');
-        else child.kill();
-      } catch {
-        // already exited
+        if (!isWin && child.pid) process.kill(-child.pid, sig);
+        else child.kill(sig);
+        return true;
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'EPERM') return false;
+        return true; // ESRCH: already exited
       }
+    };
+    const kill = () => {
+      if (settled || killTimer) return;
+      if (!signalGroup('SIGTERM')) {
+        // Elevated commands run as root: this app may not stop them. Do not hang the agent
+        // waiting for them; say so instead.
+        child.stdout.destroy();
+        child.stderr.destroy();
+        child.unref();
+        done(
+          130,
+          '\n[No se pudo detener el comando de administrador (permiso denegado): puede seguir ejecutándose en segundo plano.]',
+        );
+        return;
+      }
+      // A process that ignores SIGTERM (trap '' TERM) is killed for good after a grace period;
+      // if even then the pipes stay open (a daemon kept them), give up waiting.
+      killTimer = setTimeout(() => {
+        signalGroup('SIGKILL');
+        killTimer = setTimeout(() => {
+          child.stdout.destroy();
+          child.stderr.destroy();
+          done(137, '\n[El proceso no terminó tras SIGKILL; se dejó de esperar.]');
+        }, 2000);
+      }, KILL_GRACE_MS);
     };
     const timer = setTimeout(() => {
       timedOut = true;
       kill();
     }, timeoutMs);
     signal.addEventListener('abort', kill, { once: true });
-    child.on('error', (e) => {
-      clearTimeout(timer);
-      resolve({ code: 127, output: `${output}\n${e.message}`, timedOut });
-    });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      signal.removeEventListener('abort', kill);
-      resolve({ code: code ?? 1, output, timedOut });
-    });
+    if (signal.aborted) kill();
+    child.on('error', (e) => done(127, `\n${e.message}`));
+    child.on('close', (code, sig) => done(code ?? (sig ? 128 + (signalNumber(sig) ?? 1) : 1)));
   });
+}
+
+function signalNumber(sig: NodeJS.Signals): number | undefined {
+  return ({ SIGHUP: 1, SIGINT: 2, SIGKILL: 9, SIGTERM: 15 } as Record<string, number>)[sig];
 }
 
 /** "Resumen: 1 críticos · 2 altos · …" → "1 crítico · 2 altos" (only non-zero), for tool cards. */

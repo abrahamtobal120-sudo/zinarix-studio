@@ -4,6 +4,7 @@ import { setState, useStore } from '../store';
 import { askAgent } from './Chat';
 
 interface Check {
+  id: string;
   icon: string;
   title: string;
   desc: string;
@@ -13,58 +14,53 @@ interface Check {
   input?: { placeholder: string; build: (v: string) => string };
 }
 
-const CHECKS: Check[] = [
+const checks = (): Check[] => [
   {
+    id: 'secrets',
     icon: '🔑',
-    title: 'Secretos y código inseguro',
-    desc: 'Busca llaves, tokens y contraseñas filtradas, archivos .env subidos a git y patrones peligrosos (inyección SQL, eval, TLS desactivado…).',
-    prompt:
-      'Haz una auditoría de seguridad de este proyecto con security_scan_project. Explícame los hallazgos ordenados por gravedad, con palabras sencillas, y ofréceme corregir los más graves.',
+    title: t('chkSecretsTitle'),
+    desc: t('chkSecretsDesc'),
+    prompt: t('chkSecretsPrompt'),
     needsProject: true,
   },
   {
+    id: 'deps',
     icon: '📦',
-    title: 'Dependencias vulnerables',
-    desc: 'Compara tus librerías con la base pública de vulnerabilidades (osv.dev) y te dice a qué versión actualizar.',
-    prompt:
-      'Revisa las dependencias de este proyecto con audit_dependencies. Dime cuáles tienen vulnerabilidades, qué tan graves son y a qué versión actualizar; ofrécete a actualizarlas.',
+    title: t('chkDepsTitle'),
+    desc: t('chkDepsDesc'),
+    prompt: t('chkDepsPrompt'),
     needsProject: true,
   },
   {
+    id: 'system',
     icon: '💻',
-    title: 'Mi equipo',
-    desc: 'Puertos abiertos a la red, firewall, actualizaciones pendientes, SSH, cifrado de disco y permisos.',
-    prompt:
-      'Revisa la seguridad de mi computadora con security_check_system. Explícame cada problema en palabras sencillas y dime cómo corregirlo (ofrécete a hacerlo con mi permiso).',
+    title: t('chkSystemTitle'),
+    desc: t('chkSystemDesc'),
+    prompt: t('chkSystemPrompt'),
   },
   {
+    id: 'ports',
     icon: '📡',
-    title: 'Escáner de puertos (nmap)',
-    desc: 'Escáner con interfaz: elige objetivo y puertos, descubre servicios y versiones. Tu red local directo; otros objetivos piden que confirmes autorización.',
+    title: t('chkPortsTitle'),
+    desc: t('chkPortsDesc'),
     prompt: '',
     opensScanner: true,
   },
   {
+    id: 'site',
     icon: '🌐',
-    title: 'Mi sitio web',
-    desc: 'Certificado HTTPS, versión de TLS, encabezados de seguridad, cookies y archivos expuestos como .env o .git.',
+    title: t('chkSiteTitle'),
+    desc: t('chkSiteDesc'),
     prompt: '',
-    input: {
-      placeholder: 'https://misitio.com',
-      build: (v) =>
-        `Revisa la seguridad de mi sitio ${v} con check_site_security. Ordena los hallazgos por gravedad y dime exactamente qué configurar en el servidor para corregirlos.`,
-    },
+    input: { placeholder: t('phSite'), build: (v) => t('chkSitePrompt', { url: v }) },
   },
   {
+    id: 'hash',
     icon: '🧾',
-    title: 'Verificar un archivo',
-    desc: 'Calcula el SHA-256 de un archivo descargado y lo compara con el publicado para saber si fue alterado.',
+    title: t('chkHashTitle'),
+    desc: t('chkHashDesc'),
     prompt: '',
-    input: {
-      placeholder: '~/Descargas/archivo.iso',
-      build: (v) =>
-        `Calcula el hash del archivo ${v} con file_hash y dime cómo comprobar que coincide con el oficial.`,
-    },
+    input: { placeholder: t('phHashFile'), build: (v) => t('chkHashPrompt', { path: v }) },
   },
 ];
 
@@ -79,17 +75,17 @@ export function SecurityCenter() {
   return (
     <div className="modal-backdrop" onMouseDown={close}>
       <div className="security" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={close} aria-label="Cerrar">
+        <button className="modal-x" onClick={close} aria-label={t('close')}>
           ×
         </button>
         <h2>🛡️ {t('securityTitle')}</h2>
         <p className="dim">{t('securityIntro')}</p>
         <div className="sec-grid">
-          {CHECKS.map((c) => {
+          {checks().map((c) => {
             const blocked = c.needsProject && !workspace;
-            const v = values[c.title] ?? '';
+            const v = values[c.id] ?? '';
             return (
-              <div key={c.title} className={`sec-card ${blocked ? 'disabled' : ''}`}>
+              <div key={c.id} className={`sec-card ${blocked ? 'disabled' : ''}`}>
                 <div className="sec-head">
                   <span className="sec-icon">{c.icon}</span>
                   <strong>{c.title}</strong>
@@ -114,7 +110,7 @@ export function SecurityCenter() {
                       value={v}
                       placeholder={c.input.placeholder}
                       spellCheck={false}
-                      onChange={(e) => setValues({ ...values, [c.title]: e.target.value })}
+                      onChange={(e) => setValues({ ...values, [c.id]: e.target.value })}
                     />
                     <button className="primary" disabled={!v.trim()}>
                       {t('securityRun')}

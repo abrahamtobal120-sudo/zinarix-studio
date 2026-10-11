@@ -1,4 +1,5 @@
 import { fstatSync } from 'node:fs';
+import { OmniError } from '@omni/shared';
 import { redact } from '@omni/security';
 
 const useColor = () => process.stdout.isTTY && !process.env.NO_COLOR;
@@ -70,12 +71,18 @@ export async function readStdin(waitForData = true): Promise<string> {
   });
 }
 
-/** Reads a line without echoing it (API keys, vault password). */
-export function readHidden(prompt: string): Promise<string> {
+/**
+ * Reads a line without echoing it (API keys, vault password, header values). Ctrl+C or Esc
+ * rejects with an `aborted` OmniError, so the CLI exits with 130.
+ */
+export function readHidden(
+  prompt: string,
+  notTtyHint = 'stdin is not a TTY: use --key-stdin to pipe the key',
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const stdin = process.stdin;
     if (!stdin.isTTY) {
-      reject(new Error('stdin is not a TTY: use --key-stdin to pipe the key'));
+      reject(new OmniError('config', notTtyHint));
       return;
     }
     process.stderr.write(prompt);
@@ -88,7 +95,7 @@ export function readHidden(prompt: string): Promise<string> {
       stdin.pause();
       stdin.removeListener('data', onData);
       process.stderr.write('\n');
-      if (result === undefined) reject(new Error('cancelled'));
+      if (result === undefined) reject(new OmniError('aborted', 'cancelled'));
       else resolve(result);
     };
     const onData = (chunk: string) => {

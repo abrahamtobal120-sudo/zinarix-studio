@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 import type { DirEntry } from '../../shared/api';
 import { t } from '../i18n';
 import { api, askText, closeTab, getState, openFile, renamePath, toast, useStore } from '../store';
@@ -34,9 +34,13 @@ export function Explorer() {
     if (workspace) void load('');
   }, [workspace, load]);
 
-  useEffect(() => {
+  // Re-read every expanded folder when the file system changes (not when folders are toggled).
+  const reloadOpen = useEffectEvent(() => {
     if (!workspace) return;
     for (const dir of open) void load(dir);
+  });
+  useEffect(() => {
+    reloadOpen();
   }, [fsVersion]);
 
   useEffect(() => {

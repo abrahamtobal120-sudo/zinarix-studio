@@ -50,7 +50,12 @@ export const OmniConfig = z.object({
   prices: z
     .record(
       z.string(),
-      z.object({ input: z.number().nonnegative(), output: z.number().nonnegative() }),
+      z.object({
+        input: z.number().nonnegative(),
+        output: z.number().nonnegative(),
+        cachedInput: z.number().nonnegative().optional(),
+        cacheWrite: z.number().nonnegative().optional(),
+      }),
     )
     .default({}),
   budgets: z.record(z.string(), Budget).default({}),

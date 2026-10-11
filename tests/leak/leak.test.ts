@@ -63,6 +63,23 @@ function needles(key: string): string[] {
   return [key, key.slice(8, 28), Buffer.from(key).toString('base64')];
 }
 
+// Never skip silently: a missing build hides the most important test in the suite.
+// Locally it is skipped with a visible warning; in CI (CI=true) it fails.
+if (!hasCli) {
+  console.warn(
+    `\n[leak] SKIPPED: ${CLI} does not exist. Run \`pnpm build\` (or \`tsc -b\`) to run the canary leak test.\n`,
+  );
+  describe('API keys never leak (canary)', () => {
+    it.runIf(Boolean(process.env.CI))('requires the built CLI (apps/cli/dist)', () => {
+      expect.fail(`missing ${CLI}: build the CLI before running the leak test`);
+    });
+    it.skipIf(Boolean(process.env.CI))(
+      'skipped: apps/cli/dist is missing (run pnpm build)',
+      () => {},
+    );
+  });
+}
+
 describe.skipIf(!hasCli)('API keys never leak (canary)', () => {
   beforeAll(async () => {
     home = mkdtempSync(join(tmpdir(), 'omni-leak-'));

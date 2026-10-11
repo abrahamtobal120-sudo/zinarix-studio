@@ -1,8 +1,8 @@
 import { execFile, spawn } from 'node:child_process';
-import { existsSync, watch } from 'node:fs';
+import { existsSync, lstatSync, realpathSync, watch } from 'node:fs';
 import type { FSWatcher } from 'node:fs';
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
-import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { DirEntry, FileContent, SearchHit, WorkspaceInfo } from '../shared/api.js';
 
 const MAX_FILE = 10 * 1024 * 1024;
@@ -33,9 +33,13 @@ export class Workspace {
   resolve(rel: string): string {
     if (isAbsolute(rel)) throw new Error('absolute paths are not allowed');
     const abs = resolve(this.root, rel);
-    const r = relative(this.root, abs);
-    if (r === '..' || r.startsWith(`..${sep}`) || isAbsolute(r))
-      throw new Error('path escapes the workspace');
+    if (!inside(this.root, abs)) throw new Error('path escapes the workspace');
+    // A symlink inside the project must not lead outside it (a cloned repo can ship one
+    // pointing at ~/.ssh or ~/.bashrc). Checked on the real path of the longest existing
+    // prefix, so new files under a linked folder are caught too.
+    const real = realish(abs);
+    if (real === null || !inside(realRoot(this.root), real))
+      throw new Error('path escapes the workspace (symbolic link)');
     return abs;
   }
 
@@ -157,6 +161,48 @@ export class Workspace {
 
   dispose(): void {
     this.watcher?.close();
+  }
+}
+
+function inside(root: string, abs: string): boolean {
+  const r = relative(root, abs);
+  return !(r === '..' || r.startsWith(`..${sep}`) || isAbsolute(r));
+}
+
+function realRoot(root: string): string {
+  try {
+    return realpathSync(root);
+  } catch {
+    return root;
+  }
+}
+
+/**
+ * Real path of the longest existing prefix of `p`, plus the not-yet-existing rest.
+ * null = a dangling symlink on the way (its target cannot be checked, so it is refused).
+ */
+function realish(p: string): string | null {
+  let cur = p;
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync(cur), ...rest);
+    } catch (e) {
+      const parent = dirname(cur);
+      // A dangling symlink (lstat works, realpath fails) must not be followed blindly.
+      if (isLink(cur)) return null;
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || parent === cur) return p;
+      rest.unshift(basename(cur));
+      cur = parent;
+    }
+  }
+}
+
+function isLink(p: string): boolean {
+  try {
+    return lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
   }
 }
 

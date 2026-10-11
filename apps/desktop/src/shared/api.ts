@@ -100,13 +100,112 @@ export interface UsageReport {
   budgets: Record<string, { daily?: number; monthly?: number; hardStop: boolean }>;
 }
 
+/** Color themes: the two base ones plus extra palettes (see renderer/themes.ts). */
+export const THEME_IDS = [
+  'dark',
+  'light',
+  'midnight',
+  'dracula',
+  'monokai',
+  'nord',
+  'solarized-light',
+  'github-light',
+] as const;
+export type ThemeId = (typeof THEME_IDS)[number];
+
 export interface Settings {
   defaultModel: string | null;
   /** Per-role overrides; missing roles use defaultModel. */
   roles: Partial<Record<AiRole, string>>;
   localOnly: boolean;
-  theme: 'dark' | 'light';
+  theme: ThemeId;
   todayUsd: number;
+}
+
+/** Editor and app preferences (Settings screen), kept in desktop.json. */
+export interface Prefs {
+  fontSize: number;
+  fontFamily: string;
+  tabSize: number;
+  wordWrap: boolean;
+  minimap: boolean;
+  lineNumbers: boolean;
+  formatOnSave: boolean;
+  autoSave: boolean;
+  /** Ghost-text suggestions while typing (costs tokens; off by default). */
+  inlineCompletions: boolean;
+  /** Send .zinarix/rules.md (or AGENTS.md) to the chat and the agent. */
+  projectRules: boolean;
+  /** Command id -> shortcut ("Ctrl+Shift+G"); overrides the defaults. */
+  keybindings: Record<string, string>;
+}
+
+export const DEFAULT_PREFS: Prefs = {
+  fontSize: 14,
+  fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace",
+  tabSize: 2,
+  wordWrap: false,
+  minimap: true,
+  lineNumbers: true,
+  formatOnSave: false,
+  autoSave: false,
+  inlineCompletions: false,
+  projectRules: true,
+  keybindings: {},
+};
+
+export interface GitFileView {
+  path: string;
+  /** Original path of a rename. */
+  from?: string;
+  /** Porcelain status letters: index (staged) and working tree. */
+  index: string;
+  work: string;
+  untracked: boolean;
+  conflict: boolean;
+}
+export interface GitStatusView {
+  isRepo: boolean;
+  branch: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  files: GitFileView[];
+  hasCommits: boolean;
+  remotes: string[];
+}
+export interface GitCommitView {
+  hash: string;
+  short: string;
+  author: string;
+  date: string;
+  subject: string;
+  refs: string;
+}
+export interface GitBranchView {
+  name: string;
+  current: boolean;
+  remote: boolean;
+  upstream?: string;
+}
+export interface GitHubStatus {
+  installed: boolean;
+  loggedIn: boolean;
+  user: string | null;
+}
+export interface GitHubRepoView {
+  name: string;
+  description: string;
+  private: boolean;
+  updatedAt: string;
+  url: string;
+}
+
+export interface CompletionRequestView {
+  path: string;
+  language: string;
+  prefix: string;
+  suffix: string;
 }
 
 export interface ChatContext {
@@ -130,6 +229,20 @@ export interface ToolPreview {
   /** High-risk: approved one at a time ("always" is not offered). */
   noAlways?: boolean;
 }
+
+export interface FindingView {
+  severity: 'crítico' | 'alto' | 'medio' | 'bajo';
+  title: string;
+  where?: string;
+  detail?: string;
+  fix?: string;
+}
+export interface SecReportView {
+  title: string;
+  findings: FindingView[];
+  notes: string[];
+}
+export type SecKind = 'project' | 'deps' | 'system' | 'site' | 'hash';
 
 export interface ScanHitView {
   port: number;
@@ -262,13 +375,47 @@ export interface OmniApi {
     settings(): Promise<Settings>;
     setDefaultModel(ref: string): Promise<void>;
     setLocalOnly(on: boolean): Promise<void>;
-    setTheme(theme: 'dark' | 'light'): Promise<void>;
+    setTheme(theme: ThemeId): Promise<void>;
+    /** Inline completion (ghost text) at the cursor; '' when there is nothing to suggest. */
+    complete(requestId: string, req: CompletionRequestView): Promise<string>;
+    /** Commit message for the staged changes (or all changes when nothing is staged). */
+    commitMessage(): Promise<string>;
+    /** Project rules file in use (.zinarix/rules.md, AGENTS.md…) or null. */
+    rulesFile(): Promise<string | null>;
+    /** Forget the agent's model-side transcript (regenerate / edit a message); keeps undo data. */
+    resetContext(conversationId: string): Promise<void>;
     chat(requestId: string, req: ChatRequestView): Promise<void>;
     edit(requestId: string, req: EditRequestView): Promise<void>;
     abort(requestId: string): Promise<void>;
     toolDecision(requestId: string, toolCallId: string, decision: ToolDecision): Promise<void>;
     /** Undo every file change the agent made in a conversation. Returns restored paths. */
     revert(conversationId: string): Promise<string[]>;
+  };
+  git: {
+    status(): Promise<GitStatusView>;
+    init(): Promise<void>;
+    stage(paths: string[]): Promise<void>;
+    unstage(paths: string[]): Promise<void>;
+    /** Discards changes; untracked files go to the trash. */
+    discard(paths: string[]): Promise<void>;
+    diff(path: string, staged: boolean): Promise<{ before: string; after: string }>;
+    commit(message: string, amend: boolean): Promise<void>;
+    log(): Promise<GitCommitView[]>;
+    show(hash: string): Promise<string>;
+    branches(): Promise<GitBranchView[]>;
+    checkout(name: string, create: boolean): Promise<void>;
+    deleteBranch(name: string, force: boolean): Promise<void>;
+    sync(op: 'pull' | 'push' | 'fetch'): Promise<string>;
+    stash(op: 'push' | 'pop'): Promise<void>;
+    addRemote(url: string): Promise<void>;
+  };
+  github: {
+    status(): Promise<GitHubStatus>;
+    repos(): Promise<GitHubRepoView[]>;
+    /** Asks for a parent folder, clones there and opens the clone. */
+    clone(spec: string): Promise<WorkspaceInfo | null>;
+    /** Creates the repository on GitHub from the open folder and pushes it. Returns its URL. */
+    publish(name: string, visibility: 'private' | 'public', description: string): Promise<string>;
   };
   security: {
     /**
@@ -280,6 +427,11 @@ export interface OmniApi {
       opts: { target: string; ports?: string; serviceDetection?: boolean; authorized?: boolean },
     ): Promise<ScanResultView>;
     scanAbort(requestId: string): Promise<void>;
+    /** Runs one analysis and returns structured findings for the security section. */
+    run(
+      requestId: string,
+      opts: { kind: SecKind; checks?: string[]; url?: string; path?: string; expected?: string },
+    ): Promise<SecReportView>;
   };
   browser: {
     /** Screen area (CSS px, window coordinates) where the page is drawn; null hides it. */
@@ -299,6 +451,8 @@ export interface OmniApi {
     kill(id: number): Promise<void>;
   };
   app: {
+    prefs(): Promise<Prefs>;
+    setPrefs(patch: Partial<Prefs>): Promise<Prefs>;
     openExternal(url: string): Promise<void>;
     /** Confirms a close requested by the window manager (after unsaved-changes check). */
     quit(): Promise<void>;
@@ -345,6 +499,32 @@ export const CHANNELS = [
   'ai:abort',
   'ai:toolDecision',
   'ai:revert',
+  'ai:complete',
+  'ai:commitMessage',
+  'ai:rulesFile',
+  'ai:resetContext',
+  'git:status',
+  'git:init',
+  'git:stage',
+  'git:unstage',
+  'git:discard',
+  'git:diff',
+  'git:commit',
+  'git:log',
+  'git:show',
+  'git:branches',
+  'git:checkout',
+  'git:deleteBranch',
+  'git:sync',
+  'git:stash',
+  'git:addRemote',
+  'github:status',
+  'github:repos',
+  'github:clone',
+  'github:publish',
+  'app:prefs',
+  'app:setPrefs',
+  'security:run',
   'security:scan',
   'security:scanAbort',
   'browser:setBounds',

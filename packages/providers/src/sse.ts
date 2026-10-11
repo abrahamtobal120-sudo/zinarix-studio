@@ -1,6 +1,9 @@
 import { OmniError } from '@omni/shared';
 import { abortError } from './http.js';
 
+/** One SSE event (or one line) larger than this is a broken or hostile server. */
+export const MAX_SSE_EVENT = 16 * 1024 * 1024;
+
 export interface SseEvent {
   event?: string;
   data: string;
@@ -20,6 +23,7 @@ export async function* parseSse(
   let buffer = '';
   let event: string | undefined;
   let data: string[] = [];
+  let pending = 0;
   const idle = opts.idleTimeoutMs ?? 120_000;
 
   const readChunk = async (): Promise<{ done: boolean; value?: Uint8Array }> => {
@@ -52,6 +56,11 @@ export async function* parseSse(
       const { value, done } = await readChunk();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > MAX_SSE_EVENT || pending > MAX_SSE_EVENT)
+        throw new OmniError('server', `stream event larger than ${MAX_SSE_EVENT} bytes`, {
+          provider: opts.provider,
+          retryable: false,
+        });
       let nl: number;
       while ((nl = buffer.search(/\r?\n/)) >= 0) {
         const line = buffer.slice(0, nl);
@@ -60,10 +69,12 @@ export async function* parseSse(
           if (data.length) yield { event, data: data.join('\n') };
           event = undefined;
           data = [];
+          pending = 0;
         } else if (line.startsWith(':')) {
           // comment / keep-alive
         } else if (line.startsWith('data:')) {
           data.push(line.slice(5).replace(/^ /, ''));
+          pending += line.length;
         } else if (line.startsWith('event:')) {
           event = line.slice(6).trim();
         } else if (line.startsWith('{')) {

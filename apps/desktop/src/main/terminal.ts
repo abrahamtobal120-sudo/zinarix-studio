@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import type { IPty } from '@lydell/node-pty';
+import { childEnv } from './env.js';
 
 const require = createRequire(import.meta.url);
 
@@ -22,15 +23,13 @@ export class Terminals {
   create(cwd: string, cols: number, rows: number): number {
     const pty = require('@lydell/node-pty') as typeof import('@lydell/node-pty');
     const { file, args } = defaultShell();
+    // Never hand provider keys the app can read (catalog envVars, OMNI_KEY_*) to child shells.
     const env = {
-      ...process.env,
+      ...childEnv(process.env),
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
       TERM_PROGRAM: 'ZinarixStudio',
-    } as Record<string, string>;
-    // Never hand provider keys loaded by the app to child shells.
-    for (const k of Object.keys(env))
-      if (k.startsWith('OMNI_KEY_') || k === 'OMNI_VAULT_PASSWORD') delete env[k];
+    };
     const p = pty.spawn(file, args, { name: 'xterm-256color', cols, rows, cwd, env });
     const id = this.next++;
     this.ptys.set(id, p);

@@ -192,7 +192,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
       });
     }
     return r;
-  }, [rows, query, provider, filters, favs, sort, recent]);
+  }, [rows, query, filters, favs, sort, recent]);
 
   /** Providers view: shown until the user opens a provider or types a search. */
   const gridMode = provider === null && !query.trim() && !filters.has('fav');
@@ -305,7 +305,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
               </button>
             ))}
           </div>
-          <button className="modal-x" onClick={close} aria-label="Cerrar">
+          <button className="modal-x" onClick={close} aria-label={t('close')}>
             ×
           </button>
         </div>

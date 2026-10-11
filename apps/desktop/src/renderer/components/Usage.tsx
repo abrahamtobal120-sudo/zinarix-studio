@@ -97,7 +97,7 @@ export function UsagePanel() {
   return (
     <div className="modal-backdrop" onMouseDown={close}>
       <div className="usage" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={close} aria-label="Cerrar">
+        <button className="modal-x" onClick={close} aria-label={t('close')}>
           ×
         </button>
         <h2>📊 {t('usageTitle')}</h2>

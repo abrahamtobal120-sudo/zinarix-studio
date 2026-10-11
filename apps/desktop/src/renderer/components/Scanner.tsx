@@ -3,16 +3,16 @@ import type { ScanResultView } from '../../shared/api';
 import { t } from '../i18n';
 import { api, newRequestId, setState } from '../store';
 
-const PRESETS: { id: string; label: string; ports?: string }[] = [
+const presets = (): { id: string; label: string; ports?: string }[] => [
   { id: 'top', label: 'Top 100', ports: undefined },
   {
     id: 'common',
-    label: 'Comunes',
+    label: t('scanCommon'),
     ports: '21,22,23,25,53,80,110,143,443,445,3306,3389,5432,6379,8080,8443,27017',
   },
   { id: 'web', label: 'Web', ports: '80,443,3000,5000,5173,8000,8080,8443,8888' },
-  { id: 'all', label: 'Todos (1-65535)', ports: '1-65535' },
-  { id: 'custom', label: 'Personalizado' },
+  { id: 'all', label: t('scanAll'), ports: '1-65535' },
+  { id: 'custom', label: t('scanCustom') },
 ];
 
 /** Private LAN / localhost — a public target needs the authorization checkbox. */
@@ -58,7 +58,7 @@ export function Scanner() {
   const run = async () => {
     if (busy || !target.trim()) return;
     if (isPublic && !authorized) return;
-    const ports = PRESETS.find((p) => p.id === preset)?.ports;
+    const ports = presets().find((p) => p.id === preset)?.ports;
     const id = newRequestId();
     reqId.current = id;
     setBusy(true);
@@ -93,7 +93,7 @@ export function Scanner() {
   return (
     <div className="modal-backdrop" onMouseDown={close}>
       <div className="scanner" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={close} aria-label="Cerrar">
+        <button className="modal-x" onClick={close} aria-label={t('close')}>
           ×
         </button>
         <h2>📡 {t('scannerTitle')}</h2>
@@ -104,14 +104,14 @@ export function Scanner() {
             {t('scannerTarget')}
             <input
               value={target}
-              placeholder="localhost · 192.168.1.1 · 192.168.1.0/24 · midominio.com"
+              placeholder={t('phScanTarget')}
               spellCheck={false}
               onChange={(e) => setTarget(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void run()}
             />
           </label>
           <div className="scan-presets">
-            {PRESETS.map((p) => (
+            {presets().map((p) => (
               <button
                 key={p.id}
                 className={`scan-chip ${preset === p.id ? 'on' : ''}`}
@@ -225,12 +225,15 @@ export function Scanner() {
                   close();
                   import('./Chat').then((m) =>
                     m.askAgent(
-                      `Acabo de escanear ${target.trim()} y encontré estos puertos abiertos:\n${result.hosts
-                        .map(
-                          (h) =>
-                            `${h.host}: ${h.openPorts.map((p) => `${p.port} ${p.service}${p.banner ? ` (${p.banner})` : ''}`).join(', ')}`,
-                        )
-                        .join('\n')}\nExplícame qué riesgo tiene cada uno y cómo lo aseguro.`,
+                      t('scanExplainPrompt', {
+                        target: target.trim(),
+                        ports: result.hosts
+                          .map(
+                            (h) =>
+                              `${h.host}: ${h.openPorts.map((p) => `${p.port} ${p.service}${p.banner ? ` (${p.banner})` : ''}`).join(', ')}`,
+                          )
+                          .join('\n'),
+                      }),
                     ),
                   );
                 }}

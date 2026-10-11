@@ -14,23 +14,53 @@ export interface UsageRecord {
 }
 
 export interface Price {
+  /** USD per 1M tokens. */
   input: number;
   output: number;
+  /** USD per 1M cache-read input tokens; defaults to a share of `input` (see cacheRates). */
+  cachedInput?: number;
+  /** USD per 1M cache-write input tokens (Anthropic cache_creation); same default rule. */
+  cacheWrite?: number;
 }
 
 /**
- * USD for one request. Cached input tokens are billed at 10 % of the input price by
- * default (the common discount); user overrides in config win.
+ * Default cache multipliers over the input price when the catalog or config gives no
+ * explicit cache prices. Anthropic bills cache reads at 10 % and 5-minute cache writes at
+ * 125 %; Gemini reads at 25 %; OpenAI (and the OpenAI-compatible default) reads at 50 %.
+ * Unknown APIs get the OpenAI rate: overestimating is the safe side for a budget.
+ */
+export function cacheRates(adapter: string): { read: number; write: number } {
+  switch (adapter) {
+    case 'anthropic':
+      return { read: 0.1, write: 1.25 };
+    case 'google-gemini':
+    case 'google-vertex':
+      return { read: 0.25, write: 1 };
+    default:
+      return { read: 0.5, write: 1 };
+  }
+}
+
+/**
+ * USD for one request. `input` includes cached and cache-write tokens; they are billed
+ * at the explicit cache prices when known, otherwise at `rates` times the input price.
  */
 export function computeCost(
   price: Price | undefined,
   input: number,
   output: number,
   cached = 0,
+  opts: { cacheWrite?: number; rates?: { read: number; write: number } } = {},
 ): number | null {
   if (!price) return null;
-  const fresh = Math.max(0, input - cached);
-  return (fresh * price.input + cached * price.input * 0.1 + output * price.output) / 1e6;
+  const rates = opts.rates ?? cacheRates('openai-compatible');
+  const write = opts.cacheWrite ?? 0;
+  const fresh = Math.max(0, input - cached - write);
+  const readPrice = price.cachedInput ?? price.input * rates.read;
+  const writePrice = price.cacheWrite ?? price.input * rates.write;
+  return (
+    (fresh * price.input + cached * readPrice + write * writePrice + output * price.output) / 1e6
+  );
 }
 
 export function recordUsage(db: Db, r: UsageRecord, ts = Date.now()): void {

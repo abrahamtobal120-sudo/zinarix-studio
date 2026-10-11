@@ -1,42 +1,59 @@
 import { useEffect, useRef } from 'react';
+import { t } from '../i18n';
 import { monaco } from '../monaco';
+import { registerInlineCompletions } from '../inline';
+import { monacoTheme } from '../themes';
+import type { Prefs } from '../../shared/api';
 import {
   BROWSER_TAB,
+  SECURITY_TAB,
   activate,
   attachEditor,
   closeTab,
   getDoc,
+  getState,
   setState,
   useStore,
 } from '../store';
 import { BrowserPane } from './Browser';
+import { SecuritySection } from './SecuritySection';
 import { Welcome } from './Chrome';
 
+function prefOptions(p: Prefs): monaco.editor.IEditorOptions {
+  return {
+    fontSize: p.fontSize,
+    fontFamily: p.fontFamily,
+    wordWrap: p.wordWrap ? 'on' : 'off',
+    minimap: { enabled: p.minimap },
+    lineNumbers: p.lineNumbers ? 'on' : 'off',
+    inlineSuggest: { enabled: true, mode: 'subwordSmart' },
+  };
+}
+
 export function EditorArea() {
+  const prefs = useStore((s) => s.prefs);
   const tabs = useStore((s) => s.tabs);
   const active = useStore((s) => s.active);
-  const theme = useStore((s) => s.settings.theme);
   const host = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const activeTab = tabs.find((x) => x.path === active);
 
   useEffect(() => {
     if (!host.current) return;
+    registerInlineCompletions();
     const ed = monaco.editor.create(host.current, {
       model: null,
+      ...prefOptions(getState().prefs),
       automaticLayout: true,
-      theme: theme === 'dark' ? 'vs-dark' : 'vs',
-      fontSize: 14,
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace",
+      // Initial theme only; later changes go through monaco.editor.setTheme.
+      theme: monacoTheme(getState().settings.theme),
       fontLigatures: true,
-      minimap: { enabled: true },
       smoothScrolling: true,
       cursorBlinking: 'smooth',
       renderWhitespace: 'selection',
       bracketPairColorization: { enabled: true },
       guides: { bracketPairs: true, indentation: true },
       stickyScroll: { enabled: true },
-      tabSize: 2,
       scrollBeyondLastLine: false,
       padding: { top: 6 },
     });
@@ -53,17 +70,24 @@ export function EditorArea() {
   }, []);
 
   useEffect(() => {
+    editorRef.current?.updateOptions(prefOptions(prefs));
+    for (const m of monaco.editor.getModels()) m.updateOptions({ tabSize: prefs.tabSize });
+  }, [prefs]);
+
+  useEffect(() => {
     const ed = editorRef.current;
     if (!ed) return;
     const doc = active ? getDoc(active) : undefined;
+    doc?.model.updateOptions({ tabSize: getState().prefs.tabSize });
     ed.setModel(doc?.model ?? null);
     if (doc?.viewState) ed.restoreViewState(doc.viewState);
     if (doc) ed.focus();
   }, [active, tabs.length]);
 
   const isBrowser = active === BROWSER_TAB;
+  const isSecurity = active === SECURITY_TAB;
   const hasBrowserTab = tabs.some((x) => x.path === BROWSER_TAB);
-  const showEditor = Boolean(activeTab && !activeTab.notice && !isBrowser);
+  const showEditor = Boolean(activeTab && !activeTab.notice && !isBrowser && !isSecurity);
   return (
     <div className="editor-area">
       {tabs.length > 0 && (
@@ -84,6 +108,7 @@ export function EditorArea() {
               }}
             >
               <span className="tab-name">
+                {tab.path === SECURITY_TAB && '🛡️ '}
                 {tab.path === BROWSER_TAB && (
                   <svg
                     className="tab-globe"
@@ -104,7 +129,7 @@ export function EditorArea() {
               </span>
               <button
                 className={`tab-close ${tab.dirty ? 'dirty' : ''}`}
-                aria-label="Cerrar"
+                aria-label={t('close')}
                 onClick={(e) => {
                   e.stopPropagation();
                   closeTab(tab.path);
@@ -122,6 +147,7 @@ export function EditorArea() {
       <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />
       {activeTab?.notice && <div className="notice-pane">{activeTab.notice}</div>}
       {hasBrowserTab && <BrowserPane visible={isBrowser} />}
+      {isSecurity && <SecuritySection />}
       {!activeTab && <Welcome />}
     </div>
   );

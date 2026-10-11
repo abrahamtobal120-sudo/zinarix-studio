@@ -73,6 +73,8 @@ export interface LoadedCatalog {
   catalog: Catalog;
   source: 'bundled' | 'update';
   providers: Map<string, CatalogEntry>;
+  /** config.json entries that were ignored because they would weaken the signed catalog. */
+  rejected: string[];
 }
 
 /**
@@ -100,8 +102,94 @@ export function loadCatalog(
   }
   catalog ??= parseCatalog(readFileSync(bundledCatalogPath(), 'utf8'), 'bundled catalog');
   const providers = new Map(catalog.providers.map((p) => [p.id, p]));
-  for (const custom of config.customProviders) providers.set(custom.id, custom);
-  return { catalog, source, providers };
+  const rejected = configIssues(config, catalog);
+  for (const custom of config.customProviders)
+    if (!providers.has(custom.id)) providers.set(custom.id, custom);
+  return { catalog, source, providers, rejected };
+}
+
+/**
+ * config.json is not signed, so it must not be able to redirect a signed provider's key:
+ * a custom provider cannot reuse a catalog id, and a baseUrl override of a catalog
+ * provider must stay on the same registrable domain (or loopback). Returns one readable
+ * line per violation; `saveConfig` refuses them and `loadCatalog` ignores them.
+ */
+export function configIssues(config: OmniConfig, catalog: Catalog): string[] {
+  const signed = new Map(catalog.providers.map((p) => [p.id, p]));
+  const out: string[] = [];
+  for (const c of config.customProviders) {
+    if (signed.has(c.id))
+      out.push(
+        `customProviders: "${c.id}" is already a catalog provider; pick another id (e.g. "${c.id}-custom")`,
+      );
+  }
+  for (const [id, p] of Object.entries(config.providers)) {
+    const entry = signed.get(id);
+    if (!entry || !p.baseUrl) continue;
+    const why = baseUrlOverrideIssue(entry, p.baseUrl);
+    if (why) out.push(`providers.${id}.baseUrl: ${why}`);
+  }
+  return out;
+}
+
+export function isLoopbackHost(host: string): boolean {
+  // URL.hostname keeps the brackets of IPv6 literals ("[::1]").
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+  return (
+    h === 'localhost' || h === '::1' || h.endsWith('.localhost') || /^127(?:\.\d{1,3}){3}$/.test(h)
+  );
+}
+
+// Second-level labels under a ccTLD that act as public suffixes (co.uk, com.cn, ...).
+const SECOND_LEVEL = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'or', 'ne', 'go']);
+
+/** eTLD+1 approximation without a public-suffix list: good enough to compare two hosts. */
+export function registrableDomain(host: string): string {
+  const labels = host.toLowerCase().replace(/\.$/, '').split('.');
+  if (labels.length <= 2 || /^\d+$/.test(labels[labels.length - 1]!)) return labels.join('.');
+  const n =
+    labels[labels.length - 1]!.length === 2 && SECOND_LEVEL.has(labels[labels.length - 2]!) ? 3 : 2;
+  return labels.slice(-n).join('.');
+}
+
+function hostOf(url: string): string | undefined {
+  try {
+    // Catalog URLs may hold {placeholders} in the host (https://{resource}.openai.azure.com).
+    return new URL(url.replace(/\{[a-z_]+\}/g, 'x')).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Why a user baseUrl override of a catalog provider is refused, or undefined if allowed. */
+export function baseUrlOverrideIssue(entry: CatalogEntry, override: string): string | undefined {
+  const host = hostOf(override);
+  if (!host) return `invalid URL "${override}"`;
+  if (isLoopbackHost(host)) return undefined;
+  // Keyless local servers (Ollama, LM Studio...) may live anywhere on the LAN: no key to leak.
+  if (entry.auth.type === 'none' && !entry.auth.optional) return undefined;
+  const expected = hostOf(entry.baseUrl);
+  if (expected && registrableDomain(host) === registrableDomain(expected)) return undefined;
+  return `"${host}" is not on ${expected ? registrableDomain(expected) : 'the catalog domain'} nor loopback; the ${entry.name} key would be sent to another server. Add it as a custom provider instead (omni providers add-custom).`;
+}
+
+/**
+ * Credentials must not travel in clear text: plain http:// is only allowed to loopback
+ * hosts. Throws a config error when `baseUrl` is http to anything else.
+ */
+export function assertSecureTransport(provider: string, baseUrl: string): void {
+  let u: URL;
+  try {
+    u = new URL(baseUrl);
+  } catch {
+    throw new OmniError('config', `${provider}: invalid base URL "${baseUrl}"`);
+  }
+  if (u.protocol === 'https:' || isLoopbackHost(u.hostname)) return;
+  throw new OmniError(
+    'config',
+    `${provider}: refusing to send credentials over plain HTTP to ${u.host}; use https:// (http:// is only allowed for localhost)`,
+    { provider, retryable: false },
+  );
 }
 
 export async function updateCatalogFromUrl(
@@ -168,10 +256,7 @@ export function resolveParams(
 export function isLocalProvider(entry: CatalogEntry, baseUrl: string): boolean {
   if (entry.category === 'local') return true;
   try {
-    const host = new URL(baseUrl).hostname;
-    return (
-      host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
-    );
+    return isLoopbackHost(new URL(baseUrl).hostname);
   } catch {
     return false;
   }

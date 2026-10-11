@@ -31,6 +31,9 @@ describe('Secret', () => {
 
   it('masks short values entirely', () => {
     expect(maskKey('abc')).toBe('••••');
+    expect(maskKey('key-abc123456')).toBe('••••');
+    // Medium keys keep only the prefix: the last 4 would be too large a share.
+    expect(maskKey('key-abc1234567890xy')).toBe('key-••••');
   });
 
   it('registers its value for exact-match redaction', () => {
@@ -63,6 +66,9 @@ describe('redact patterns', () => {
     expect(r.count).toBeGreaterThan(0);
     expect(r.text).toContain(REDACTED);
     expect(r.text.startsWith('before ')).toBe(true);
+    // The secret itself must be gone, not just a marker added next to it.
+    const secret = input.replace(/^.*?(?:key=|Bearer |PASSWORD="|admin:)/s, '').slice(0, 12);
+    expect(r.text).not.toContain(secret);
   });
 
   it('keeps ordinary code untouched', () => {
@@ -82,7 +88,24 @@ describe('redact patterns', () => {
   });
 });
 
+describe('redactDeep(Error)', () => {
+  it('keeps name, message and stack, redacted', () => {
+    const key = 'sk-' + 'proj-ERRORERRORERRORERRORERROR00';
+    const out = redactDeep(new TypeError(`bad key ${key}`)) as unknown as Record<string, string>;
+    expect(out.name).toBe('TypeError');
+    expect(out.message).toBe(`bad key ${REDACTED}`);
+    expect(out.stack).toContain('TypeError');
+    expect(JSON.stringify(out)).not.toContain(key);
+  });
+});
+
 describe('logger', () => {
+  it('survives unserializable data', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'omni-log-')), 'x.log');
+    expect(() => createLogger({ file }).info('x', { big: 10n })).not.toThrow();
+    expect(readFileSync(file, 'utf8')).toContain('[unserializable]');
+  });
+
   it('writes redacted JSON lines', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'omni-log-')), 'x.log');
     const log = createLogger({ file, level: 'debug' });
@@ -94,5 +117,50 @@ describe('logger', () => {
     expect(text).not.toContain('sk-ant-api03');
     expect(text).not.toContain('plain');
     expect(JSON.parse(text).data.apiKey).toBe(REDACTED);
+  });
+});
+
+describe('provider key formats', () => {
+  it.each([
+    ['google-oauth', `ya29.${'a1B2'.repeat(10)}`],
+    ['perplexity', `pplx-${'a1'.repeat(24)}`],
+    ['replicate', `r8_${'Ab3'.repeat(12)}`],
+    ['nvidia', `nvapi-${'xY9_'.repeat(14)}`],
+    ['cerebras', `csk-${'k3y'.repeat(12)}`],
+    ['fireworks', `fw_${'Q8w'.repeat(9)}`],
+    ['together', `tgp_v1_${'Zz1'.repeat(12)}`],
+    ['gitlab', `glpat-${'Ab1'.repeat(8)}`],
+    ['npm', `npm_${'A1b2'.repeat(9)}`],
+    ['stripe-webhook', `whsec_${'Wh1'.repeat(10)}`],
+    ['supabase', `sbp_${'5ab'.repeat(14)}`],
+  ])('redacts %s keys', (_id, key) => {
+    expect(redact(`key = ${key} end`)).not.toContain(key);
+  });
+});
+
+describe('StreamRedactor', () => {
+  it('redacts a registered secret split across chunks, and keeps the text intact', async () => {
+    const { StreamRedactor, registerSecret: reg } = await import('../src/redact.js');
+    const key = 'zz-registered-stream-secret-0123456789';
+    reg(key);
+    const text = `Intro text that is long enough to stream. Your key is ${key} — keep it safe. ${'More words follow here. '.repeat(10)}`;
+    for (const size of [1, 3, 7, 50]) {
+      const r = new StreamRedactor();
+      let out = '';
+      for (let i = 0; i < text.length; i += size) out += r.push(text.slice(i, i + size));
+      out += r.flush();
+      expect(out).not.toContain(key);
+      expect(out).toBe(text.replace(key, REDACTED));
+    }
+  });
+
+  it('holds an unfinished private key block until it ends', async () => {
+    const { StreamRedactor } = await import('../src/redact.js');
+    const pem = `-----BEGIN PRIVATE KEY-----\n${'QUJD'.repeat(80)}\n-----END PRIVATE KEY-----`;
+    const r = new StreamRedactor();
+    let out = '';
+    for (const line of `start ${pem} end`.split(/(?<=\n)/)) out += r.push(line);
+    out += r.flush();
+    expect(out).not.toContain('QUJDQUJD');
   });
 });

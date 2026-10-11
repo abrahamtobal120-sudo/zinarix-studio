@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import type { ChatContext, ChatEventView, ToolDecision, ToolPreview } from '../../shared/api';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type {
+  ChatContext,
+  ChatEventView,
+  OmniApi,
+  ToolDecision,
+  ToolPreview,
+} from '../../shared/api';
 import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
+import { monacoTheme } from '../themes';
 import {
   BROWSER_TAB,
   api,
@@ -14,9 +22,19 @@ import {
   toast,
   useStore,
 } from '../store';
+import { runCommand } from '../commands';
+import { fileIcon } from './icons';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory } from './ChatHistory';
 import { Markdown } from './Markdown';
+import { listTerminals, sendTerminalToChat, type TerminalSession } from './Terminal';
+
+/** Readable label for a context source ("file:src/a.ts", "terminal:2:selection", …). */
+function contextLabel(source: string): string {
+  const term = /^terminal:(\d+)(:selection)?$/.exec(source);
+  if (term) return t(term[2] ? 'termSelection' : 'termSession', { n: term[1]! });
+  return source.replace(/^(file|selection):/, '');
+}
 
 interface ToolStep {
   kind: 'tool';
@@ -42,12 +60,59 @@ interface Turn {
   context?: string[];
 }
 
+/** "/" commands of the message box: a ready-made prompt (or an action). */
+interface Slash {
+  name: string;
+  hint: string;
+  prompt?: string;
+  agent?: boolean;
+  action?: 'new' | 'agent' | 'chat' | 'rules' | 'commit';
+}
+function slashCommands(): Slash[] {
+  return [
+    { name: 'explicar', hint: t('slashExplain'), prompt: t('slashExplainPrompt') },
+    { name: 'revisar', hint: t('slashReview'), prompt: t('slashReviewPrompt') },
+    { name: 'arreglar', hint: t('slashFix'), prompt: t('slashFixPrompt'), agent: true },
+    { name: 'pruebas', hint: t('slashTests'), prompt: t('slashTestsPrompt'), agent: true },
+    { name: 'docs', hint: t('slashDocs'), prompt: t('slashDocsPrompt') },
+    { name: 'optimizar', hint: t('slashOptimize'), prompt: t('slashOptimizePrompt') },
+    { name: 'seguridad', hint: t('slashSecurity'), prompt: t('slashSecurityPrompt') },
+    { name: 'commit', hint: t('slashCommit'), action: 'commit' },
+    { name: 'reglas', hint: t('rulesEdit'), action: 'rules' },
+    { name: 'agente', hint: t('slashAgent'), action: 'agent' },
+    { name: 'chat', hint: t('slashChat'), action: 'chat' },
+    { name: 'nuevo', hint: t('newChat'), action: 'new' },
+  ];
+}
+
+/** Workspace files mentioned as "@path" in a prompt (only paths that exist). */
+function mentionedFiles(prompt: string, files: string[]): string[] {
+  const known = new Set(files);
+  const out: string[] = [];
+  for (const m of prompt.matchAll(/(^|\s)@([^\s@]+)/g)) {
+    const p = m[2]!.replace(/[.,;:!?)]+$/, '');
+    if (known.has(p) && !out.includes(p)) out.push(p);
+  }
+  return out.slice(0, 12);
+}
+
+interface Suggest {
+  kind: 'slash' | 'file';
+  /** Text range of the input being completed. */
+  from: number;
+  to: number;
+  items: { id: string; label: string; hint?: string }[];
+  index: number;
+}
+
 /** Lets other parts of the UI (Ctrl+L, palette) push a prompt into the chat. */
 /** Sends a task to the chat in agent mode (used by the security center and similar). */
 export let askAgent: (prompt: string) => void = () => {};
 export let askInChat: (prompt: string, context?: ChatContext[]) => void = () => {};
 
 const LAST_KEY = 'zs.lastConversation';
+/** Most recent messages sent as history (main rejects more than 500). */
+const MAX_HISTORY = 400;
 const AGENT_KEY = 'zs.agentMode';
 function savedAgentMode(): boolean {
   try {
@@ -158,7 +223,7 @@ function toolTitle(step: ToolStep): string {
     case 'sql_query':
       return String(a.query ?? '');
     case 'set_env_var':
-      return `${String(a.name ?? '')} (${a.scope === 'user' ? 'permanente' : 'sesión'})`;
+      return `${String(a.name ?? '')} (${a.scope === 'user' ? t('envPermanent') : t('envSession')})`;
     default:
       return String(a.path ?? '.');
   }
@@ -178,7 +243,7 @@ function DiffView({ before, after, path }: { before: string; after: string; path
       automaticLayout: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      theme: theme === 'dark' ? 'vs-dark' : 'vs',
+      theme: monacoTheme(theme),
       hideUnchangedRegions: { enabled: true },
       fontSize: 12,
     });
@@ -255,7 +320,17 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
           <button className="primary" onClick={() => onDecide('approve')}>
             ✓ {t('approve')}
           </button>
-          {!p?.noAlways && <button onClick={() => onDecide('always')}>{t('approveAlways')}</button>}
+          {!p?.noAlways && (
+            // "Always" for run_command only covers this exact command (approvalKey in main/agent.ts).
+            <button
+              title={
+                step.name === 'run_command' ? t('approveAlwaysCmdTitle') : t('approveAlwaysTitle')
+              }
+              onClick={() => onDecide('always')}
+            >
+              {step.name === 'run_command' ? t('approveAlwaysCmd') : t('approveAlways')}
+            </button>
+          )}
           <button className="danger" onClick={() => onDecide('deny')}>
             ✗ {t('reject')}
           </button>
@@ -271,6 +346,8 @@ export function ChatPanel() {
   const models = useStore((s) => s.models);
   const workspace = useStore((s) => s.workspace);
   const [turns, setTurns] = useState<Turn[]>([]);
+  const turnsNow = useRef(turns);
+  turnsNow.current = turns;
   const [input, setInput] = useState('');
   const [includeFile, setIncludeFile] = useState(true);
   const [agentMode, setAgentModeState] = useState(savedAgentMode);
@@ -282,14 +359,62 @@ export function ChatPanel() {
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [changed, setChanged] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const attachments = useStore((s) => s.chatAttachments);
+  const [termMenu, setTermMenu] = useState<TerminalSession[] | null>(null);
+  /** The request currently streaming into the last turn, and its event unsubscribe. */
+  const current = useRef<{ id: string; off: () => void } | null>(null);
+  const [suggest, setSuggest] = useState<Suggest | null>(null);
+  const [files, setFiles] = useState<string[]>([]);
+  const [rulesFile, setRulesFile] = useState<string | null>(null);
+  const projectRules = useStore((s) => s.prefs.projectRules);
+  const fsVersion = useStore((s) => s.fsVersion);
+  /** Prompts sent in this session, for ↑ / ↓ in an empty box. */
+  const sent = useRef<string[]>([]);
+  const sentIdx = useRef(-1);
+
+  const root = workspace?.root;
+  useEffect(() => {
+    if (!root) {
+      setFiles([]);
+      setRulesFile(null);
+      return;
+    }
+    void api()
+      .workspace.listFiles()
+      .then(setFiles)
+      .catch(() => setFiles([]));
+  }, [root]);
+  useEffect(() => {
+    if (!root) return;
+    void api()
+      .ai.rulesFile()
+      .then(setRulesFile)
+      .catch(() => setRulesFile(null));
+  }, [root, fsVersion, projectRules]);
+
+  /** Aborts the in-flight request (if any) and stops listening to its events. */
+  const cancelCurrent = () => {
+    const req = current.current;
+    if (!req) return;
+    current.current = null;
+    req.off();
+    void api().ai.abort(req.id);
+    setBusy(null);
+  };
 
   const loadConversation = async (id: string) => {
-    const data = await api().ai.conversation(id);
+    let data: Awaited<ReturnType<OmniApi['ai']['conversation']>>;
+    try {
+      data = await api().ai.conversation(id);
+    } catch (err) {
+      toast(String(err instanceof Error ? err.message : err));
+      return;
+    }
     if (!data) {
       remember(undefined);
       return;
     }
-    if (busy) void api().ai.abort(busy);
+    cancelCurrent();
     setTurns(
       data.messages.map((m): Turn => {
         const d = (m.display ?? {}) as SavedDisplay;
@@ -313,8 +438,11 @@ export function ChatPanel() {
     stick.current = true;
   };
 
-  // Reopen the last conversation when the app starts.
-  useEffect(() => {
+  // Reopen the last conversation when the app starts (once, also under StrictMode).
+  const reopened = useRef(false);
+  const reopenLast = useEffectEvent(() => {
+    if (reopened.current) return;
+    reopened.current = true;
     let last: string | null = null;
     try {
       last = localStorage.getItem(LAST_KEY);
@@ -322,6 +450,9 @@ export function ChatPanel() {
       last = null;
     }
     if (last) void loadConversation(last);
+  });
+  useEffect(() => {
+    reopenLast();
   }, []);
   const scroller = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -349,13 +480,50 @@ export function ChatPanel() {
     return out;
   };
 
-  const send = async (prompt: string, extra: ChatContext[] = [], forceAgent = false) => {
+  /** Reads the files mentioned with "@" so they travel as context. */
+  const mentionContext = async (prompt: string): Promise<ChatContext[]> => {
+    const out: ChatContext[] = [];
+    for (const path of mentionedFiles(prompt, files)) {
+      try {
+        const f = await api().workspace.readFile(path);
+        if (!f.binary && !f.tooLarge && f.content.length < 400_000)
+          out.push({ source: `file:${path}`, content: f.content });
+      } catch {
+        // unreadable: the mention stays as plain text
+      }
+    }
+    return out;
+  };
+
+  const send = async (
+    prompt: string,
+    extra: ChatContext[] = [],
+    forceAgent = false,
+    /** Turns to continue from (regenerate / edit drop the last exchange). */
+    base?: Turn[],
+  ) => {
     if (!prompt.trim() || busy) return;
     setShowHistory(false);
-    const context = [...extra, ...(includeFile ? currentFileContext() : [])];
+    setSuggest(null);
+    if (sent.current[sent.current.length - 1] !== prompt) sent.current.push(prompt);
+    sentIdx.current = -1;
+    const pending = getState().chatAttachments;
+    const mentions = await mentionContext(prompt);
+    const fileCtx = includeFile ? currentFileContext() : [];
+    const context = [
+      ...extra,
+      ...pending,
+      ...mentions,
+      ...fileCtx.filter((c) => !mentions.some((m) => m.source === c.source)),
+    ];
+    if (pending.length) setState({ chatAttachments: [] });
+    const turns = base ?? turnsNow.current;
+    if (base) setTurns(base);
     const history = turns
       .filter((x) => !x.error)
-      .map((x) => ({ role: x.role, content: x.content }));
+      .map((x) => ({ role: x.role, content: x.content }))
+      .slice(-MAX_HISTORY);
+    if (history[0]?.role === 'assistant') history.shift();
     const requestId = newRequestId();
     // Agent mode also works without a folder (system, network, browser and security tools).
     const useAgent = forceAgent || agentMode;
@@ -387,12 +555,17 @@ export function ChatPanel() {
 
     const finish = () => {
       off();
+      // A newer request (new chat, another conversation) already took over: leave it alone.
+      if (current.current?.id !== requestId) return;
+      current.current = null;
       setBusy(null);
       void refreshSettings();
       textarea.current?.focus();
     };
     const off = api().on((ev) => {
       if (ev.type !== 'chat' || ev.requestId !== requestId) return;
+      // Events of a request that was cancelled or replaced must not touch the current turns.
+      if (current.current?.id !== requestId) return;
       const e: ChatEventView = ev.event;
       switch (e.type) {
         case 'conversation':
@@ -449,15 +622,26 @@ export function ChatPanel() {
           break;
       }
     });
-    await api().ai.chat(requestId, {
-      agent: useAgent,
-      // Main resolves the model for the role (agent / chat), falling back to the default.
-      model: undefined,
-      history,
-      prompt,
-      context,
-      conversationId,
-    });
+    current.current = { id: requestId, off };
+    try {
+      await api().ai.chat(requestId, {
+        agent: useAgent,
+        // Main resolves the model for the role (agent / chat), falling back to the default.
+        model: undefined,
+        history,
+        prompt,
+        context,
+        conversationId,
+      });
+    } catch (err) {
+      // The request never reached the model (validation, IPC failure): show it and unlock the input.
+      if (current.current?.id !== requestId) return;
+      update((turn) => ({
+        ...turn,
+        error: err instanceof Error ? err.message : String(err),
+      }));
+      finish();
+    }
   };
 
   askAgent = (prompt) => {
@@ -472,6 +656,196 @@ export function ChatPanel() {
     else setTimeout(() => textarea.current?.focus(), 50);
   };
 
+  const newChat = () => {
+    cancelCurrent();
+    setTurns([]);
+    setConversationId(undefined);
+    setChanged([]);
+    setShowHistory(false);
+    remember(undefined);
+  };
+
+  /** Index of the last user turn (the exchange regenerate / edit replace). */
+  const lastUserIndex = () => {
+    for (let i = turns.length - 1; i >= 0; i--) if (turns[i]!.role === 'user') return i;
+    return -1;
+  };
+
+  const regenerate = async () => {
+    const i = lastUserIndex();
+    if (i < 0 || busy) return;
+    if (conversationId) await api().ai.resetContext(conversationId);
+    void send(turns[i]!.content, [], false, turns.slice(0, i));
+  };
+
+  const editLast = async () => {
+    const i = lastUserIndex();
+    if (i < 0 || busy) return;
+    if (conversationId) await api().ai.resetContext(conversationId);
+    setInput(turns[i]!.content);
+    setTurns(turns.slice(0, i));
+    setTimeout(() => textarea.current?.focus(), 30);
+  };
+
+  const copyTurn = (turn: Turn) => {
+    void navigator.clipboard.writeText(turn.content);
+    toast(t('copied'));
+  };
+
+  /** Runs a "/" command; returns true when it was handled without sending text. */
+  const runSlash = async (text: string): Promise<boolean> => {
+    const m = /^\/(\S+)\s*([\s\S]*)$/.exec(text.trim());
+    if (!m) return false;
+    const cmd = slashCommands().find((c) => c.name === m[1]!.toLowerCase());
+    if (!cmd) return false;
+    const rest = m[2]!.trim();
+    setInput('');
+    setSuggest(null);
+    switch (cmd.action) {
+      case 'new':
+        newChat();
+        return true;
+      case 'agent':
+        setAgentMode(true);
+        toast(t('agentOnToast'));
+        return true;
+      case 'chat':
+        setAgentMode(false);
+        toast(t('agentOffToast'));
+        return true;
+      case 'rules':
+        void runCommand('ai.rules');
+        return true;
+      case 'commit':
+        if (!workspace) {
+          toast(t('noFolder'));
+          return true;
+        }
+        setState({ sidebar: 'git' });
+        void send(t('slashCommitPrompt'), [], true);
+        return true;
+    }
+    void send(rest ? `${cmd.prompt}\n\n${rest}` : cmd.prompt!, [], Boolean(cmd.agent));
+    return true;
+  };
+
+  /** Opens the "/" or "@" menu for the text left of the caret. */
+  const updateSuggest = (value: string, caret: number) => {
+    const left = value.slice(0, caret);
+    const slash = /^\/(\S*)$/.exec(left);
+    if (slash) {
+      const q = slash[1]!.toLowerCase();
+      const items = slashCommands()
+        .filter((c) => c.name.startsWith(q))
+        .map((c) => ({ id: c.name, label: `/${c.name}`, hint: c.hint }));
+      return setSuggest(
+        items.length ? { kind: 'slash', from: 0, to: caret, items, index: 0 } : null,
+      );
+    }
+    const at = /(^|\s)@([^\s@]*)$/.exec(left);
+    if (at && files.length) {
+      const q = at[2]!.toLowerCase();
+      const scored = files
+        .map((f) => {
+          const lower = f.toLowerCase();
+          const name = lower.slice(lower.lastIndexOf('/') + 1);
+          const score = !q
+            ? 1
+            : name.startsWith(q)
+              ? 3
+              : name.includes(q)
+                ? 2
+                : lower.includes(q)
+                  ? 1
+                  : 0;
+          return { f, score };
+        })
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score || a.f.length - b.f.length)
+        .slice(0, 12);
+      const items = scored.map(({ f }) => ({
+        id: f,
+        label: f.slice(f.lastIndexOf('/') + 1),
+        hint: f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '',
+      }));
+      return setSuggest(
+        items.length
+          ? { kind: 'file', from: caret - at[2]!.length - 1, to: caret, items, index: 0 }
+          : null,
+      );
+    }
+    setSuggest(null);
+  };
+
+  const pickSuggest = (s: Suggest, i = s.index) => {
+    const item = s.items[i];
+    if (!item) return;
+    const insert = s.kind === 'slash' ? `/${item.id} ` : `@${item.id} `;
+    const next = input.slice(0, s.from) + insert + input.slice(s.to);
+    setInput(next);
+    setSuggest(null);
+    const caret = s.from + insert.length;
+    setTimeout(() => {
+      textarea.current?.focus();
+      textarea.current?.setSelectionRange(caret, caret);
+    }, 0);
+  };
+
+  const submit = async () => {
+    if (await runSlash(input)) return;
+    void send(input);
+  };
+
+  const onInputKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggest) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const n = suggest.items.length;
+        const d = e.key === 'ArrowDown' ? 1 : -1;
+        setSuggest({ ...suggest, index: (suggest.index + d + n) % n });
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault();
+        // A complete "/command" + Enter runs it right away.
+        const item = suggest.items[suggest.index];
+        if (e.key === 'Enter' && suggest.kind === 'slash' && item && input.trim() === `/${item.id}`)
+          return void submit();
+        pickSuggest(suggest);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSuggest(null);
+        return;
+      }
+    }
+    // ↑ / ↓ in an empty (or recalled) box walk through the prompts sent before.
+    const recalled = sentIdx.current >= 0 && input === sent.current[sentIdx.current];
+    if (
+      (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+      (!input || recalled) &&
+      sent.current.length
+    ) {
+      e.preventDefault();
+      const n = sent.current.length;
+      let i = sentIdx.current < 0 ? n : sentIdx.current;
+      i = e.key === 'ArrowUp' ? Math.max(0, i - 1) : i + 1;
+      if (i >= n) {
+        sentIdx.current = -1;
+        setInput('');
+      } else {
+        sentIdx.current = i;
+        setInput(sent.current[i]!);
+      }
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void submit();
+    }
+  };
+
   const decide = (toolCallId: string, d: ToolDecision) => {
     if (busy) void api().ai.toolDecision(busy, toolCallId, d);
   };
@@ -479,7 +853,13 @@ export function ChatPanel() {
   const revert = async () => {
     if (!conversationId) return;
     if (!confirm(t('revertConfirm', { n: changed.length }))) return;
-    const restored = await api().ai.revert(conversationId);
+    let restored: string[];
+    try {
+      restored = await api().ai.revert(conversationId);
+    } catch (err) {
+      toast(String(err instanceof Error ? err.message : err));
+      return;
+    }
     for (const p of restored) await reloadFromDisk(p);
     setChanged([]);
     toast(t('reverted', { n: restored.length }));
@@ -499,20 +879,10 @@ export function ChatPanel() {
           >
             🕘
           </button>
-          <button
-            title={t('newChat')}
-            onClick={() => {
-              if (busy) void api().ai.abort(busy);
-              setTurns([]);
-              setConversationId(undefined);
-              setChanged([]);
-              setShowHistory(false);
-              remember(undefined);
-            }}
-          >
+          <button title={t('newChat')} onClick={newChat}>
             ＋
           </button>
-          <button title="Cerrar" onClick={() => setState({ chatOpen: false })}>
+          <button title={t('close')} onClick={() => setState({ chatOpen: false })}>
             ×
           </button>
         </span>
@@ -524,6 +894,7 @@ export function ChatPanel() {
           onClose={() => setShowHistory(false)}
           onDeleted={(id) => {
             if (id === conversationId) {
+              cancelCurrent();
               setTurns([]);
               setConversationId(undefined);
               remember(undefined);
@@ -556,6 +927,7 @@ export function ChatPanel() {
             ) : (
               <div className="dim chat-hints">
                 <p>{agentMode ? t('agentHint') : t('chatHint')}</p>
+                <p>{t('chatTips')}</p>
                 <p>
                   Ctrl+L · {t('includeFile')}
                   <br />
@@ -572,10 +944,17 @@ export function ChatPanel() {
               {turn.role === 'user' ? (
                 <>
                   <div className="turn-user">{turn.content}</div>
+                  {!busy && i === lastUserIndex() && (
+                    <div className="turn-actions user">
+                      <button title={t('chatEdit')} onClick={() => void editLast()}>
+                        ✎ {t('chatEdit')}
+                      </button>
+                    </div>
+                  )}
                   {turn.context && turn.context.length > 0 && (
                     <div className="turn-context">
                       {turn.context
-                        .map((c) => `📎 ${c.replace(/^(file|selection):/, '')}`)
+                        .map((c) => `${c.startsWith('terminal:') ? '⌨' : '📎'} ${contextLabel(c)}`)
                         .join('  ')}
                     </div>
                   )}
@@ -630,6 +1009,20 @@ export function ChatPanel() {
                     </div>
                   )}
                   {turn.meta && <div className="turn-meta">{turn.meta}</div>}
+                  {!(busy !== null && last) && (turn.content || turn.error) && (
+                    <div className="turn-actions">
+                      {turn.content && (
+                        <button title={t('copy')} onClick={() => copyTurn(turn)}>
+                          ⧉ {t('copy')}
+                        </button>
+                      )}
+                      {last && (
+                        <button title={t('chatRegenerate')} onClick={() => void regenerate()}>
+                          ↻ {t('chatRegenerate')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -643,18 +1036,102 @@ export function ChatPanel() {
         </div>
       )}
       <div className="chat-input">
+        {attachments.length > 0 && (
+          <div className="chat-attachments">
+            {attachments.map((c) => (
+              <span key={c.source} className="chat-attachment" title={c.content.slice(-600)}>
+                {c.source.startsWith('terminal:') ? '⌨' : '📎'} {contextLabel(c.source)}
+                <button
+                  aria-label={t('removeAttachment')}
+                  title={t('removeAttachment')}
+                  onClick={() =>
+                    setState((st) => ({
+                      chatAttachments: st.chatAttachments.filter((x) => x.source !== c.source),
+                    }))
+                  }
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {termMenu && (
+          <div className="term-menu" onMouseLeave={() => setTermMenu(null)}>
+            <div className="term-menu-title">{t('termPick')}</div>
+            {termMenu.length === 0 ? (
+              <button
+                onClick={() => {
+                  setState({ panelOpen: true });
+                  setTermMenu(null);
+                }}
+              >
+                ＋ {t('termOpenNew')}
+              </button>
+            ) : (
+              termMenu.flatMap((term) => [
+                <button
+                  key={`${term.id}:s`}
+                  onClick={() => {
+                    sendTerminalToChat(term.id, 'session');
+                    setTermMenu(null);
+                    textarea.current?.focus();
+                  }}
+                >
+                  ⌨ {t('termSession', { n: term.n })}
+                </button>,
+                term.hasSelection && (
+                  <button
+                    key={`${term.id}:sel`}
+                    onClick={() => {
+                      sendTerminalToChat(term.id, 'selection');
+                      setTermMenu(null);
+                      textarea.current?.focus();
+                    }}
+                  >
+                    ✂ {t('termSelection', { n: term.n })}
+                  </button>
+                ),
+              ])
+            )}
+          </div>
+        )}
+        {suggest && (
+          <div className="chat-suggest" role="listbox">
+            <div className="term-menu-title">
+              {suggest.kind === 'slash' ? t('slashTitle') : t('mentionTitle')}
+            </div>
+            {suggest.items.map((it, i) => (
+              <div
+                key={it.id}
+                role="option"
+                aria-selected={i === suggest.index}
+                className={`chat-suggest-item ${i === suggest.index ? 'active' : ''}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pickSuggest(suggest, i);
+                }}
+              >
+                <span className="chat-suggest-label">
+                  {suggest.kind === 'file' ? `${fileIcon(it.id)} ` : ''}
+                  {it.label}
+                </span>
+                {it.hint && <span className="chat-suggest-hint">{it.hint}</span>}
+              </div>
+            ))}
+          </div>
+        )}
         <textarea
           ref={textarea}
           value={input}
           rows={3}
           placeholder={agentMode && workspace ? t('agentPlaceholder') : t('askPlaceholder')}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void send(input);
-            }
+          onChange={(e) => {
+            setInput(e.target.value);
+            updateSuggest(e.target.value, e.target.selectionStart);
           }}
+          onBlur={() => setTimeout(() => setSuggest(null), 150)}
+          onKeyDown={onInputKey}
         />
         <div className="chat-input-bar">
           <label className="check agent-toggle" title={t('agentTitle')}>
@@ -673,6 +1150,23 @@ export function ChatPanel() {
             />
             📎 {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
           </label>
+          {rulesFile && (
+            <button
+              className="rules-chip"
+              title={t('rulesActive', { file: rulesFile })}
+              onClick={() => void runCommand('ai.rules')}
+            >
+              📜
+            </button>
+          )}
+          <button
+            className={`term-pick ${termMenu ? 'on' : ''}`}
+            title={t('termPick')}
+            aria-label={t('termPick')}
+            onClick={() => setTermMenu((m) => (m ? null : listTerminals()))}
+          >
+            ⌨
+          </button>
           <button
             className="model-chip"
             onClick={() =>
@@ -690,7 +1184,7 @@ export function ChatPanel() {
               ■ {t('stop')}
             </button>
           ) : (
-            <button className="primary" disabled={!input.trim()} onClick={() => void send(input)}>
+            <button className="primary" disabled={!input.trim()} onClick={() => void submit()}>
               {t('send')} ⏎
             </button>
           )}

@@ -1,8 +1,29 @@
 import type { Command } from 'commander';
-import { OmniError, t } from '@omni/shared';
+import { ExitCode, OmniError, errorCodeForStatus, t } from '@omni/shared';
+import type { OmniErrorCode } from '@omni/shared';
 import { maskKey } from '@omni/security';
 import { omni } from '../context.js';
 import { c, collectKv, errln, outln, printJson, readHidden, readStdin, table } from '../io.js';
+
+/**
+ * Exit code for a failed connection test: 3 only when the provider rejected the key
+ * (401/403), 4 on rate limit, 1 for anything else (network, timeout, server error, key
+ * that cannot be verified), so scripts can tell "bad key" from "provider unreachable".
+ */
+export function connectionFailureExitCode(r: {
+  error?: string;
+  code?: OmniErrorCode;
+  unverified?: boolean;
+}): number {
+  if (r.unverified) return ExitCode.error;
+  // `code` is used when the adapter reports it; otherwise it is read from the
+  // "HTTP <status>: …" prefix every provider error message carries.
+  const status = /^HTTP (\d{3})\b/.exec(r.error ?? '')?.[1];
+  const code = r.code ?? (status ? errorCodeForStatus(Number(status)) : undefined);
+  if (code === 'auth') return ExitCode.auth;
+  if (code === 'rate_limit') return ExitCode.rateLimit;
+  return ExitCode.error;
+}
 
 export function registerAuth(program: Command): void {
   const auth = program
@@ -41,7 +62,25 @@ export function registerAuth(program: Command): void {
             c.yellow(t('provider.deprecated', { provider: entry.name, notes: entry.notes ?? '' })),
           );
 
+        // Read and store the key first: the provider is only written to config.json once
+        // there is a key (or it needs none), so cancelling leaves nothing behind.
+        let keyStore: 'file' | 'keychain' | undefined;
+        if (core.needsKey(entry) || opts.keyStdin) {
+          if (entry.keyUrl && !opts.keyStdin)
+            errln(c.dim(t('auth.get_key', { url: entry.keyUrl })));
+          const key = (
+            opts.keyStdin
+              ? await readStdin()
+              : await readHidden(t('auth.prompt', { provider: entry.name }))
+          ).trim();
+          if (!key) throw new OmniError('config', t('auth.empty'));
+          const store = await core.vault.set(id, key, opts.fileVault ? 'file' : undefined);
+          if (store === 'file' && !opts.fileVault) errln(c.yellow(t('vault.keychain_unavailable')));
+          keyStore = store === 'file' ? 'file' : 'keychain';
+        }
+
         const prev = core.config.providers[id];
+        const nextKeyStore = keyStore ?? prev?.keyStore;
         core.saveConfig({
           ...core.config,
           providers: {
@@ -54,37 +93,17 @@ export function registerAuth(program: Command): void {
                 : prev?.baseUrl
                   ? { baseUrl: prev.baseUrl }
                   : {}),
-              ...(prev?.keyStore ? { keyStore: prev.keyStore } : {}),
+              ...(nextKeyStore ? { keyStore: nextKeyStore } : {}),
             },
           },
         });
 
-        if (core.needsKey(entry) || opts.keyStdin) {
-          if (entry.keyUrl && !opts.keyStdin)
-            errln(c.dim(t('auth.get_key', { url: entry.keyUrl })));
-          const key = (
-            opts.keyStdin
-              ? await readStdin()
-              : await readHidden(t('auth.prompt', { provider: entry.name }))
-          ).trim();
-          if (!key) throw new OmniError('config', t('auth.empty'));
-          const store = await core.vault.set(id, key, opts.fileVault ? 'file' : undefined);
-          if (store === 'file' && !opts.fileVault) errln(c.yellow(t('vault.keychain_unavailable')));
-          core.saveConfig({
-            ...core.config,
-            providers: {
-              ...core.config.providers,
-              [id]: {
-                ...core.config.providers[id]!,
-                keyStore: store === 'file' ? 'file' : 'keychain',
-              },
-            },
-          });
+        if (keyStore) {
           errln(
             c.green(
               t('auth.saved', {
                 provider: entry.name,
-                store: store === 'keychain' ? 'keychain' : '~/.omni/vault.enc',
+                store: keyStore === 'keychain' ? 'keychain' : '~/.omni/vault.enc',
               }),
             ),
           );
@@ -104,7 +123,7 @@ export function registerAuth(program: Command): void {
             core.models.invalidate(id);
           } else {
             errln(c.red(`✗ ${t('auth.test_fail', { detail: r.error ?? '' })}`));
-            process.exitCode = 3;
+            process.exitCode = connectionFailureExitCode(r);
           }
         }
       },
@@ -153,13 +172,15 @@ export function registerAuth(program: Command): void {
 
   auth
     .command('test <provider>')
-    .description('Prueba la conexión con un proveedor')
+    .description(
+      'Prueba la conexión con un proveedor (salida 3: llave rechazada; 1: red, servidor o no verificable)',
+    )
     .action(async (id: string) => {
       const r = await omni().testConnection(id);
       if (r.ok) errln(c.green(`✓ ${t('auth.test_ok', { provider: id })}`));
       else {
         errln(c.red(`✗ ${t('auth.test_fail', { detail: r.error ?? '' })}`));
-        process.exitCode = 3;
+        process.exitCode = connectionFailureExitCode(r);
       }
     });
 }

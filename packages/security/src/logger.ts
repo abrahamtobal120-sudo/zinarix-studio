@@ -30,12 +30,23 @@ export function createLogger(opts: LoggerOptions = {}): Logger {
 
   const write = (level: Level, msg: string, data?: Record<string, unknown>) => {
     if (ORDER[level] < min) return;
-    const line = JSON.stringify({
-      ts: new Date().toISOString(),
-      level,
-      msg: redact(msg),
-      ...(data ? { data: redactDeep(data) } : {}),
-    });
+    let line: string;
+    try {
+      // Inside the try: a cyclic object or a throwing toJSON must not crash the caller.
+      line = JSON.stringify({
+        ts: new Date().toISOString(),
+        level,
+        msg: redact(msg),
+        ...(data ? { data: redactDeep(data) } : {}),
+      });
+    } catch {
+      line = JSON.stringify({
+        ts: new Date().toISOString(),
+        level,
+        msg: redact(msg),
+        data: '[unserializable]',
+      });
+    }
     if (opts.file) {
       try {
         if (!dirReady) {

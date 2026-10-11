@@ -18,8 +18,24 @@ export interface KeyStore {
 
 // ---------------- Environment variables (CI) ----------------
 
+/**
+ * Names that hold configuration, not credentials (endpoints, account/project ids, regions).
+ * The catalog keeps those in `envParams`; this guard also covers catalogs (hot updates,
+ * custom providers) that still list them in `envVars`, so a URL is never sent as a key.
+ */
+export const NON_CREDENTIAL_ENV =
+  /(?:_|^)(?:ENDPOINT|BASE_URL|URL|HOST|ACCOUNT_ID|PROJECT_ID|PROJECT|REGION|LOCATION|DEPLOYMENT|RESOURCE|WORKSPACE(?:_ID|_HOST)?|ORG(?:ANIZATION)?(?:_ID)?|API_VERSION)$/;
+
+export function isCredentialEnvName(name: string): boolean {
+  return !NON_CREDENTIAL_ENV.test(name);
+}
+
+/** Environment variables that may hold this provider's key, in lookup order. */
 export function envVarNames(entry: CatalogEntry): string[] {
-  return [...entry.envVars, `OMNI_KEY_${entry.id.toUpperCase().replace(/-/g, '_')}`];
+  return [
+    ...entry.envVars.filter(isCredentialEnvName),
+    `OMNI_KEY_${entry.id.toUpperCase().replace(/-/g, '_')}`,
+  ];
 }
 
 export class EnvStore implements KeyStore {
@@ -133,6 +149,29 @@ interface VaultFile {
 
 const KDF = { memory: 65536, passes: 3, parallelism: 1 };
 
+/**
+ * Bounds for KDF parameters read from vault.enc. The file is not authenticated before the
+ * key is derived, so a tampered `memory: 2**31` would hang or kill the process (local DoS).
+ * Memory is in KiB: 8 MiB to 1 GiB.
+ */
+const KDF_LIMITS = {
+  memory: [8192, 1048576],
+  passes: [1, 16],
+  parallelism: [1, 16],
+} as const;
+
+function checkKdf(kdf: unknown): VaultFile['kdf'] {
+  const k = (kdf ?? {}) as Record<string, unknown>;
+  for (const [name, [min, max]] of Object.entries(KDF_LIMITS)) {
+    const v = k[name];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
+      throw new OmniError('config', `corrupted vault: kdf.${name} out of range`);
+  }
+  if (k.alg !== 'argon2id' || typeof k.salt !== 'string')
+    throw new OmniError('config', 'corrupted vault: unsupported kdf');
+  return k as VaultFile['kdf'];
+}
+
 function deriveKey(password: string, salt: Buffer, p = KDF): Buffer {
   return argon2Sync('argon2id', {
     message: password,
@@ -167,6 +206,11 @@ export class FileVault implements KeyStore {
     return existsSync(this.file);
   }
 
+  /** True once the master password was entered (or the vault is empty) in this process. */
+  unlocked() {
+    return this.#cache !== undefined;
+  }
+
   private async password(): Promise<string> {
     this.#password ??= this.env.OMNI_VAULT_PASSWORD || (await this.askPassword());
     if (!this.#password) throw new OmniError('config', 'vault password required');
@@ -176,8 +220,14 @@ export class FileVault implements KeyStore {
   private async read(): Promise<Record<string, string>> {
     if (this.#cache) return this.#cache;
     if (!this.exists()) return (this.#cache = {});
-    const vf = JSON.parse(readFileSync(this.file, 'utf8')) as VaultFile;
-    const key = deriveKey(await this.password(), Buffer.from(vf.kdf.salt, 'base64'), vf.kdf);
+    let vf: VaultFile;
+    try {
+      vf = JSON.parse(readFileSync(this.file, 'utf8')) as VaultFile;
+    } catch {
+      throw new OmniError('config', 'corrupted vault: invalid JSON');
+    }
+    const kdf = checkKdf(vf.kdf);
+    const key = deriveKey(await this.password(), Buffer.from(kdf.salt, 'base64'), kdf);
     try {
       const d = createDecipheriv('aes-256-gcm', key, Buffer.from(vf.iv, 'base64'));
       d.setAuthTag(Buffer.from(vf.tag, 'base64'));
@@ -258,11 +308,16 @@ export class Vault {
     readonly file: FileVault,
   ) {}
 
-  async get(id: string): Promise<KeyLookup | undefined> {
+  /**
+   * `unlockFile: false` only reads the encrypted file if it is already unlocked, so a
+   * lookup for a keyless provider never prompts for (or fails on) the master password.
+   */
+  async get(id: string, opts: { unlockFile?: boolean } = {}): Promise<KeyLookup | undefined> {
     const fromEnv = await this.env.get(id);
     if (fromEnv) return { secret: fromEnv, store: 'env' };
     const fromKeychain = await this.keychain.get(id);
     if (fromKeychain) return { secret: fromKeychain, store: 'keychain' };
+    if (opts.unlockFile === false && !this.file.unlocked()) return undefined;
     const fromFile = await this.file.get(id);
     if (fromFile) return { secret: fromFile, store: 'file' };
     return undefined;

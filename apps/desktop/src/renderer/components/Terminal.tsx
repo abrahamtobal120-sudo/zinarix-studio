@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
+import { isDark } from '../themes';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import type { ChatContext } from '../../shared/api';
 import { t } from '../i18n';
-import { api, setState, useStore } from '../store';
+import { api, attachToChat, getState, setState, toast, useStore } from '../store';
 
 interface Term {
   id: number;
@@ -14,12 +16,113 @@ interface Term {
 
 const terms = new Map<number, Term>();
 let unsubscribe: (() => void) | undefined;
+/** Exit handler of the mounted panel (null while the panel is hidden). */
+let exitHandler: ((id: number) => void) | null = null;
+/** First session being created, so a StrictMode re-run of the mount effect does not open a second one. */
+let firstCreate: Promise<number> | null = null;
+/** Session shown in the panel (module level so the chat and commands can reach it). */
+let activeId: number | null = null;
 
-function ensureListener(onExit: (id: number) => void): void {
+/** Most recent lines sent to the chat when attaching a whole session. */
+const MAX_LINES = 400;
+const MAX_CHARS = 40_000;
+
+/** Number shown on the tab ("1: shell") for a session. */
+function terminalNumber(id: number): number {
+  return [...terms.keys()].indexOf(id) + 1;
+}
+
+export interface TerminalSession {
+  id: number;
+  n: number;
+  hasSelection: boolean;
+}
+
+/** Open terminal sessions, in tab order. */
+export function listTerminals(): TerminalSession[] {
+  return [...terms.values()].map((term, i) => ({
+    id: term.id,
+    n: i + 1,
+    hasSelection: term.xterm.getSelection().trim().length > 0,
+  }));
+}
+
+/** True when the keyboard focus is inside the terminal panel. */
+export function terminalFocused(): boolean {
+  return Boolean(document.activeElement?.closest('.terminal-host'));
+}
+
+/** Plain text of a session (wrapped rows joined, trailing blank rows dropped, tail only). */
+function sessionText(term: Term): string {
+  const buf = term.xterm.buffer.active;
+  const lines: string[] = [];
+  for (let i = 0; i < buf.length; i++) {
+    const line = buf.getLine(i);
+    if (!line) continue;
+    const text = line.translateToString(true);
+    if (line.isWrapped && lines.length) lines[lines.length - 1] += text;
+    else lines.push(text);
+  }
+  while (lines.length && !lines.at(-1)!.trim()) lines.pop();
+  const text = lines.slice(-MAX_LINES).join('\n');
+  return text.length > MAX_CHARS ? text.slice(-MAX_CHARS) : text;
+}
+
+/**
+ * Chat context for a session: its selected text, or the whole session when nothing is
+ * selected ('auto'). Returns null when there is nothing to send.
+ */
+export function terminalContext(
+  id: number,
+  mode: 'auto' | 'session' | 'selection' = 'auto',
+): ChatContext | null {
+  const term = terms.get(id);
+  if (!term) return null;
+  const n = terminalNumber(id);
+  const selected = term.xterm.getSelection();
+  if (mode !== 'session' && selected.trim())
+    return { source: `terminal:${n}:selection`, content: selected.slice(-MAX_CHARS) };
+  if (mode === 'selection') return null;
+  const content = sessionText(term);
+  return content.trim() ? { source: `terminal:${n}`, content } : null;
+}
+
+/** Attaches a terminal session (or its selection) to the next chat message. */
+export function sendTerminalToChat(
+  id: number | null = activeId,
+  mode: 'auto' | 'session' | 'selection' = 'auto',
+): boolean {
+  if (id === null || !terms.has(id)) {
+    toast(t('termNone'));
+    return false;
+  }
+  const ctx = terminalContext(id, mode);
+  if (!ctx) {
+    toast(t('termEmpty'));
+    return false;
+  }
+  attachToChat(ctx);
+  const n = terminalNumber(id);
+  toast(ctx.source.endsWith(':selection') ? t('termSelAttached', { n }) : t('termAttached', { n }));
+  return true;
+}
+
+/** Frees a session's xterm and DOM node. */
+function disposeTerm(id: number): void {
+  const term = terms.get(id);
+  term?.xterm.dispose();
+  term?.el.remove();
+  terms.delete(id);
+}
+
+function ensureListener(): void {
   if (unsubscribe) return;
   unsubscribe = api().on((ev) => {
     if (ev.type === 'term:data') terms.get(ev.id)?.xterm.write(ev.data);
-    if (ev.type === 'term:exit') onExit(ev.id);
+    if (ev.type === 'term:exit') {
+      if (exitHandler) exitHandler(ev.id);
+      else disposeTerm(ev.id);
+    }
   });
 }
 
@@ -48,7 +151,7 @@ export function TerminalPanel() {
   const [ids, setIds] = useState<number[]>([]);
   const [active, setActive] = useState<number | null>(null);
 
-  const create = async () => {
+  const create = useCallback(async () => {
     const el = document.createElement('div');
     el.className = 'xterm-host';
     const xterm = new XTerm({
@@ -56,7 +159,7 @@ export function TerminalPanel() {
       fontSize: 13,
       cursorBlink: true,
       allowProposedApi: false,
-      theme: xtermTheme(theme === 'dark'),
+      theme: xtermTheme(isDark(getState().settings.theme)),
       scrollback: 5000,
     });
     const fit = new FitAddon();
@@ -71,40 +174,46 @@ export function TerminalPanel() {
     setIds((x) => [...x, id]);
     setActive(id);
     return id;
-  };
+  }, []);
 
-  const kill = (id: number) => {
+  const kill = useCallback((id: number) => {
     void api().terminal.kill(id);
-    const term = terms.get(id);
-    term?.xterm.dispose();
-    term?.el.remove();
-    terms.delete(id);
+    disposeTerm(id);
     setIds((x) => {
       const rest = x.filter((i) => i !== id);
       setActive((a) => (a === id ? (rest.at(-1) ?? null) : a));
       if (!rest.length) setState({ panelOpen: false });
       return rest;
     });
-  };
+  }, []);
 
   useEffect(() => {
-    ensureListener((id) => kill(id));
-    if (!terms.size) void create();
-    else {
+    ensureListener();
+    exitHandler = kill;
+    if (!terms.size && !firstCreate) {
+      firstCreate = create().finally(() => {
+        firstCreate = null;
+      });
+    } else {
       for (const term of terms.values()) host.current?.appendChild(term.el);
       setIds([...terms.keys()]);
       setActive([...terms.keys()].at(-1) ?? null);
     }
     runInTerminal = async (text: string) => {
-      const id = active ?? [...terms.keys()].at(-1) ?? (await create());
+      const id = activeId ?? [...terms.keys()].at(-1) ?? (await (firstCreate ?? create()));
       await api().terminal.write(id, text.replace(/\n$/, '') + '\r');
     };
-  }, []);
+    return () => {
+      if (exitHandler === kill) exitHandler = null;
+      runInTerminal = async () => {};
+    };
+  }, [create, kill]);
 
   useEffect(() => {
+    activeId = active;
     for (const term of terms.values()) {
       term.el.style.display = term.id === active ? 'block' : 'none';
-      term.xterm.options.theme = xtermTheme(theme === 'dark');
+      term.xterm.options.theme = xtermTheme(isDark(theme));
     }
     const term = active ? terms.get(active) : undefined;
     if (term) {
@@ -137,17 +246,30 @@ export function TerminalPanel() {
               onClick={() => setActive(id)}
             >
               {i + 1}: shell
-              <button aria-label="kill" onClick={(e) => (e.stopPropagation(), kill(id))}>
+              <button
+                aria-label={t('termKill')}
+                title={t('termKill')}
+                onClick={(e) => (e.stopPropagation(), kill(id))}
+              >
                 ×
               </button>
             </span>
           ))}
         </div>
         <span className="sidebar-actions">
-          <button title="Nueva terminal" onClick={() => void create()}>
+          <button
+            className="term-to-chat"
+            title={t('termToChatTitle')}
+            disabled={active === null}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => sendTerminalToChat(active)}
+          >
+            💬 {t('termToChat')}
+          </button>
+          <button title={t('termNew')} onClick={() => void create()}>
             ＋
           </button>
-          <button title="Ocultar" onClick={() => setState({ panelOpen: false })}>
+          <button title={t('termHide')} onClick={() => setState({ panelOpen: false })}>
             ⌄
           </button>
         </span>

@@ -33,7 +33,7 @@ describe('secret scanning', () => {
     ]);
     expect(f[0]!.where).toBe('src/config.ts:1');
     expect(JSON.stringify(f)).not.toContain('ABCDEFGHIJKLMNOP');
-    expect(mask('abcdefghijkl')).toBe('abcd…kl (12 caracteres)');
+    expect(mask('abcdefghijkl')).toBe('abc… (12 caracteres)');
   });
 });
 

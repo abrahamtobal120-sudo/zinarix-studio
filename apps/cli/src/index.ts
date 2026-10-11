@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
 import { Command, CommanderError } from 'commander';
 import { OmniError, exitCodeFor, setLocale, t } from '@omni/shared';
 import type { MessageKey } from '@omni/shared';
@@ -26,11 +27,14 @@ for (const stream of [process.stdout, process.stderr]) {
   });
 }
 
+/** Version from apps/cli/package.json (one level above both src/ and dist/). */
+const VERSION = (createRequire(import.meta.url)('../package.json') as { version: string }).version;
+
 export function buildProgram(): Command {
   const program = new Command()
     .name('omni')
     .description('Zinarix Studio CLI — cualquier modelo de cualquier proveedor desde la terminal')
-    .version('0.1.0')
+    .version(VERSION)
     .option('--lang <es|en>', 'idioma de la interfaz')
     .hook('preAction', (cmd) => {
       const lang = cmd.opts<{ lang?: string }>().lang;

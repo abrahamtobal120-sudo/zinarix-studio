@@ -1,6 +1,6 @@
 import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest, ModelInfo } from '@omni/shared';
-import { request, requestJson } from '../http.js';
+import { providerMessage, request, requestJson } from '../http.js';
 import { baseModel, catalogModels } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ConnectionTest, ProviderAdapter, ProviderConfig } from '../types.js';
@@ -143,9 +143,13 @@ async function* chat(
     const chunk = safeJson<OaiChunk>(ev.data);
     if (!chunk) continue;
     if (chunk.error) {
-      throw new OmniError('server', String(chunk.error.message ?? 'stream error'), {
-        provider: cfg.entry.id,
-      });
+      throw new OmniError(
+        'server',
+        providerMessage(String(chunk.error.message ?? 'stream error')),
+        {
+          provider: cfg.entry.id,
+        },
+      );
     }
     const choice = chunk.choices?.[0];
     const delta = choice?.delta;
@@ -241,7 +245,12 @@ export async function testViaModelsOrChat(
       return { ok: true, models: models.length };
     }
     const model = cfg.entry.fallbackModels[0]?.id;
-    if (!model) return { ok: true };
+    if (!model)
+      return {
+        ok: false,
+        unverified: true,
+        error: `${cfg.entry.name}: cannot verify the key (no models endpoint and no known model to try)`,
+      };
     const ctrl = new AbortController();
     for await (const c of adapter.chat(
       { ...cfg, maxRetries: 0 },
@@ -253,7 +262,9 @@ export async function testViaModelsOrChat(
     ctrl.abort();
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return e instanceof OmniError
+      ? { ok: false, error: e.message, code: e.code, ...(e.status ? { status: e.status } : {}) }
+      : { ok: false, error: e instanceof Error ? e.message : String(e), code: 'unknown' };
   }
 }
 

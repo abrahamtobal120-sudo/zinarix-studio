@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto';
 import { promises as dns } from 'node:dns';
 import { existsSync, statSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { isIP, connect } from 'node:net';
 import { homedir, platform } from 'node:os';
 import { join } from 'node:path';
 import { connect as tlsConnect } from 'node:tls';
 import type { ToolDefinition } from '@omni/shared';
 import { redact } from '@omni/security';
-import { deniedPath, execFile, expandPath } from './system.js';
+import { assertNotMetadata, deniedPath, execFile, expandPath, readCapped } from './system.js';
 import type { Workspace } from './workspace.js';
 
 /**
@@ -159,7 +159,9 @@ const SECRET_RULES: { name: string; re: RegExp; severity: Finding['severity'] }[
 
 export function mask(v: string): string {
   const s = v.trim();
-  return s.length <= 8 ? '****' : `${s.slice(0, 4)}…${s.slice(-2)} (${s.length} caracteres)`;
+  // Enough to recognise the kind of value, never enough to narrow it down (the text goes
+  // to the model and to reports).
+  return s.length <= 8 ? '****' : `${s.slice(0, 3)}… (${s.length} caracteres)`;
 }
 
 export function scanSecretsInText(path: string, text: string): Finding[] {
@@ -368,10 +370,26 @@ export function formatFindings(title: string, findings: Finding[], notes: string
   return [head, ...notes, '', ...(shown.length ? shown : ['Sin hallazgos. ✓'])].join('\n');
 }
 
-export async function scanProject(
-  ws: Workspace,
-  checks: string[],
-): Promise<{ text: string; findings: Finding[] }> {
+export interface SecReport {
+  title: string;
+  findings: Finding[];
+  notes: string[];
+}
+
+export function reportCounts(f: Finding[]): Record<Finding['severity'], number> {
+  return {
+    crítico: f.filter((x) => x.severity === 'crítico').length,
+    alto: f.filter((x) => x.severity === 'alto').length,
+    medio: f.filter((x) => x.severity === 'medio').length,
+    bajo: f.filter((x) => x.severity === 'bajo').length,
+  };
+}
+
+export function reportText(r: SecReport): string {
+  return formatFindings(r.title, r.findings, r.notes);
+}
+
+export async function scanProject(ws: Workspace, checks: string[]): Promise<SecReport> {
   const doSecrets = !checks.length || checks.includes('secrets');
   const doCode = !checks.length || checks.includes('code');
   const files = await ws.listFiles(20_000);
@@ -428,10 +446,7 @@ export async function scanProject(
     }
   }
   notes.push(`Archivos revisados: ${scanned} (se respetan .gitignore y carpetas pesadas).`);
-  return {
-    text: formatFindings('== Auditoría de seguridad del proyecto ==', findings, notes),
-    findings,
-  };
+  return { title: '== Auditoría de seguridad del proyecto ==', findings, notes };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -523,12 +538,18 @@ export function compareVersions(a?: string, b?: string): number {
 const LOCKFILES =
   /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|requirements[^/]*\.txt|poetry\.lock|Cargo\.lock|go\.sum|composer\.lock|Gemfile\.lock)$/;
 
-export async function auditDependencies(ws: Workspace, signal: AbortSignal): Promise<string> {
+export async function auditDependencies(ws: Workspace, signal: AbortSignal): Promise<SecReport> {
   const files = (await ws.listFiles(20_000)).filter(
     (f) => LOCKFILES.test(f) && !f.includes('node_modules/'),
   );
   if (!files.length)
-    return 'No encontré archivos de dependencias con versiones exactas (package-lock.json, pnpm-lock.yaml, requirements.txt, Cargo.lock…).';
+    return {
+      title: '== Vulnerabilidades en dependencias (osv.dev) ==',
+      findings: [],
+      notes: [
+        'No encontré archivos de dependencias con versiones exactas (package-lock.json, pnpm-lock.yaml, requirements.txt, Cargo.lock…).',
+      ],
+    };
   const deps: Dep[] = [];
   for (const f of files) deps.push(...parseLockfile(f, await readFile(ws.resolve(f), 'utf8')));
   const vulnsByDep = new Map<number, string[]>();
@@ -615,15 +636,17 @@ export async function auditDependencies(ws: Workspace, signal: AbortSignal): Pro
         : 'Revisa el aviso y actualiza a una versión sin la vulnerabilidad.',
     });
   }
-  return formatFindings('== Vulnerabilidades en dependencias (osv.dev) ==', findings, [
-    `Dependencias revisadas: ${deps.length} en ${files.join(', ')}`,
-  ]);
+  return {
+    title: '== Vulnerabilidades en dependencias (osv.dev) ==',
+    findings,
+    notes: [`Dependencias revisadas: ${deps.length} en ${files.join(', ')}`],
+  };
 }
 
 // ---------------------------------------------------------------------------------------
 // This computer
 
-export async function checkSystem(): Promise<string> {
+export async function checkSystem(): Promise<SecReport> {
   const os = platform();
   const findings: Finding[] = [];
   const notes: string[] = [];
@@ -672,17 +695,26 @@ export async function checkSystem(): Promise<string> {
 
   // Firewall
   if (os === 'linux') {
-    const ufw = await run('ufw', ['status']);
-    const fwd = await run('firewall-cmd', ['--state']);
-    const active = /Status: active/i.test(ufw.out) || /^running/m.test(fwd.out);
-    const unknown = ufw.code === 127 && fwd.code === 127;
-    notes.push(
-      `Firewall: ${active ? 'activo' : unknown ? 'no se encontró ufw ni firewalld (puede haber reglas nftables/iptables)' : 'INACTIVO'}`,
+    const state = linuxFirewallState(
+      await run('ufw', ['status']),
+      await run('firewall-cmd', ['--state']),
     );
-    if (!active)
+    notes.push(
+      `Firewall: ${
+        state === 'active'
+          ? 'activo'
+          : state === 'missing'
+            ? 'no se encontró ufw ni firewalld (puede haber reglas nftables/iptables)'
+            : state === 'unknown'
+              ? 'no se pudo leer su estado sin permisos de administrador (prueba "sudo ufw status")'
+              : 'INACTIVO'
+      }`,
+    );
+    if (state === 'inactive' || state === 'missing')
       findings.push({
-        severity: unknown ? 'medio' : 'alto',
-        title: unknown ? 'No se detectó un firewall configurado' : 'Firewall desactivado',
+        severity: state === 'missing' ? 'medio' : 'alto',
+        title:
+          state === 'missing' ? 'No se detectó un firewall configurado' : 'Firewall desactivado',
         fix: 'Instala/activa uno: "sudo ufw enable" (Ubuntu/Arch con ufw) o "sudo systemctl enable --now firewalld".',
       });
   } else if (os === 'darwin') {
@@ -833,9 +865,12 @@ export async function checkSystem(): Promise<string> {
       });
   }
 
-  return redact(
-    formatFindings(`== Revisión de seguridad de este equipo (${os}) ==`, findings, notes),
-  );
+  // The findings/notes may contain command output, so redact their text fields.
+  return {
+    title: `== Revisión de seguridad de este equipo (${os}) ==`,
+    findings: findings.map((f) => ({ ...f, detail: f.detail ? redact(f.detail) : f.detail })),
+    notes: notes.map((n) => redact(n)),
+  };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1177,9 +1212,11 @@ function certInfo(
   });
 }
 
-export async function checkSite(input: string, signal: AbortSignal): Promise<string> {
+export async function checkSite(input: string, signal: AbortSignal): Promise<SecReport> {
   const url = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`);
-  if (url.hostname === '169.254.169.254') throw new Error('Dirección no permitida.');
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Solo http(s).');
+  // Every address the name resolves to (and every redirect hop below) is checked.
+  await assertNotMetadata(url.hostname);
   const findings: Finding[] = [];
   const notes: string[] = [];
   const timeout = () => AbortSignal.any([signal, AbortSignal.timeout(15_000)]);
@@ -1240,7 +1277,7 @@ export async function checkSite(input: string, signal: AbortSignal): Promise<str
     });
   }
 
-  const r = await fetch(url, { redirect: 'follow', signal: timeout() });
+  const r = await fetchFollowingSafely(url, timeout);
   const h = r.headers;
   notes.push(`Respuesta: HTTP ${r.status} · ${r.url}`);
   const need: [string, Finding['severity'], string][] = [
@@ -1306,7 +1343,7 @@ export async function checkSite(input: string, signal: AbortSignal): Promise<str
   for (const path of ['/.git/HEAD', '/.env']) {
     try {
       const x = await fetch(new URL(path, url), { redirect: 'manual', signal: timeout() });
-      const body = x.ok ? (await x.text()).slice(0, 200) : '';
+      const body = x.ok ? (await readCapped(x, 4096)).slice(0, 200) : '';
       if (x.ok && (path === '/.git/HEAD' ? body.startsWith('ref:') : /^\s*[A-Z_]+=/m.test(body)))
         findings.push({
           severity: 'crítico',
@@ -1317,7 +1354,63 @@ export async function checkSite(input: string, signal: AbortSignal): Promise<str
       // ignore
     }
   }
-  return formatFindings(`== Seguridad del sitio ${url.host} ==`, findings, notes);
+  return { title: `== Seguridad del sitio ${url.host} ==`, findings, notes };
+}
+
+/**
+ * GET that follows up to 5 redirects by hand, refusing any hop that is not http(s) or that
+ * points at the cloud metadata service (a site could bounce the check to 169.254.169.254).
+ */
+async function fetchFollowingSafely(
+  start: URL,
+  timeout: () => AbortSignal,
+): Promise<{ status: number; url: string; headers: Headers }> {
+  let url = start;
+  for (let hop = 0; ; hop++) {
+    const r = await fetch(url, { redirect: 'manual', signal: timeout() });
+    const loc = r.headers.get('location');
+    if (!(r.status >= 300 && r.status < 400 && loc) || hop >= 5) {
+      await r.body?.cancel().catch(() => {});
+      return { status: r.status, url: url.toString(), headers: r.headers };
+    }
+    await r.body?.cancel().catch(() => {});
+    const next = new URL(loc, url);
+    if (next.protocol !== 'http:' && next.protocol !== 'https:')
+      throw new Error(`Redirección no permitida a ${next.protocol}`);
+    await assertNotMetadata(next.hostname);
+    url = next;
+  }
+}
+
+/**
+ * ufw needs root to report its status: without it, it exits 1 with "need to be root",
+ * which says nothing about the firewall. Only a clear answer counts as active/inactive.
+ */
+export function linuxFirewallState(
+  ufw: { code: number; out: string },
+  firewalld: { code: number; out: string },
+): 'active' | 'inactive' | 'missing' | 'unknown' {
+  const ufwState =
+    ufw.code === 127
+      ? 'missing'
+      : /Status:\s*active/i.test(ufw.out)
+        ? 'active'
+        : /Status:\s*inactive/i.test(ufw.out)
+          ? 'inactive'
+          : 'unknown';
+  const fwdState =
+    firewalld.code === 127
+      ? 'missing'
+      : /not running/i.test(firewalld.out)
+        ? 'inactive'
+        : /^running/m.test(firewalld.out)
+          ? 'active'
+          : 'unknown';
+  const all = [ufwState, fwdState];
+  if (all.includes('active')) return 'active';
+  if (all.includes('unknown')) return 'unknown';
+  if (all.includes('inactive')) return 'inactive';
+  return 'missing';
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1326,6 +1419,9 @@ export async function checkSite(input: string, signal: AbortSignal): Promise<str
 export async function fileHash(abs: string, expected?: string): Promise<string> {
   const denied = deniedPath(abs, 'read');
   if (denied) throw new Error(denied);
+  // Devices (/dev/zero, /dev/urandom) and FIFOs never end: reading one would hang or
+  // exhaust memory in the main process (file_hash runs without approval).
+  if (!(await stat(abs)).isFile()) throw new Error(`${abs} no es un archivo normal.`);
   const data = await readFile(abs);
   const sums = Object.fromEntries(
     ['sha256', 'sha1', 'md5'].map((a) => [a, createHash(a).update(data).digest('hex')]),

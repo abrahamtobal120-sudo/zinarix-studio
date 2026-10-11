@@ -4,14 +4,19 @@ import { ChatPanel } from './components/Chat';
 import { ActivityBar, StatusBar } from './components/Chrome';
 import { EditorArea } from './components/Editor';
 import { Explorer } from './components/Explorer';
+import { GitPanel } from './components/GitPanel';
+import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
+import { RunPanel } from './components/RunPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
 import {
   api,
   applyTheme,
   getState,
+  loadPrefs,
   openBrowserTab,
+  refreshGitBadge,
   openDropped,
   refreshModels,
   refreshSettings,
@@ -107,9 +112,34 @@ export function App() {
     if (panelOpen) setTerminalMounted(true);
   }, [panelOpen]);
 
+  // Shortcuts customised in Settings (the built-in ones live in the app menu).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const custom = getState().prefs.keybindings;
+      if (!Object.keys(custom).length) return;
+      const combo = comboFromEvent(e);
+      if (!combo) return;
+      const id = Object.keys(custom).find((k) => custom[k] === combo);
+      if (!id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void runCommand(id);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
+  // Changed-files badge on the Git icon.
+  const workspaceRoot = useStore((s) => s.workspace?.root);
+  const fsVersion = useStore((s) => s.fsVersion);
+  useEffect(() => {
+    const timer = setTimeout(() => void refreshGitBadge(), 400);
+    return () => clearTimeout(timer);
+  }, [workspaceRoot, fsVersion]);
+
   useEffect(() => {
     void (async () => {
-      await refreshSettings();
+      await Promise.all([refreshSettings(), loadPrefs()]);
       applyTheme(getState().settings.theme);
       setState({ workspace: await api().workspace.current() });
       void refreshModels();
@@ -132,7 +162,15 @@ export function App() {
         {sidebar && (
           <>
             <aside className="sidebar" style={{ width: sideW }}>
-              {sidebar === 'explorer' ? <Explorer /> : <SearchView />}
+              {sidebar === 'explorer' ? (
+                <Explorer />
+              ) : sidebar === 'git' ? (
+                <GitPanel />
+              ) : sidebar === 'run' ? (
+                <RunPanel />
+              ) : (
+                <SearchView />
+              )}
             </aside>
             <Sash dir="x" onDrag={(d) => setSideW((w) => Math.min(600, Math.max(160, w + d)))} />
           </>

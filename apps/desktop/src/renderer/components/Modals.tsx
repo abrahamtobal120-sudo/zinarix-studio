@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ProviderView } from '../../shared/api';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import type { OmniApi, ProviderView } from '../../shared/api';
 import { commands, runCommand } from '../commands';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
+import { monacoTheme } from '../themes';
 import {
   api,
   chooseModel,
@@ -20,6 +21,8 @@ import { ModelPicker } from './ModelPicker';
 import { UsagePanel } from './Usage';
 import { SecurityCenter } from './SecurityCenter';
 import { Scanner } from './Scanner';
+import { CloneRepo, CommitView, GitDiff, PublishRepo } from './GitModals';
+import { SettingsPanel } from './Settings';
 import { fileIcon } from './icons';
 import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
@@ -42,6 +45,11 @@ export function Modals() {
       {modal?.kind === 'usage' && <UsagePanel />}
       {modal?.kind === 'security' && <SecurityCenter />}
       {modal?.kind === 'scanner' && <Scanner />}
+      {modal?.kind === 'settings' && <SettingsPanel />}
+      {modal?.kind === 'diff' && <GitDiff path={modal.path} staged={modal.staged} />}
+      {modal?.kind === 'commit' && <CommitView hash={modal.hash} subject={modal.subject} />}
+      {modal?.kind === 'clone' && <CloneRepo />}
+      {modal?.kind === 'publish' && <PublishRepo />}
       {inputBox && <InputBox />}
     </>
   );
@@ -109,10 +117,15 @@ function Providers({ focus }: { focus?: string }) {
     void reload();
   }, []);
   const p = list.find((x) => x.id === selected);
-  useEffect(() => {
+  // Reset the form when another provider is picked or the list first loads (not on every reload,
+  // which would wipe the result of "Save and test").
+  const resetForm = useEffectEvent(() => {
     setKey('');
     setStatus(null);
     setParams(Object.fromEntries((p?.params ?? []).map((x) => [x.name, x.value])));
+  });
+  useEffect(() => {
+    resetForm();
   }, [selected, list.length]);
 
   const shown = list
@@ -130,7 +143,14 @@ function Providers({ focus }: { focus?: string }) {
     if (!p) return;
     setBusy(true);
     setStatus({ ok: true, text: t('testing') });
-    const r = await api().ai.saveProvider(p.id, key || null, params);
+    let r: Awaited<ReturnType<OmniApi['ai']['saveProvider']>>;
+    try {
+      r = await api().ai.saveProvider(p.id, key || null, params);
+    } catch (err) {
+      setBusy(false);
+      setStatus({ ok: false, text: err instanceof Error ? err.message : String(err) });
+      return;
+    }
     setBusy(false);
     setKey('');
     setStatus(
@@ -153,7 +173,7 @@ function Providers({ focus }: { focus?: string }) {
         <div className="providers-list">
           <input
             autoFocus
-            placeholder="Buscar proveedor…"
+            placeholder={t('providerSearch')}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
@@ -182,7 +202,7 @@ function Providers({ focus }: { focus?: string }) {
               <p>
                 {list.filter((x) => x.connected).length} / {list.length}
               </p>
-              <p>← Elige un proveedor para conectarlo.</p>
+              <p>{t('providerPick')}</p>
             </div>
           ) : (
             <>
@@ -207,7 +227,7 @@ function Providers({ focus }: { focus?: string }) {
               ))}
               {p.needsKey || p.category === 'local' ? (
                 <label className="field">
-                  {t('apiKey')} {!p.needsKey && <span className="dim">(opcional)</span>}
+                  {t('apiKey')} {!p.needsKey && <span className="dim">{t('optional')}</span>}
                   {p.adapter === 'google-vertex' ? (
                     // Accepts an API key, a pasted service-account JSON or an access token.
                     <textarea
@@ -267,9 +287,7 @@ function Providers({ focus }: { focus?: string }) {
                 )}
               </div>
               {status && <div className={status.ok ? 'ok-text' : 'err'}>{status.text}</div>}
-              <p className="dim small">
-                🔒 La llave se guarda en el llavero del sistema y nunca vuelve a esta ventana.
-              </p>
+              <p className="dim small">{t('keyStoredNote')}</p>
             </>
           )}
         </div>
@@ -299,7 +317,7 @@ function AiEdit() {
       readOnly: true,
       renderSideBySide: true,
       automaticLayout: true,
-      theme: theme === 'dark' ? 'vs-dark' : 'vs',
+      theme: monacoTheme(theme),
       minimap: { enabled: false },
     });
     const a = monaco.editor.createModel(original, model.getLanguageId());
@@ -310,7 +328,7 @@ function AiEdit() {
       a.dispose();
       b.dispose();
     };
-  }, [phase]);
+  }, [phase, model, original, result, theme]);
 
   if (!ed || !model || !sel || sel.isEmpty()) {
     setTimeout(() => {
@@ -346,23 +364,31 @@ function AiEdit() {
       }
     });
     const full = model.getFullModelRange();
-    await api().ai.edit(requestId, {
-      model: undefined, // resolved for the 'inline' role in main
-      instruction,
-      path: getState().active ?? 'untitled',
-      language: model.getLanguageId(),
-      selection: original,
-      before: model.getValueInRange({
-        ...full,
-        endLineNumber: sel.startLineNumber,
-        endColumn: sel.startColumn,
-      }),
-      after: model.getValueInRange({
-        ...full,
-        startLineNumber: sel.endLineNumber,
-        startColumn: sel.endColumn,
-      }),
-    });
+    try {
+      await api().ai.edit(requestId, {
+        model: undefined, // resolved for the 'inline' role in main
+        instruction,
+        path: getState().active ?? 'untitled',
+        language: model.getLanguageId(),
+        selection: original,
+        before: model.getValueInRange({
+          ...full,
+          endLineNumber: sel.startLineNumber,
+          endColumn: sel.startColumn,
+        }),
+        after: model.getValueInRange({
+          ...full,
+          startLineNumber: sel.endLineNumber,
+          startColumn: sel.endColumn,
+        }),
+      });
+    } catch (err) {
+      // Rejected before streaming (validation, IPC failure): unlock the dialog and show why.
+      off();
+      if (requestRef.current === requestId) requestRef.current = null;
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase('ask');
+    }
   };
 
   const accept = () => {

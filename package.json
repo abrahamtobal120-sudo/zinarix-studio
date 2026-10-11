@@ -30,6 +30,7 @@
     "@types/react": "^19.3.0",
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "ink-testing-library": "^4.0.0",
     "prettier": "^3.9.9",
     "turbo": "^2.11.7",

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import { buildContextMessages } from '@omni/core';
 import type { OmniCore, OmniEvent, StreamRequest } from '@omni/core';
-import { OmniError, t } from '@omni/shared';
+import { ExitCode, OmniError, exitCodeFor, t } from '@omni/shared';
 import type { ChatMessage } from '@omni/shared';
 import { interruptSignal, omni } from '../context.js';
 import {
@@ -163,6 +163,7 @@ export function registerAsk(program: Command): void {
         if (opts.model.length < 2)
           throw new OmniError('config', 'compare needs at least two -m models');
         const signal = interruptSignal();
+        const failures: unknown[] = [];
         const results = await Promise.all(
           opts.model.map(async (model) => {
             try {
@@ -179,10 +180,21 @@ export function registerAsk(program: Command): void {
                 model,
               };
             } catch (e) {
+              failures.push(e);
               return { model, error: e instanceof Error ? e.message : String(e) };
             }
           }),
         );
+        // Every model failed: exit non-zero (130 if cancelled, the shared code if all
+        // failures agree, otherwise 1), so scripts do not read an all-error run as success.
+        if (failures.length === results.length) {
+          const codes = new Set(failures.map((e) => exitCodeFor(e)));
+          process.exitCode = signal.aborted
+            ? ExitCode.aborted
+            : codes.size === 1
+              ? [...codes][0]!
+              : ExitCode.error;
+        }
         if (opts.json) return printJson(results);
         for (const r of results) {
           outln(c.bold(c.cyan(`━━ ${r.model} ━━`)));

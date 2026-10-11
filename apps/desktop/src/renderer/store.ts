@@ -1,8 +1,18 @@
 import { useSyncExternalStore } from 'react';
 import type { ModelInfo } from '@omni/shared';
-import type { AiRole, OmniApi, Settings, WorkspaceInfo } from '../shared/api';
+import type {
+  AiRole,
+  ChatContext,
+  OmniApi,
+  Prefs,
+  Settings,
+  ThemeId,
+  WorkspaceInfo,
+} from '../shared/api';
+import { DEFAULT_PREFS } from '../shared/api';
 import { languageFor, monaco } from './monaco';
 import { t } from './i18n';
+import { applyThemeColors, isDark } from './themes';
 
 declare global {
   interface Window {
@@ -28,13 +38,18 @@ export type Modal =
   | { kind: 'shortcuts' }
   | { kind: 'usage' }
   | { kind: 'security' }
-  | { kind: 'scanner' };
+  | { kind: 'scanner' }
+  | { kind: 'settings' }
+  | { kind: 'diff'; path: string; staged: boolean }
+  | { kind: 'commit'; hash: string; subject: string }
+  | { kind: 'clone' }
+  | { kind: 'publish' };
 
 export interface State {
   workspace: WorkspaceInfo | null;
   tabs: Tab[];
   active: string | null;
-  sidebar: 'explorer' | 'search' | null;
+  sidebar: 'explorer' | 'search' | 'git' | 'run' | null;
   panelOpen: boolean;
   chatOpen: boolean;
   modal: Modal | null;
@@ -45,6 +60,11 @@ export interface State {
   toast: string | null;
   fsVersion: number;
   inputBox: { label: string; value: string; resolve: (v: string | null) => void } | null;
+  /** Context attached to the next chat message (e.g. a terminal session or selection). */
+  chatAttachments: ChatContext[];
+  prefs: Prefs;
+  /** Number of changed files in the git repository (activity bar badge). */
+  gitChanges: number;
 }
 
 let state: State = {
@@ -62,6 +82,9 @@ let state: State = {
   toast: null,
   fsVersion: 0,
   inputBox: null,
+  chatAttachments: [],
+  prefs: DEFAULT_PREFS,
+  gitChanges: 0,
 };
 
 const listeners = new Set<() => void>();
@@ -145,7 +168,16 @@ export async function openFile(
       monaco.editor.getModel(uri) ??
       monaco.editor.createModel(file.content, languageFor(path), uri);
     docs.set(path, { model, savedVersion: model.getAlternativeVersionId(), viewState: null });
-    model.onDidChangeContent(() => updateDirty(path));
+    let autoSave: ReturnType<typeof setTimeout> | undefined;
+    model.onDidChangeContent(() => {
+      updateDirty(path);
+      if (!state.prefs.autoSave) return;
+      clearTimeout(autoSave);
+      autoSave = setTimeout(() => {
+        if (docs.get(path)?.model === model && state.tabs.some((x) => x.path === path && x.dirty))
+          void save(path, false);
+      }, 1000);
+    });
     setState((s) => ({ tabs: [...s.tabs, { path, name, dirty: false }] }));
   }
   activate(path);
@@ -161,6 +193,17 @@ export async function openFile(
 /** Pseudo-path of the built-in browser tab (never a real file: real paths have no "::"). */
 export const BROWSER_TAB = '::browser';
 
+/** Pseudo-path of the full-page security section. */
+export const SECURITY_TAB = '::security';
+
+export function openSecurityTab(): void {
+  if (!state.tabs.some((x) => x.path === SECURITY_TAB))
+    setState((s) => ({
+      tabs: [...s.tabs, { path: SECURITY_TAB, name: t('secTab'), dirty: false }],
+    }));
+  activate(SECURITY_TAB);
+}
+
 export function openBrowserTab(): void {
   if (!state.tabs.some((x) => x.path === BROWSER_TAB))
     setState((s) => ({
@@ -175,10 +218,17 @@ export function activate(path: string | null): void {
   setState({ active: path });
 }
 
-export async function save(path = state.active): Promise<void> {
+export async function save(path = state.active, format = true): Promise<void> {
   if (!path) return;
   const d = docs.get(path);
   if (!d) return;
+  // Format on save works on the visible editor (Monaco formatters need a view).
+  if (format && state.prefs.formatOnSave && editor?.getModel() === d.model) {
+    await editor
+      .getAction('editor.action.formatDocument')
+      ?.run()
+      .catch(() => undefined);
+  }
   await api().workspace.writeFile(path, d.model.getValue());
   d.savedVersion = d.model.getAlternativeVersionId();
   updateDirty(path);
@@ -223,7 +273,7 @@ export async function reloadFromDisk(path: string): Promise<void> {
   if (!d) return;
   const tab = state.tabs.find((x) => x.path === path);
   if (tab?.dirty) {
-    toast(`"${tab.name}" cambió en disco pero tiene cambios sin guardar; no se recargó.`);
+    toast(t('diskChangedDirty', { name: tab.name }));
     return;
   }
   try {
@@ -246,7 +296,7 @@ export function resetDocs(): void {
   for (const d of docs.values()) d.model.dispose();
   docs.clear();
   setState((s) => {
-    const tabs = s.tabs.filter((x) => x.path === BROWSER_TAB);
+    const tabs = s.tabs.filter((x) => x.path === BROWSER_TAB || x.path === SECURITY_TAB);
     return { tabs, active: tabs[0]?.path ?? null };
   });
 }
@@ -282,16 +332,48 @@ export async function chooseModel(ref: string): Promise<void> {
   await refreshSettings();
 }
 
-export function applyTheme(theme: 'dark' | 'light'): void {
-  document.documentElement.dataset.theme = theme;
-  monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+export function applyTheme(theme: ThemeId): void {
+  applyThemeColors(theme);
 }
 
-export async function toggleTheme(): Promise<void> {
-  const theme = state.settings.theme === 'dark' ? 'light' : 'dark';
+export async function setTheme(theme: ThemeId): Promise<void> {
   await api().ai.setTheme(theme);
   applyTheme(theme);
   setState((s) => ({ settings: { ...s.settings, theme } }));
+}
+
+export async function toggleTheme(): Promise<void> {
+  await setTheme(isDark(state.settings.theme) ? 'light' : 'dark');
+}
+
+// ---------------- preferences ----------------
+
+export async function loadPrefs(): Promise<void> {
+  setState({ prefs: await api().app.prefs() });
+}
+
+export async function updatePrefs(patch: Partial<Prefs>): Promise<void> {
+  setState((s) => ({ prefs: { ...s.prefs, ...patch } }));
+  setState({ prefs: await api().app.setPrefs(patch) });
+}
+
+/** Refreshes the git badge (changed files) of the activity bar. */
+export async function refreshGitBadge(): Promise<void> {
+  if (!state.workspace) return setState({ gitChanges: 0 });
+  try {
+    const st = await api().git.status();
+    setState({ gitChanges: st.files.length });
+  } catch {
+    setState({ gitChanges: 0 });
+  }
+}
+
+/** Attaches context to the next chat message (replaces an attachment with the same source). */
+export function attachToChat(ctx: ChatContext): void {
+  setState((s) => ({
+    chatOpen: true,
+    chatAttachments: [...s.chatAttachments.filter((c) => c.source !== ctx.source), ctx],
+  }));
 }
 
 let seq = 0;

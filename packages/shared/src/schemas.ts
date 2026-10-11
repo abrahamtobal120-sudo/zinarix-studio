@@ -31,6 +31,10 @@ export const CatalogModel = z.object({
   inputPrice: z.number().nonnegative().nullable().optional(),
   /** USD per 1M output tokens. */
   outputPrice: z.number().nonnegative().nullable().optional(),
+  /** USD per 1M cache-read input tokens (when the provider publishes it). */
+  cachedInputPrice: z.number().nonnegative().nullable().optional(),
+  /** USD per 1M cache-write input tokens (Anthropic cache_creation). */
+  cacheWritePrice: z.number().nonnegative().nullable().optional(),
   tools: z.boolean().nullable().optional(),
   vision: z.boolean().nullable().optional(),
   reasoning: z.boolean().nullable().optional(),
@@ -68,7 +72,13 @@ export const CatalogEntry = z.object({
     )
     .default([]),
   auth: AuthSpec,
+  /** Environment variables that hold the credential (API key / token), in lookup order. */
   envVars: z.array(z.string()).default([]),
+  /**
+   * Non-secret environment variables the provider also uses (endpoint, account or project
+   * id, region). Documentation only: they are never read as a key.
+   */
+  envParams: z.array(z.string()).optional(),
   extraHeaders: z.record(z.string(), z.string()).optional(),
   docsUrl: z.string().url().nullable().optional(),
   keyUrl: z.string().url().nullable().optional(),
@@ -191,7 +201,15 @@ export type ChatChunk =
   | { type: 'text'; delta: string }
   | { type: 'reasoning'; delta: string }
   | { type: 'tool_call'; id: string; name: string; argsDelta: string }
-  | { type: 'usage'; inputTokens: number; outputTokens: number; cachedTokens?: number }
+  | {
+      type: 'usage';
+      /** All input tokens, including cache reads and cache writes. */
+      inputTokens: number;
+      outputTokens: number;
+      cachedTokens?: number;
+      /** Input tokens written to the prompt cache (billed above the base price by Anthropic). */
+      cacheWriteTokens?: number;
+    }
   | { type: 'error'; code: string; message: string; retryable: boolean }
   | { type: 'raw'; adapter: string; content: unknown }
   | { type: 'done'; stopReason: string };

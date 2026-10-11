@@ -1,6 +1,6 @@
 import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest, ModelInfo } from '@omni/shared';
-import { request, requestJson } from '../http.js';
+import { providerMessage, request, requestJson } from '../http.js';
 import { baseModel } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
@@ -177,6 +177,7 @@ async function* chat(
   const partialJson = new Map<number, string>();
   let input = 0;
   let cached = 0;
+  let cacheWrite = 0;
   let output = 0;
   let stop: string | undefined;
   for await (const ev of parseSse(res.body, {
@@ -190,7 +191,8 @@ async function* chat(
       case 'message_start': {
         const u = e.message?.usage ?? {};
         cached = u.cache_read_input_tokens ?? 0;
-        input = (u.input_tokens ?? 0) + cached + (u.cache_creation_input_tokens ?? 0);
+        cacheWrite = u.cache_creation_input_tokens ?? 0;
+        input = (u.input_tokens ?? 0) + cached + cacheWrite;
         output = u.output_tokens ?? 0;
         break;
       }
@@ -241,7 +243,9 @@ async function* chat(
             : type === 'rate_limit_error'
               ? 'rate_limit'
               : 'bad_request';
-        throw new OmniError(code, e.error?.message ?? 'stream error', { provider: cfg.entry.id });
+        throw new OmniError(code, providerMessage(e.error?.message ?? 'stream error'), {
+          provider: cfg.entry.id,
+        });
       }
     }
   }
@@ -251,7 +255,13 @@ async function* chat(
   }
   const content = blocks.filter(Boolean);
   if (content.length) yield { type: 'raw', adapter: 'anthropic', content };
-  yield { type: 'usage', inputTokens: input, outputTokens: output, cachedTokens: cached };
+  yield {
+    type: 'usage',
+    inputTokens: input,
+    outputTokens: output,
+    cachedTokens: cached,
+    ...(cacheWrite ? { cacheWriteTokens: cacheWrite } : {}),
+  };
   yield { type: 'done', stopReason: normalizeStop(stop) };
 }
 

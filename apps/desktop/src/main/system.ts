@@ -1,7 +1,11 @@
 import { spawn } from 'node:child_process';
-import { promises as dns } from 'node:dns';
+import dnsCb, { promises as dns } from 'node:dns';
+import type { LookupAddress, LookupOptions } from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
+import type { LookupFunction } from 'node:net';
 import { existsSync, realpathSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { connect } from 'node:net';
 import { homedir, networkInterfaces, platform } from 'node:os';
 import { dirname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
@@ -146,8 +150,16 @@ function realish(p: string): string {
 }
 
 /** Credential stores and secrets: never read or written by the AI. */
+/** The app's own data folders (config, vault, history), wherever paths.ts placed them. */
+let appDirs: string[] = [];
+export function setAppDataDirs(dirs: string[]): void {
+  appDirs = [...new Set(dirs)].map((d) => realish(resolve(d)).replace(/\\/g, '/'));
+}
+
 export function deniedPath(input: string, mode: 'read' | 'write'): string | null {
   const p = realish(resolve(input)).replace(/\\/g, '/');
+  if (appDirs.some((d) => p === d || p.startsWith(`${d}/`)))
+    return 'Por seguridad la IA no puede acceder a contraseñas, llaves ni credenciales.';
   const home = homedir().replace(/\\/g, '/');
   const rel = p.startsWith(`${home}/`) ? p.slice(home.length + 1) : null;
   const H = (re: RegExp) => rel !== null && re.test(rel);
@@ -156,7 +168,14 @@ export function deniedPath(input: string, mode: 'read' | 'write'): string | null
     H(/^\.gnupg(\/|$)/) ||
     H(/^\.omni(\/|$)/) ||
     H(/^\.config\/Zinarix Studio(\/|$)/) ||
-    H(/^\.aws\/credentials$/) ||
+    H(/^\.aws\/(credentials$|sso\/cache\/|cli\/cache\/)/) ||
+    H(/^\.kube\/config$/) ||
+    H(/^\.npmrc$/) ||
+    H(/^\.pypirc$/) ||
+    H(/^\.pgpass$/) ||
+    H(/^\.config\/gh\/hosts\.ya?ml$/) ||
+    H(/^\.(bash|zsh|sh|python|psql|mysql|node_repl|sqlite)_history$/) ||
+    H(/^\.local\/share\/fish\/fish_history$/) ||
     H(/^\.azure(\/|$)/) ||
     H(/^\.config\/gcloud(\/|$)/) ||
     H(/^\.netrc$/) ||
@@ -174,6 +193,8 @@ export function deniedPath(input: string, mode: 'read' | 'write'): string | null
       /^AppData\/(Roaming|Local)\/(Microsoft\/(Credentials|Protect|Vault)|Google\/Chrome|Mozilla|BraveSoftware|Zinarix Studio)(\/|$)/i,
     ) ||
     /^\/etc\/(shadow|gshadow|sudoers)(\.d)?(\/|$)/.test(p) ||
+    // Another process's environment and memory hold the keys it was started with.
+    /^\/proc\/(?:[^/]+\/)*(environ|mem)$/.test(p) ||
     /^\/(root|private\/var\/db)(\/|$)/.test(p);
   if (secret) return 'Por seguridad la IA no puede acceder a contraseñas, llaves ni credenciales.';
   if (
@@ -219,6 +240,35 @@ export function isWriteSql(query: string): boolean {
   );
 }
 
+/**
+ * psql and the mysql client run their own commands besides SQL: `\! cmd` / `system cmd`
+ * start a shell, `\o |cmd` / `pager cmd` pipe output to one, `\i` / `source` read files.
+ * sql_query is for SQL only; a query carrying any of them is refused (run_command exists
+ * for shell work, with its own approval).
+ */
+export function sqlClientCommand(query: string): string | null {
+  const q = query.replace(/'(?:[^'\\]|''|\\.)*'/g, "''").replace(/"(?:[^"]|"")*"/g, '""');
+  if (q.includes('\\'))
+    return 'La consulta contiene comandos del cliente (\\…), que pueden ejecutar programas. Solo se permite SQL.';
+  if (/^\s*(system|source|pager|tee|edit|connect|delimiter)\b/im.test(q))
+    return 'La consulta contiene comandos del cliente mysql (system, source, pager…). Solo se permite SQL.';
+  return null;
+}
+
+/** Max size of a request body the AI can send (the approval card shows the start of it). */
+const MAX_REQUEST_BODY = 1024 * 1024;
+
+const CREDENTIAL_HEADER = /authorization|api[-_]?key|token|cookie|secret|password|session/i;
+
+/** Request headers as shown to the user: credential values masked, the rest redacted. */
+export function headerLines(h: unknown): string[] {
+  if (!h || typeof h !== 'object') return [];
+  return Object.entries(h as Record<string, unknown>).map(([k, v]) => {
+    const value = String(v);
+    return `${k}: ${CREDENTIAL_HEADER.test(k) ? `••• (${value.length} caracteres)` : redact(value).slice(0, 500)}`;
+  });
+}
+
 function isSecretName(name: string): boolean {
   return /key|token|secret|password|passwd|pwd|credential|auth/i.test(name);
 }
@@ -255,19 +305,36 @@ export async function systemPreview(
         // shown as typed
       }
       const safe = method === 'GET' || method === 'HEAD';
+      const headers = headerLines(a.headers);
+      const body = a.body !== undefined && !safe ? String(a.body) : '';
+      if (body.length > MAX_REQUEST_BODY)
+        throw new Error(`El cuerpo de la petición supera ${MAX_REQUEST_BODY / 1024} KB.`);
+      // Everything the request carries is shown: a header or the query string can carry data
+      // out as well as a body. "Always" covers only this exact request (URL and headers), so
+      // a later call cannot reuse it to send something else to the same host.
+      const shown = [
+        headers.length ? `Cabeceras:\n${headers.join('\n')}` : '',
+        body ? `Cuerpo:\n${redact(body.slice(0, 4000))}${body.length > 4000 ? '\n…' : ''}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
       return {
         risk: safe ? 'medium' : 'high',
         warning: safe
-          ? `La IA se conectará a ${host}. Ese servicio verá la petición (y tu dirección IP).`
+          ? `La IA se conectará a ${host}. Ese servicio verá la petición (y tu dirección IP).${headers.length ? ' Revisa las cabeceras: también pueden llevar datos.' : ''}`
           : `⚠️ ${method} puede crear, modificar o borrar datos en ${host}. Revisa el contenido antes de aprobar.`,
-        allowKey: safe ? `http:${host}` : undefined,
+        allowKey: safe ? `http:${method} ${url} ${headers.join('\n')}` : undefined,
         action: `${method} ${url}`,
         url,
-        command: a.body ? String(a.body).slice(0, 4000) : undefined,
+        command: shown || undefined,
       };
     }
     case 'sql_query': {
       const query = String(a.query ?? '');
+      const client = /^(postgres(ql)?|mysql):\/\//i.test(String(a.database ?? ''))
+        ? sqlClientCommand(query)
+        : null;
+      if (client) throw new Error(client);
       const writes = isWriteSql(query);
       const db = dbLabel(String(a.database ?? ''));
       return {
@@ -312,12 +379,16 @@ export async function systemPreview(
     }
     case 'set_env_var': {
       const n = String(a.name ?? '');
+      // Refused before the approval card: approving it would not run anyway.
+      validateEnvName(n);
       const v = String(a.value ?? '');
       const shown = isSecretName(n) ? `${v.slice(0, 3)}…(${v.length} caracteres)` : v;
+      const exec = execEnvVar(n);
       return {
-        risk: a.scope === 'user' ? 'high' : 'medium',
-        warning:
-          a.scope === 'user'
+        risk: a.scope === 'user' || exec ? 'high' : 'medium',
+        warning: exec
+          ? `⚠️ ${n} decide qué programa se ejecuta o qué carga al arrancar. Con este valor, comandos que ya aprobaste podrían ejecutar otra cosa${a.scope === 'user' ? ' (y quedará PERMANENTE en tu perfil)' : ''}. Apruébalo solo si entiendes el valor.`
+          : a.scope === 'user'
             ? `⚠️ La variable ${n} quedará guardada de forma PERMANENTE para tu usuario (perfil de la terminal). Afecta a todos tus programas nuevos. Puedes revertirlo.`
             : `La variable ${n} se usará solo en los comandos de esta conversación.`,
         allowKey: undefined,
@@ -497,8 +568,7 @@ export async function httpRequest(
   const method = String(a.method ?? 'GET').toUpperCase();
   const url = new URL(String(a.url ?? ''));
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Solo http(s).');
-  if (url.hostname === '169.254.169.254' || url.hostname === 'metadata.google.internal')
-    throw new Error('Por seguridad no se permite el servicio de metadatos de la nube.');
+  await assertNotMetadata(url.hostname);
   const headers: Record<string, string> = {};
   if (a.headers && typeof a.headers === 'object')
     for (const [k, v] of Object.entries(a.headers as Record<string, unknown>)) {
@@ -506,38 +576,224 @@ export async function httpRequest(
       if (/authorization|api[-_]?key|token|cookie/i.test(k))
         registerSecret(String(v).replace(/^Bearer\s+/i, ''));
     }
+  const body =
+    a.body !== undefined && method !== 'GET' && method !== 'HEAD' ? String(a.body) : undefined;
+  if (body !== undefined && Buffer.byteLength(body) > MAX_REQUEST_BODY)
+    throw new Error(`El cuerpo de la petición supera ${MAX_REQUEST_BODY / 1024} KB.`);
   const t0 = Date.now();
-  const r = await fetch(url, {
-    method,
-    headers,
-    body:
-      a.body !== undefined && method !== 'GET' && method !== 'HEAD' ? String(a.body) : undefined,
-    signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
-  });
-  const body = method === 'HEAD' ? '' : await r.text();
-  const hdrs = [...r.headers]
+  // Redirects are not followed: an approved host could bounce the request (with its
+  // headers) to another one. The model gets the Location and must ask again. The address
+  // actually connected to is checked too (guardedLookup), so a DNS answer that changes
+  // between the check above and the connection cannot reach the metadata service.
+  const r = await rawRequest(url, method, headers, body, signal);
+  const hdrs = r.headers
     .filter(([k]) => !/set-cookie/i.test(k))
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n');
+  const location = r.status >= 300 && r.status < 400 ? r.location : null;
+  let note = '';
+  if (location) {
+    let target = location;
+    try {
+      target = new URL(location, url).toString();
+    } catch {
+      // shown as sent
+    }
+    note = `\n\n(Redirección a ${target}: no se siguió. Si hace falta, pide esa URL con otra llamada a http_request; el usuario la aprobará.)`;
+  }
   return {
-    ok: r.ok,
+    ok: r.status >= 200 && r.status < 300,
     text: redact(
-      `${method} ${url.toString()}\nHTTP ${r.status} ${r.statusText} · ${Date.now() - t0} ms\n${hdrs}\n\n${cut(body)}`,
+      `${method} ${url.toString()}\nHTTP ${r.status} ${r.statusText} · ${Date.now() - t0} ms\n${hdrs}\n\n${cut(method === 'HEAD' ? '' : r.body)}${note}`,
     ),
   };
 }
 
-export async function sqlQuery(database: string, query: string): Promise<string> {
+/** One HTTP(S) exchange, no redirects, response capped at MAX_RESPONSE bytes. */
+function rawRequest(
+  url: URL,
+  method: string,
+  headers: Record<string, string>,
+  body: string | undefined,
+  signal: AbortSignal,
+): Promise<{
+  status: number;
+  statusText: string;
+  headers: [string, string][];
+  location: string | null;
+  body: string;
+}> {
+  return new Promise((res, rej) => {
+    const mod = url.protocol === 'https:' ? https : http;
+    const req = mod.request(
+      url,
+      {
+        method,
+        headers,
+        lookup: guardedLookup,
+        signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
+      },
+      (resp) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        let cutShort = false;
+        resp.on('data', (d: Buffer) => {
+          if (cutShort) return;
+          chunks.push(d);
+          size += d.length;
+          if (size > MAX_RESPONSE) {
+            cutShort = true;
+            resp.destroy();
+            finish();
+          }
+        });
+        resp.on('end', () => finish());
+        resp.on('error', (e) => (cutShort ? finish() : rej(e)));
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          const text = new TextDecoder().decode(Buffer.concat(chunks).subarray(0, MAX_RESPONSE));
+          const loc = resp.headers.location;
+          res({
+            status: resp.statusCode ?? 0,
+            statusText: resp.statusMessage ?? '',
+            headers: Object.entries(resp.headers).map(([k, v]) => [
+              k,
+              Array.isArray(v) ? v.join(', ') : String(v ?? ''),
+            ]),
+            location: typeof loc === 'string' ? loc : null,
+            body: cutShort ? `${text}\n… [respuesta cortada en ${MAX_RESPONSE} bytes]` : text,
+          });
+        };
+      },
+    );
+    req.on('error', rej);
+    req.end(body);
+  });
+}
+
+/**
+ * dns.lookup for outgoing AI requests that refuses cloud metadata addresses, so the check
+ * applies to the address the socket really connects to (no DNS-rebinding window).
+ */
+export const guardedLookup = ((
+  hostname: string,
+  options: LookupOptions,
+  cb: (
+    err: NodeJS.ErrnoException | null,
+    address: string | LookupAddress[],
+    family?: number,
+  ) => void,
+) => {
+  dnsCb.lookup(hostname, { ...options, all: true }, (err, addrs) => {
+    if (err) return cb(err, '');
+    const list = addrs as LookupAddress[];
+    if (list.some((x) => isMetadataAddress(x.address)))
+      return cb(Object.assign(new Error(METADATA_DENIED), { code: 'EACCES' }), '');
+    if (options.all) return cb(null, list);
+    const first = list[0];
+    if (!first)
+      return cb(Object.assign(new Error(`ENOTFOUND ${hostname}`), { code: 'ENOTFOUND' }), '');
+    cb(null, first.address, first.family);
+  });
+}) as unknown as LookupFunction;
+
+const MAX_RESPONSE = 5 * 1024 * 1024;
+
+/** Response body as text, at most `max` bytes (a hostile server cannot exhaust memory). */
+export async function readCapped(r: Response, max: number): Promise<string> {
+  if (!r.body) return '';
+  const reader = r.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  let cutShort = false;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.length;
+    if (size > max) {
+      cutShort = true;
+      await reader.cancel().catch(() => {});
+      break;
+    }
+  }
+  const text = new TextDecoder().decode(Buffer.concat(chunks).subarray(0, max));
+  return cutShort ? `${text}\n… [respuesta cortada en ${max} bytes]` : text;
+}
+
+/**
+ * Cloud metadata services hand out the machine's cloud credentials. Checked on every
+ * address the name resolves to, so other spellings (decimal IP, IPv6-mapped, a DNS name
+ * pointing there) are caught too. The LAN and localhost stay reachable on purpose.
+ */
+export async function assertNotMetadata(hostname: string): Promise<void> {
+  const name = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (
+    /^(metadata(\.google\.internal)?|metadata\.azure\.com|instance-data(\.ec2\.internal)?)\.?$/.test(
+      name,
+    )
+  )
+    throw new Error(METADATA_DENIED);
+  let addrs: string[] = [name];
+  try {
+    addrs = (await dns.lookup(name, { all: true, verbatim: true })).map((x) => x.address);
+  } catch {
+    // unresolvable: fetch will fail on its own
+  }
+  if (addrs.some(isMetadataAddress)) throw new Error(METADATA_DENIED);
+}
+
+const METADATA_DENIED = 'Por seguridad no se permite el servicio de metadatos de la nube.';
+
+export function isMetadataAddress(ip: string): boolean {
+  const raw = ip
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/%.*$/, '');
+  // IPv4 carried inside IPv6: mapped (::ffff:), compatible (::) and NAT64 (64:ff9b::).
+  const a = raw.replace(/^(::ffff:(0:)?|::|64:ff9b::)(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  return (
+    /^169\.254\./.test(a) || // link-local: AWS, GCP, Azure, OpenStack metadata
+    a === '100.100.100.200' || // Alibaba Cloud
+    /^fe[89ab][0-9a-f]:/.test(a) || // IPv6 link-local fe80::/10
+    a === 'fd00:ec2::254' || // AWS IMDS over IPv6
+    /^(::ffff:(0:)?|::|64:ff9b::)a9fe:/.test(raw) // the same IPv4 forms written in hex
+  );
+}
+
+/**
+ * `base` resolves a relative SQLite path (the open project); without it a relative path is
+ * refused instead of landing wherever the app happened to start.
+ */
+export async function sqlQuery(
+  database: string,
+  query: string,
+  base?: (rel: string) => string,
+): Promise<string> {
+  if (/^(postgres(ql)?|mysql):\/\//i.test(database)) {
+    const client = sqlClientCommand(query);
+    if (client) throw new Error(client);
+  }
   if (/^postgres(ql)?:\/\//i.test(database)) {
     const u = new URL(database);
-    if (u.password) registerSecret(decodeURIComponent(u.password));
+    // The password goes in the environment (PGPASSWORD), never in argv: every local user
+    // can read a process's command line (ps, /proc/<pid>/cmdline).
+    const env: Record<string, string> = {};
+    if (u.password) {
+      const pw = decodeURIComponent(u.password);
+      registerSecret(pw);
+      env.PGPASSWORD = pw;
+      u.password = '';
+    }
     const ro = isWriteSql(query)
       ? []
       : ['-c', 'SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY'];
     const r = await exec(
       'psql',
-      [database, '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', ...ro, '-c', query],
-      { timeout: 120_000 },
+      [u.toString(), '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-P', 'pager=off', ...ro, '-c', query],
+      { timeout: 120_000, env },
     );
     if (r.code === 127)
       throw new Error('No está instalado el cliente psql. Instálalo o usa run_command.');
@@ -559,7 +815,10 @@ export async function sqlQuery(database: string, query: string): Promise<string>
       decodeURIComponent(u.username),
       '--table',
     ];
-    const db = u.pathname.replace(/^\//, '');
+    const db = decodeURIComponent(u.pathname.replace(/^\//, ''));
+    // Never let a URL part become a client option (e.g. "--plugin-dir=…").
+    if ([db, u.hostname, decodeURIComponent(u.username)].some((v) => v.startsWith('-')))
+      throw new Error('URL de base de datos inválida.');
     if (db) args.push(db);
     const input = isWriteSql(query) ? query : `SET SESSION TRANSACTION READ ONLY;\n${query}`;
     const r = await exec('mysql', args, { input, timeout: 120_000, env });
@@ -568,8 +827,10 @@ export async function sqlQuery(database: string, query: string): Promise<string>
     return redact(cut(r.out));
   }
   // SQLite file
-  const path =
-    database.startsWith('~') || isAbsolute(database) ? expandPath(database) : resolve(database);
+  let path: string;
+  if (database.startsWith('~') || isAbsolute(database)) path = expandPath(database);
+  else if (base) path = base(database);
+  else throw new Error('Abre una carpeta o usa una ruta absoluta para la base de datos SQLite.');
   const denied = deniedPath(path, 'read');
   if (denied) throw new Error(denied);
   if (!existsSync(path)) throw new Error(`No existe la base de datos ${path}`);
@@ -597,6 +858,9 @@ export async function readSystemFile(path: string): Promise<string> {
   const abs = expandPath(path);
   const denied = deniedPath(abs, 'read');
   if (denied) throw new Error(denied);
+  const st = await stat(abs);
+  if (!st.isFile()) throw new Error(`${abs} no es un archivo normal.`);
+  if (st.size > 20 * 1024 * 1024) throw new Error(`${abs} es demasiado grande (más de 20 MB).`);
   const text = await readFile(abs, 'utf8');
   return redact(cut(text, 200_000));
 }
@@ -627,6 +891,7 @@ export async function writeSystemFile(
   let backup: string | null = null;
   if (before !== null) {
     await mkdir(backupDir, { recursive: true, mode: 0o700 });
+    await pruneBackups(backupDir);
     backup = join(backupDir, `${Date.now()}-${abs.replace(/[\\/:]+/g, '_')}`);
     await writeFile(backup, before, { mode: 0o600 });
   }
@@ -646,6 +911,17 @@ export async function writeSystemFile(
   return { abs, before, backup };
 }
 
+const BACKUP_DAYS = 14;
+
+/** Backups can hold secrets (config files): they are kept for two weeks, not forever. */
+export async function pruneBackups(dir: string, now = Date.now()): Promise<void> {
+  for (const name of await readdir(dir).catch(() => [] as string[])) {
+    const ts = Number(name.split('-')[0]);
+    if (Number.isFinite(ts) && now - ts > BACKUP_DAYS * 86_400_000)
+      await rm(join(dir, name), { force: true });
+  }
+}
+
 /** Shell profile used for permanent variables on Linux/macOS. */
 export function profileFile(): string {
   const shell = process.env.SHELL ?? '';
@@ -658,8 +934,28 @@ export function profileFile(): string {
 export function validateEnvName(name: string): void {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new Error('Nombre de variable inválido.');
   if (/^OMNI_/i.test(name)) throw new Error('Las variables OMNI_* las administra Zinarix Studio.');
-  if (/^(LD_PRELOAD|LD_LIBRARY_PATH|DYLD_.*)$/i.test(name))
-    throw new Error('Por seguridad la IA no puede cambiar esa variable.');
+  if (blockedEnvVar(name)) throw new Error('Por seguridad la IA no puede cambiar esa variable.');
+}
+
+/**
+ * Variables that make the shell, the dynamic loader or a common interpreter run other code
+ * (or a different program) without the command saying so: a later approved command would
+ * silently become something else. The AI never sets them; the user can, in a terminal.
+ */
+export function blockedEnvVar(name: string): boolean {
+  return /^(LD_.*|DYLD_.*|BASH_ENV|ENV|PROMPT_COMMAND|ZDOTDIR|PS4|SHELLOPTS|BASHOPTS|IFS|PATH|NODE_OPTIONS|PYTHONSTARTUP|PYTHONPATH|PYTHONHOME|PERL5OPT|PERL5LIB|RUBYOPT|RUBYLIB|GIT_.*_COMMAND|GIT_SSH|GIT_ASKPASS|GIT_EXEC_PATH|GIT_CONFIG_.*|SSH_ASKPASS|JAVA_TOOL_OPTIONS|_JAVA_OPTIONS|JDK_JAVA_OPTIONS|DOTNET_STARTUP_HOOKS|ELECTRON_RUN_AS_NODE)$/i.test(
+    name,
+  );
+}
+
+/**
+ * Variables with legitimate uses that also decide which program actually runs (or what it
+ * loads first): a later approved command could silently become a different one.
+ */
+export function execEnvVar(name: string): boolean {
+  return /^(PATH|HOME|NODE_OPTIONS|NODE_PATH|NPM_CONFIG_.*|GIT_(SSH|SSH_COMMAND|EXEC_PATH|PAGER|EDITOR|ASKPASS|CONFIG.*|DIR|WORK_TREE|PROXY_COMMAND)|SSH_ASKPASS|EDITOR|VISUAL|PAGER|PYTHONPATH|PYTHONSTARTUP|PYTHONHOME|PERL5OPT|PERL5LIB|RUBYOPT|RUBYLIB|JAVA_TOOL_OPTIONS|_JAVA_OPTIONS|JDK_JAVA_OPTIONS|CARGO_HOME|RUSTC_WRAPPER|GOFLAGS|DOTNET_STARTUP_HOOKS|ELECTRON_RUN_AS_NODE)$/i.test(
+    name,
+  );
 }
 
 /** New content of the profile with NAME set (replacing a previous line it wrote). */

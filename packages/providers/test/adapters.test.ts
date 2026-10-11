@@ -10,6 +10,7 @@ import {
   toAnthropic,
   toGemini,
   toOpenAiMessages,
+  toResponsesInput,
 } from '@omni/providers';
 import type { ProviderAdapter, ProviderConfig } from '@omni/providers';
 import {
@@ -233,6 +234,28 @@ describe('openai-compatible', () => {
     const r = await openAiCompatible.testConnection({ entry: entry(), baseUrl: srv.url });
     expect(r.ok).toBe(false);
     expect(r.error).toContain('401');
+    expect(r).toMatchObject({ code: 'auth', status: 401 });
+  });
+
+  it('testConnection never passes without a network check', async () => {
+    const r = await openAiCompatible.testConnection({
+      entry: entry({ modelsEndpoint: null, fallbackModels: [] }),
+      baseUrl: 'http://127.0.0.1:9',
+    });
+    expect(r).toMatchObject({ ok: false, unverified: true });
+  });
+
+  it('redacts secrets echoed in mid-stream error messages', async () => {
+    const leaked = 'sk-' + 'proj-ECHOEDECHOEDECHOEDECHOED00';
+    const srv = await mockServer((_req, res) =>
+      sse(res, [{ data: { error: { message: `Invalid key ${leaked} ${'x'.repeat(900)}` } } }]),
+    );
+    close = srv.close;
+    const err = (await collect(openAiCompatible, { entry: entry(), baseUrl: srv.url }).catch(
+      (e: unknown) => e,
+    )) as Error;
+    expect(err.message).not.toContain(leaked);
+    expect(err.message.length).toBeLessThanOrEqual(500);
   });
 
   it('maps messages including images and tool results', () => {
@@ -516,6 +539,52 @@ describe('openai-responses', () => {
     expect(body.instructions).toBe('sé breve');
     expect(body.store).toBe(false);
     expect(body.tools[0]).toMatchObject({ type: 'function', name: 'read_file' });
+  });
+
+  it('replays reasoning items (encrypted_content) on the next tool-use turn with store:false', async () => {
+    const reasoning = {
+      type: 'reasoning',
+      id: 'rs_1',
+      summary: [],
+      encrypted_content: 'gAAAAenc',
+    };
+    const call = {
+      type: 'function_call',
+      id: 'fc_1',
+      call_id: 'call_1',
+      name: 'read_file',
+      arguments: '{}',
+    };
+    const srv = await mockServer((_req, res) =>
+      sse(res, [
+        { data: { type: 'response.output_item.done', output_index: 0, item: reasoning } },
+        { data: { type: 'response.output_item.added', output_index: 1, item: call } },
+        { data: { type: 'response.output_item.done', output_index: 1, item: call } },
+        { data: { type: 'response.completed', response: {} } },
+      ]),
+    );
+    close = srv.close;
+    const cfg = { entry: entry({ adapter: 'openai-responses' }), baseUrl: srv.url };
+    const chunks = await collect(openAiResponses, cfg, { tools: true });
+    const raw = chunks.find((c) => c.type === 'raw') as Extract<ChatChunk, { type: 'raw' }>;
+    expect(raw).toEqual({ type: 'raw', adapter: 'openai-responses', content: [reasoning, call] });
+    expect(JSON.parse(srv.requests[0]!.body).include).toEqual(['reasoning.encrypted_content']);
+
+    const { input } = toResponsesInput([
+      { role: 'user', content: 'lee a.ts' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'call_1', name: 'read_file', arguments: '{}' }],
+        raw: { adapter: raw.adapter, content: raw.content },
+      },
+      { role: 'tool', toolCallId: 'call_1', content: 'ok' },
+    ]);
+    expect(input.slice(1)).toEqual([
+      reasoning,
+      call,
+      { type: 'function_call_output', call_id: 'call_1', output: 'ok' },
+    ]);
   });
 
   it('raises response.failed as an error', async () => {

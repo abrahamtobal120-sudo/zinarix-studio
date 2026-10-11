@@ -4,7 +4,15 @@ import { createLogger, redactWithReport } from '@omni/security';
 import type { Logger } from '@omni/security';
 import { getAdapter, isAdapterImplemented } from '@omni/providers';
 import type { ConnectionTest, FetchLike, ProviderConfig } from '@omni/providers';
-import { isLocalProvider, loadCatalog, resolveBaseUrl, resolveParams } from './catalog.js';
+import {
+  assertSecureTransport,
+  baseUrlOverrideIssue,
+  configIssues,
+  isLocalProvider,
+  loadCatalog,
+  resolveBaseUrl,
+  resolveParams,
+} from './catalog.js';
 import type { LoadedCatalog } from './catalog.js';
 import { loadConfig, saveConfig } from './config.js';
 import type { OmniConfig, Role } from './config.js';
@@ -14,7 +22,7 @@ import { History } from './history.js';
 import { ModelService } from './models.js';
 import { ensureHome, omniPaths } from './paths.js';
 import type { OmniPaths } from './paths.js';
-import { audit, computeCost, periodStart, recordUsage, spend } from './usage.js';
+import { audit, cacheRates, computeCost, periodStart, recordUsage, spend } from './usage.js';
 import type { Price } from './usage.js';
 import { EnvStore, FileVault, KeychainStore, Vault } from './vault.js';
 
@@ -92,6 +100,8 @@ export class OmniCore {
         level: env.OMNI_DEBUG ? 'debug' : 'info',
         stderr: env.OMNI_DEBUG === '1',
       });
+    for (const issue of this.catalog.rejected)
+      this.logger.warn('config.json entry ignored', { issue });
     this.db = openDb(this.paths.db);
     this.vault = new Vault(
       new EnvStore(this.catalog.providers, env),
@@ -113,6 +123,8 @@ export class OmniCore {
   }
 
   saveConfig(next: OmniConfig = this.config): void {
+    const issues = configIssues(next, this.catalog.catalog);
+    if (issues.length) throw new OmniError('config', issues.join('; '));
     this.config = next;
     saveConfig(this.paths.config, next);
     this.catalog = loadCatalog(this.paths, next);
@@ -152,6 +164,15 @@ export class OmniCore {
   async providerConfig(id: string): Promise<ProviderConfig> {
     const entry = this.provider(id);
     const userCfg = this.config.providers[id];
+    // A baseUrl override of a signed provider must not send its key to another domain.
+    const signed = this.catalog.catalog.providers.some((p) => p.id === id);
+    const overrideIssue =
+      signed && userCfg?.baseUrl ? baseUrlOverrideIssue(entry, userCfg.baseUrl) : undefined;
+    if (overrideIssue)
+      throw new OmniError('config', `providers.${id}.baseUrl: ${overrideIssue}`, {
+        provider: id,
+        retryable: false,
+      });
     const baseUrl = resolveBaseUrl(entry, userCfg?.params ?? {}, userCfg?.baseUrl);
     if (this.config.privacy.localOnly && !isLocalProvider(entry, baseUrl)) {
       throw new OmniError('privacy', `${entry.name} is a cloud provider`);
@@ -162,13 +183,18 @@ export class OmniCore {
         `${entry.name} uses the "${entry.adapter}" adapter, planned for Phase 3`,
       );
     }
-    const key = await this.vault.get(id);
+    // Keyless providers (Ollama, local servers) must not prompt for the file vault's master
+    // password; an optional key is still read from there if the user stored it in the file.
+    const key = await this.vault.get(id, {
+      unlockFile: this.needsKey(entry) || userCfg?.keyStore === 'file',
+    });
     if (!key && this.needsKey(entry)) {
       throw new OmniError('auth', `no API key for ${id}: run \`omni auth add ${id}\``, {
         provider: id,
         retryable: false,
       });
     }
+    if (key || Object.keys(userCfg?.headers ?? {}).length) assertSecureTransport(id, baseUrl);
     return {
       entry,
       baseUrl,
@@ -206,12 +232,56 @@ export class OmniCore {
       ?.fallbackModels.find((m) => m.id === ref.model);
     const input = info?.inputPrice ?? cat?.inputPrice;
     const output = info?.outputPrice ?? cat?.outputPrice;
-    return input != null && output != null ? { input, output } : undefined;
+    if (input == null || output == null) return undefined;
+    return {
+      input,
+      output,
+      ...(cat?.cachedInputPrice != null ? { cachedInput: cat.cachedInputPrice } : {}),
+      ...(cat?.cacheWritePrice != null ? { cacheWrite: cat.cacheWritePrice } : {}),
+    };
   }
 
-  /** Throws when a hard budget is exhausted; returns warnings at >= 80 %. */
-  checkBudget(provider: string): string[] {
+  private cost(
+    ref: ModelRef,
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      cachedTokens: number;
+      cacheWriteTokens: number;
+    },
+  ): number | null {
+    const adapter = this.catalog.providers.get(ref.provider)?.adapter ?? 'openai-compatible';
+    return computeCost(this.price(ref), usage.inputTokens, usage.outputTokens, usage.cachedTokens, {
+      cacheWrite: usage.cacheWriteTokens,
+      rates: cacheRates(adapter),
+    });
+  }
+
+  /** Budgets (provider-specific and "*") that apply to a provider. */
+  private budgetsFor(provider: string) {
+    return [provider, '*']
+      .map((key) => ({ key, b: this.config.budgets[key] }))
+      .filter((x) => x.b && (x.b.daily || x.b.monthly));
+  }
+
+  /**
+   * Throws when a hard budget is exhausted; returns warnings at >= 80 %.
+   *
+   * `unpriced` names a cloud model whose price is unknown. Its spend would be recorded as
+   * nothing, so a budget could never stop it: with hardStop the request is refused (the
+   * user can add the price under `prices` in config.json or turn hardStop off); without
+   * hardStop it only warns. Local providers are free and never count as unpriced.
+   */
+  checkBudget(provider: string, unpriced?: string): string[] {
     const notices: string[] = [];
+    if (unpriced) {
+      for (const { key, b } of this.budgetsFor(provider)) {
+        const msg = `${unpriced} has no known price, so the "${key}" budget cannot track it; add it under "prices" in config.json`;
+        if (b!.hardStop)
+          throw new OmniError('budget', `${msg} or disable hardStop`, { retryable: false });
+        notices.push(msg);
+      }
+    }
     for (const key of [provider, '*']) {
       const b = this.config.budgets[key];
       if (!b) continue;
@@ -292,12 +362,30 @@ export class OmniCore {
       const ref = chain[i]!;
       let emitted = false;
       const started = Date.now();
-      let usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
+      let usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 };
       try {
-        for (const n of this.checkBudget(ref.provider))
-          yield { type: 'notice', kind: 'budget', message: n };
         const cfg = await this.providerConfig(ref.provider);
         const adapter = getAdapter(cfg.entry.adapter);
+        let unpriced: string | undefined;
+        // Local servers are free: catalog "local" entries, or keyless endpoints on loopback.
+        // A keyed endpoint on loopback may be a proxy to a paid cloud, so it still counts.
+        const free =
+          cfg.entry.category === 'local' ||
+          (!cfg.apiKey && isLocalProvider(cfg.entry, cfg.baseUrl));
+        if (this.budgetsFor(ref.provider).length && !free) {
+          // Prices come from the model cache: warm it before deciding the model is unpriced.
+          if (
+            !this.price(ref) &&
+            cfg.entry.supports.listModels &&
+            !this.models.cached(ref.provider)
+          )
+            await this.models
+              .list({ ...cfg, maxRetries: 0, timeoutMs: 5000 })
+              .catch(() => undefined);
+          if (!this.price(ref)) unpriced = `${ref.provider}/${ref.model}`;
+        }
+        for (const n of this.checkBudget(ref.provider, unpriced))
+          yield { type: 'notice', kind: 'budget', message: n };
         yield { type: 'start', provider: ref.provider, model: ref.model };
         const chatReq: ChatRequest = {
           model: ref.model,
@@ -314,6 +402,7 @@ export class OmniCore {
               inputTokens: chunk.inputTokens,
               outputTokens: chunk.outputTokens,
               cachedTokens: chunk.cachedTokens ?? 0,
+              cacheWriteTokens: chunk.cacheWriteTokens ?? 0,
             };
           }
           if (chunk.type === 'text' || chunk.type === 'tool_call' || chunk.type === 'reasoning')
@@ -329,17 +418,14 @@ export class OmniCore {
         ) {
           await this.models.list({ ...cfg, maxRetries: 0, timeoutMs: 5000 }).catch(() => undefined);
         }
-        const usd = computeCost(
-          this.price(ref),
-          usage.inputTokens,
-          usage.outputTokens,
-          usage.cachedTokens,
-        );
+        const usd = this.cost(ref, usage);
         recordUsage(this.db, {
           ...ref,
           role,
           project: req.project,
-          ...usage,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          cachedTokens: usage.cachedTokens,
           costUsd: usd,
           latencyMs,
         });
@@ -368,14 +454,19 @@ export class OmniCore {
         const err =
           e instanceof OmniError
             ? e
-            : new OmniError('unknown', e instanceof Error ? e.message : String(e));
+            : e instanceof Error && e.name === 'TimeoutError'
+              ? new OmniError('timeout', e.message, { provider: ref.provider })
+              : new OmniError('unknown', e instanceof Error ? e.message : String(e));
         if (err.code !== 'aborted') {
+          // Tokens consumed before the failure are billed too, so they count for budgets.
           recordUsage(this.db, {
             ...ref,
             role,
             project: req.project,
-            ...usage,
-            costUsd: null,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            cachedTokens: usage.cachedTokens,
+            costUsd: usage.inputTokens || usage.outputTokens ? this.cost(ref, usage) : null,
             latencyMs: Date.now() - started,
             ok: false,
           });

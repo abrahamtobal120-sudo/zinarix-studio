@@ -1,6 +1,6 @@
 import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest } from '@omni/shared';
-import { request } from '../http.js';
+import { providerMessage, request } from '../http.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
 import { openAiCompatible, testViaModelsOrChat } from './openai-compatible.js';
@@ -31,6 +31,12 @@ export function toResponsesInput(messages: ChatMessage[]): {
         });
         break;
       case 'assistant':
+        // With store:false the server keeps nothing between turns, so reasoning models need
+        // their own output items back (reasoning with encrypted_content, then the calls).
+        if (m.raw?.adapter === 'openai-responses' && Array.isArray(m.raw.content)) {
+          input.push(...(m.raw.content as Record<string, unknown>[]));
+          break;
+        }
         if (m.content) input.push({ role: 'assistant', content: m.content });
         for (const c of m.toolCalls ?? []) {
           input.push({
@@ -54,7 +60,7 @@ interface ResponsesEvent {
   delta?: string;
   item_id?: string;
   output_index?: number;
-  item?: { type?: string; id?: string; call_id?: string; name?: string };
+  item?: { type?: string; id?: string; call_id?: string; name?: string } & Record<string, unknown>;
   response?: {
     status?: string;
     usage?: {
@@ -80,6 +86,9 @@ async function* chat(
     input,
     stream: true,
     store: false,
+    // Stateless (ZDR-friendly) reasoning: the encrypted chain of thought comes back in the
+    // output items and is replayed on the next tool-use turn instead of a stored response.
+    include: ['reasoning.encrypted_content'],
     ...(instructions ? { instructions } : {}),
     ...(req.maxTokens ? { max_output_tokens: req.maxTokens } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
@@ -100,6 +109,8 @@ async function* chat(
 
   // output_index -> function call identity
   const calls = new Map<number, { id: string; name: string }>();
+  // Completed output items by output_index, replayed verbatim on the next turn.
+  const items: Record<string, unknown>[] = [];
   let stop = 'end_turn';
   for await (const ev of parseSse(res.body, {
     signal,
@@ -128,6 +139,9 @@ async function* chat(
           yield { type: 'tool_call', id: call.id, name: call.name, argsDelta: '' };
         }
         break;
+      case 'response.output_item.done':
+        if (e.item?.type) items[e.output_index ?? items.length] = e.item;
+        break;
       case 'response.function_call_arguments.delta': {
         const call = calls.get(e.output_index ?? 0);
         if (call && e.delta)
@@ -152,19 +166,27 @@ async function* chat(
         break;
       }
       case 'response.failed':
-        throw new OmniError('server', e.response?.error?.message ?? 'response failed', {
-          provider: cfg.entry.id,
-        });
+        throw new OmniError(
+          'server',
+          providerMessage(e.response?.error?.message ?? 'response failed'),
+          {
+            provider: cfg.entry.id,
+          },
+        );
       case 'error':
         throw new OmniError(
           e.code === 'rate_limit_exceeded' ? 'rate_limit' : 'server',
-          e.message ?? 'stream error',
+          providerMessage(e.message ?? 'stream error'),
           {
             provider: cfg.entry.id,
           },
         );
     }
   }
+  const output = items.filter(Boolean);
+  // Only worth replaying when there is reasoning to carry over; plain turns rebuild fine.
+  if (output.some((i) => i.type === 'reasoning'))
+    yield { type: 'raw', adapter: 'openai-responses', content: output };
   yield { type: 'done', stopReason: stop };
 }
 

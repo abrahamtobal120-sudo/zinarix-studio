@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ConversationView } from '../../shared/api';
 import { t } from '../i18n';
 import { api, askText, toast, useStore } from '../store';
@@ -42,19 +42,20 @@ export function ChatHistory({
   const [list, setList] = useState<ConversationView[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const root = workspace?.root;
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      setList(await api().ai.conversations(query, onlyProject && Boolean(workspace)));
+      setList(await api().ai.conversations(query, onlyProject && Boolean(root)));
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, onlyProject, root]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), query ? 200 : 0);
     return () => clearTimeout(timer);
-  }, [query, onlyProject, workspace?.root]);
+  }, [query, load]);
 
   const groups = useMemo(() => {
     const out: [string, ConversationView[]][] = [];

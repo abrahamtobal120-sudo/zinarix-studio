@@ -18,10 +18,10 @@ const AI_ACTIVE_MS = 4000;
 const QUICK = [
   { label: 'localhost:3000', url: 'http://localhost:3000', hint: 'Next · React · Express' },
   { label: 'localhost:5173', url: 'http://localhost:5173', hint: 'Vite' },
-  { label: 'localhost:8080', url: 'http://localhost:8080', hint: 'Servidor local' },
+  { label: 'localhost:8080', url: 'http://localhost:8080', hint: t('hintLocalServer') },
   { label: 'GitHub', url: 'https://github.com', hint: 'github.com' },
-  { label: 'MDN', url: 'https://developer.mozilla.org', hint: 'Docs web' },
-  { label: 'npm', url: 'https://www.npmjs.com', hint: 'Paquetes' },
+  { label: 'MDN', url: 'https://developer.mozilla.org', hint: t('hintWebDocs') },
+  { label: 'npm', url: 'https://www.npmjs.com', hint: t('hintPackages') },
 ];
 
 const ICON = {
@@ -165,7 +165,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             className="bicon"
             disabled={!st.canGoBack}
             onClick={() => void api().browser.back()}
-            title="Atrás"
+            title={t('navBack')}
           >
             <Icon d={ICON.back} />
           </button>
@@ -173,7 +173,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             className="bicon"
             disabled={!st.canGoForward}
             onClick={() => void api().browser.forward()}
-            title="Adelante"
+            title={t('navForward')}
           >
             <Icon d={ICON.forward} />
           </button>
@@ -181,11 +181,11 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             className="bicon"
             disabled={!st.url}
             onClick={() => void api().browser.reload()}
-            title="Recargar"
+            title={t('navReload')}
           >
             <Icon d={st.loading ? ICON.stop : ICON.reload} />
           </button>
-          <button className="bicon" onClick={() => void api().browser.home()} title="Inicio">
+          <button className="bicon" onClick={() => void api().browser.home()} title={t('navHome')}>
             <Icon d={ICON.home} />
           </button>
         </div>

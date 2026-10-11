@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CatalogEntry } from '@omni/shared';
 import { Secret } from '@omni/security';
-import { parseRetryAfter, parseSse, request } from '@omni/providers';
+import { parseRetryAfter, parseSse, request, requestJson } from '@omni/providers';
 import type { ProviderConfig } from '@omni/providers';
 import { json, mockServer } from '../../../tests/helpers/mock-server.js';
 
@@ -100,6 +100,44 @@ describe('request()', () => {
     ).rejects.toMatchObject({ code: 'aborted' });
   });
 
+  it('does not cut a stream that lasts longer than timeoutMs (timeout only covers headers)', async () => {
+    const srv = await mockServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.flushHeaders();
+      let n = 0;
+      const t = setInterval(() => {
+        res.write(`data: {"n":${n}}\n\n`);
+        if (++n === 6) {
+          clearInterval(t);
+          res.end();
+        }
+      }, 100);
+    });
+    close = srv.close;
+    const res = await request(
+      { entry: entry(), baseUrl: srv.url, timeoutMs: 300, maxRetries: 0 },
+      { path: '/stream' },
+    );
+    const events = [];
+    for await (const e of parseSse(res.body, { idleTimeoutMs: 1000 })) events.push(e.data);
+    // ~600 ms of streaming against a 300 ms timeout.
+    expect(events).toHaveLength(6);
+  });
+
+  it('times out a JSON body that stalls after the headers', async () => {
+    const srv = await mockServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.write('{"partial":');
+    });
+    close = srv.close;
+    await expect(
+      requestJson(
+        { entry: entry(), baseUrl: srv.url, timeoutMs: 100, maxRetries: 0 },
+        { path: '/j' },
+      ),
+    ).rejects.toMatchObject({ code: 'timeout' });
+  });
+
   it('applies header, query and optional auth modes', async () => {
     const srv = await mockServer((_req, res) => json(res, 200, {}));
     close = srv.close;
@@ -157,6 +195,19 @@ describe('helpers', () => {
     const stream = new ReadableStream<Uint8Array>({ start() {} });
     const it = parseSse(stream, { idleTimeoutMs: 50 });
     await expect(it.next()).rejects.toMatchObject({ code: 'timeout' });
+  });
+
+  it('stops a stream that never ends a line instead of exhausting memory', async () => {
+    const chunk = new TextEncoder().encode('data: ' + 'x'.repeat(1024 * 1024));
+    let sent = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (sent++ > 40) c.close();
+        else c.enqueue(chunk);
+      },
+    });
+    await expect(parseSse(stream).next()).rejects.toMatchObject({ code: 'server' });
+    expect(sent).toBeLessThan(25);
   });
 });
 

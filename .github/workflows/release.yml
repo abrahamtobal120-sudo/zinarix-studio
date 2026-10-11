@@ -2,26 +2,43 @@ name: Release
 
 # Push a tag like v0.3.0 to build installers for Windows, macOS and Linux
 # and attach them to a GitHub release.
+#
+# Flow: create-release (draft) -> build x3 (upload to the draft) -> publish (SHA256SUMS +
+# make the release public). The release stays a draft until every installer is uploaded,
+# so `releases/latest`, the website and install.sh / install.ps1 never see a release
+# without assets, and installers.yml (on: release: published) runs against a complete one.
+#
+# Actions are pinned to a commit SHA (H-14); Dependabot (.github/dependabot.yml) keeps
+# them up to date.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Create the release once, before the three builds run in parallel; otherwise each
   # build races to create its own release for the same tag.
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Create release
+      - name: Check the ref is a version tag
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) ;;
+            *) echo "::error::Run this workflow from a tag like v1.2.3 (got $GITHUB_REF)"; exit 1 ;;
+          esac
+      - name: Create draft release
         run: |
           gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "${GITHUB_REF_NAME#v}" --notes "Zinarix Studio ${GITHUB_REF_NAME#v}"
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+              --title "${GITHUB_REF_NAME#v}" --notes "Zinarix Studio ${GITHUB_REF_NAME#v}"
 
   build:
     needs: create-release
@@ -36,13 +53,18 @@ jobs:
           - os: windows-latest
             target: --win nsis zip --x64
     runs-on: ${{ matrix.os }}
+    # The write token is only given to the publishing step: dependency install scripts
+    # (pnpm install) and the build never see it.
+    permissions:
+      contents: write
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
@@ -54,4 +76,42 @@ jobs:
       - name: Build installers
         working-directory: apps/desktop
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # electron-builder's publish config uses releaseType "draft": it uploads to the
+        # draft created above and never publishes it.
         run: pnpm exec electron-builder ${{ matrix.target }} --publish always
+
+  # Runs only when every build succeeded: a failed platform leaves the release as a draft
+  # (fix it and re-run the failed job, then this one).
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write # only to dispatch installers.yml below
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Generate SHA256SUMS
+        run: |
+          mkdir assets && cd assets
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --skip-existing
+          rm -f SHA256SUMS SHA256SUMS.minisig
+          # One "<sha256>  <file name>" line per asset (sha256sum text format).
+          sha256sum -- * > ../SHA256SUMS
+          cat ../SHA256SUMS
+      # TODO(H-13): sign SHA256SUMS (minisign or cosign) once a signing key exists: add the
+      # secret key as a repository secret, upload SHA256SUMS.minisig here and embed the
+      # public key in website/install.sh and website/install.ps1 so they verify it.
+      - name: Upload SHA256SUMS
+        run: gh release upload "$GITHUB_REF_NAME" SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Publish release
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      # A release published with GITHUB_TOKEN does not trigger other workflows
+      # (installers.yml listens to `release: published`), so start the installer tests
+      # explicitly; workflow_dispatch is the exception GitHub allows.
+      - name: Test the installers against the new release
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run installers.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH"

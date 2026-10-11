@@ -3,11 +3,13 @@ import { runCommand } from '../commands';
 import { t } from '../i18n';
 import {
   BROWSER_TAB,
+  SECURITY_TAB,
   activate,
   api,
   getState,
   openBrowserTab,
   openDropped,
+  openSecurityTab,
   setState,
   useStore,
 } from '../store';
@@ -17,7 +19,15 @@ export function ActivityBar() {
   const panelOpen = useStore((s) => s.panelOpen);
   const chatOpen = useStore((s) => s.chatOpen);
   const browserActive = useStore((s) => s.active === BROWSER_TAB);
-  const item = (active: boolean, title: string, icon: string, onClick: () => void) => (
+  const active = useStore((s) => s.active);
+  const gitChanges = useStore((s) => s.gitChanges);
+  const item = (
+    active: boolean,
+    title: string,
+    icon: string,
+    onClick: () => void,
+    badge?: number,
+  ) => (
     <button
       className={`activity ${active ? 'active' : ''}`}
       title={title}
@@ -25,6 +35,7 @@ export function ActivityBar() {
       onClick={onClick}
     >
       {icon}
+      {badge ? <span className="activity-badge">{badge > 99 ? '99+' : badge}</span> : null}
     </button>
   );
   return (
@@ -35,6 +46,16 @@ export function ActivityBar() {
       {item(sidebar === 'search', t('search'), '🔍', () =>
         setState({ sidebar: sidebar === 'search' ? null : 'search' }),
       )}
+      {item(
+        sidebar === 'git',
+        t('gitTitle'),
+        '⎇',
+        () => setState({ sidebar: sidebar === 'git' ? null : 'git' }),
+        gitChanges,
+      )}
+      {item(sidebar === 'run', t('runTitle'), '▶', () =>
+        setState({ sidebar: sidebar === 'run' ? null : 'run' }),
+      )}
       {item(chatOpen, t('chat'), '✨', () => setState({ chatOpen: !chatOpen }))}
       {item(panelOpen, t('terminal'), '⌨', () => setState({ panelOpen: !panelOpen }))}
       {item(browserActive, t('browser'), '🌐', () => {
@@ -44,10 +65,11 @@ export function ActivityBar() {
         } else openBrowserTab();
       })}
       <div className="spacer" />
-      {item(false, t('securityTitle'), '🛡️', () => setState({ modal: { kind: 'security' } }))}
+      {item(active === '::security', t('securityTitle'), '🛡️', () => openSecurityTab())}
       {item(false, t('usageTitle'), '📊', () => setState({ modal: { kind: 'usage' } }))}
       {item(false, t('providers'), '🔑', () => setState({ modal: { kind: 'providers' } }))}
-      {item(false, 'Paleta de comandos', '⚙', () => setState({ modal: { kind: 'palette' } }))}
+      {item(false, t('cmdPalette'), '☰', () => setState({ modal: { kind: 'palette' } }))}
+      {item(false, t('settings'), '⚙', () => setState({ modal: { kind: 'settings' } }))}
     </nav>
   );
 }
@@ -60,8 +82,12 @@ export function StatusBar() {
   const workspace = useStore((s) => s.workspace);
   const settings = useStore((s) => s.settings);
   const cursor = useStore((s) => s.cursor);
-  const active = useStore((s) => (s.active === BROWSER_TAB ? null : s.active));
+  const active = useStore((s) =>
+    s.active === BROWSER_TAB || s.active === SECURITY_TAB ? null : s.active,
+  );
   const tabs = useStore((s) => s.tabs);
+  const prefs = useStore((s) => s.prefs);
+  const gitChanges = useStore((s) => s.gitChanges);
   const dirty = tabs.filter((x) => x.dirty).length;
   const [provider, ...rest] = (settings.defaultModel ?? '').split('/');
   return (
@@ -69,7 +95,16 @@ export function StatusBar() {
       <span className="status-item" onClick={() => void api().workspace.openDialog()}>
         📁 {workspace?.name ?? t('openFolder')}
       </span>
-      {workspace?.branch && <span className="status-item">⎇ {workspace.branch}</span>}
+      {workspace?.branch && (
+        <span
+          className="status-item"
+          title={t('gitTitle')}
+          onClick={() => setState({ sidebar: 'git' })}
+        >
+          ⎇ {workspace.branch}
+          {gitChanges > 0 ? ` · ${gitChanges}✎` : ''}
+        </span>
+      )}
       {dirty > 0 && (
         <span className="status-item" onClick={() => void runCommand('file.saveAll')}>
           ● {dirty}
@@ -80,6 +115,15 @@ export function StatusBar() {
         <span className="status-item">{t('ln', { l: cursor.line, c: cursor.column })}</span>
       )}
       {active && <span className="status-item">{getState().active?.split('.').pop()}</span>}
+      {active && (
+        <span
+          className={`status-item ${prefs.inlineCompletions ? '' : 'off'}`}
+          title={t('setInlineHint')}
+          onClick={() => void runCommand('ai.toggleInline')}
+        >
+          {prefs.inlineCompletions ? '✨' : '✧'} {t('inlineShort')}
+        </span>
+      )}
       {settings.localOnly && (
         <span className="status-item local" onClick={() => void runCommand('ai.toggleLocal')}>
           🔒 {t('localOnly')}
@@ -156,10 +200,10 @@ export function Welcome() {
             </button>
           </div>
           <div className="welcome-keys">
-            {row('Apertura rápida', 'Ctrl+P', 'quickOpen')}
-            {row('Paleta de comandos', 'Ctrl+Shift+P', 'palette')}
+            {row(t('welcomeQuickOpen'), 'Ctrl+P', 'quickOpen')}
+            {row(t('cmdPalette'), 'Ctrl+Shift+P', 'palette')}
             {row(t('aiEdit'), 'Ctrl+K', 'ai.edit')}
-            {row('Preguntar a la IA', 'Ctrl+L', 'ai.askSelection')}
+            {row(t('welcomeAsk'), 'Ctrl+L', 'ai.askSelection')}
             {row(t('pickModel'), 'Ctrl+Alt+M', 'ai.pickModel')}
             {row(t('terminal'), 'Ctrl+`', 'view.terminal')}
           </div>
