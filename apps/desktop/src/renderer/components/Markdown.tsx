@@ -8,7 +8,7 @@ import { runInTerminal } from './Terminal';
 
 /**
  * Minimal, injection-safe Markdown: builds React elements (no innerHTML), so model output
- * can never execute script in the renderer. Supports fences, headings, lists, quotes,
+ * can never execute script in the renderer. Supports fences, headings, lists, quotes, tables,
  * inline code, bold, italics and links (opened externally, https only).
  */
 export function Markdown({ text, streaming }: { text: string; streaming?: boolean }) {
@@ -54,6 +54,35 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
       );
       continue;
     }
+    if (TABLE_ROW.test(line) && TABLE_SEP.test(lines[i + 1] ?? '')) {
+      const head = cells(line);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length && TABLE_ROW.test(lines[i]!)) rows.push(cells(lines[i++]!));
+      blocks.push(
+        <div key={key++} className="md-table">
+          <table>
+            <thead>
+              <tr>
+                {head.map((c, j) => (
+                  <th key={j}>{inline(c)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, j) => (
+                <tr key={j}>
+                  {head.map((_, k) => (
+                    <td key={k}>{inline(r[k] ?? '')}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
     if (/^>\s?/.test(line)) {
       const q: string[] = [];
       while (i < lines.length && /^>\s?/.test(lines[i]!)) q.push(lines[i++]!.replace(/^>\s?/, ''));
@@ -70,12 +99,26 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
       lines[i]!.trim() &&
       !/^\s*```/.test(lines[i]!) &&
       !/^(#{1,4})\s/.test(lines[i]!) &&
-      !/^\s*([-*+]|\d+\.)\s+/.test(lines[i]!)
+      !/^\s*([-*+]|\d+\.)\s+/.test(lines[i]!) &&
+      !(TABLE_ROW.test(lines[i]!) && TABLE_SEP.test(lines[i + 1] ?? ''))
     )
       para.push(lines[i++]!);
     blocks.push(<p key={key++}>{inline(para.join('\n'))}</p>);
   }
   return <div className="md">{blocks}</div>;
+}
+
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_SEP = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+/** "| a | b |" → ["a", "b"] */
+function cells(row: string): string[] {
+  return row
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim());
 }
 
 function inline(text: string): ReactNode {

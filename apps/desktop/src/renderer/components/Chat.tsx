@@ -1278,7 +1278,9 @@ export function ChatPanel() {
               onChange={(e) => setIncludeFile(e.target.checked)}
             />
             <Icon name="file" size={14} />
-            {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
+            <span className="pill-label">
+              {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
+            </span>
           </label>
           <button
             className="term-pick"

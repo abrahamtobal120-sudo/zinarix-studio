@@ -4540,3 +4540,59 @@ kbd.custom {
 .browser-start-search input:focus {
   box-shadow: none;
 }
+
+/* ---------- chat: nothing gets cut ---------- */
+/* Long words, paths and URLs wrap instead of widening the chat. */
+.chat-scroll {
+  overflow-x: hidden;
+}
+.turn {
+  min-width: 0;
+}
+.turn-user,
+.turn-error,
+.turn-notice,
+.md p,
+.md li,
+.md blockquote,
+.md-h,
+.md code {
+  overflow-wrap: anywhere;
+}
+.code-block pre code {
+  overflow-wrap: normal;
+}
+.md-table {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.md-table table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.md-table th,
+.md-table td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  min-width: 60px;
+}
+.md-table th {
+  background: var(--bg-3);
+  color: var(--fg-strong);
+}
+/* A narrow chat panel shows the file pill as an icon, so the model name still fits. */
+.chat-input {
+  container-type: inline-size;
+}
+.chat-input-bar .pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container (max-width: 440px) {
+  .chat-input-bar .pill:not(.agent-toggle) .pill-label {
+    display: none;
+  }
+}
