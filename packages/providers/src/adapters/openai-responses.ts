@@ -1,6 +1,6 @@
 import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest } from '@omni/shared';
-import { providerMessage, request } from '../http.js';
+import { describeErrorBody, providerMessage, request } from '../http.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
 import { openAiCompatible, testViaModelsOrChat } from './openai-compatible.js';
@@ -73,6 +73,7 @@ interface ResponsesEvent {
   };
   message?: string;
   code?: string;
+  error?: { message?: string; code?: string; type?: string };
 }
 
 async function* chat(
@@ -168,15 +169,17 @@ async function* chat(
       case 'response.failed':
         throw new OmniError(
           'server',
-          providerMessage(e.response?.error?.message ?? 'response failed'),
+          e.response?.error?.message
+            ? providerMessage(e.response.error.message)
+            : describeErrorBody(ev.data),
           {
             provider: cfg.entry.id,
           },
         );
       case 'error':
         throw new OmniError(
-          e.code === 'rate_limit_exceeded' ? 'rate_limit' : 'server',
-          providerMessage(e.message ?? 'stream error'),
+          (e.code ?? e.error?.code) === 'rate_limit_exceeded' ? 'rate_limit' : 'server',
+          describeErrorBody(ev.data),
           {
             provider: cfg.entry.id,
           },

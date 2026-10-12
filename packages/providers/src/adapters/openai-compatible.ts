@@ -1,6 +1,6 @@
 import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest, ModelInfo } from '@omni/shared';
-import { providerMessage, request, requestJson } from '../http.js';
+import { describeErrorBody, request, requestJson } from '../http.js';
 import { baseModel, catalogModels } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ConnectionTest, ProviderAdapter, ProviderConfig } from '../types.js';
@@ -143,13 +143,9 @@ async function* chat(
     const chunk = safeJson<OaiChunk>(ev.data);
     if (!chunk) continue;
     if (chunk.error) {
-      throw new OmniError(
-        'server',
-        providerMessage(String(chunk.error.message ?? 'stream error')),
-        {
-          provider: cfg.entry.id,
-        },
-      );
+      throw new OmniError('server', describeErrorBody(ev.data), {
+        provider: cfg.entry.id,
+      });
     }
     const choice = chunk.choices?.[0];
     const delta = choice?.delta;

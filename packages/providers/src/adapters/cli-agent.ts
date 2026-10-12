@@ -312,6 +312,8 @@ export class CliStreamParser {
   private toolSince = false;
   private plain: string[] = [];
   private usage?: Extract<ChatChunk, { type: 'usage' }>;
+  /** Tools the CLI wanted but was not allowed to use (nobody can approve them here). */
+  private denied: string[] = [];
   /** Fatal error reported by the CLI itself (failed turn, error result). */
   error?: string;
   /** Last non-fatal error event: shown if the process then fails without saying why. */
@@ -406,6 +408,14 @@ export class CliStreamParser {
             ev.result || (Array.isArray(ev.errors) ? ev.errors.join('; ') : '') || ev.subtype,
           );
         else if (!this.hasText && typeof ev.result === 'string') return this.text(ev.result);
+        for (const d of Array.isArray(ev.permission_denials)
+          ? (ev.permission_denials as Json[])
+          : []) {
+          const detail = summarize(d.tool_input);
+          this.denied.push(
+            `${String(d.tool_name ?? 'herramienta')}${detail ? ` (${detail})` : ''}`,
+          );
+        }
         const u = ev.usage as Json | undefined;
         if (u) {
           const cached = Number(u.cache_read_input_tokens ?? 0);
@@ -501,6 +511,16 @@ export class CliStreamParser {
   finish(): ChatChunk[] {
     const out: ChatChunk[] = [];
     if (!this.hasText && this.plain.length) out.push(...this.text(this.plain.join('\n')));
+    if (this.denied.length) {
+      const list = [...new Set(this.denied)].map((d) => `- ${d}`).join('\n');
+      out.push({
+        type: 'text',
+        delta:
+          `${this.hasText ? '\n\n' : ''}⚠ No se permitió usar:\n${list}\n\n` +
+          'El modo del proveedor no deja ejecutar esto y nadie puede aprobarlo desde Zinarix. ' +
+          'Para que lo haga sin preguntar, cambia el modo a **full** en Proveedores.\n',
+      });
+    }
     if (this.usage) out.push(this.usage);
     out.push({ type: 'done', stopReason: 'stop' });
     return out;

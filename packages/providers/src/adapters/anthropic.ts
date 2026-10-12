@@ -1,6 +1,6 @@
 import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest, ModelInfo } from '@omni/shared';
-import { providerMessage, request, requestJson } from '../http.js';
+import { describeErrorBody, request, requestJson } from '../http.js';
 import { baseModel } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
@@ -243,7 +243,7 @@ async function* chat(
             : type === 'rate_limit_error'
               ? 'rate_limit'
               : 'bad_request';
-        throw new OmniError(code, providerMessage(e.error?.message ?? 'stream error'), {
+        throw new OmniError(code, describeErrorBody(ev.data), {
           provider: cfg.entry.id,
         });
       }

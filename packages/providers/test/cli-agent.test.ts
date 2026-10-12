@@ -191,6 +191,29 @@ describe('CliStreamParser', () => {
     expect(p.error).toContain('OAuth');
   });
 
+  it('tells the user which tools Claude Code was not allowed to use', () => {
+    const p = new CliStreamParser();
+    const out = [
+      {
+        type: 'stream_event',
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'No pude.' } },
+      },
+      {
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+        result: 'No pude.',
+        permission_denials: [
+          { tool_name: 'Bash', tool_use_id: 'x', tool_input: { command: 'wmctrl -l' } },
+        ],
+      },
+    ].flatMap((e) => p.push(JSON.stringify(e)));
+    out.push(...p.finish());
+    expect(text(out)).toContain('Bash (wmctrl -l)');
+    expect(text(out)).toContain('**full**');
+    expect(p.error).toBeUndefined();
+  });
+
   it('reads Codex exec --json', () => {
     const p = new CliStreamParser();
     const out = [

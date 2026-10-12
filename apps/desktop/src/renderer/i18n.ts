@@ -158,7 +158,7 @@ const es = {
   cliHint:
     'Agente de terminal: Zinarix ejecuta el programa instalado en tu equipo con tu propia sesión o suscripción (no necesita API key; inicia sesión una vez en la terminal). En el chat solo responde; con 🤖 Agente trabaja en la carpeta abierta con sus propias herramientas.',
   cliModeRead: 'read — solo responde, no cambia nada',
-  cliModeEdit: 'edit — puede editar archivos del proyecto (recomendado)',
+  cliModeEdit: 'edit — puede editar archivos del proyecto, no ejecuta comandos (recomendado)',
   cliModeFull: 'full — todo, incluidos comandos, sin preguntar',
   localOnly: '100 % local',
   localOnlyOn: 'Modo 100 % local activado',
@@ -701,7 +701,7 @@ const en: Record<Key, string> = {
   cliHint:
     'Terminal agent: Zinarix runs the program installed on your computer with your own login or subscription (no API key; sign in once in a terminal). In chat it only answers; with 🤖 Agent it works in the open folder with its own tools.',
   cliModeRead: 'read — answers only, changes nothing',
-  cliModeEdit: 'edit — may edit project files (recommended)',
+  cliModeEdit: 'edit — may edit project files, runs no commands (recommended)',
   cliModeFull: 'full — everything, including commands, without asking',
   localOnly: '100% local',
   localOnlyOn: '100% local mode enabled',

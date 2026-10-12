@@ -4661,8 +4661,8 @@
         "profile": "codex",
         "command": "codex"
       },
-      "status": "unverified",
-      "verifiedAt": null,
+      "status": "active",
+      "verifiedAt": "2026-10-11",
       "notes": "Runs the local `codex exec --json` with the user's ChatGPT plan or key. Sandbox: read-only in chat, workspace-write (edit) or danger-full-access (full) in agent mode."
     },
     {
