@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { AdapterId } from '@omni/shared';
 import type { CatalogEntry, ChatChunk } from '@omni/shared';
 import { Secret } from '@omni/security';
 import {
@@ -640,10 +641,11 @@ describe('openai-responses', () => {
 });
 
 describe('registry', () => {
-  it('maps OpenAI-wire families to the compatible adapter and rejects bedrock until Phase 3', () => {
+  it('maps OpenAI-wire families to the compatible adapter and every family to an adapter', () => {
     expect(getAdapter('azure-openai')).toBe(openAiCompatible);
     expect(getAdapter('cohere')).toBe(openAiCompatible);
-    expect(() => getAdapter('aws-bedrock')).toThrow(/Phase 3/);
+    for (const id of AdapterId.options) expect(getAdapter(id).listModels).toBeTypeOf('function');
+    expect(() => getAdapter('nope' as AdapterId)).toThrow(/not implemented/);
   });
 });
 

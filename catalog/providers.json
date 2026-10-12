@@ -486,15 +486,14 @@
       "baseUrlParams": [
         {
           "name": "region",
-          "label": "AWS Region (e.g. us-east-1)"
+          "label": "AWS Region (e.g. us-east-1)",
+          "default": "us-east-1"
         }
       ],
       "auth": {
         "type": "aws-sigv4"
       },
       "envVars": [
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
         "AWS_BEARER_TOKEN_BEDROCK"
       ],
       "envParams": [
@@ -504,36 +503,36 @@
       "keyUrl": "https://console.aws.amazon.com/bedrock/home#/api-keys/long-term/create",
       "region": "global",
       "category": "enterprise",
-      "modelsEndpoint": null,
+      "modelsEndpoint": "/foundation-models",
       "supports": {
-        "listModels": false,
+        "listModels": true,
         "streaming": true,
         "tools": true,
         "vision": true,
-        "jsonMode": true,
+        "jsonMode": false,
         "embeddings": false,
         "fim": false
       },
       "fallbackModels": [
         {
-          "id": "anthropic.claude-sonnet-5-5",
+          "id": "global.anthropic.claude-sonnet-5-5",
           "label": "Claude Sonnet 5.5",
           "context": 1000000
         },
         {
-          "id": "anthropic.claude-opus-5-5",
+          "id": "global.anthropic.claude-opus-5-5",
           "label": "Claude Opus 5.5",
           "context": 1000000
         },
         {
-          "id": "amazon.nova-2-lite-v1:0",
+          "id": "global.amazon.nova-2-lite-v1:0",
           "label": "Amazon Nova 2 Lite",
           "context": 1000000
         }
       ],
       "status": "active",
-      "verifiedAt": "2026-10-06",
-      "notes": "Use Converse/InvokeModel on bedrock-runtime (SigV4), or a long-term Bedrock API key sent as Authorization: Bearer (AWS_BEARER_TOKEN_BEDROCK). Model listing is on the separate control-plane host bedrock.{region}.amazonaws.com (GET /foundation-models). Geo/global inference profiles use prefixes us./eu./global. (e.g. us.amazon.nova-2-lite-v1:0). Optional OpenAI-compatible endpoint bedrock-mantle: https://bedrock-mantle.{region}.api.aws/v1 (not supported for all models; Nova 2 Lite no)."
+      "verifiedAt": "2026-10-11",
+      "notes": "Bedrock Converse API (/model/{id}/converse-stream, binary AWS event-stream). Key: a Bedrock API key (AWS_BEARER_TOKEN_BEDROCK, sent as Bearer) or IAM keys pasted as ACCESS_KEY_ID:SECRET_ACCESS_KEY[:SESSION_TOKEN] (or JSON), signed with SigV4. Current models (Claude 4.5+/5.x, Nova 2) need inference-profile ids (global./us./eu. prefixes); a bare id is retried once with global.. Model listing uses the control plane bedrock.{region}.amazonaws.com (/foundation-models + /inference-profiles)."
     },
     {
       "id": "mistral",
@@ -1731,47 +1730,6 @@
       "notes": "/models confirmed via live public response. Supports MODEL:VERSION and deploy_id:ID model references."
     },
     {
-      "id": "perplexity",
-      "name": "Perplexity (Sonar)",
-      "adapter": "openai-compatible",
-      "baseUrl": "https://api.perplexity.ai",
-      "baseUrlParams": [],
-      "auth": {
-        "type": "bearer",
-        "header": "Authorization"
-      },
-      "envVars": [
-        "PERPLEXITY_API_KEY"
-      ],
-      "docsUrl": "https://docs.perplexity.ai/docs/sonar/models",
-      "keyUrl": "https://www.perplexity.ai/settings/api",
-      "region": "us",
-      "category": "lab",
-      "modelsEndpoint": null,
-      "supports": {
-        "listModels": false,
-        "streaming": true,
-        "tools": false,
-        "vision": false,
-        "jsonMode": false,
-        "embeddings": false,
-        "fim": false
-      },
-      "fallbackModels": [
-        {
-          "id": "sonar",
-          "label": "Sonar"
-        },
-        {
-          "id": "sonar-pro",
-          "label": "Sonar Pro"
-        }
-      ],
-      "status": "deprecated",
-      "verifiedAt": "2026-10-06",
-      "notes": "Sonar Chat Completions is deprecated; per migration docs support ended 2026-09-27. Replacement is the Agent API (input/output typed array, presets fast/low/high/xhigh), which is NOT OpenAI chat-completions shaped and needs a custom adapter. Sonar ids sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research. Context lengths not confirmed."
-    },
-    {
       "id": "huggingface-inference-providers",
       "name": "Hugging Face Inference Providers",
       "adapter": "huggingface",
@@ -1934,7 +1892,7 @@
     {
       "id": "replicate",
       "name": "Replicate",
-      "adapter": "openai-compatible",
+      "adapter": "replicate",
       "baseUrl": "https://api.replicate.com/v1",
       "baseUrlParams": [],
       "auth": {
@@ -1948,20 +1906,49 @@
       "keyUrl": "https://replicate.com/account/api-tokens",
       "region": "global",
       "category": "aggregator",
-      "modelsEndpoint": null,
+      "modelsEndpoint": "/collections/language-models",
       "supports": {
-        "listModels": false,
+        "listModels": true,
         "streaming": true,
         "tools": false,
-        "vision": false,
+        "vision": true,
         "jsonMode": false,
         "embeddings": false,
         "fim": false
       },
-      "fallbackModels": [],
-      "status": "unverified",
-      "verifiedAt": null,
-      "notes": "requires custom adapter: docs show only native POST /v1/predictions (owner/name model ids, Bearer auth); no OpenAI-compatible /chat/completions endpoint could be confirmed. Base URL is native API root."
+      "fallbackModels": [
+        {
+          "id": "anthropic/claude-4.5-sonnet",
+          "label": "Claude 4.5 Sonnet"
+        },
+        {
+          "id": "openai/gpt-5",
+          "label": "GPT-5"
+        },
+        {
+          "id": "google/gemini-3-pro",
+          "label": "Gemini 3 Pro"
+        },
+        {
+          "id": "deepseek-ai/deepseek-v3.1",
+          "label": "DeepSeek V3.1"
+        },
+        {
+          "id": "qwen/qwen3-235b-a22b-instruct-2507",
+          "label": "Qwen3 235B"
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss-120b"
+        },
+        {
+          "id": "meta/meta-llama-3-70b-instruct",
+          "label": "Llama 3 70B Instruct"
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-11",
+      "notes": "Native predictions API (no OpenAI-compatible endpoint): ids owner/name (official models) or owner/name:version; input mapped per model OpenAPI schema; billed per token/time per model."
     },
     {
       "id": "novita",
@@ -2205,38 +2192,6 @@
       "notes": "Base URL confirmed (docs show trailing slash; omitted). Formerly Nebius AI Studio. Model ids from docs examples may be dated; use /models?verbose=true. Docs show DeepSeek-R1-0528 in examples. Capability flags not individually verified."
     },
     {
-      "id": "lambda-inference",
-      "name": "Lambda Inference",
-      "adapter": "openai-compatible",
-      "baseUrl": "https://api.lambda.ai/v1",
-      "baseUrlParams": [],
-      "auth": {
-        "type": "bearer",
-        "header": "Authorization"
-      },
-      "envVars": [
-        "LAMBDA_API_KEY"
-      ],
-      "docsUrl": "https://docs.lambda.ai/public-cloud/lambda-inference-api",
-      "keyUrl": "https://cloud.lambda.ai/api-keys",
-      "region": "us",
-      "category": "aggregator",
-      "modelsEndpoint": "/models",
-      "supports": {
-        "listModels": true,
-        "streaming": true,
-        "tools": true,
-        "vision": false,
-        "jsonMode": true,
-        "embeddings": false,
-        "fim": false
-      },
-      "fallbackModels": [],
-      "status": "deprecated",
-      "verifiedAt": "2026-10-06",
-      "notes": "Lambda states the Inference API is winding down in favor of self-hosting on Lambda GPU instances (lambda.ai/inference); search reports announcement dated 2026-05-29. Not recommended for new setups."
-    },
-    {
       "id": "nvidia-nim",
       "name": "NVIDIA NIM (build.nvidia.com)",
       "adapter": "openai-compatible",
@@ -2396,46 +2351,25 @@
       "notes": "Base URL, chat/embeddings/responses endpoints confirmed. API key is a Cloudflare API token with Workers AI permission. /v1/models not confirmed in OpenAI-compat docs (modelsEndpoint null); Responses API only for gpt-oss, non-streaming. Catalog has ~69 models."
     },
     {
-      "id": "github-models",
-      "name": "GitHub Models",
-      "adapter": "openai-compatible",
-      "baseUrl": "https://models.github.ai/inference",
-      "baseUrlParams": [],
-      "auth": {
-        "type": "bearer",
-        "header": "Authorization"
-      },
-      "envVars": [
-        "GITHUB_TOKEN"
-      ],
-      "docsUrl": "https://docs.github.com/en/rest/models/inference",
-      "keyUrl": null,
-      "region": "global",
-      "category": "aggregator",
-      "modelsEndpoint": null,
-      "supports": {
-        "listModels": false,
-        "streaming": true,
-        "tools": true,
-        "vision": true,
-        "jsonMode": true,
-        "embeddings": true,
-        "fim": false
-      },
-      "fallbackModels": [],
-      "status": "deprecated",
-      "verifiedAt": "2026-10-06",
-      "notes": "GitHub docs state GitHub Models (playground, catalog, inference API, BYOK) fully retired as of 2026-07-30. Suggested alternatives: Azure AI Foundry, GitHub Copilot. Base URL is the historical one."
-    },
-    {
       "id": "ibm-watsonx-ai",
       "name": "IBM watsonx.ai",
-      "adapter": "openai-compatible",
-      "baseUrl": "https://{region}.ml.cloud.ibm.com/ml/v1",
+      "adapter": "ibm-watsonx",
+      "baseUrl": "https://{region}.ml.cloud.ibm.com",
       "baseUrlParams": [
         {
           "name": "region",
-          "label": "Region (us-south, eu-de, eu-gb, jp-tok, au-syd, ca-tor)"
+          "label": "Region (us-south, eu-de, eu-gb, jp-tok, au-syd, ca-tor; AWS: ap-south-1, us-east-1)",
+          "default": "us-south"
+        },
+        {
+          "name": "project_id",
+          "label": "watsonx.ai project ID (or set space_id)",
+          "optional": true
+        },
+        {
+          "name": "space_id",
+          "label": "Deployment space ID (instead of project_id)",
+          "optional": true
         }
       ],
       "auth": {
@@ -2452,14 +2386,14 @@
       "keyUrl": "https://cloud.ibm.com/iam/apikeys",
       "region": "global",
       "category": "enterprise",
-      "modelsEndpoint": "/foundation_model_specs",
+      "modelsEndpoint": "/ml/v1/foundation_model_specs",
       "supports": {
         "listModels": true,
         "streaming": true,
         "tools": true,
         "vision": true,
-        "jsonMode": false,
-        "embeddings": true,
+        "jsonMode": true,
+        "embeddings": false,
         "fim": false
       },
       "fallbackModels": [
@@ -2469,14 +2403,29 @@
           "context": 131072
         },
         {
-          "id": "ibm/granite-8b-code-instruct",
-          "label": "Granite 8B Code Instruct",
-          "context": 128000
+          "id": "meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+          "label": "Llama 4 Maverick",
+          "context": 131072
+        },
+        {
+          "id": "meta-llama/llama-3-3-70b-instruct",
+          "label": "Llama 3.3 70B",
+          "context": 131072
+        },
+        {
+          "id": "mistralai/mistral-small-3-1-24b-instruct-2503",
+          "label": "Mistral Small 3.1 24B",
+          "context": 131072
+        },
+        {
+          "id": "openai/gpt-oss-120b",
+          "label": "gpt-oss-120b",
+          "context": 131072
         }
       ],
-      "status": "unverified",
-      "verifiedAt": null,
-      "notes": "requires custom adapter: native chat is POST /ml/v1/text/chat (and /text/chat_stream) with required ?version=YYYY-MM-DD query param and project_id/space_id in body; auth is an IBM Cloud IAM bearer token obtained by exchanging the API key (not the raw key). No OpenAI-compatible /chat/completions confirmed. Regional hosts: us-south, eu-de, eu-gb, jp-tok, au-syd, ca-tor (.ml.cloud.ibm.com), Mumbai ap-south-1.aws.wxai.ibm.com. Model ids from docs table; some models deprecated."
+      "status": "active",
+      "verifiedAt": "2026-10-11",
+      "notes": "Native watsonx chat API (/ml/v1/text/chat_stream, ?version=2026-09-25). The API key is exchanged for an IAM token (iam.cloud.ibm.com; AWS regions use account-iam.platform.saas.ibm.com). project_id or space_id required. A pasted IAM/CPD bearer token (JWT) is used directly."
     },
     {
       "id": "databricks",
@@ -2590,7 +2539,7 @@
     {
       "id": "writer",
       "name": "Writer (Palmyra)",
-      "adapter": "openai-compatible",
+      "adapter": "writer",
       "baseUrl": "https://api.writer.com/v1",
       "baseUrlParams": [],
       "auth": {
@@ -2618,17 +2567,25 @@
         {
           "id": "palmyra-x6",
           "label": "Palmyra X6",
-          "context": 1000000
+          "context": 1000000,
+          "inputPrice": 2.0,
+          "outputPrice": 8.0,
+          "tools": true,
+          "vision": true
         },
         {
           "id": "palmyra-x5",
           "label": "Palmyra X5",
-          "context": 1000000
+          "context": 1000000,
+          "inputPrice": 0.6,
+          "outputPrice": 6.0,
+          "tools": true,
+          "vision": true
         }
       ],
-      "status": "unverified",
-      "verifiedAt": null,
-      "notes": "requires custom adapter: documented chat endpoint is POST https://api.writer.com/v1/chat (not /chat/completions); docs do not claim OpenAI compatibility. Request shape is OpenAI-like (messages, tools, stream). /models endpoint and keyUrl not confirmed. Palmyra X5/X4 retire 2026-12-14."
+      "status": "active",
+      "verifiedAt": "2026-10-11",
+      "notes": "Native adapter: POST /v1/chat (OpenAI-like), models via GET /v1/models {models:[{id,name}]}; response_format is json_schema only (x4/x5); palmyra-x5/x4 retire 2026-12-14, use palmyra-x6."
     },
     {
       "id": "upstage",

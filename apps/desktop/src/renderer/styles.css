@@ -1523,6 +1523,21 @@ button.big {
   overflow-y: auto;
   flex: 1;
 }
+.provider-group + .provider-group {
+  margin-top: 10px;
+}
+.provider-group-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  background: var(--bg-2);
+}
 .provider-row {
   display: flex;
   align-items: center;
@@ -4614,4 +4629,47 @@ kbd.custom {
 .field select option {
   background: var(--bg-2);
   color: var(--fg);
+}
+
+/* Model picker sections (ready / terminal agents / to connect) */
+.mp-section {
+  display: contents;
+}
+.mp-section-title {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+.mp-section:first-child .mp-section-title {
+  margin-top: 0;
+}
+
+/* Providers dialog filter chips */
+.prov-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.prov-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+}
+.prov-chip.on {
+  background: var(--sel);
+  border-color: transparent;
+}
+.provider-group-on {
+  float: right;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--ok, #3fb950);
 }

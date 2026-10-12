@@ -33,16 +33,13 @@ const MAP = {
   together: 'together',
   fireworks: 'fireworks',
   deepinfra: 'deepinfra',
-  perplexity: 'perplexity',
   'huggingface-inference-providers': 'huggingface',
   replicate: 'replicate',
   novita: 'novita',
   hyperbolic: 'hyperbolic',
   'nebius-token-factory': 'nebius',
-  'lambda-inference': 'lambda',
   'nvidia-nim': 'nvidia',
   'cloudflare-workers-ai': 'cloudflare',
-  'github-models': 'github',
   'ibm-watsonx-ai': 'ibm',
   databricks: 'dbrx',
   'snowflake-cortex': 'snowflake',
@@ -67,6 +64,15 @@ const MAP = {
   stepfun: 'stepfun',
   'byteplus-modelark': 'doubao',
   venice: 'venice',
+  // Terminal agents (cli-agent)
+  'claude-code': 'claudecode',
+  'codex-cli': 'codex',
+  'gemini-cli': 'geminicli',
+  'qwen-code': 'qwen',
+  'cursor-agent': 'cursor',
+  'copilot-cli': 'githubcopilot',
+  opencode: 'opencode',
+  'amp-cli': 'amp',
 };
 
 const targets = [

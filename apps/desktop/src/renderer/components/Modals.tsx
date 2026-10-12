@@ -107,6 +107,7 @@ function Providers({ focus }: { focus?: string }) {
   const [list, setList] = useState<ProviderView[]>([]);
   const [selected, setSelected] = useState<string | undefined>(focus);
   const [filter, setFilter] = useState('');
+  const [kind, setKind] = useState<'all' | 'connected' | 'cli' | 'api' | 'local'>('all');
   const [key, setKey] = useState('');
   const [params, setParams] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -131,7 +132,13 @@ function Providers({ focus }: { focus?: string }) {
   const shown = list
     .filter(
       (x) =>
-        !filter || `${x.name} ${x.id} ${x.category}`.toLowerCase().includes(filter.toLowerCase()),
+        (!filter ||
+          `${x.name} ${x.id} ${x.category}`.toLowerCase().includes(filter.toLowerCase())) &&
+        (kind === 'all' ||
+          (kind === 'connected' && x.connected) ||
+          (kind === 'cli' && x.adapter === 'cli-agent') ||
+          (kind === 'api' && x.adapter !== 'cli-agent') ||
+          (kind === 'local' && x.local)),
     )
     .sort(
       (a, b) =>
@@ -177,19 +184,68 @@ function Providers({ focus }: { focus?: string }) {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
-          <div className="providers-scroll">
-            {shown.map((x) => (
-              <div
-                key={x.id}
-                className={`provider-row ${x.id === selected ? 'active' : ''}`}
-                onClick={() => setSelected(x.id)}
+          <div className="prov-chips">
+            {(
+              [
+                ['all', t('provFilterAll')],
+                [
+                  'connected',
+                  `● ${t('provFilterConnected')} (${list.filter((x) => x.connected).length})`,
+                ],
+                ['cli', 'CLI'],
+                ['api', 'API'],
+                ['local', t('provFilterLocal')],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                className={`prov-chip ${kind === k ? 'on' : ''}`}
+                onClick={() => setKind(k)}
               >
-                <ProviderLogo id={x.id} name={x.name} size={22} />
-                <span className="provider-name">{x.name}</span>
-                <span className={`dot ${x.connected ? 'on' : ''}`} />
-                {x.status !== 'active' && <span className={`badge ${x.status}`}>{x.status}</span>}
-              </div>
+                {label}
+              </button>
             ))}
+          </div>
+          <div className="providers-scroll">
+            {[
+              {
+                key: 'cli',
+                title: t('providersCli'),
+                items: shown.filter((x) => x.adapter === 'cli-agent'),
+              },
+              {
+                key: 'api',
+                title: t('providersApi'),
+                items: shown.filter((x) => x.adapter !== 'cli-agent'),
+              },
+            ]
+              .filter((g) => g.items.length)
+              .map((g) => (
+                <div key={g.key} className="provider-group">
+                  <div className="provider-group-title">
+                    {g.title} <span className="dim">{g.items.length}</span>
+                    {g.items.some((x) => x.connected) && (
+                      <span className="provider-group-on">
+                        {t('provConnectedCount', { n: g.items.filter((x) => x.connected).length })}
+                      </span>
+                    )}
+                  </div>
+                  {g.items.map((x) => (
+                    <div
+                      key={x.id}
+                      className={`provider-row ${x.id === selected ? 'active' : ''}`}
+                      onClick={() => setSelected(x.id)}
+                    >
+                      <ProviderLogo id={x.id} name={x.name} size={22} />
+                      <span className="provider-name">{x.name}</span>
+                      <span className={`dot ${x.connected ? 'on' : ''}`} />
+                      {x.status !== 'active' && (
+                        <span className={`badge ${x.status}`}>{x.status}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
           </div>
         </div>
         <div className="providers-detail">

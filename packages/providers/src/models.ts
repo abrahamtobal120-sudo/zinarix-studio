@@ -8,6 +8,8 @@ export function classifyModel(id: string): ModelKind {
   if (/moderation|guard|shield|safety/.test(s)) return 'moderation';
   if (/whisper|tts|transcri|speech|audio|voice|realtime/.test(s)) return 'audio';
   if (/dall-e|image|imagen|flux|stable-diffusion|sdxl|veo|sora|video/.test(s)) return 'image';
+  // Legacy completions-only models (no chat endpoint): babbage-002, davinci-002, gpt-3.5-turbo-instruct.
+  if (/^(babbage|davinci|curie|ada)(-|$)|^gpt-3\.5-turbo-instruct/.test(s)) return 'other';
   return 'chat';
 }
 

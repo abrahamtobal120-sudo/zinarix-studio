@@ -143,11 +143,11 @@ describe('OmniCore', () => {
     expect(c.price({ provider: 'b', model: 'y' })).toEqual({ input: 1, output: 1 });
   });
 
-  it('rejects adapters scheduled for later phases with a clear message', async () => {
+  it('asks for a key before using Bedrock, and rejects unknown providers', async () => {
     const c = open({
       providers: { 'amazon-bedrock': { params: { region: 'us-east-1' }, headers: {} } },
     });
-    await expect(c.providerConfig('amazon-bedrock')).rejects.toMatchObject({ code: 'unsupported' });
+    await expect(c.providerConfig('amazon-bedrock')).rejects.toMatchObject({ code: 'auth' });
     expect(() => c.provider('nope')).toThrow(/unknown provider/);
   });
 

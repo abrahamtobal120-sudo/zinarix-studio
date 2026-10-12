@@ -110,7 +110,9 @@ const PROVIDERS = [
   ['sambanova', 'SambaNova'],
   ['cloudflare-workers-ai', 'Cloudflare'],
   ['upstage', 'Upstage'],
-  ['perplexity', 'Perplexity'],
+  ['claude-code', 'Claude Code'],
+  ['codex-cli', 'Codex'],
+  ['gemini-cli', 'Gemini CLI'],
   ['hyperbolic', 'Hyperbolic'],
   ['novita', 'Novita'],
 ];

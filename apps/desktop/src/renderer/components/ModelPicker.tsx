@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { api, refreshModels, refreshSettings, setState, toast, useStore } from '../store';
 import { ProviderLogo } from './ProviderLogo';
 import { fuzzy } from './QuickPick';
+import { isLegacyModel, siblingIds } from '../legacyModels';
 
 interface Row {
   ref: string;
@@ -19,6 +20,8 @@ interface Row {
   reasoning: boolean | null;
   connected: boolean;
   local: boolean;
+  /** Dated snapshot of another listed model, or a previous generation. */
+  legacy: boolean;
 }
 
 type Filter = 'fav' | 'tools' | 'vision' | 'reasoning' | 'local' | 'cheap' | 'long' | 'connected';
@@ -90,6 +93,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
   const [recent] = useState<string[]>(() => load(RECENT_KEY));
   const [loading, setLoading] = useState(false);
   const [index, setIndex] = useState(0);
+  const [showOld, setShowOld] = useState(false);
   const list = useRef<HTMLDivElement>(null);
 
   const close = () => setState({ modal: null });
@@ -124,6 +128,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
         reasoning: m.capabilities.reasoning,
         connected: true,
         local: p?.local ?? false,
+        legacy: false,
       });
     }
     for (const p of providers) {
@@ -145,16 +150,26 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
           reasoning: m.reasoning ?? null,
           connected: p.connected,
           local: p.local,
+          legacy: false,
         });
       }
     }
+    const ids = new Map<string, string[]>();
+    for (const r of out.values()) ids.set(r.provider, [...(ids.get(r.provider) ?? []), r.id]);
+    const siblings = new Map([...ids].map(([k, v]) => [k, siblingIds(v)]));
+    for (const r of out.values()) r.legacy = isLegacyModel(r.id, siblings.get(r.provider)!);
     return [...out.values()];
   }, [models, providers]);
+
+  /** Older models stay reachable: the one in use and favorites are never hidden. */
+  const hidden = (x: Row) => x.legacy && !showOld && x.ref !== effective && !favs.has(x.ref);
+  const hiddenCount = rows.filter(hidden).length;
 
   const shown = useMemo(() => {
     const q = query.trim();
     let r = rows.filter(
       (x) =>
+        !(x.legacy && !showOld && x.ref !== effective && !favs.has(x.ref)) &&
         (!filters.has('fav') || favs.has(x.ref)) &&
         (!filters.has('tools') || x.tools === true) &&
         (!filters.has('vision') || x.vision === true) &&
@@ -192,7 +207,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
       });
     }
     return r;
-  }, [rows, query, filters, favs, sort, recent]);
+  }, [rows, query, filters, favs, sort, recent, showOld, effective]);
 
   /** Providers view: shown until the user opens a provider or types a search. */
   const gridMode = provider === null && !query.trim() && !filters.has('fav');
@@ -210,6 +225,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
           connected: p?.connected ?? false,
           local: p?.local ?? false,
           category: p?.category ?? '',
+          cli: p?.adapter === 'cli-agent',
           count: list.length,
           minPrice: prices.length ? Math.min(...prices) : null,
           maxContext: Math.max(0, ...list.map((x) => x.context ?? 0)) || null,
@@ -219,11 +235,24 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
       .sort(
         (a, b) =>
           Number(b.inUse) - Number(a.inUse) ||
+          Number(a.cli) - Number(b.cli) ||
           Number(b.connected) - Number(a.connected) ||
           b.count - a.count ||
           a.name.localeCompare(b.name),
       );
   }, [shown, providers, effective]);
+
+  /** Grid sections: what is ready to use first, then terminal agents, then the rest. */
+  const sections = [
+    {
+      key: 'ready',
+      title: t('mpReady'),
+      cards: providerCards.filter((p) => p.connected && !p.cli),
+    },
+    { key: 'cli', title: t('providersCli'), cards: providerCards.filter((p) => p.cli) },
+    { key: 'more', title: t('mpMore'), cards: providerCards.filter((p) => !p.connected && !p.cli) },
+  ].filter((g) => g.cards.length);
+  const ordered = sections.flatMap((g) => g.cards);
 
   const visible = provider ? shown.filter((x) => x.provider === provider) : shown;
   const openProvider = providers.find((p) => p.id === provider);
@@ -315,10 +344,10 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
             autoFocus
             className="mp-search"
             value={query}
-            placeholder={t('searchModels', { n: rows.length })}
+            placeholder={t('searchModels', { n: rows.length - hiddenCount })}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              const max = (gridMode ? providerCards.length : visible.length) - 1;
+              const max = (gridMode ? ordered.length : visible.length) - 1;
               if (e.key === 'Escape') {
                 if (provider) setProvider(null);
                 else close();
@@ -329,7 +358,7 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
                 e.preventDefault();
                 setIndex((i) => Math.max(i - 1, 0));
               } else if (e.key === 'Enter') {
-                if (gridMode && providerCards[index]) setProvider(providerCards[index]!.id);
+                if (gridMode && ordered[index]) setProvider(ordered[index]!.id);
                 else if (!gridMode && visible[index]) void choose(visible[index]!);
               }
             }}
@@ -358,6 +387,15 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
           {chip('long', `📚 ≥200k`)}
           {chip('cheap', `💲 ${t('fCheap')}`)}
           {chip('local', `🏠 ${t('fLocal')}`)}
+          {(hiddenCount > 0 || showOld) && (
+            <button
+              className={`mp-chip ${showOld ? 'on' : ''}`}
+              onClick={() => setShowOld((v) => !v)}
+              title={t('mpOldHint')}
+            >
+              🕘 {showOld ? t('mpHideOld') : t('mpShowOld', { n: hiddenCount })}
+            </button>
+          )}
           {role !== 'chat' && settings.roles[role] && (
             <button
               className="mp-chip reset"
@@ -374,37 +412,47 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
         <div className="mp-body">
           {gridMode ? (
             <div className="mp-grid" ref={list}>
-              {providerCards.map((p, i) => (
-                <button
-                  key={p.id}
-                  className={`mp-card ${i === index ? 'active' : ''} ${p.connected ? 'connected' : ''} ${p.inUse ? 'in-use' : ''}`}
-                  onMouseEnter={() => setIndex(i)}
-                  onClick={() => setProvider(p.id)}
-                >
-                  <ProviderLogo id={p.id} name={p.name} size={44} />
-                  <span className="mp-card-body">
-                    <span className="mp-card-name">{p.name}</span>
-                    <span className="mp-card-meta">
-                      {t('nModels', { n: p.count })}
-                      {p.maxContext ? ` · ${t('upTo')} ${fmtCtx(p.maxContext)}` : ''}
-                      {p.local
-                        ? ` · ${t('free')}`
-                        : p.minPrice !== null
-                          ? ` · ${t('from')} ${fmtPrice(p.minPrice)}`
-                          : ''}
-                    </span>
-                    <span className="mp-card-status">
-                      {p.inUse && <span className="mp-badge cur">{t('inUse')}</span>}
-                      {p.local && <span className="mp-badge local">{t('fLocal')}</span>}
-                      {p.connected ? (
-                        <span className="mp-ok">● {t('connected')}</span>
-                      ) : (
-                        <span className="dim">○ {t('notConnected')}</span>
-                      )}
-                    </span>
-                  </span>
-                  <span className="mp-card-go">›</span>
-                </button>
+              {sections.map((g) => (
+                <div key={g.key} className="mp-section">
+                  <div className="mp-section-title">
+                    {g.title} <span className="dim">{g.cards.length}</span>
+                  </div>
+                  {g.cards.map((p) => {
+                    const i = ordered.indexOf(p);
+                    return (
+                      <button
+                        key={p.id}
+                        className={`mp-card ${i === index ? 'active' : ''} ${p.connected ? 'connected' : ''} ${p.inUse ? 'in-use' : ''}`}
+                        onMouseEnter={() => setIndex(i)}
+                        onClick={() => setProvider(p.id)}
+                      >
+                        <ProviderLogo id={p.id} name={p.name} size={44} />
+                        <span className="mp-card-body">
+                          <span className="mp-card-name">{p.name}</span>
+                          <span className="mp-card-meta">
+                            {t('nModels', { n: p.count })}
+                            {p.maxContext ? ` · ${t('upTo')} ${fmtCtx(p.maxContext)}` : ''}
+                            {p.local
+                              ? ` · ${t('free')}`
+                              : p.minPrice !== null
+                                ? ` · ${t('from')} ${fmtPrice(p.minPrice)}`
+                                : ''}
+                          </span>
+                          <span className="mp-card-status">
+                            {p.inUse && <span className="mp-badge cur">{t('inUse')}</span>}
+                            {p.local && <span className="mp-badge local">{t('fLocal')}</span>}
+                            {p.connected ? (
+                              <span className="mp-ok">● {t('connected')}</span>
+                            ) : (
+                              <span className="dim">○ {t('notConnected')}</span>
+                            )}
+                          </span>
+                        </span>
+                        <span className="mp-card-go">›</span>
+                      </button>
+                    );
+                  })}
+                </div>
               ))}
               <button
                 className="mp-card add"

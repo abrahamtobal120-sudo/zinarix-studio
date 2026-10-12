@@ -28,6 +28,9 @@ export const AdapterId = z.enum([
   'cohere',
   'huggingface',
   'cli-agent',
+  'ibm-watsonx',
+  'writer',
+  'replicate',
 ]);
 export type AdapterId = z.infer<typeof AdapterId>;
 
