@@ -19,6 +19,7 @@ export {
   cliAgent,
   cliPrompt,
   cliMode,
+  cliDeniedHint,
   findExecutable,
   CliStreamParser,
 } from './adapters/cli-agent.js';

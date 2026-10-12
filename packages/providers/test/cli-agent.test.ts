@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { CatalogEntry, ChatChunk, ChatRequest, CliProfile } from '@omni/shared';
-import { CliStreamParser, cliMode, cliPrompt, getAdapter } from '@omni/providers';
+import { CliStreamParser, cliDeniedHint, cliMode, cliPrompt, getAdapter } from '@omni/providers';
 import type { ProviderConfig } from '@omni/providers';
 
 const dir = mkdtempSync(join(tmpdir(), 'omni-cli-'));
@@ -124,6 +124,23 @@ describe('cliMode', () => {
         cwd: '/p',
       }),
     ).toBe('edit');
+  });
+});
+
+describe('cliDeniedHint', () => {
+  const base = { model: 'm', messages: [{ role: 'user' as const, content: 'x' }] };
+  const tools = [{ name: 't', description: '', parameters: {} }];
+  const cfgWith = (mode?: string) =>
+    ({ params: mode ? { mode } : {} }) as unknown as ProviderConfig;
+  it('points at the Agent switch, the folder or the provider mode', () => {
+    expect(cliDeniedHint(cfgWith(), base as ChatRequest)).toContain('**Agente**');
+    expect(cliDeniedHint(cfgWith(), { ...base, tools } as ChatRequest)).toContain('carpeta');
+    expect(cliDeniedHint(cfgWith('read'), { ...base, tools, cwd: '/p' } as ChatRequest)).toContain(
+      '**edit**',
+    );
+    expect(cliDeniedHint(cfgWith(), { ...base, tools, cwd: '/p' } as ChatRequest)).toContain(
+      '**full**',
+    );
   });
 });
 

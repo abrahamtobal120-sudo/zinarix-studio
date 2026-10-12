@@ -199,6 +199,27 @@ export function cliMode(cfg: ProviderConfig, req: ChatRequest): CliMode {
   return m === 'read' || m === 'full' ? m : 'edit';
 }
 
+const CLI_HINT_FULL =
+  'El modo del proveedor no deja hacer esto y nadie puede aprobarlo desde Zinarix. ' +
+  'Para que lo haga sin preguntar, cambia el modo a **full** en Proveedores.';
+
+/** Why the CLI could not act, and what to change: chat mode, no folder, or the provider mode. */
+export function cliDeniedHint(cfg: ProviderConfig, req: ChatRequest): string {
+  if (!req.tools?.length)
+    return (
+      'Estás en modo chat, donde el agente solo responde y no puede editar. ' +
+      'Activa el interruptor **Agente** junto a la caja de texto y vuelve a pedírselo.'
+    );
+  if (!req.cwd)
+    return 'No hay una carpeta abierta: abre la carpeta del proyecto para que el agente pueda editarla.';
+  if (cliMode(cfg, req) === 'read')
+    return (
+      'El modo del proveedor es **read** (solo lectura). Cámbialo a **edit** para editar ' +
+      'archivos, o a **full** para que además ejecute comandos, en Proveedores.'
+    );
+  return CLI_HINT_FULL;
+}
+
 function isExecutable(file: string): boolean {
   try {
     if (!statSync(file).isFile()) return false;
@@ -319,7 +340,11 @@ export class CliStreamParser {
   /** Last non-fatal error event: shown if the process then fails without saying why. */
   lastWarning?: string;
 
-  constructor(private readonly output: 'json' | 'text' = 'json') {}
+  constructor(
+    private readonly output: 'json' | 'text' = 'json',
+    /** What the user can change so the blocked tools are allowed next time. */
+    private readonly deniedHint = CLI_HINT_FULL,
+  ) {}
 
   private text(s: unknown): ChatChunk[] {
     if (typeof s !== 'string' || !s) return [];
@@ -515,10 +540,7 @@ export class CliStreamParser {
       const list = [...new Set(this.denied)].map((d) => `- ${d}`).join('\n');
       out.push({
         type: 'text',
-        delta:
-          `${this.hasText ? '\n\n' : ''}⚠ No se permitió usar:\n${list}\n\n` +
-          'El modo del proveedor no deja ejecutar esto y nadie puede aprobarlo desde Zinarix. ' +
-          'Para que lo haga sin preguntar, cambia el modo a **full** en Proveedores.\n',
+        delta: `${this.hasText ? '\n\n' : ''}⚠ No se permitió usar:\n${list}\n\n${this.deniedHint}\n`,
       });
     }
     if (this.usage) out.push(this.usage);
@@ -593,7 +615,7 @@ async function* run(
   child.stdin.on('error', () => undefined);
   child.stdin.end(spec.prompt === 'stdin' ? prompt : '');
 
-  const parser = new CliStreamParser(spec.output);
+  const parser = new CliStreamParser(spec.output, cliDeniedHint(cfg, req));
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
   try {
     for await (const line of lines) {
