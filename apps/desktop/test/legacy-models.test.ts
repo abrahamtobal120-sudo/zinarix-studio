@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { isLegacyModel, siblingIds } from '../src/renderer/legacyModels';
 
 describe('isLegacyModel', () => {
-  const ids = ['gpt-5.5', 'gpt-4o', 'gpt-4o-2024-05-13', 'gpt-5.4-mini-2026-03-17', 'claude-haiku-4-5'];
+  const ids = [
+    'gpt-5.5',
+    'gpt-4o',
+    'gpt-4o-2024-05-13',
+    'gpt-5.4-mini-2026-03-17',
+    'claude-haiku-4-5',
+  ];
   const sib = siblingIds(ids);
 
   it('hides dated snapshots only when the undated alias is listed too', () => {
