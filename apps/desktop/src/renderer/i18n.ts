@@ -157,6 +157,7 @@ const es = {
   notImplemented: 'Este proveedor necesita un adaptador que llegará en una fase posterior.',
   cliHint:
     'Agente de terminal: Zinarix ejecuta el programa instalado en tu equipo con tu propia sesión o suscripción (no necesita API key; inicia sesión una vez en la terminal). En el chat solo responde; con 🤖 Agente trabaja en la carpeta abierta con sus propias herramientas.',
+  cliModeSaved: 'Modo guardado: {mode}. Se aplica en tu próximo mensaje con 🤖 Agente.',
   cliModeRead: 'read — solo responde, no cambia nada',
   cliModeEdit: 'edit — puede editar archivos del proyecto, no ejecuta comandos (recomendado)',
   cliModeFull: 'full — todo, incluidos comandos, sin preguntar',
@@ -700,6 +701,7 @@ const en: Record<Key, string> = {
   notImplemented: 'This provider needs an adapter planned for a later phase.',
   cliHint:
     'Terminal agent: Zinarix runs the program installed on your computer with your own login or subscription (no API key; sign in once in a terminal). In chat it only answers; with 🤖 Agent it works in the open folder with its own tools.',
+  cliModeSaved: 'Mode saved: {mode}. It applies to your next message with 🤖 Agent.',
   cliModeRead: 'read — answers only, changes nothing',
   cliModeEdit: 'edit — may edit project files, runs no commands (recommended)',
   cliModeFull: 'full — everything, including commands, without asking',

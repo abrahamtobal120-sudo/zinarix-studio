@@ -222,7 +222,22 @@ function Providers({ focus }: { focus?: string }) {
                   {p.adapter === 'cli-agent' && bp.name === 'mode' ? (
                     <select
                       value={params[bp.name] || 'edit'}
-                      onChange={(e) => setParams({ ...params, [bp.name]: e.target.value })}
+                      disabled={busy}
+                      onChange={(e) => {
+                        const next = { ...params, [bp.name]: e.target.value };
+                        setParams(next);
+                        // Already verified: the new mode applies right away, no "Save and test".
+                        if (p.connected)
+                          void api()
+                            .ai.saveProvider(p.id, null, next)
+                            .then((r) =>
+                              setStatus(
+                                r.ok
+                                  ? { ok: true, text: t('cliModeSaved', { mode: e.target.value }) }
+                                  : { ok: false, text: r.error ?? 'error' },
+                              ),
+                            );
+                      }}
                     >
                       <option value="read">{t('cliModeRead')}</option>
                       <option value="edit">{t('cliModeEdit')}</option>
@@ -299,7 +314,7 @@ function Providers({ focus }: { focus?: string }) {
                 )}
               </div>
               {status && <div className={status.ok ? 'ok-text' : 'err'}>{status.text}</div>}
-              <p className="dim small">{t('keyStoredNote')}</p>
+              {p.adapter !== 'cli-agent' && <p className="dim small">{t('keyStoredNote')}</p>}
             </>
           )}
         </div>

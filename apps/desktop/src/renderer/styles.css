@@ -4596,3 +4596,22 @@ kbd.custom {
     display: none;
   }
 }
+
+/* Selects match the text inputs (the native one is white in the dark theme). */
+.field select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  outline: none;
+}
+.field select:focus {
+  border-color: var(--focus);
+  box-shadow: var(--ring);
+}
+.field select option {
+  background: var(--bg-2);
+  color: var(--fg);
+}
