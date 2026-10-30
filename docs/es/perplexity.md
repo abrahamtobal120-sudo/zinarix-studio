@@ -72,4 +72,3 @@ sudo apt install ./apps/desktop/release/zinarix-studio_0.4.7_amd64.deb
 El paquete `.deb` instalado previamente es una copia independiente del código
 fuente: compilar el repositorio no actualiza esa instalación. Reinstala el nuevo
 paquete, cierra la aplicación anterior y vuelve a abrirla.
-
