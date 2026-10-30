@@ -27,7 +27,8 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.once('listening', r));
 
 const home = mkdtempSync(join(tmpdir(), 'zs-term-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 mkdirSync(proj);
 writeFileSync(join(proj, 'a.txt'), 'hola');
 writeFileSync(
@@ -68,8 +69,11 @@ const app = await electron.launch({
 });
 const win = await app.firstWindow();
 await win.waitForSelector('.tree-row');
-await win.locator('.agent-toggle input').uncheck();
-await win.locator('.chat-input label.check:not(.agent-toggle) input').uncheck();
+// The checkboxes are drawn as pills: click the label (the input itself is hidden).
+if (await win.locator('.agent-toggle input').isChecked())
+  await win.locator('.agent-toggle').click();
+const fileCheck = win.locator('.chat-input label.check:not(.agent-toggle)');
+if (await fileCheck.locator('input').isChecked()) await fileCheck.click();
 
 // Open the terminal and print a marker.
 await app.evaluate(({ BrowserWindow }) =>
@@ -97,7 +101,7 @@ const chipsAfterSend = await win.locator('.chat-attachment').count();
 const turnContext = await win.locator('.turn-context').allTextContents();
 
 // 2) Session picker in the chat.
-await win.locator('button.term-pick').click();
+await win.locator('button.term-pick[aria-label*="erminal"]').click();
 await win.waitForSelector('.term-menu');
 const menu = await win.locator('.term-menu button').allTextContents();
 await win.screenshot({ path: join(out, 'terminal-chat-menu.png') });

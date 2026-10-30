@@ -8,7 +8,8 @@ import { join } from 'node:path';
 
 const out = process.argv[2] ?? tmpdir();
 const home = mkdtempSync(join(tmpdir(), 'zs-sec-'));
-const proj = join(home, 'tienda');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'tienda');
 mkdirSync(join(proj, 'src'), { recursive: true });
 const fakeKey = ['AKIA', 'QWERTYUIOPASDFGH'].join('');
 writeFileSync(

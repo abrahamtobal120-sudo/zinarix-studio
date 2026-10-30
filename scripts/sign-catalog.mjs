@@ -28,7 +28,20 @@ if (cmd === 'keygen') {
   writeFileSync(pubPath, publicKey.export({ type: 'spki', format: 'pem' }));
   console.log(`private key: ${keyPath}\npublic key:  ${pubPath}`);
 } else if (cmd === 'sign') {
-  const sig = sign(null, readFileSync(file), createPrivateKey(readFileSync(keyPath)));
+  if (!existsSync(keyPath)) {
+    console.error(
+      `missing signing key: ${keyPath}\nSet OMNI_CATALOG_SIGNING_KEY to the original private key matching catalog/keys/catalog.pub.`,
+    );
+    process.exit(1);
+  }
+  const privateKey = createPrivateKey(readFileSync(keyPath));
+  const expected = createPublicKey(readFileSync(pubPath)).export({ type: 'spki', format: 'der' });
+  const actual = createPublicKey(privateKey).export({ type: 'spki', format: 'der' });
+  if (!actual.equals(expected)) {
+    console.error('signing key does not match catalog/keys/catalog.pub; signature was not changed');
+    process.exit(1);
+  }
+  const sig = sign(null, readFileSync(file), privateKey);
   writeFileSync(`${file}.sig`, sig.toString('base64') + '\n');
   console.log(`signed ${file}`);
 } else if (cmd === 'verify') {

@@ -89,7 +89,8 @@ base = `http://127.0.0.1:${server.address().port}`;
 const url = `${base}/v1`;
 
 const home = mkdtempSync(join(tmpdir(), 'zs-browser-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 mkdirSync(join(proj, 'src', 'lib'), { recursive: true });
 writeFileSync(join(proj, 'notas.txt'), 'Notas del proyecto');
 writeFileSync(join(proj, 'src', 'leeme.txt'), 'Otro archivo de texto');

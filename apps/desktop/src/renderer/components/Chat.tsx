@@ -13,13 +13,22 @@ import { monacoTheme } from '../themes';
 import {
   BROWSER_TAB,
   api,
+  chatTab,
+  closeChat,
+  focusedChat,
   getEditor,
   getState,
+  isChatVisible,
+  newChat,
   newRequestId,
   reloadFromDisk,
   refreshSettings,
+  saveAgentMode,
+  selectChat,
   setState,
   toast,
+  toggleChatSplit,
+  updateChat,
   useStore,
 } from '../store';
 import { runCommand } from '../commands';
@@ -42,6 +51,8 @@ interface ToolStep {
   id: string;
   name: string;
   args: Record<string, unknown>;
+  /** A helper AI (delegate_to_ai) made this call: its model. */
+  agent?: string;
   status: 'running' | 'approval' | 'ok' | 'error';
   summary?: string;
   output?: string;
@@ -106,29 +117,56 @@ interface Suggest {
   index: number;
 }
 
-/** Lets other parts of the UI (Ctrl+L, palette) push a prompt into the chat. */
+/** What other parts of the UI can ask of an open chat. */
+interface ChatHandle {
+  send: (prompt: string, context?: ChatContext[], forceAgent?: boolean) => void;
+  busy: () => boolean;
+  abort: () => void;
+  focus: () => void;
+  setAgent: (on: boolean) => void;
+  load: (conversationId: string) => void;
+  reset: () => void;
+}
+const handles = new Map<string, ChatHandle>();
+
+/**
+ * Sends a prompt from elsewhere (Ctrl+L, palette, security center…) to the chat the user is
+ * looking at; if that chat is busy, a new chat takes it so nothing is interrupted.
+ */
+function deliver(prompt: string, context: ChatContext[] | undefined, agent: boolean): void {
+  setState({ chatOpen: true });
+  const id = focusedChat();
+  const h = handles.get(id);
+  if (!h || h.busy()) {
+    newChat(
+      {
+        ...(agent ? { agent: true } : {}),
+        initial: { prompt, context, send: true },
+      },
+      true,
+    );
+    if (h?.busy()) toast(t('chatOpenedInNew'));
+    return;
+  }
+  if (agent) h.setAgent(true);
+  h.send(prompt, context, agent);
+}
+
 /** Sends a task to the chat in agent mode (used by the security center and similar). */
-export let askAgent: (prompt: string) => void = () => {};
-export let askInChat: (prompt: string, context?: ChatContext[]) => void = () => {};
+export function askAgent(prompt: string): void {
+  deliver(prompt, undefined, true);
+}
+
+/** Puts a prompt in the chat (or just focuses the message box when it is empty). */
+export function askInChat(prompt: string, context?: ChatContext[]): void {
+  if (prompt) return deliver(prompt, context, false);
+  setState({ chatOpen: true });
+  setTimeout(() => handles.get(focusedChat())?.focus(), 50);
+}
 
 const LAST_KEY = 'zs.lastConversation';
 /** Most recent messages sent as history (main rejects more than 500). */
 const MAX_HISTORY = 400;
-const AGENT_KEY = 'zs.agentMode';
-function savedAgentMode(): boolean {
-  try {
-    return localStorage.getItem(AGENT_KEY) !== 'off';
-  } catch {
-    return true;
-  }
-}
-function saveAgentMode(on: boolean): void {
-  try {
-    localStorage.setItem(AGENT_KEY, on ? 'on' : 'off');
-  } catch {
-    // storage unavailable: the mode just resets to agent on the next start
-  }
-}
 function remember(id: string | undefined): void {
   try {
     if (id) localStorage.setItem(LAST_KEY, id);
@@ -190,6 +228,8 @@ const TOOL_ICON: Record<string, IconName> = {
   port_scan: 'wifi',
   check_site_security: 'lock',
   file_hash: 'hash',
+  list_ai_models: 'cpu',
+  delegate_to_ai: 'users',
 };
 
 const STATUS_ICON: Record<ToolStep['status'], IconName> = {
@@ -232,6 +272,10 @@ function toolTitle(step: ToolStep): string {
       return String(a.query ?? '');
     case 'set_env_var':
       return `${String(a.name ?? '')} (${a.scope === 'user' ? t('envPermanent') : t('envSession')})`;
+    case 'list_ai_models':
+      return '';
+    case 'delegate_to_ai':
+      return `${String(a.model ?? '')} · ${String(a.task ?? '').slice(0, 120)}`;
     default:
       return String(a.path ?? '.');
   }
@@ -278,6 +322,12 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
         <span className="tool-icon">
           <Icon name={icon} size={14} />
         </span>
+        {step.agent && (
+          <span className="tool-helper" title={t('helperTitle', { model: step.agent })}>
+            <ProviderLogo id={step.agent.split('/')[0]!} size={12} />
+            {step.agent.split('/').slice(1).join('/')}
+          </span>
+        )}
         <span className="tool-name">{step.name}</span>
         <span className="tool-arg" title={toolTitle(step)}>
           {toolTitle(step)}
@@ -301,7 +351,16 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
               <span>{p.warning}</span>
             </div>
           )}
-          {p?.action && p.url === undefined && (
+          {p?.delegate && (
+            <div className="tool-delegate">
+              <ProviderLogo id={p.delegate.model.split('/')[0]!} size={18} />
+              <div>
+                <b>{p.delegate.model}</b>
+                <span>{p.delegate.mode === 'agent' ? t('delegateAgent') : t('delegateChat')}</span>
+              </div>
+            </div>
+          )}
+          {p?.action && p.url === undefined && !p.delegate && (
             <div className="tool-web">
               <b>{p.action}</b>
               {p.path && p.before === undefined ? (
@@ -313,7 +372,7 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
             </div>
           )}
           {p?.command !== undefined && (
-            <pre className="tool-cmd">
+            <pre className={`tool-cmd ${p.delegate ? 'tool-task' : ''}`}>
               {step.name === 'run_command' ? `$ ${p.command}` : p.command}
             </pre>
           )}
@@ -326,7 +385,14 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
           {p?.path !== undefined && p.before !== undefined && p.after !== undefined && (
             <DiffView before={p.before} after={p.after} path={p.path} />
           )}
-          {step.output && <pre className="tool-output">{step.output.slice(-20000)}</pre>}
+          {step.output &&
+            (step.name === 'delegate_to_ai' ? (
+              <div className="tool-output tool-helper-answer">
+                <Markdown text={step.output.slice(-20000)} streaming={step.status === 'running'} />
+              </div>
+            ) : (
+              <pre className="tool-output">{step.output.slice(-20000)}</pre>
+            ))}
         </div>
       )}
       {step.status === 'approval' && (
@@ -338,7 +404,11 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
             // "Always" for run_command only covers this exact command (approvalKey in main/agent.ts).
             <button
               title={
-                step.name === 'run_command' ? t('approveAlwaysCmdTitle') : t('approveAlwaysTitle')
+                step.name === 'run_command'
+                  ? t('approveAlwaysCmdTitle')
+                  : step.name === 'delegate_to_ai'
+                    ? t('approveAlwaysDelegateTitle')
+                    : t('approveAlwaysTitle')
               }
               onClick={() => onDecide('always')}
             >
@@ -354,25 +424,43 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
   );
 }
 
-export function ChatPanel() {
+/**
+ * One chat. Every open chat stays mounted (hidden when not shown), so a chat keeps
+ * streaming, running tools and waiting for approvals while the user works in another one.
+ */
+function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; split: boolean }) {
+  const visible = pane !== null;
   const settings = useStore((s) => s.settings);
   const active = useStore((s) => s.active);
   const models = useStore((s) => s.models);
   const workspace = useStore((s) => s.workspace);
+  const meta = useStore((s) => s.chats.find((c) => c.id === id));
+  const focusedPane = useStore((s) => s.chatFocus);
   const [turns, setTurns] = useState<Turn[]>([]);
   const turnsNow = useRef(turns);
   turnsNow.current = turns;
   const [input, setInput] = useState('');
   const [includeFile, setIncludeFile] = useState(true);
-  const [agentMode, setAgentModeState] = useState(savedAgentMode);
+  const agentMode = meta?.agent ?? true;
   const setAgentMode = (on: boolean) => {
-    setAgentModeState(on);
+    updateChat(id, { agent: on });
     saveAgentMode(on);
   };
+  /** Model of this chat; undefined = the app default for the mode. */
+  const chatModel = meta?.model ?? undefined;
   const [busy, setBusy] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [conversationId, setConversationIdState] = useState<string | undefined>();
+  const setConversationId = (c: string | undefined) => {
+    setConversationIdState(c);
+    updateChat(id, { conversationId: c });
+    remember(c);
+  };
   const [changed, setChanged] = useState<string[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const showHistory = useStore((s) => s.chatHistoryFor === id);
+  const setShowHistory = (v: boolean | ((cur: boolean) => boolean)) => {
+    const next = typeof v === 'function' ? v(getState().chatHistoryFor === id) : v;
+    setState({ chatHistoryFor: next ? id : null });
+  };
   const attachments = useStore((s) => s.chatAttachments);
   const [termMenu, setTermMenu] = useState<TerminalSession[] | null>(null);
   /** The request currently streaming into the last turn, and its event unsubscribe. */
@@ -416,10 +504,10 @@ export function ChatPanel() {
     setBusy(null);
   };
 
-  const loadConversation = async (id: string) => {
+  const loadConversation = async (cid: string) => {
     let data: Awaited<ReturnType<OmniApi['ai']['conversation']>>;
     try {
-      data = await api().ai.conversation(id);
+      data = await api().ai.conversation(cid);
     } catch (err) {
       toast(String(err instanceof Error ? err.message : err));
       return;
@@ -446,27 +534,48 @@ export function ChatPanel() {
       }),
     );
     setConversationId(data.conversation.id);
+    updateChat(id, { title: data.conversation.title.slice(0, 60) });
     setChanged([]);
     setShowHistory(false);
-    remember(data.conversation.id);
     stick.current = true;
   };
 
-  // Reopen the last conversation when the app starts (once, also under StrictMode).
-  const reopened = useRef(false);
-  const reopenLast = useEffectEvent(() => {
-    if (reopened.current) return;
-    reopened.current = true;
-    let last: string | null = null;
-    try {
-      last = localStorage.getItem(LAST_KEY);
-    } catch {
-      last = null;
+  /** Opens a saved conversation without interrupting anything that is running. */
+  const openConversation = (cid: string) => {
+    const there = getState().chats.find((c) => c.conversationId === cid);
+    if (there) {
+      selectChat(there.id);
+      setShowHistory(false);
+      return;
     }
-    if (last) void loadConversation(last);
+    if (busy) {
+      setShowHistory(false);
+      newChat({ conversationId: cid });
+      return;
+    }
+    void loadConversation(cid);
+  };
+
+  // When the chat opens: its saved conversation (reopened after a restart), or the task it
+  // was opened for (a handoff, a prompt from the palette). Once, also under StrictMode.
+  const opened = useRef(false);
+  const onOpen = useEffectEvent(() => {
+    if (opened.current) return;
+    opened.current = true;
+    const m = chatTab(id);
+    if (m?.conversationId) void loadConversation(m.conversationId);
+    const init = m?.initial;
+    if (init) {
+      updateChat(id, { initial: undefined });
+      if (init.send) void send(init.prompt, init.context ?? [], m.agent);
+      else {
+        setInput(init.prompt);
+        setTimeout(() => textarea.current?.focus(), 60);
+      }
+    }
   });
   useEffect(() => {
-    reopenLast();
+    onOpen();
   }, []);
   const scroller = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -539,6 +648,7 @@ export function ChatPanel() {
       ...fileCtx.filter((c) => !mentions.some((m) => m.source === c.source)),
     ];
     if (pending.length) setState({ chatAttachments: [] });
+    if (!chatTab(id)?.title) updateChat(id, { title: prompt.trim().split('\n')[0]!.slice(0, 60) });
     const turns = base ?? turnsNow.current;
     if (base) setTurns(base);
     const history = turns
@@ -592,7 +702,6 @@ export function ChatPanel() {
       switch (e.type) {
         case 'conversation':
           setConversationId(e.id);
-          remember(e.id);
           break;
         case 'start':
           if (e.conversationId) setConversationId(e.conversationId);
@@ -612,7 +721,14 @@ export function ChatPanel() {
             ...turn,
             parts: [
               ...(turn.parts ?? []),
-              { kind: 'tool', id: e.id, name: e.name, args: e.args, status: 'running' },
+              {
+                kind: 'tool',
+                id: e.id,
+                name: e.name,
+                args: e.args,
+                ...(e.agent ? { agent: e.agent } : {}),
+                status: 'running',
+              },
             ],
           }));
           break;
@@ -648,8 +764,8 @@ export function ChatPanel() {
     try {
       await api().ai.chat(requestId, {
         agent: useAgent,
-        // Main resolves the model for the role (agent / chat), falling back to the default.
-        model: undefined,
+        // This chat's own model, or (undefined) the one main resolves for the role.
+        model: chatModel,
         history,
         prompt,
         context,
@@ -666,26 +782,99 @@ export function ChatPanel() {
     }
   };
 
-  askAgent = (prompt) => {
-    setState({ chatOpen: true });
-    setAgentMode(true);
-    void send(prompt, [], true);
-  };
-
-  askInChat = (prompt, context) => {
-    setState({ chatOpen: true });
-    if (prompt) void send(prompt, context);
-    else setTimeout(() => textarea.current?.focus(), 50);
-  };
-
-  const newChat = () => {
+  /** Empties this chat (a new conversation in the same tab). */
+  const resetChat = () => {
     cancelCurrent();
     setTurns([]);
     setConversationId(undefined);
+    updateChat(id, { title: '' });
     setChanged([]);
     setShowHistory(false);
-    remember(undefined);
   };
+
+  // What the rest of the UI can do with this chat (the latest closures, every render).
+  const handle = useRef<ChatHandle | null>(null);
+  handle.current = {
+    send: (prompt, context, forceAgent) => void send(prompt, context ?? [], Boolean(forceAgent)),
+    busy: () => busy !== null,
+    abort: () => cancelCurrent(),
+    focus: () => textarea.current?.focus(),
+    setAgent: setAgentMode,
+    load: (cid) => void loadConversation(cid),
+    reset: resetChat,
+  };
+  useEffect(() => {
+    const proxy: ChatHandle = {
+      send: (...a) => handle.current!.send(...a),
+      busy: () => handle.current!.busy(),
+      abort: () => handle.current!.abort(),
+      focus: () => handle.current!.focus(),
+      setAgent: (on) => handle.current!.setAgent(on),
+      load: (cid) => handle.current!.load(cid),
+      reset: () => handle.current!.reset(),
+    };
+    handles.set(id, proxy);
+    return () => {
+      if (handles.get(id) === proxy) handles.delete(id);
+    };
+  }, [id]);
+
+  // The tab strip shows what each chat is doing.
+  const waiting = Boolean(
+    busy && turns.at(-1)?.parts?.some((p) => p.kind === 'tool' && p.status === 'approval'),
+  );
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    const finished = wasBusy.current && !busy;
+    wasBusy.current = Boolean(busy);
+    updateChat(id, {
+      busy: Boolean(busy),
+      waiting,
+      ...(finished && !isChatVisible(id) ? { unread: true } : {}),
+    });
+  }, [id, busy, waiting]);
+
+  /** Sends one answer of this chat to another AI, in a new chat (the user reviews and sends). */
+  const handoff = (turn: Turn) => {
+    const quoted = turn.content
+      .trim()
+      .split('\n')
+      .map((l) => `> ${l}`)
+      .join('\n');
+    setState({
+      modal: {
+        kind: 'models',
+        pick: {
+          title: t('chatHandoff'),
+          current: null,
+          onPick: (ref) => {
+            if (!ref) return;
+            // Handing a conversation to another AI is part of the agents: every plan.
+            newChat(
+              {
+                model: ref,
+                agent: agentMode,
+                initial: { prompt: `${t('chatHandoffPrompt')}\n\n${quoted}`, send: false },
+              },
+              true,
+            );
+          },
+        },
+      },
+    });
+  };
+
+  const pickModel = () =>
+    setState({
+      modal: {
+        kind: 'models',
+        pick: {
+          title: t('chatModelFor'),
+          current: meta?.model ?? null,
+          onPick: (ref) => updateChat(id, { model: ref }),
+        },
+      },
+    });
 
   /** Index of the last user turn (the exchange regenerate / edit replace). */
   const lastUserIndex = () => {
@@ -760,7 +949,8 @@ export function ChatPanel() {
     setSuggest(null);
     switch (cmd.action) {
       case 'new':
-        newChat();
+        if (busy) newChat();
+        else resetChat();
         return true;
       case 'agent':
         setAgentMode(true);
@@ -909,7 +1099,24 @@ export function ChatPanel() {
   };
 
   const decide = (toolCallId: string, d: ToolDecision) => {
-    if (busy) void api().ai.toolDecision(busy, toolCallId, d);
+    if (!busy) return;
+    void api().ai.toolDecision(busy, toolCallId, d);
+    // The card leaves the approval state right away (a long command or a helper AI may
+    // run for minutes); its result updates it again when it arrives.
+    setTurns((x) =>
+      x.map((turn, i) =>
+        i === x.length - 1
+          ? {
+              ...turn,
+              parts: (turn.parts ?? []).map((p) =>
+                p.kind === 'tool' && p.id === toolCallId && p.status === 'approval'
+                  ? { ...p, status: d === 'deny' ? 'error' : 'running' }
+                  : p,
+              ),
+            }
+          : turn,
+      ),
+    );
   };
 
   const revert = async () => {
@@ -929,38 +1136,33 @@ export function ChatPanel() {
 
   const noProviders = models.length === 0 && !settings.defaultModel;
 
+  const shownModel =
+    chatModel ?? (agentMode ? settings.roles.agent : undefined) ?? settings.defaultModel;
+
   return (
-    <div className="chat">
-      <div className="panel-header">
-        <span className="panel-title">{t('chat').toUpperCase()}</span>
-        <span className="sidebar-actions">
-          <button
-            title={t('histTitle')}
-            className={showHistory ? 'on' : ''}
-            onClick={() => setShowHistory((v) => !v)}
-          >
-            <Icon name="history" size={15} />
-          </button>
-          <button title={t('newChat')} onClick={newChat}>
-            <Icon name="plus" size={15} />
-          </button>
-          <button title={t('close')} onClick={() => setState({ chatOpen: false })}>
-            <Icon name="close" size={15} />
-          </button>
-        </span>
-      </div>
+    <div
+      className={`chat chat-session ${split && visible && focusedPane === pane ? 'focused' : ''}`}
+      style={{ display: visible ? 'flex' : 'none', order: pane ?? 0 }}
+      onMouseDown={() => {
+        if (pane !== null && getState().chatFocus !== pane) setState({ chatFocus: pane });
+      }}
+    >
+      {split && (
+        <div className="chat-pane-head" title={meta?.title}>
+          {shownModel && <ProviderLogo id={shownModel.split('/')[0]!} size={13} />}
+          <span className="chat-pane-model">{shownModel ?? t('noModel')}</span>
+          <span className="chat-pane-title">{meta?.title}</span>
+        </div>
+      )}
       {showHistory && (
         <ChatHistory
           current={conversationId}
-          onOpen={(id) => void loadConversation(id)}
+          onOpen={(cid) => openConversation(cid)}
           onClose={() => setShowHistory(false)}
-          onDeleted={(id) => {
-            if (id === conversationId) {
-              cancelCurrent();
-              setTurns([]);
-              setConversationId(undefined);
-              remember(undefined);
-            }
+          onDeleted={(cid) => {
+            // The deleted conversation may be open in any chat: empty those.
+            for (const c of getState().chats)
+              if (c.conversationId === cid) handles.get(c.id)?.reset();
           }}
         />
       )}
@@ -1112,6 +1314,11 @@ export function ChatPanel() {
                       {turn.content && (
                         <button title={t('chatQuote')} onClick={() => quoteTurn(turn)}>
                           <Icon name="quote" size={13} /> {t('chatQuote')}
+                        </button>
+                      )}
+                      {turn.content && (
+                        <button title={t('chatHandoffTitle')} onClick={() => handoff(turn)}>
+                          <Icon name="handoff" size={13} /> {t('chatHandoff')}
                         </button>
                       )}
                       {last && (
@@ -1308,17 +1515,12 @@ export function ChatPanel() {
             <Icon name="terminal" size={15} />
           </button>
           <button
-            className="model-chip"
-            onClick={() =>
-              setState({ modal: { kind: 'models', role: agentMode ? 'agent' : 'chat' } })
-            }
-            title={t('pickModel')}
+            className={`model-chip ${chatModel ? 'own' : ''}`}
+            onClick={pickModel}
+            title={chatModel ? t('chatModelOwn') : t('chatModelFor')}
           >
-            <span className="model-chip-label">
-              {(agentMode ? settings.roles.agent : undefined) ??
-                settings.defaultModel ??
-                t('noModel')}
-            </span>
+            {shownModel && <ProviderLogo id={shownModel.split('/')[0]!} size={13} />}
+            <span className="model-chip-label">{shownModel ?? t('noModel')}</span>
             <Icon name="chevronDown" size={12} />
           </button>
           {busy ? (
@@ -1341,6 +1543,133 @@ export function ChatPanel() {
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Asks before closing a chat that is still working, then stops and closes it. */
+export function requestCloseChat(id: string): void {
+  const h = handles.get(id);
+  if (h?.busy()) {
+    if (!confirm(t('chatCloseBusy'))) return;
+    h.abort();
+  }
+  if (getState().chatHistoryFor === id) setState({ chatHistoryFor: null });
+  closeChat(id);
+}
+
+/**
+ * The chat panel: a tab per chat (they all run at the same time), optionally two of them
+ * side by side, each with its own model, mode and conversation.
+ */
+export function ChatPanel() {
+  const chats = useStore((s) => s.chats);
+  const activeChat = useStore((s) => s.activeChat);
+  const split = useStore((s) => s.chatSplit);
+  const focus = useStore((s) => s.chatFocus);
+  const historyFor = useStore((s) => s.chatHistoryFor);
+  const focusedId = focus === 1 && split ? split : activeChat;
+  const strip = useRef<HTMLDivElement>(null);
+
+  // Keep the focused tab in view when there are many.
+  useEffect(() => {
+    strip.current
+      ?.querySelector('.chat-tab.focus')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [focusedId, chats.length]);
+
+  return (
+    <div className="chat chat-multi">
+      <div className="panel-header chat-tabs-bar">
+        <div className="chat-tabs" role="tablist" ref={strip}>
+          {chats.map((c, i) => {
+            const shown = c.id === activeChat || c.id === split;
+            const label = c.title || t('chatTabN', { n: i + 1 });
+            const status = c.waiting
+              ? t('chatWaiting')
+              : c.busy
+                ? t('chatRunning')
+                : c.unread
+                  ? t('chatDoneBg')
+                  : '';
+            return (
+              <div
+                key={c.id}
+                role="tab"
+                aria-selected={shown}
+                className={`chat-tab ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
+                title={status ? `${label} · ${status}` : label}
+                onClick={() => selectChat(c.id)}
+                onAuxClick={(e) => {
+                  if (e.button === 1) requestCloseChat(c.id);
+                }}
+              >
+                <span className="chat-tab-status">
+                  {c.waiting ? (
+                    <Icon name="pause" size={11} />
+                  ) : c.busy ? (
+                    <span className="chat-tab-spin" />
+                  ) : c.unread ? (
+                    <span className="chat-tab-dot" />
+                  ) : c.model ? (
+                    <ProviderLogo id={c.model.split('/')[0]!} size={12} />
+                  ) : (
+                    <Icon name="message" size={12} />
+                  )}
+                </span>
+                <span className="chat-tab-label">{label}</span>
+                {chats.length > 1 && (
+                  <button
+                    className="chat-tab-x"
+                    aria-label={t('chatCloseTab')}
+                    title={t('chatCloseTab')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      requestCloseChat(c.id);
+                    }}
+                  >
+                    <Icon name="x" size={11} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <span className="sidebar-actions">
+          <button title={`${t('chatNewTab')} (Ctrl+Alt+N)`} onClick={() => newChat()}>
+            <Icon name="plus" size={15} />
+          </button>
+          <button
+            title={split ? t('chatUnsplit') : `${t('chatSplit')} (Ctrl+Alt+D)`}
+            className={split ? 'on' : ''}
+            onClick={toggleChatSplit}
+          >
+            <Icon name="columns" size={15} />
+          </button>
+          <button
+            title={t('histTitle')}
+            className={historyFor === focusedId ? 'on' : ''}
+            onClick={() =>
+              setState({ chatHistoryFor: historyFor === focusedId ? null : focusedId })
+            }
+          >
+            <Icon name="history" size={15} />
+          </button>
+          <button title={t('close')} onClick={() => setState({ chatOpen: false })}>
+            <Icon name="close" size={15} />
+          </button>
+        </span>
+      </div>
+      <div className={`chat-panes ${split ? 'split' : ''}`}>
+        {chats.map((c) => (
+          <ChatSession
+            key={c.id}
+            id={c.id}
+            pane={c.id === activeChat ? 0 : c.id === split ? 1 : null}
+            split={Boolean(split)}
+          />
+        ))}
       </div>
     </div>
   );

@@ -11,3 +11,5 @@ coverage/
 release/
 apps/desktop/release/
 .vercel/
+*private*.pem
+license-private*

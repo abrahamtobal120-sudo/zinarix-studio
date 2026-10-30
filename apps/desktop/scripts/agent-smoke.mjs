@@ -72,7 +72,8 @@ await new Promise((r) => server.once('listening', r));
 const url = `http://127.0.0.1:${server.address().port}/v1`;
 
 const home = mkdtempSync(join(tmpdir(), 'zs-agent-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 mkdirSync(proj);
 writeFileSync(join(proj, 'hola.txt'), 'Hola Zinarix');
 writeFileSync(

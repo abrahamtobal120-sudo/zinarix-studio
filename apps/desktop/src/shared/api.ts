@@ -4,6 +4,8 @@
  * API keys flow renderer -> main exactly once (when the user types them) and never back.
  */
 import type { ChatMessage, ModelInfo } from '@omni/shared';
+import type { LicenseStatus } from './plans.js';
+export type { LicenseStatus } from './plans.js';
 
 export interface WorkspaceInfo {
   root: string;
@@ -120,6 +122,10 @@ export interface Settings {
   localOnly: boolean;
   theme: ThemeId;
   todayUsd: number;
+  /** App version (package.json). */
+  version: string;
+  /** Show the guided setup / what's new on start (off for automated tests). */
+  intro: boolean;
 }
 
 /** Editor and app preferences (Settings screen), kept in desktop.json. */
@@ -228,6 +234,8 @@ export interface ToolPreview {
   warning?: string;
   /** High-risk: approved one at a time ("always" is not offered). */
   noAlways?: boolean;
+  /** delegate_to_ai: the AI that would receive the task, and whether it may act. */
+  delegate?: { model: string; mode: 'agent' | 'chat' };
 }
 
 export interface FindingView {
@@ -270,6 +278,24 @@ export interface BrowserStateView {
   canGoForward: boolean;
 }
 
+/** One tab of the built-in browser: the user's own, or the one of an AI conversation. */
+export interface BrowserTabView {
+  id: string;
+  title: string;
+  url: string;
+  loading: boolean;
+  /** Conversation that owns the tab (null: the user's own tab). */
+  owner: string | null;
+  /** "Tú" or the model of the conversation that uses it. */
+  label: string;
+  ai: boolean;
+}
+
+export interface BrowserTabsView {
+  tabs: BrowserTabView[];
+  active: string | null;
+}
+
 export interface ChatRequestView {
   /** Agent mode: the model may read files, search, edit (with approval) and run commands (with approval). */
   agent?: boolean;
@@ -305,7 +331,14 @@ export type ChatEventView =
     }
   | { type: 'done'; stopReason: string }
   | { type: 'error'; message: string; code: string }
-  | { type: 'tool_call'; id: string; name: string; args: Record<string, unknown> }
+  | {
+      type: 'tool_call';
+      id: string;
+      name: string;
+      args: Record<string, unknown>;
+      /** Set when a helper AI (delegate_to_ai) makes the call: its model. */
+      agent?: string;
+    }
   | {
       type: 'tool_approval';
       id: string;
@@ -325,9 +358,19 @@ export type AppEvent =
   | { type: 'workspace'; workspace: WorkspaceInfo | null }
   | { type: 'command'; command: string }
   | { type: 'browser:state'; state: BrowserStateView }
-  /** The agent started using the browser: the UI should show the browser tab. */
-  | { type: 'browser:show' }
-  | { type: 'scan:progress'; requestId: string; done: number; total: number };
+  | { type: 'browser:tabs'; view: BrowserTabsView }
+  /** An agent started using the browser: the UI should show the browser (that tab). */
+  | { type: 'browser:show'; tab?: string }
+  | { type: 'scan:progress'; requestId: string; done: number; total: number }
+  /** Another window changed shared settings (models, keys, theme, preferences, license). */
+  | { type: 'settings:changed' }
+  /**
+   * A new version: downloading / ready to restart into (installers that update themselves),
+   * or just available, with where to download it (other installs).
+   */
+  | { type: 'update'; state: 'available' | 'ready'; version: string; url?: string }
+  /** A message from the app's owner (app-config.json), shown once. */
+  | { type: 'notice'; id: string; text: string; url?: string };
 
 export interface OmniApi {
   workspace: {
@@ -439,13 +482,22 @@ export interface OmniApi {
   browser: {
     /** Screen area (CSS px, window coordinates) where the page is drawn; null hides it. */
     setBounds(rect: { x: number; y: number; width: number; height: number } | null): Promise<void>;
-    navigate(url: string): Promise<BrowserStateView>;
-    back(): Promise<void>;
-    forward(): Promise<void>;
-    reload(): Promise<void>;
+    /**
+     * The user's own navigation, on the tab they were looking at (null: the visible one).
+     * An address typed while an AI's tab is shown opens in a tab of the user's own.
+     */
+    navigate(url: string, tabId: string | null): Promise<BrowserStateView>;
+    back(tabId: string | null): Promise<void>;
+    forward(tabId: string | null): Promise<void>;
+    reload(tabId: string | null): Promise<void>;
     /** Leaves the current page and shows the start page. */
-    home(): Promise<void>;
+    home(tabId: string | null): Promise<void>;
     state(): Promise<BrowserStateView>;
+    /** Open tabs (one per AI conversation that used the browser, plus the user's). */
+    tabs(): Promise<BrowserTabsView>;
+    selectTab(id: string): Promise<void>;
+    closeTab(id: string): Promise<void>;
+    newTab(): Promise<void>;
   };
   terminal: {
     create(cols: number, rows: number): Promise<number>;
@@ -457,11 +509,24 @@ export interface OmniApi {
     prefs(): Promise<Prefs>;
     setPrefs(patch: Partial<Prefs>): Promise<Prefs>;
     openExternal(url: string): Promise<void>;
-    /** Confirms a close requested by the window manager (after unsaved-changes check). */
+    /** Closes this window (after the unsaved-changes check); the app quits with the last one. */
     quit(): Promise<void>;
+    /**
+     * Opens another Zinarix Studio window (its own folder, chats, browser and terminals).
+     * false: the plan does not include more windows (Pro).
+     */
+    newWindow(): Promise<boolean>;
+    /** Restarts into the update already downloaded (see the 'update' event). */
+    installUpdate(): Promise<void>;
     /** Absolute path of a File from a drag-and-drop event (Electron webUtils). */
     pathForFile(file: File): string;
     platform: string;
+  };
+  license: {
+    status(): Promise<LicenseStatus>;
+    /** A license key (ZX1.…) or the owner's word. Throws with a readable reason. */
+    activate(key: string): Promise<LicenseStatus>;
+    remove(): Promise<LicenseStatus>;
   };
   on(listener: (ev: AppEvent) => void): () => void;
 }
@@ -538,12 +603,21 @@ export const CHANNELS = [
   'browser:reload',
   'browser:state',
   'browser:home',
+  'browser:tabs',
+  'browser:selectTab',
+  'browser:closeTab',
+  'browser:newTab',
   'terminal:create',
   'terminal:write',
   'terminal:resize',
   'terminal:kill',
   'app:openExternal',
   'app:quit',
+  'app:newWindow',
+  'app:installUpdate',
+  'license:status',
+  'license:activate',
+  'license:remove',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

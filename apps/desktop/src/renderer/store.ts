@@ -10,6 +10,8 @@ import type {
   WorkspaceInfo,
 } from '../shared/api';
 import { DEFAULT_PREFS } from '../shared/api';
+import type { LicenseStatus, ProFeature, RemoteNotice } from '../shared/plans';
+import { BUY_URL, FREE_FEATURES, PRO_FEATURES } from '../shared/plans';
 import { languageFor, monaco } from './monaco';
 import { t } from './i18n';
 import { applyThemeColors, isDark } from './themes';
@@ -32,7 +34,12 @@ export interface Tab {
 export type Modal =
   | { kind: 'palette' }
   | { kind: 'quickOpen' }
-  | { kind: 'models'; role?: AiRole }
+  | {
+      kind: 'models';
+      role?: AiRole;
+      /** Picking for one chat (or a handoff) instead of changing the app-wide model. */
+      pick?: { title: string; current: string | null; onPick: (ref: string | null) => void };
+    }
   | { kind: 'providers'; focus?: string }
   | { kind: 'aiEdit' }
   | { kind: 'shortcuts' }
@@ -43,7 +50,15 @@ export type Modal =
   | { kind: 'diff'; path: string; staged: boolean }
   | { kind: 'commit'; hash: string; subject: string }
   | { kind: 'clone' }
-  | { kind: 'publish' };
+  | { kind: 'publish' }
+  /** Plan and license (activate a key, see the trial). */
+  | { kind: 'license' }
+  /** A Pro feature was used on the free plan. */
+  | { kind: 'upgrade'; feature: ProFeature }
+  /** First launch: a short guided setup. */
+  | { kind: 'welcome' }
+  /** First launch of a new version: what changed. */
+  | { kind: 'whatsNew' };
 
 export interface State {
   workspace: WorkspaceInfo | null;
@@ -65,6 +80,40 @@ export interface State {
   prefs: Prefs;
   /** Number of changed files in the git repository (activity bar badge). */
   gitChanges: number;
+  /** Open chats (tabs of the chat panel); each one runs on its own, in parallel. */
+  chats: ChatTab[];
+  /** Chat shown in the (left) pane. */
+  activeChat: string;
+  /** Second chat shown side by side, or null. */
+  chatSplit: string | null;
+  /** Pane that receives a tab picked in the strip (0 left, 1 right). */
+  chatFocus: 0 | 1;
+  /** Chat whose history list is open. */
+  chatHistoryFor: string | null;
+  /** Plan of this installation (until main answers, everything is allowed). */
+  license: LicenseStatus;
+  /** A new version (downloaded in the background, or to download). */
+  update: { state: 'available' | 'ready'; version: string; url?: string } | null;
+  /** A message from the app's owner (shown once). */
+  notice: RemoteNotice | null;
+}
+
+/** One chat of the panel. Its turns live in its own component; this is what the tabs show. */
+export interface ChatTab {
+  id: string;
+  title: string;
+  /** Saved conversation it continues (reopened on the next start). */
+  conversationId?: string;
+  /** Model of this chat ("provider/model"); null = the app default for the mode. */
+  model: string | null;
+  agent: boolean;
+  busy: boolean;
+  /** An action of the AI waits for the user's approval. */
+  waiting: boolean;
+  /** Finished while the user was looking at another chat. */
+  unread: boolean;
+  /** Sent (or put in the box) once the chat opens: a handoff or a task from elsewhere. */
+  initial?: { prompt: string; context?: ChatContext[]; send: boolean };
 }
 
 let state: State = {
@@ -75,7 +124,15 @@ let state: State = {
   panelOpen: false,
   chatOpen: true,
   modal: null,
-  settings: { defaultModel: null, roles: {}, localOnly: false, theme: 'dark', todayUsd: 0 },
+  settings: {
+    defaultModel: null,
+    roles: {},
+    localOnly: false,
+    theme: 'dark',
+    todayUsd: 0,
+    version: '',
+    intro: false,
+  },
   models: [],
   modelErrors: [],
   cursor: { line: 1, column: 1 },
@@ -85,6 +142,21 @@ let state: State = {
   chatAttachments: [],
   prefs: DEFAULT_PREFS,
   gitChanges: 0,
+  // Filled from the last session at the end of this module (see restoreChats).
+  chats: [],
+  activeChat: '',
+  chatSplit: null,
+  chatFocus: 0,
+  chatHistoryFor: null,
+  license: {
+    plan: 'open',
+    features: PRO_FEATURES,
+    billing: false,
+    buyUrl: BUY_URL,
+    free: FREE_FEATURES,
+  },
+  update: null,
+  notice: null,
 };
 
 const listeners = new Set<() => void>();
@@ -377,4 +449,230 @@ export function attachToChat(ctx: ChatContext): void {
 }
 
 let seq = 0;
-export const newRequestId = (): string => `r${Date.now().toString(36)}${(seq++).toString(36)}`;
+export const newRequestId = (): string =>
+  `r${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+// ---------------- chats (tabs of the chat panel) ----------------
+
+const CHATS_KEY = 'zs.chats';
+const LAST_KEY = 'zs.lastConversation';
+const AGENT_KEY = 'zs.agentMode';
+
+function savedAgentMode(): boolean {
+  try {
+    return localStorage.getItem(AGENT_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function saveAgentMode(on: boolean): void {
+  try {
+    localStorage.setItem(AGENT_KEY, on ? 'on' : 'off');
+  } catch {
+    // storage unavailable: the mode just resets to agent on the next start
+  }
+}
+
+const newChatId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+function blankChat(patch: Partial<ChatTab> = {}): ChatTab {
+  return {
+    id: newChatId(),
+    title: '',
+    model: null,
+    agent: savedAgentMode(),
+    busy: false,
+    waiting: false,
+    unread: false,
+    ...patch,
+  };
+}
+
+/**
+ * The first window of a session keeps its open chats across restarts; windows opened later
+ * start with one empty chat (otherwise they would show the same conversations twice).
+ */
+const primaryWindow = new URLSearchParams(location.search).has('restore');
+
+/** Open chats from the last session (or the last conversation of older versions). */
+function restoreChats(): Pick<State, 'chats' | 'activeChat' | 'chatSplit' | 'chatFocus'> {
+  if (!primaryWindow) {
+    const first = blankChat();
+    return { chats: [first], activeChat: first.id, chatSplit: null, chatFocus: 0 };
+  }
+  try {
+    const raw = localStorage.getItem(CHATS_KEY);
+    if (raw) {
+      const v = JSON.parse(raw) as {
+        tabs?: Partial<ChatTab>[];
+        active?: string;
+        split?: string | null;
+      };
+      const chats = (v.tabs ?? [])
+        .filter((x) => typeof x.id === 'string')
+        .slice(0, 12)
+        .map((x) =>
+          blankChat({
+            id: x.id,
+            title: String(x.title ?? ''),
+            conversationId: typeof x.conversationId === 'string' ? x.conversationId : undefined,
+            model: typeof x.model === 'string' ? x.model : null,
+            agent: typeof x.agent === 'boolean' ? x.agent : savedAgentMode(),
+          }),
+        );
+      if (chats.length) {
+        const has = (id?: string | null) => Boolean(id && chats.some((c) => c.id === id));
+        const active = has(v.active) ? v.active! : chats[0]!.id;
+        const split = has(v.split) && v.split !== active ? v.split! : null;
+        return { chats, activeChat: active, chatSplit: split, chatFocus: 0 };
+      }
+    }
+  } catch {
+    // unreadable: start with one empty chat
+  }
+  let last: string | undefined;
+  try {
+    last = localStorage.getItem(LAST_KEY) ?? undefined;
+  } catch {
+    last = undefined;
+  }
+  const first = blankChat({ conversationId: last });
+  return { chats: [first], activeChat: first.id, chatSplit: null, chatFocus: 0 };
+}
+
+function persistChats(): void {
+  if (!primaryWindow) return;
+  try {
+    localStorage.setItem(
+      CHATS_KEY,
+      JSON.stringify({
+        tabs: state.chats.map((c) => ({
+          id: c.id,
+          title: c.title,
+          conversationId: c.conversationId,
+          model: c.model,
+          agent: c.agent,
+        })),
+        active: state.activeChat,
+        split: state.chatSplit,
+      }),
+    );
+  } catch {
+    // storage unavailable: chats are still saved in the history
+  }
+}
+
+export function chatTab(id: string): ChatTab | undefined {
+  return state.chats.find((c) => c.id === id);
+}
+
+export function updateChat(id: string, patch: Partial<ChatTab>): void {
+  const cur = chatTab(id);
+  if (!cur) return;
+  const changed = (Object.keys(patch) as (keyof ChatTab)[]).some((k) => cur[k] !== patch[k]);
+  if (!changed) return;
+  setState((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
+  if ('title' in patch || 'conversationId' in patch || 'model' in patch || 'agent' in patch)
+    persistChats();
+}
+
+/** The chat that receives prompts sent from elsewhere (menus, security center…). */
+export function focusedChat(): string {
+  return state.chatFocus === 1 && state.chatSplit ? state.chatSplit : state.activeChat;
+}
+
+export function isChatVisible(id: string): boolean {
+  return id === state.activeChat || id === state.chatSplit;
+}
+
+/** Shows a chat: in the pane that has the focus, or where it already is. */
+export function selectChat(id: string): void {
+  if (!chatTab(id)) return;
+  if (id === state.activeChat) setState({ chatFocus: 0 });
+  else if (id === state.chatSplit) setState({ chatFocus: 1 });
+  else if (state.chatFocus === 1 && state.chatSplit) setState({ chatSplit: id });
+  else setState({ activeChat: id, chatFocus: 0 });
+  updateChat(id, { unread: false });
+  setState({ chatOpen: true });
+  persistChats();
+}
+
+// ---------------- plan (Pro features) ----------------
+
+export async function refreshLicense(): Promise<void> {
+  try {
+    setState({ license: await api().license.status() });
+  } catch {
+    // main not ready: keep the last known plan
+  }
+}
+
+/** True when the plan includes the feature; otherwise explains it and offers Pro. */
+export function requirePro(feature: ProFeature): boolean {
+  const f = state.license.features;
+  const ok =
+    feature === 'chats'
+      ? state.chats.length < f.maxChats
+      : feature === 'split'
+        ? f.split
+        : f.windows;
+  if (!ok) setState({ modal: { kind: 'upgrade', feature } });
+  return ok;
+}
+
+/**
+ * Opens a new chat next to the others; the running ones keep working. `always`: work handed
+ * from one AI to another, or a prompt that must not be lost, never waits for a plan.
+ */
+export function newChat(patch: Partial<ChatTab> = {}, always = false): string {
+  if (!always && !requirePro('chats')) return state.activeChat;
+  const tab = blankChat(patch);
+  setState((s) => ({ chats: [...s.chats, tab], chatHistoryFor: null }));
+  selectChat(tab.id);
+  return tab.id;
+}
+
+/** Closes a chat (the caller has already stopped it if it was working). */
+export function closeChat(id: string): void {
+  const idx = state.chats.findIndex((c) => c.id === id);
+  if (idx < 0) return;
+  let chats = state.chats.filter((c) => c.id !== id);
+  if (!chats.length) chats = [blankChat()];
+  const others = chats.filter((c) => c.id !== state.chatSplit || id === state.chatSplit);
+  const pick = () => (others[Math.min(idx, others.length - 1)] ?? chats[0]!).id;
+  let { activeChat, chatSplit, chatFocus } = state;
+  if (id === chatSplit) {
+    chatSplit = null;
+    chatFocus = 0;
+  } else if (id === activeChat) {
+    activeChat = pick();
+    if (activeChat === chatSplit) {
+      chatSplit = null;
+      chatFocus = 0;
+    }
+  }
+  setState({ chats, activeChat, chatSplit, chatFocus });
+  persistChats();
+}
+
+/** Two chats side by side (or back to one). */
+export function toggleChatSplit(): void {
+  if (!state.chatSplit && !requirePro('split')) return;
+  if (state.chatSplit) {
+    setState({ chatSplit: null, chatFocus: 0 });
+  } else {
+    const other = [...state.chats].reverse().find((c) => c.id !== state.activeChat);
+    const id = other?.id ?? blankChat().id;
+    if (!other) setState((s) => ({ chats: [...s.chats, blankChat({ id })] }));
+    setState({ chatSplit: id, chatFocus: 1, chatOpen: true });
+    updateChat(id, { unread: false });
+  }
+  persistChats();
+}
+
+export function runningChats(): number {
+  return state.chats.filter((c) => c.busy).length;
+}
+
+state = { ...state, ...restoreChats() };

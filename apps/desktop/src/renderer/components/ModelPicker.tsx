@@ -79,7 +79,14 @@ const ROLE_LABEL: Record<AiRole, () => string> = {
   inline: () => t('roleInline'),
 };
 
-export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
+export function ModelPicker({
+  role: initialRole = 'chat',
+  pick,
+}: {
+  role?: AiRole;
+  /** Choosing for one chat (or a handoff): nothing app-wide changes. */
+  pick?: { title: string; current: string | null; onPick: (ref: string | null) => void };
+}) {
   const models = useStore((s) => s.models);
   const errors = useStore((s) => s.modelErrors);
   const settings = useStore((s) => s.settings);
@@ -106,7 +113,11 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const current = role === 'chat' ? settings.defaultModel : (settings.roles[role] ?? null);
+  const current = pick
+    ? pick.current
+    : role === 'chat'
+      ? settings.defaultModel
+      : (settings.roles[role] ?? null);
   const effective = current ?? settings.defaultModel;
 
   const rows = useMemo<Row[]>(() => {
@@ -284,6 +295,13 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
       setState({ modal: { kind: 'providers', focus: r.provider } });
       return;
     }
+    if (pick) {
+      pushRecent(r.ref);
+      close();
+      pick.onPick(r.ref);
+      toast(`${pick.title}: ${r.label}`);
+      return;
+    }
     if (role === 'chat') await api().ai.setDefaultModel(r.ref);
     else await api().ai.setRole(role, r.ref);
     pushRecent(r.ref);
@@ -314,26 +332,30 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
         <div className="mp-head">
           <div className="mp-title">
             <img src="./logo.svg" alt="" />
-            {t('pickModel')}
+            {pick ? pick.title : t('pickModel')}
           </div>
-          <div className="mp-roles" role="tablist">
-            {(['chat', 'agent', 'inline'] as AiRole[]).map((r) => (
-              <button
-                key={r}
-                role="tab"
-                aria-selected={role === r}
-                className={`mp-role ${role === r ? 'on' : ''}`}
-                onClick={() => setRole(r)}
-              >
-                {ROLE_LABEL[r]()}
-                <span className="mp-role-model">
-                  {r === 'chat'
-                    ? (settings.defaultModel ?? t('noModel'))
-                    : (settings.roles[r] ?? t('sameAsChat'))}
-                </span>
-              </button>
-            ))}
-          </div>
+          {pick ? (
+            <div className="mp-pick-hint dim">{t('mpPickHint')}</div>
+          ) : (
+            <div className="mp-roles" role="tablist">
+              {(['chat', 'agent', 'inline'] as AiRole[]).map((r) => (
+                <button
+                  key={r}
+                  role="tab"
+                  aria-selected={role === r}
+                  className={`mp-role ${role === r ? 'on' : ''}`}
+                  onClick={() => setRole(r)}
+                >
+                  {ROLE_LABEL[r]()}
+                  <span className="mp-role-model">
+                    {r === 'chat'
+                      ? (settings.defaultModel ?? t('noModel'))
+                      : (settings.roles[r] ?? t('sameAsChat'))}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           <button className="modal-x" onClick={close} aria-label={t('close')}>
             ×
           </button>
@@ -396,7 +418,18 @@ export function ModelPicker({ role: initialRole = 'chat' }: { role?: AiRole }) {
               🕘 {showOld ? t('mpHideOld') : t('mpShowOld', { n: hiddenCount })}
             </button>
           )}
-          {role !== 'chat' && settings.roles[role] && (
+          {pick?.current && (
+            <button
+              className="mp-chip reset"
+              onClick={() => {
+                close();
+                pick.onPick(null);
+              }}
+            >
+              ↺ {t('chatModelDefault')}
+            </button>
+          )}
+          {!pick && role !== 'chat' && settings.roles[role] && (
             <button
               className="mp-chip reset"
               onClick={async () => {

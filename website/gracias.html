@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gracias por tu compra — Zinarix Studio</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#070a18" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true">
+      <span class="blob b1"></span>
+      <span class="blob b2"></span>
+      <span class="blob b3"></span>
+      <div class="grid-overlay"></div>
+    </div>
+
+    <header class="nav" id="nav">
+      <a class="brand" href="/" aria-label="Zinarix Studio, inicio">
+        <img src="assets/logo.svg" alt="" width="34" height="34" />
+        <span>Zinarix <b>Studio</b></span>
+      </a>
+      <nav aria-label="Principal">
+        <a class="btn btn-sm btn-primary" href="/#descargar">Descargar</a>
+      </nav>
+    </header>
+
+    <main class="thanks">
+      <span class="eyebrow">Zinarix Studio Pro</span>
+      <h1 id="t-title">Preparando tu licencia…</h1>
+      <p class="muted" id="t-lead">Un momento, estamos confirmando tu pago con Stripe.</p>
+
+      <div id="t-key" hidden>
+        <div class="keybox" id="t-keytext"></div>
+        <button class="btn btn-primary" id="t-copy" type="button">Copiar clave</button>
+        <h2>Cómo activarla</h2>
+        <ol>
+          <li>
+            Abre Zinarix Studio (si aún no lo tienes, <a href="/#descargar">descárgalo aquí</a>).
+          </li>
+          <li>Ve a <b>Ayuda → Plan y licencia…</b></li>
+          <li>Pega la clave y pulsa <b>Activar</b>. Listo: Pro queda activo en esa computadora.</li>
+        </ol>
+        <p class="muted small">
+          Guarda esta clave: sirve para tus computadoras y puedes volver a esta página con el mismo
+          enlace para verla de nuevo.
+        </p>
+      </div>
+
+      <p class="muted small" id="t-help" hidden>
+        Si el problema sigue, escríbenos al correo de soporte de tu recibo de Stripe con tu número
+        de recibo y te enviamos la clave a mano.
+      </p>
+    </main>
+
+    <footer class="footer">
+      <div class="brand">
+        <img src="assets/logo.svg" alt="" width="26" height="26" /> Zinarix Studio
+      </div>
+      <span class="muted">Código abierto · Licencia MIT · Hecho con ❤️ en México</span>
+      <a href="/">Inicio</a>
+    </footer>
+    <script src="gracias.js" defer></script>
+  </body>
+</html>

@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const home = mkdtempSync(join(tmpdir(), 'zs-system-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 const outside = join(home, 'fuera');
 mkdirSync(proj);
 mkdirSync(outside);

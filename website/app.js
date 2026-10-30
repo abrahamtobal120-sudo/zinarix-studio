@@ -274,3 +274,34 @@ setupTabs();
 setupTerminalInstall();
 setupMotion();
 setupDownloads();
+
+// ---------- pricing (app-config.json: the same switch the installed apps read) ----------
+async function setupPricing() {
+  let cfg;
+  try {
+    const res = await fetch('/app-config.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    cfg = await res.json();
+  } catch {
+    return;
+  }
+  const $ = (id) => document.getElementById(id);
+  if (cfg.free?.maxChats) $('free-chats').textContent = String(cfg.free.maxChats);
+  if (cfg.price) $('pro-price').textContent = cfg.price;
+  if (cfg.priceNote) $('pro-note').textContent = cfg.priceNote;
+  if (!cfg.billing) return; // free for everyone: the page already says so
+  $('pricing-title').textContent = 'Empieza gratis. Pasa a Pro cuando lo necesites.';
+  $('pricing-lead').textContent =
+    `Cada instalación trae ${cfg.trialDays ?? 14} días de Pro gratis. Después sigues con el plan gratis o compras Pro.`;
+  const buy = $('buy-pro');
+  if (/^https:\/\//.test(cfg.stripeLink ?? '')) {
+    buy.href = cfg.stripeLink;
+    buy.textContent = 'Comprar Pro';
+    $('buy-note').textContent =
+      'Pago seguro con Stripe. Recibes tu clave al instante y la pegas en Zinarix Studio → Plan y licencia.';
+  } else {
+    buy.textContent = 'Pro: muy pronto';
+    $('buy-note').textContent = 'Las compras abren muy pronto.';
+  }
+}
+setupPricing();

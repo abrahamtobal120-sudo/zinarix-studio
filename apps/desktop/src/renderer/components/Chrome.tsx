@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { runCommand } from '../commands';
 import { t } from '../i18n';
 import { Icon, type IconName } from './Icon';
+import { PlanBadge } from './Plan';
 import {
   BROWSER_TAB,
   SECURITY_TAB,
@@ -145,6 +146,7 @@ export function StatusBar() {
       >
         <Icon name="chart" size={13} /> {usd(settings.todayUsd)} {t('today')}
       </span>
+      <PlanBadge />
     </footer>
   );
 }

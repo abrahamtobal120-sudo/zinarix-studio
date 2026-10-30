@@ -1028,3 +1028,111 @@ pre {
 .trust a {
   color: var(--cyan);
 }
+
+/* ---------- pricing ---------- */
+.plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 360px));
+  justify-content: center;
+  gap: 22px;
+  margin-top: 34px;
+}
+.plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 28px 26px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+.plan.pro {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--card-solid), var(--card-solid)) padding-box,
+    var(--grad) border-box;
+  box-shadow: 0 20px 60px rgba(47, 107, 255, 0.18);
+}
+.plan h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.plan .price {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.plan.pro .price span {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.plan ul {
+  margin: 6px 0 14px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.plan li {
+  padding-left: 24px;
+  position: relative;
+  color: var(--muted);
+}
+.plan li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--cyan);
+  font-weight: 700;
+}
+.plan-tag {
+  position: absolute;
+  top: -12px;
+  right: 22px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--grad);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.small {
+  font-size: 13px;
+  margin: 0;
+}
+@media (max-width: 760px) {
+  .plans {
+    grid-template-columns: 1fr;
+  }
+}
+/* ---------- thank-you page ---------- */
+.thanks {
+  max-width: 680px;
+  margin: 120px auto 80px;
+  padding: 0 20px;
+  text-align: center;
+}
+.thanks .keybox {
+  margin: 24px 0 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--card-solid);
+  border: 1px solid var(--line-strong);
+  font:
+    13px/1.5 ui-monospace,
+    Menlo,
+    monospace;
+  word-break: break-all;
+  text-align: left;
+  user-select: all;
+}
+.thanks ol {
+  text-align: left;
+  color: var(--muted);
+}

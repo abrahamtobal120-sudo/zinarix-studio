@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { BrowserStateView } from '../../shared/api';
+import type { BrowserStateView, BrowserTabsView } from '../../shared/api';
 import { BROWSER_TAB, api, setState, toast, useStore } from '../store';
 import { t } from '../i18n';
 import { askInChat } from './Chat';
 import { Icon as UiIcon } from './Icon';
+import { ProviderLogo } from './ProviderLogo';
 
 const EMPTY: BrowserStateView = {
   url: '',
@@ -77,16 +78,21 @@ export function BrowserPane({ visible }: { visible: boolean }) {
   const [url, setUrl] = useState('');
   const [editing, setEditing] = useState(false);
   const [aiActive, setAiActive] = useState(false);
+  const [tabs, setTabs] = useState<BrowserTabsView>({ tabs: [], active: null });
   const host = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  /** Tab shown when the user started typing an address (an AI may switch the view meanwhile). */
+  const editTab = useRef<string | null>(null);
   const covered = useStore((s) => Boolean(s.modal || s.inputBox));
   const show = visible && !covered && Boolean(st.url);
 
   useEffect(() => {
     void api().browser.state().then(setSt);
+    void api().browser.tabs().then(setTabs);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const off = api().on((ev) => {
       if (ev.type === 'browser:state') setSt(ev.state);
+      if (ev.type === 'browser:tabs') setTabs(ev.view);
       if (ev.type === 'browser:show') {
         setAiActive(true);
         clearTimeout(timer);
@@ -141,12 +147,12 @@ export function BrowserPane({ visible }: { visible: boolean }) {
     };
   }, [show]);
 
-  const open = async (target: string) => {
+  const open = async (target: string, tab: string | null = tabs.active) => {
     if (!target.trim()) return;
     setEditing(false);
     input.current?.blur();
     try {
-      setSt(await api().browser.navigate(target));
+      setSt(await api().browser.navigate(target, tab));
     } catch (e) {
       setSt((s) => ({ ...s, loading: false }));
       toast(
@@ -158,14 +164,66 @@ export function BrowserPane({ visible }: { visible: boolean }) {
   };
 
   const parts = splitUrl(st.url);
+  // Tabs: one per AI conversation that used the browser (two agents never share a page),
+  // plus the user's own. Shown once there is more than the user's single tab.
+  const showTabs = tabs.tabs.length > 1 || tabs.tabs.some((x) => x.ai);
   return (
     <div className="browser-pane" style={{ display: visible ? 'flex' : 'none' }}>
+      {showTabs && (
+        <div className="browser-tabs" role="tablist">
+          {tabs.tabs.map((x) => {
+            const title = x.title || (x.url ? splitUrl(x.url).host : t('browserNewTab'));
+            const who = x.ai ? x.label : t('browserYou');
+            return (
+              <div
+                key={x.id}
+                role="tab"
+                aria-selected={x.id === tabs.active}
+                className={`browser-tab ${x.id === tabs.active ? 'on' : ''} ${x.ai ? 'ai' : ''}`}
+                title={`${title}\n${who}${x.url ? `\n${x.url}` : ''}`}
+                onClick={() => void api().browser.selectTab(x.id)}
+                onAuxClick={(e) => {
+                  if (e.button === 1) void api().browser.closeTab(x.id);
+                }}
+              >
+                <span className={`browser-tab-who ${x.loading ? 'loading' : ''}`}>
+                  {x.ai ? (
+                    <ProviderLogo id={x.label.replace(/^🤝\s*/, '').split('/')[0]!} size={12} />
+                  ) : (
+                    <Icon d={ICON.globe} size={12} />
+                  )}
+                </span>
+                <span className="browser-tab-title">{title}</span>
+                {x.ai && <span className="browser-tab-owner">{who.split('/').pop()}</span>}
+                <button
+                  className="browser-tab-x"
+                  title={t('browserCloseTab')}
+                  aria-label={t('browserCloseTab')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void api().browser.closeTab(x.id);
+                  }}
+                >
+                  <Icon d={ICON.stop} size={10} />
+                </button>
+              </div>
+            );
+          })}
+          <button
+            className="bicon browser-tab-new"
+            title={t('browserNewTab')}
+            onClick={() => void api().browser.newTab()}
+          >
+            <UiIcon name="plus" size={14} />
+          </button>
+        </div>
+      )}
       <div className="browser-bar">
         <div className="browser-nav">
           <button
             className="bicon"
             disabled={!st.canGoBack}
-            onClick={() => void api().browser.back()}
+            onClick={() => void api().browser.back(tabs.active)}
             title={t('navBack')}
           >
             <Icon d={ICON.back} />
@@ -173,7 +231,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
           <button
             className="bicon"
             disabled={!st.canGoForward}
-            onClick={() => void api().browser.forward()}
+            onClick={() => void api().browser.forward(tabs.active)}
             title={t('navForward')}
           >
             <Icon d={ICON.forward} />
@@ -181,12 +239,16 @@ export function BrowserPane({ visible }: { visible: boolean }) {
           <button
             className="bicon"
             disabled={!st.url}
-            onClick={() => void api().browser.reload()}
+            onClick={() => void api().browser.reload(tabs.active)}
             title={t('navReload')}
           >
             <Icon d={st.loading ? ICON.stop : ICON.reload} />
           </button>
-          <button className="bicon" onClick={() => void api().browser.home()} title={t('navHome')}>
+          <button
+            className="bicon"
+            onClick={() => void api().browser.home(tabs.active)}
+            title={t('navHome')}
+          >
             <Icon d={ICON.home} />
           </button>
         </div>
@@ -213,6 +275,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             spellCheck={false}
             style={!editing && st.url ? { position: 'absolute', opacity: 0, width: 1 } : undefined}
             onFocus={(e) => {
+              editTab.current = tabs.active;
               setEditing(true);
               const el = e.currentTarget;
               setTimeout(() => el.select(), 0);
@@ -220,7 +283,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             onBlur={() => setEditing(false)}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void open(url);
+              if (e.key === 'Enter') void open(url, editTab.current ?? tabs.active);
               if (e.key === 'Escape') {
                 setUrl(st.url);
                 e.currentTarget.blur();

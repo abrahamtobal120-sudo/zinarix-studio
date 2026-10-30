@@ -97,6 +97,12 @@ function vaultPassword(home: string): () => Promise<string> {
 
 type Emit = (requestId: string, ev: ChatEventView) => void;
 
+/** The window a request comes from: its open folder and its browser. */
+export interface Scope {
+  workspace: () => Workspace | undefined;
+  browser?: BrowserController;
+}
+
 /**
  * Model text as the UI receives it: streamed through StreamRedactor, so a credential the
  * model repeats (a loaded key, a token pattern) never reaches the DOM, even when it arrives
@@ -132,12 +138,18 @@ export class AiService {
   readonly agent: Agent;
   /** Settings toggle: include the project rules file in prompts. */
   useRules = true;
+  /** What the plan includes (delegation between AIs is Pro). */
+  features: () => { delegation: boolean } = () => ({ delegation: true });
+
+  /** Used when a call does not say which window it comes from (CLI tests, one window). */
+  private readonly scope: Scope;
 
   constructor(
-    private readonly workspace: () => Workspace | undefined,
+    workspace: () => Workspace | undefined = () => undefined,
     home = omniHome(),
     browser?: BrowserController,
   ) {
+    this.scope = { workspace, browser };
     this.core = OmniCore.open({ home, askPassword: vaultPassword(home) });
     this.agent = new Agent(this.core, workspace, browser);
     // Child shells never get the provider keys the app can read from the environment.
@@ -317,13 +329,18 @@ export class AiService {
     });
   }
 
-  private newConversation(req: ChatRequestView, requestId: string, emit: Emit): string {
+  private newConversation(
+    req: ChatRequestView,
+    requestId: string,
+    emit: Emit,
+    scope: Scope,
+  ): string {
     let id = req.conversationId;
     if (!id || !this.core.history.get(id)) {
       id = this.core.history.create(
         req.prompt.split('\n')[0]!.slice(0, 80) || 'chat',
         req.model,
-        this.workspace()?.root,
+        scope.workspace()?.root,
       ).id;
     }
     // Tell the UI right away, so the conversation is known even if the request fails.
@@ -335,26 +352,36 @@ export class AiService {
     return id;
   }
 
-  async chat(requestId: string, req: ChatRequestView, emit: Emit): Promise<void> {
+  async chat(
+    requestId: string,
+    req: ChatRequestView,
+    emit: Emit,
+    scope: Scope = this.scope,
+  ): Promise<void> {
     const out = safeStream(emit);
     try {
-      await this.chatTurn(requestId, req, out.emit);
+      await this.chatTurn(requestId, req, out.emit, scope);
     } finally {
       out.flush(requestId);
     }
   }
 
-  private async chatTurn(requestId: string, req: ChatRequestView, emit: Emit): Promise<void> {
-    if (req.agent) return this.agentChat(requestId, req, emit);
+  private async chatTurn(
+    requestId: string,
+    req: ChatRequestView,
+    emit: Emit,
+    scope: Scope,
+  ): Promise<void> {
+    if (req.agent) return this.agentChat(requestId, req, emit, scope);
     const [system, user] = buildContextMessages(
       req.prompt,
       req.context,
-      CHAT_SYSTEM + this.rulesBlock(),
+      CHAT_SYSTEM + this.rulesBlock(scope),
     ) as [ChatMessage, ChatMessage];
     const messages: ChatMessage[] = [system, ...recentHistory(req.history), user];
     let conversationId: string;
     try {
-      conversationId = this.newConversation(req, requestId, emit);
+      conversationId = this.newConversation(req, requestId, emit, scope);
     } catch (e) {
       // History not writable (database locked, disk full): the UI must still hear about it.
       const d = describeError(e);
@@ -366,7 +393,7 @@ export class AiService {
       rec.add(ev);
       emit(rid, ev);
     };
-    const cwd = this.workspace()?.root;
+    const cwd = scope.workspace()?.root;
     await this.run(requestId, { model: req.model, messages, role: 'chat', cwd }, (ev) => {
       if (ev.type === 'start') {
         send(requestId, { ...ev, conversationId });
@@ -378,7 +405,12 @@ export class AiService {
   }
 
   /** Agent mode: multi-step tool use over the open workspace, with approvals. */
-  private async agentChat(requestId: string, req: ChatRequestView, emit: Emit): Promise<void> {
+  private async agentChat(
+    requestId: string,
+    req: ChatRequestView,
+    emit: Emit,
+    scope: Scope,
+  ): Promise<void> {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
     const rec = new TurnRecorder();
@@ -390,25 +422,33 @@ export class AiService {
     try {
       // Inside the try: a history failure (database locked, disk full) reaches the UI as an
       // error event instead of leaving the chat busy forever.
-      convId = this.newConversation(req, requestId, emit);
+      convId = this.newConversation(req, requestId, emit, scope);
       const id = convId;
       const userMessage = buildContextMessages(req.prompt, req.context).at(-1)!;
       await this.agent.run({
         conversationId: convId,
         model: req.model,
-        rules: this.rulesBlock(),
+        scope,
+        delegation: this.features().delegation,
+        rules: this.rulesBlock(scope),
         userMessage,
         fallbackHistory: recentHistory(req.history),
         signal: ctrl.signal,
         emit: (ev) => send(ev.type === 'start' ? { ...ev, conversationId: id } : ev),
         ask: (toolCallId) =>
           new Promise<ToolDecision>((resolve) => {
+            // Stopped while the tool was being prepared: nobody will answer, so it is a no.
+            if (ctrl.signal.aborted) return resolve('deny');
             const key = `${requestId}:${toolCallId}`;
-            this.decisions.set(key, resolve);
-            ctrl.signal.addEventListener('abort', () => {
+            const onAbort = () => {
               this.decisions.delete(key);
               resolve('deny');
+            };
+            this.decisions.set(key, (d) => {
+              ctrl.signal.removeEventListener('abort', onAbort);
+              resolve(d);
             });
+            ctrl.signal.addEventListener('abort', onAbort, { once: true });
           }),
       });
     } catch (e) {
@@ -421,8 +461,8 @@ export class AiService {
   }
 
   /** The project rules file in use, if any. */
-  rulesFile(): string | null {
-    const ws = this.workspace();
+  rulesFile(scope: Scope = this.scope): string | null {
+    const ws = scope.workspace();
     if (!ws || !this.useRules) return null;
     for (const f of RULES_FILES) {
       try {
@@ -435,12 +475,12 @@ export class AiService {
   }
 
   /** System-prompt block with the project rules (style and conventions, never safety overrides). */
-  rulesBlock(): string {
-    const f = this.rulesFile();
+  rulesBlock(scope: Scope = this.scope): string {
+    const f = this.rulesFile(scope);
     if (!f) return '';
     let text = '';
     try {
-      text = readFileSync(this.workspace()!.resolve(f), 'utf8').slice(0, MAX_RULES).trim();
+      text = readFileSync(scope.workspace()!.resolve(f), 'utf8').slice(0, MAX_RULES).trim();
     } catch {
       return '';
     }
@@ -504,8 +544,12 @@ export class AiService {
     return r.text.replace(/^```[\w-]*\n?|```\s*$/g, '').trim();
   }
 
-  conversations(query: string, onlyProject: boolean): ConversationView[] {
-    const project = onlyProject ? this.workspace()?.root : undefined;
+  conversations(
+    query: string,
+    onlyProject: boolean,
+    scope: Scope = this.scope,
+  ): ConversationView[] {
+    const project = onlyProject ? scope.workspace()?.root : undefined;
     const list = query.trim()
       ? this.core.history.search(query.trim(), 200, project)
       : this.core.history.list(200, project);
@@ -559,8 +603,8 @@ export class AiService {
     this.agent.resetMessages(conversationId);
   }
 
-  revert(conversationId: string): Promise<string[]> {
-    return this.agent.revert(conversationId);
+  revert(conversationId: string, scope: Scope = this.scope): Promise<string[]> {
+    return this.agent.revert(conversationId, scope.workspace);
   }
 
   async edit(requestId: string, req: EditRequestView, emitRaw: Emit): Promise<void> {
@@ -689,10 +733,16 @@ export interface TurnDisplay {
         id: string;
         name: string;
         args: Record<string, unknown>;
+        /** Helper AI that made the call (delegate_to_ai). */
+        agent?: string;
         status: 'ok' | 'error';
         summary?: string;
         output?: string;
-        preview?: { path?: string; command?: string };
+        preview?: {
+          path?: string;
+          command?: string;
+          delegate?: { model: string; mode: 'agent' | 'chat' };
+        };
       }
   )[];
   model?: string;
@@ -729,11 +779,23 @@ export class TurnRecorder {
         (d.notices ??= []).push(ev.message);
         break;
       case 'tool_call':
-        d.parts.push({ kind: 'tool', id: ev.id, name: ev.name, args: ev.args, status: 'error' });
+        d.parts.push({
+          kind: 'tool',
+          id: ev.id,
+          name: ev.name,
+          args: ev.args,
+          ...(ev.agent ? { agent: ev.agent } : {}),
+          status: 'error',
+        });
         break;
       case 'tool_approval': {
         const step = this.step(ev.id);
-        if (step) step.preview = { path: ev.preview.path, command: ev.preview.command };
+        if (step)
+          step.preview = {
+            path: ev.preview.path,
+            command: ev.preview.command,
+            ...(ev.preview.delegate ? { delegate: ev.preview.delegate } : {}),
+          };
         break;
       }
       case 'tool_output': {

@@ -1,14 +1,23 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import type { OmniCore } from '@omni/core';
 import { untrusted, UNTRUSTED_NOTE } from '@omni/core';
 import type { ChatMessage, ToolCall, ToolDefinition } from '@omni/shared';
-import { redact, redactDeep, registerSecret } from '@omni/security';
+import { StreamRedactor, redact, redactDeep, registerSecret } from '@omni/security';
 import type { ChatEventView, ToolDecision } from '../shared/api.js';
-import type { BrowserController, PageSnapshot } from './browser.js';
+import type { BrowserController, BrowserTab, PageSnapshot } from './browser.js';
 import { normalizeUrl, siteOf } from './browser.js';
+import {
+  ToolTagFilter,
+  parseToolCalls,
+  protocolBlock,
+  resultsMessage,
+  toolsUnsupported,
+  withProtocol,
+} from './textTools.js';
 import { globToRegExp } from '../shared/glob.js';
 import { childEnv } from './env.js';
 import { isSecretFile, protectedWrite } from './guard.js';
@@ -69,7 +78,8 @@ You can inspect and change the project with tools:
 - tree, glob, list_dir, search, read_file, read_many_files: free to use. To understand a project, start with tree, then read many relevant files at once with read_many_files (by list or glob pattern) instead of one by one. Several read-only tool calls in the same turn run in parallel, so batch them.
 - edit_file (exact string replacement) and write_file (new or fully rewritten file): the user approves every change.
 - run_command: runs a shell command in the workspace (tests, builds, git, package managers). The user approves every command; prefer non-interactive flags.
-- browser_open, browser_read, browser_click, browser_type, browser_scroll, browser_back: a real web browser the user can watch. Use it to read documentation, check a local dev server (e.g. http://localhost:3000) or follow web steps the user asks for. browser_read returns the page text and numbered interactive elements; use those numbers as "ref". Opening a site, clicking and typing need the user's approval per site. Never enter passwords, payment data or personal data; ask the user to do that.
+- browser_open, browser_read, browser_click, browser_type, browser_scroll, browser_back: a real web browser the user can watch (this conversation has its own browser tab). Use it to read documentation, check a local dev server (e.g. http://localhost:3000) or follow web steps the user asks for. browser_read returns the page text and numbered interactive elements; use those numbers as "ref". Opening a site, clicking and typing need the user's approval per site. Never enter passwords, payment data or personal data; ask the user to do that.
+- list_ai_models and delegate_to_ai: other AI models connected in Zinarix Studio can work for you as helpers (e.g. a second opinion, a cheaper model for a long chore, a model with a skill you lack). The user approves every delegation and every action the helper takes. Give the helper a complete, self-contained task; it does not see this conversation.
 ${SYSTEM_PROMPT_PART}
 ${SECURITY_PROMPT_PART}
 Work step by step: plan briefly, use tools, verify (e.g. run the tests), then summarize what you did.
@@ -260,9 +270,52 @@ export const TOOLS: ToolDefinition[] = [
   ...SECURITY_TOOLS,
 ];
 
+/** One AI asks another for help (only the main agent; helpers cannot delegate again). */
+export const DELEGATION_TOOLS: ToolDefinition[] = [
+  {
+    name: 'list_ai_models',
+    description:
+      'List the AI models connected in Zinarix Studio (provider/model, whether they can use tools, local or cloud, price). Use it before delegate_to_ai to pick a helper.',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'delegate_to_ai',
+    description:
+      'Ask another AI model to do a task for you and get its answer back. mode "agent" (default) lets the helper use the same tools (files, terminal, browser…) with the user approving each action; mode "chat" only asks it to answer. The helper does not see this conversation: write a complete task, with the context it needs. Requires the user\'s approval.',
+    parameters: {
+      type: 'object',
+      properties: {
+        model: {
+          type: 'string',
+          description: 'Model reference "provider/model" from list_ai_models',
+        },
+        task: { type: 'string', description: 'What the helper must do, self-contained' },
+        mode: { type: 'string', enum: ['agent', 'chat'] },
+      },
+      required: ['model', 'task'],
+    },
+  },
+];
+
+/** What the helper's answer may be at most when it goes back to the main agent. */
+const MAX_HELPER_ANSWER = 40_000;
+/** Tools a CLI agent (Claude Code, Codex…) gets from Zinarix: it has its own for files. */
+const CLI_TOOL_NAMES = new Set([
+  'browser_open',
+  'browser_read',
+  'browser_click',
+  'browser_type',
+  'browser_scroll',
+  'browser_back',
+  'list_ai_models',
+  'delegate_to_ai',
+]);
+
 const SYSTEM_TOOL_NAMES = new Set(SYSTEM_TOOLS.map((t) => t.name));
 
 const NEEDS_APPROVAL = new Set(['edit_file', 'write_file', 'run_command']);
+/** Tools that work without an open folder. */
+const NO_FOLDER = new Set(['list_ai_models', 'delegate_to_ai']);
 /** Browser actions that need approval once per site (by host). */
 const BROWSER_APPROVAL = new Set(['browser_open', 'browser_click', 'browser_type']);
 /** Safe to run concurrently when the model asks for several in one turn. */
@@ -274,6 +327,7 @@ const READ_ONLY = new Set([
   'read_many_files',
   'search',
   'security_scan_project',
+  'list_ai_models',
 ]);
 
 /**
@@ -468,7 +522,11 @@ export interface Checkpoint {
   backup?: string | null;
   /** Project files: the workspace root they belong to (absolute). */
   root?: string;
+  /** Order across a conversation and its helpers (revert goes newest first). */
+  seq?: number;
 }
+
+let checkpointSeq = 0;
 
 interface Session {
   messages: ChatMessage[];
@@ -476,10 +534,42 @@ interface Session {
   alwaysAllow: Set<string>;
   /** Variables set with set_env_var (scope "session"), applied to run_command. */
   env: Record<string, string>;
+  /** Models that refused native tools in this conversation (they use the text protocol). */
+  textModels: Set<string>;
 }
 
 type Emit = (ev: ChatEventView) => void;
 type Ask = (toolCallId: string) => Promise<ToolDecision>;
+
+/** The window an agent run works in: its open folder and its browser. */
+export interface AgentScope {
+  workspace?: () => Workspace | undefined;
+  browser?: BrowserController;
+}
+
+/** How the model gets its tools: native function calling, or the text protocol. */
+export type ToolMode = 'native' | 'text' | 'cli';
+
+type Totals = { usd: number | null; inputTokens: number; outputTokens: number; latencyMs: number };
+
+interface LoopOpts {
+  conversationId: string;
+  model?: string;
+  signal: AbortSignal;
+  emit: Emit;
+  ask: Ask;
+  scope?: AgentScope;
+  /** 0 = the main agent; 1 = a helper (cannot delegate again). */
+  depth: number;
+  /** The plan includes AI-to-AI delegation. */
+  delegation?: boolean;
+  rules?: string;
+  /** Adds a helper's token usage to the caller's totals. */
+  addCost?: (c: Totals) => void;
+}
+
+/** Separates a helper's session (and browser tab) from the conversation that asked for it. */
+const HELPER_SEP = '~';
 
 function args(call: ToolCall): Record<string, unknown> {
   try {
@@ -513,7 +603,7 @@ export class Agent {
 
   constructor(
     private readonly core: OmniCore,
-    private readonly workspace: () => Workspace | undefined,
+    private readonly workspace: () => Workspace | undefined = () => undefined,
     private readonly browser?: BrowserController,
   ) {}
 
@@ -521,7 +611,8 @@ export class Agent {
     let s = this.sessions.get(id);
     if (s)
       this.sessions.delete(id); // re-inserted below: the Map keeps LRU order
-    else s = { messages: [], checkpoints: [], alwaysAllow: new Set(), env: {} };
+    else
+      s = { messages: [], checkpoints: [], alwaysAllow: new Set(), env: {}, textModels: new Set() };
     this.sessions.set(id, s);
     this.trim();
     return s;
@@ -556,7 +647,20 @@ export class Agent {
     signal: AbortSignal;
     emit: Emit;
     ask: Ask;
+    /** The window this run works in (folder, browser); defaults to the constructor's. */
+    scope?: AgentScope;
+    /** 1 for a helper started by delegate_to_ai. */
+    depth?: number;
+    /** The plan includes AI-to-AI delegation (default: yes). */
+    delegation?: boolean;
+    addCost?: (c: Totals) => void;
   }): Promise<string> {
+    // One run per conversation: the same chat opened in two tabs or windows would interleave
+    // its messages (and its approvals) in one transcript.
+    if (this.active.has(opts.conversationId))
+      throw new Error(
+        'Esta conversación ya está trabajando en otro chat o ventana. Espera a que termine, o empieza un chat nuevo.',
+      );
     const s = this.session(opts.conversationId);
     const system = AGENT_SYSTEM + (opts.rules ?? '');
     if (!s.messages.length)
@@ -565,7 +669,7 @@ export class Agent {
     s.messages.push(opts.userMessage);
     this.active.add(opts.conversationId);
     try {
-      return await this.loop(s, opts);
+      return await this.loop(s, { ...opts, depth: opts.depth ?? 0 });
     } catch (e) {
       // The model never answered this message: drop it, so the next turn does not send two
       // user messages in a row (the user's text is still in the saved history and the UI).
@@ -576,110 +680,365 @@ export class Agent {
     }
   }
 
-  private async loop(
-    s: Session,
-    opts: { model?: string; signal: AbortSignal; emit: Emit; ask: Ask },
-  ): Promise<string> {
+  /**
+   * Native function calling when the model has it; the text protocol (textTools.ts) for
+   * models without it and for CLI agents, so every AI can use the browser and delegate.
+   */
+  toolMode(model: string | undefined, s?: Session): ToolMode {
+    try {
+      const ref = this.core.resolveModel(model, 'agent');
+      const entry = this.core.provider(ref.provider);
+      if (entry.adapter === 'cli-agent') return 'cli';
+      if (s?.textModels.has(`${ref.provider}/${ref.model}`)) return 'text';
+      if (!entry.supports.tools) return 'text';
+      const live = this.core.models.find(ref.provider, ref.model)?.capabilities.tools;
+      const cat = entry.fallbackModels.find((m) => m.id === ref.model)?.tools;
+      return (live ?? cat) === false ? 'text' : 'native';
+    } catch {
+      return 'native';
+    }
+  }
+
+  private modelKey(model: string | undefined): string | undefined {
+    try {
+      const ref = this.core.resolveModel(model, 'agent');
+      return `${ref.provider}/${ref.model}`;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async loop(s: Session, opts: LoopOpts): Promise<string> {
     let finalText = '';
-    const totals = { usd: 0 as number | null, inputTokens: 0, outputTokens: 0, latencyMs: 0 };
+    const totals: Totals = { usd: 0, inputTokens: 0, outputTokens: 0, latencyMs: 0 };
+    const addCost = (c: Totals) => {
+      totals.usd = totals.usd === null || c.usd === null ? null : totals.usd + c.usd;
+      totals.inputTokens += c.inputTokens;
+      totals.outputTokens += c.outputTokens;
+      totals.latencyMs += c.latencyMs;
+    };
+    const tools =
+      opts.depth === 0 && opts.delegation !== false ? [...TOOLS, ...DELEGATION_TOOLS] : TOOLS;
+    let mode = this.toolMode(opts.model, s);
+    const run = Math.random().toString(36).slice(2, 7);
     for (let step = 0; step < MAX_STEPS; step++) {
       let text = '';
       let raw: { adapter: string; content: unknown } | undefined;
       const calls = new Map<string, ToolCall>();
-      for await (const ev of this.core.stream(
-        // cwd: CLI agents (Claude Code, Codex…) work in the open folder with their own tools.
-        {
-          model: opts.model,
-          messages: s.messages,
-          tools: TOOLS,
-          role: 'agent',
-          cwd: this.workspace()?.root,
-        },
-        opts.signal,
-      )) {
-        switch (ev.type) {
-          case 'start':
-            if (step === 0) opts.emit(ev);
-            break;
-          case 'text':
-            text += ev.delta;
-            opts.emit(ev);
-            break;
-          case 'reasoning':
-            opts.emit(ev);
-            break;
-          case 'tool_call': {
-            const c = calls.get(ev.id) ?? { id: ev.id, name: ev.name, arguments: '' };
-            c.arguments += ev.argsDelta;
-            if (ev.name) c.name = ev.name;
-            calls.set(ev.id, c);
-            break;
+      const offered = mode === 'cli' ? tools.filter((t) => CLI_TOOL_NAMES.has(t.name)) : tools;
+      const filter = mode === 'native' ? null : new ToolTagFilter();
+      const messages =
+        mode === 'native'
+          ? s.messages
+          : withProtocol(
+              s.messages,
+              protocolBlock(offered, mode === 'cli'),
+              mode === 'cli' ? 'user' : 'system',
+            );
+      try {
+        for await (const ev of this.core.stream(
+          // cwd: CLI agents (Claude Code, Codex…) work in the open folder with their own tools.
+          // Text-protocol API models get no native tools (the provider would refuse them);
+          // CLI agents still get the list, which is what lets them edit the project.
+          {
+            model: opts.model,
+            messages,
+            tools: mode === 'text' ? undefined : tools,
+            role: 'agent',
+            cwd: this.ws(opts)?.root,
+          },
+          opts.signal,
+        )) {
+          switch (ev.type) {
+            case 'start':
+              if (step === 0) opts.emit(ev);
+              break;
+            case 'text': {
+              text += ev.delta;
+              const shown = filter ? filter.push(ev.delta) : ev.delta;
+              if (shown) opts.emit({ type: 'text', delta: shown });
+              break;
+            }
+            case 'reasoning':
+              opts.emit(ev);
+              break;
+            case 'tool_call': {
+              const c = calls.get(ev.id) ?? { id: ev.id, name: ev.name, arguments: '' };
+              c.arguments += ev.argsDelta;
+              if (ev.name) c.name = ev.name;
+              calls.set(ev.id, c);
+              break;
+            }
+            case 'raw':
+              raw = { adapter: ev.adapter, content: ev.content };
+              break;
+            case 'notice':
+              opts.emit({ type: 'notice', kind: ev.kind, message: ev.message });
+              break;
+            case 'cost':
+              addCost(ev);
+              break;
           }
-          case 'raw':
-            raw = { adapter: ev.adapter, content: ev.content };
-            break;
-          case 'notice':
-            opts.emit({ type: 'notice', kind: ev.kind, message: ev.message });
-            break;
-          case 'cost':
-            totals.usd = totals.usd === null || ev.usd === null ? null : totals.usd + ev.usd;
-            totals.inputTokens += ev.inputTokens;
-            totals.outputTokens += ev.outputTokens;
-            totals.latencyMs += ev.latencyMs;
-            break;
         }
+      } catch (e) {
+        // The provider refused the tools (no function calling): retry this step with the
+        // text protocol, which works with any model.
+        const key = this.modelKey(opts.model);
+        if (mode === 'native' && !text && !calls.size && key && toolsUnsupported(e)) {
+          s.textModels.add(key);
+          mode = 'text';
+          opts.emit({
+            type: 'notice',
+            kind: 'tools',
+            message: `${key} no acepta herramientas nativas: Zinarix le da las herramientas por texto.`,
+          });
+          step--;
+          continue;
+        }
+        throw e;
       }
-      finalText += text;
-      const toolCalls = [...calls.values()];
-      s.messages.push({
-        role: 'assistant',
-        content: text,
-        ...(toolCalls.length ? { toolCalls } : {}),
-        ...(raw ? { raw } : {}),
-      });
-      if (!toolCalls.length) break;
+      if (filter) {
+        const rest = filter.flush();
+        if (rest) opts.emit({ type: 'text', delta: rest });
+      }
+
+      let toolCalls: ToolCall[];
+      let badCalls: string[] = [];
+      if (mode === 'native') {
+        finalText += text;
+        toolCalls = [...calls.values()];
+        s.messages.push({
+          role: 'assistant',
+          content: text,
+          ...(toolCalls.length ? { toolCalls } : {}),
+          ...(raw ? { raw } : {}),
+        });
+      } else {
+        const parsed = parseToolCalls(text, `x${run}s${step}c`);
+        finalText += parsed.calls.length || parsed.errors.length ? parsed.visible : text;
+        toolCalls = parsed.calls;
+        badCalls = parsed.errors;
+        s.messages.push({ role: 'assistant', content: parsed.kept || text });
+      }
+      if (!toolCalls.length && !badCalls.length) break;
 
       // Consecutive read-only calls run in parallel; anything else runs in order (approvals).
       const results = new Map<string, { ok: boolean; content: string }>();
+      const offeredNames = new Set(offered.map((t) => t.name));
+      const exec = (c: ToolCall) =>
+        mode !== 'native' && !offeredNames.has(c.name)
+          ? Promise.resolve({
+              ok: false,
+              content:
+                mode === 'cli'
+                  ? `Tool ${c.name} is not offered by Zinarix here: use your own tools for that.`
+                  : `Unknown tool ${c.name}.`,
+            })
+          : this.execute(s, c, { ...opts, addCost });
       for (let i = 0; i < toolCalls.length && !opts.signal.aborted;) {
         let j = i;
         while (j < toolCalls.length && READ_ONLY.has(toolCalls[j]!.name)) j++;
         if (j > i) {
           const batch = toolCalls.slice(i, j);
-          const out = await Promise.all(batch.map((c) => this.execute(s, c, opts)));
+          const out = await Promise.all(batch.map(exec));
           batch.forEach((c, k) => results.set(c.id, out[k]!));
           i = j;
         } else {
-          results.set(toolCalls[i]!.id, await this.execute(s, toolCalls[i]!, opts));
+          results.set(toolCalls[i]!.id, await exec(toolCalls[i]!));
           i++;
         }
       }
-      for (const call of toolCalls) {
-        const result = results.get(call.id) ?? { ok: false, content: 'Cancelled by the user.' };
+      const resultOf = (call: ToolCall) =>
+        results.get(call.id) ?? { ok: false, content: 'Cancelled by the user.' };
+      if (mode === 'native') {
+        for (const call of toolCalls) {
+          const result = resultOf(call);
+          s.messages.push({
+            role: 'tool',
+            toolCallId: call.id,
+            name: call.name,
+            content: result.content,
+            isError: !result.ok,
+          });
+        }
+        compactToolResults(s.messages);
+      } else {
         s.messages.push({
-          role: 'tool',
-          toolCallId: call.id,
-          name: call.name,
-          content: result.content,
-          isError: !result.ok,
+          role: 'user',
+          content: resultsMessage(
+            toolCalls.map((c) => ({ name: c.name, ...resultOf(c) })),
+            badCalls,
+          ),
         });
       }
-      compactToolResults(s.messages);
       if (opts.signal.aborted) break;
       finalText += '\n\n';
       opts.emit({ type: 'text', delta: '\n\n' });
     }
-    opts.emit({ type: 'cost', ...totals });
+    if (opts.addCost) opts.addCost(totals);
+    else opts.emit({ type: 'cost', ...totals });
     return finalText.trim();
+  }
+
+  private ws(opts: { scope?: AgentScope }): Workspace | undefined {
+    return (opts.scope?.workspace ?? this.workspace)();
+  }
+
+  /** The browser tab of this conversation (or helper), created on first use. */
+  private tab(opts: LoopOpts): BrowserTab | undefined {
+    const browser = opts.scope?.browser ?? this.browser;
+    if (!browser) return undefined;
+    const helper = opts.conversationId.includes(HELPER_SEP);
+    const label = this.modelKey(opts.model) ?? 'IA';
+    return browser.forOwner(opts.conversationId, helper ? `🤝 ${label}` : label);
+  }
+
+  /** Connected models, for list_ai_models. */
+  private async modelList(current: string | undefined): Promise<string> {
+    const lines: string[] = [];
+    for (const p of await this.core.connectedProviders()) {
+      try {
+        const entry = this.core.provider(p.id);
+        const r = await this.core.models.list(await this.core.providerConfig(p.id));
+        const chat = r.models.filter((m) => m.kind === 'chat').slice(0, 40);
+        if (!chat.length) continue;
+        const where =
+          entry.adapter === 'cli-agent'
+            ? 'CLI agent on this computer (own tools)'
+            : entry.category === 'local'
+              ? 'local'
+              : 'cloud';
+        lines.push(`${entry.name} (${where}):`);
+        for (const m of chat) {
+          const ref = `${p.id}/${m.id}`;
+          const price =
+            m.inputPrice !== null ? ` · $${m.inputPrice}/$${m.outputPrice ?? '?'} per 1M tok` : '';
+          const tools = m.capabilities.tools === false ? ' · no native tools' : '';
+          lines.push(
+            `- ${ref}${m.label && m.label !== m.id ? ` (${m.label})` : ''}${tools}${price}${ref === current ? '  ← you' : ''}`,
+          );
+        }
+      } catch {
+        // provider not reachable now: left out
+      }
+      if (lines.length > 400) break;
+    }
+    return lines.length ? lines.join('\n') : 'No AI models are connected.';
+  }
+
+  /**
+   * delegate_to_ai, after the user approved it: runs the helper model on the task. Its
+   * actions appear as tool cards in the same chat (each one approved by the user), its
+   * answer streams into the delegation card and goes back to the caller.
+   */
+  private async delegate(
+    call: ToolCall,
+    target: string,
+    task: string,
+    mode: 'agent' | 'chat',
+    opts: LoopOpts,
+  ): Promise<string> {
+    const helperId = `${opts.conversationId}${HELPER_SEP}${target}`;
+    // What the helper writes reaches the screen and the saved chat like any model text:
+    // through the redactor (a key it repeats is masked even when split across chunks).
+    const red = new StreamRedactor();
+    const out = (chunk: string) => {
+      const safe = red.push(chunk);
+      if (safe) opts.emit({ type: 'tool_output', id: call.id, chunk: safe });
+    };
+    const flush = () => {
+      const rest = red.flush();
+      if (rest) opts.emit({ type: 'tool_output', id: call.id, chunk: rest });
+    };
+    try {
+      return await this.runHelper(call, helperId, target, task, mode, opts, out);
+    } finally {
+      flush();
+    }
+  }
+
+  private async runHelper(
+    call: ToolCall,
+    helperId: string,
+    target: string,
+    task: string,
+    mode: 'agent' | 'chat',
+    opts: LoopOpts,
+    out: (chunk: string) => void,
+  ): Promise<string> {
+    if (mode === 'chat') {
+      let text = '';
+      // A CLI agent answering a question works in the project (or an empty folder), never
+      // in the home folder where it could read credentials.
+      const empty = this.ws(opts) ? undefined : mkdtempSync(join(tmpdir(), 'zx-helper-'));
+      try {
+        for await (const ev of this.core.stream(
+          {
+            model: target,
+            role: 'agent',
+            cwd: this.ws(opts)?.root ?? empty,
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You are helping another AI assistant inside Zinarix Studio. Answer its request directly and completely. Answer in the language of the request.',
+              },
+              { role: 'user', content: task },
+            ],
+          },
+          opts.signal,
+        )) {
+          if (ev.type === 'text') {
+            text += ev.delta;
+            out(ev.delta);
+          } else if (ev.type === 'cost') opts.addCost?.(ev);
+        }
+      } finally {
+        if (empty) await rm(empty, { recursive: true, force: true });
+      }
+      return text.trim();
+    }
+    const label = target;
+    return this.run({
+      conversationId: helperId,
+      model: target,
+      rules: opts.rules,
+      userMessage: { role: 'user', content: task },
+      fallbackHistory: [],
+      signal: opts.signal,
+      scope: opts.scope,
+      depth: opts.depth + 1,
+      addCost: opts.addCost,
+      ask: (id) => opts.ask(`${call.id}>${id}`),
+      emit: (ev) => {
+        switch (ev.type) {
+          case 'text':
+            out(ev.delta);
+            break;
+          case 'tool_call':
+            opts.emit({ ...ev, id: `${call.id}>${ev.id}`, agent: label });
+            break;
+          case 'tool_approval':
+          case 'tool_output':
+          case 'tool_result':
+            opts.emit({ ...ev, id: `${call.id}>${ev.id}` });
+            break;
+          case 'file_changed':
+          case 'notice':
+            opts.emit(ev);
+            break;
+        }
+      },
+    });
   }
 
   private async execute(
     s: Session,
     call: ToolCall,
-    opts: { signal: AbortSignal; emit: Emit; ask: Ask },
+    opts: LoopOpts,
   ): Promise<{ ok: boolean; content: string }> {
     const a = args(call);
-    const ws = this.workspace();
+    const ws = this.ws(opts);
     // The UI (and the saved turn) never gets a raw credential typed into a tool argument.
     opts.emit({ type: 'tool_call', id: call.id, name: call.name, args: viewArgs(call.name, a) });
     const finish = (ok: boolean, content: string, summary: string) => {
@@ -691,6 +1050,7 @@ export class Agent {
       if (
         !ws &&
         !call.name.startsWith('browser_') &&
+        !NO_FOLDER.has(call.name) &&
         !SYSTEM_TOOL_NAMES.has(call.name) &&
         !SECURITY_NO_PROJECT.has(call.name)
       )
@@ -767,13 +1127,16 @@ export class Agent {
         const blocked = blockedReason(str(a.command, 'command'));
         if (blocked) return finish(false, `Refused: ${blocked}.`, blocked);
       }
+      let tab: BrowserTab | undefined;
       if (call.name.startsWith('browser_')) {
-        if (!this.browser) return finish(false, 'The browser is not available.', 'sin navegador');
-        this.browser.reveal();
+        tab = this.tab(opts);
+        if (!tab) return finish(false, 'The browser is not available.', 'sin navegador');
+        const browser = (opts.scope?.browser ?? this.browser)!;
         if (BROWSER_APPROVAL.has(call.name)) {
-          const url = call.name === 'browser_open' ? str(a.url, 'url') : this.browser.state().url;
+          const url = call.name === 'browser_open' ? str(a.url, 'url') : tab.state().url;
           const key = `browser:${hostOf(url)}`;
           if (!s.alwaysAllow.has(key)) {
+            browser.reveal(tab);
             const action =
               call.name === 'browser_open'
                 ? 'abrir'
@@ -797,13 +1160,106 @@ export class Agent {
             if (decision === 'always') s.alwaysAllow.add(key);
           }
         }
+        browser.reveal(tab);
         // From here on the page may only lead to the site this action was approved for, or
-        // to sites approved "always" in this conversation (see BrowserController.setGuard).
+        // to sites approved "always" in this conversation (see BrowserTab.setGuard).
         const here = siteOf(
-          call.name === 'browser_open' ? normalizeUrl(str(a.url, 'url')) : this.browser.state().url,
+          call.name === 'browser_open' ? normalizeUrl(str(a.url, 'url')) : tab.state().url,
         );
-        this.browser.setGuard((site) => site === here || browserSiteAllowed(s, site));
-        this.browser.takeBlocked();
+        tab.setGuard((site) => site === here || browserSiteAllowed(s, site));
+        tab.takeBlocked();
+      }
+
+      if (call.name === 'list_ai_models') {
+        const text = await this.modelList(this.modelKey(opts.model));
+        return finish(
+          true,
+          text,
+          `${text.split('\n').filter((l) => l.startsWith('- ')).length} modelos`,
+        );
+      }
+      if (
+        (call.name === 'delegate_to_ai' || call.name === 'list_ai_models') &&
+        opts.delegation === false
+      )
+        return finish(
+          false,
+          'Delegating to other AIs is not included in the user’s plan (Zinarix Pro). Do the task yourself.',
+          'función de Zinarix Pro',
+        );
+      if (call.name === 'delegate_to_ai') {
+        if (opts.depth > 0)
+          return finish(
+            false,
+            'A helper cannot delegate again. Do the task yourself or say what is missing.',
+            'no permitido',
+          );
+        const task = str(a.task, 'task');
+        const mode = a.mode === 'chat' ? 'chat' : 'agent';
+        let target: string;
+        let cli = false;
+        try {
+          const ref = this.core.resolveModel(str(a.model, 'model'));
+          const entry = this.core.provider(ref.provider);
+          target = `${ref.provider}/${ref.model}`;
+          cli = entry.adapter === 'cli-agent';
+          if (!(await this.core.connectedProviders()).some((p) => p.id === entry.id))
+            return finish(
+              false,
+              `${entry.name} is not connected in Zinarix Studio. Call list_ai_models and pick a connected model.`,
+              'proveedor sin conectar',
+            );
+        } catch (e) {
+          return finish(
+            false,
+            `Unknown model "${String(a.model)}": ${e instanceof Error ? e.message : String(e)}. Call list_ai_models to see the available ones.`,
+            'modelo desconocido',
+          );
+        }
+        if (target === this.modelKey(opts.model) && mode === 'chat')
+          return finish(false, 'That is you: pick a different model.', 'mismo modelo');
+        // A CLI agent (Claude Code, Codex…) edits and runs commands with its OWN permissions
+        // (the provider mode), not through Zinarix's cards: approved one at a time, high risk.
+        const cliActs = cli && mode === 'agent';
+        const key = cliActs ? null : `delegate:${target}:${mode}`;
+        if (!key || !s.alwaysAllow.has(key)) {
+          opts.emit({
+            type: 'tool_approval',
+            id: call.id,
+            name: call.name,
+            args: viewArgs(call.name, a),
+            preview: {
+              risk: cliActs ? 'high' : 'medium',
+              ...(cliActs ? { noAlways: true } : {}),
+              delegate: { model: target, mode },
+              action:
+                mode === 'agent'
+                  ? `pedirle a ${target} que trabaje como su agente`
+                  : `preguntarle a ${target}`,
+              command: redact(task),
+              warning: cliActs
+                ? `${target} es un agente de terminal: editará archivos y ejecutará comandos en tu proyecto con SUS PROPIOS permisos (el modo del proveedor: read, edit o full), sin pedirte cada acción aquí, y Zinarix no podrá revertir esos cambios. Solo el navegador de Zinarix te seguirá pidiendo permiso.`
+                : mode === 'agent'
+                  ? `Esta IA le pasará la tarea a ${target}. Esa IA verá el texto de la tarea y gastará tokens de su proveedor. Cada acción que quiera hacer (editar, comandos, navegador…) también te pedirá permiso aquí.`
+                  : `Esta IA le enviará la pregunta a ${target}, que verá el texto y gastará tokens de su proveedor. Solo responde: no puede hacer acciones.`,
+            },
+          });
+          const decision = await opts.ask(call.id);
+          if (decision === 'deny')
+            return finish(
+              false,
+              'The user did not allow this delegation. Do not retry it; continue yourself or ask the user.',
+              'rechazado',
+            );
+          if (decision === 'always' && key) s.alwaysAllow.add(key);
+        }
+        const answer = await this.delegate(call, target, task, mode, opts);
+        if (opts.signal.aborted) return finish(false, 'Cancelled by the user.', 'cancelado');
+        return finish(
+          true,
+          `Answer from ${target}:\n\n${truncate(answer || '(no answer)', MAX_HELPER_ANSWER)}`,
+          `${target} respondió`,
+        );
       }
 
       // file_hash inside the project is free; outside it, it is an equality oracle on any
@@ -909,7 +1365,13 @@ export class Agent {
             a,
             join(this.core.paths.home, 'backups'),
           );
-          s.checkpoints.push({ path: r.abs, before: r.before, absolute: true, backup: r.backup });
+          s.checkpoints.push({
+            seq: ++checkpointSeq,
+            path: r.abs,
+            before: r.before,
+            absolute: true,
+            backup: r.backup,
+          });
           opts.emit({ type: 'file_changed', path: r.abs });
           return finish(
             true,
@@ -935,7 +1397,7 @@ export class Agent {
           }
           const file = profileFile();
           const before = existsSync(file) ? await readFile(file, 'utf8') : null;
-          s.checkpoints.push({ path: file, before, absolute: true });
+          s.checkpoints.push({ seq: ++checkpointSeq, path: file, before, absolute: true });
           opts.emit({ type: 'file_changed', path: file });
           await mkdir(dirname(file), { recursive: true });
           await writeFile(
@@ -950,7 +1412,7 @@ export class Agent {
           );
         }
       }
-      const br = this.browser!;
+      const br = tab!;
       const page = (snap: PageSnapshot) => {
         const blocked = br.takeBlocked();
         return (
@@ -1141,7 +1603,7 @@ export class Agent {
               `${path}: no aplicado`,
             );
           }
-          s.checkpoints.push({ path, before, root: w.root });
+          s.checkpoints.push({ seq: ++checkpointSeq, path, before, root: w.root });
           await writeFile(
             abs,
             before.replace(oldS, () => newS),
@@ -1157,7 +1619,7 @@ export class Agent {
           const denied = deniedPath(abs, 'write');
           if (denied) return finish(false, denied, `${path}: protegido`);
           const before = existsSync(abs) ? await readFile(abs, 'utf8') : null;
-          s.checkpoints.push({ path, before, root: w.root });
+          s.checkpoints.push({ seq: ++checkpointSeq, path, before, root: w.root });
           await mkdir(dirname(abs), { recursive: true });
           await writeFile(abs, content, 'utf8');
           opts.emit({ type: 'file_changed', path });
@@ -1223,10 +1685,19 @@ export class Agent {
    * files are restored only in the folder they were changed in: with another folder open,
    * the same relative path is a different file and is never overwritten or deleted.
    */
-  async revert(conversationId: string): Promise<string[]> {
-    const s = this.sessions.get(conversationId);
-    const ws = this.workspace();
-    if (!s) return [];
+  async revert(conversationId: string, workspace = this.workspace): Promise<string[]> {
+    // The conversation's own changes and those of the helpers it delegated to, in order.
+    const own = this.sessions.get(conversationId);
+    const helpers = [...this.sessions.entries()]
+      .filter(([id]) => id.startsWith(conversationId + HELPER_SEP))
+      .map(([, h]) => h);
+    if (!own && !helpers.length) return [];
+    const s = {
+      checkpoints: [...(own?.checkpoints ?? []), ...helpers.flatMap((h) => h.checkpoints)].sort(
+        (x, y) => (x.seq ?? 0) - (y.seq ?? 0),
+      ),
+    };
+    const ws = workspace();
     const roots = [...new Set(s.checkpoints.filter((c) => !c.absolute).map((c) => c.root))];
     if (roots.length) {
       const where = roots.filter(Boolean).join(', ') || 'otra carpeta';
@@ -1247,12 +1718,16 @@ export class Agent {
       if (cp.backup) await rm(cp.backup, { force: true });
       if (!restored.includes(cp.path)) restored.push(cp.path);
     }
-    s.checkpoints = [];
+    if (own) own.checkpoints = [];
+    for (const h of helpers) h.checkpoints = [];
     return restored;
   }
 
   changedFiles(conversationId: string): number {
-    return new Set(this.sessions.get(conversationId)?.checkpoints.map((c) => c.path) ?? []).size;
+    const paths = [...this.sessions.entries()]
+      .filter(([id]) => id === conversationId || id.startsWith(conversationId + HELPER_SEP))
+      .flatMap(([, s]) => s.checkpoints.map((c) => c.path));
+    return new Set(paths).size;
   }
 
   /**
@@ -1260,12 +1735,16 @@ export class Agent {
    * the next turn is rebuilt from the history the UI sends (used by regenerate / edit).
    */
   resetMessages(conversationId: string): void {
+    // Never under a run in progress (another tab or window is using this conversation).
+    if (this.active.has(conversationId)) return;
     const s = this.sessions.get(conversationId);
     if (s) s.messages = [];
   }
 
   forget(conversationId: string): void {
-    this.sessions.delete(conversationId);
+    for (const id of [...this.sessions.keys()])
+      if (id === conversationId || id.startsWith(conversationId + HELPER_SEP))
+        this.sessions.delete(id);
   }
 }
 

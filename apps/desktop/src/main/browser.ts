@@ -133,11 +133,7 @@ export function normalizeUrl(input: string): string {
   return url.toString();
 }
 
-/**
- * The embedded browser: a sandboxed WebContentsView in its own session partition (no
- * Node, no preload, no downloads, no device permissions). The renderer reserves the area
- * where it is drawn; the agent drives it through the methods below.
- */
+/** Host of a URL without "www." (the unit browser approvals are given for). */
 export function siteOf(url: string): string {
   try {
     return new URL(url).host.toLowerCase().replace(/^www\./, '');
@@ -146,9 +142,13 @@ export function siteOf(url: string): string {
   }
 }
 
-export class BrowserController {
-  private view: WebContentsView | null = null;
-  private visible = false;
+/** One page of the built-in browser: a user tab, or the tab of one AI conversation. */
+export class BrowserTab {
+  view: WebContentsView | null = null;
+  /** Last time an AI acted on this tab (ms), to know who is driving what. */
+  lastAgentAt = 0;
+  /** Closed by the user (or pruned): it never gets a page again. */
+  closed = false;
   /**
    * While the agent drives the page, navigations to sites it has no approval for are
    * stopped (a click, a script or a redirect could carry data to another site). The
@@ -156,6 +156,14 @@ export class BrowserController {
    */
   private guard: ((site: string) => boolean) | null = null;
   private blockedUrl: string | null = null;
+
+  constructor(
+    readonly id: string,
+    /** Conversation (agent session) that owns the tab; null = the user's own tab. */
+    readonly owner: string | null,
+    public label: string,
+    private readonly host: BrowserController,
+  ) {}
 
   setGuard(allowed: ((site: string) => boolean) | null): void {
     this.guard = allowed;
@@ -174,21 +182,14 @@ export class BrowserController {
     return false;
   }
 
-  constructor(
-    private readonly win: () => BrowserWindow | undefined,
-    private readonly onState: (s: BrowserState) => void,
-    private readonly onShow: () => void = () => {},
-  ) {}
-
-  /** Asks the UI to show the browser tab (the agent is about to use it). */
-  reveal(): void {
-    this.onShow();
-  }
-
-  private ensure(): WebContentsView {
+  ensure(): WebContentsView {
+    if (this.closed)
+      throw new Error(
+        'Se cerró la pestaña del navegador de esta conversación. Usa browser_open para abrir la página otra vez.',
+      );
     if (this.view && !this.view.webContents.isDestroyed()) return this.view;
     const ses = session.fromPartition(PARTITION);
-    // The partition's session outlives the view: set it up once, not on every new view.
+    // The partition's session outlives the views: set it up once, not on every new view.
     if (!configured.has(ses)) {
       configured.add(ses);
       ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
@@ -209,7 +210,7 @@ export class BrowserController {
     view.setBorderRadius(10);
     const wc = view.webContents;
     wc.setWindowOpenHandler(({ url }) => {
-      // Popups open in the same view.
+      // Popups open in the same tab.
       if (/^https?:/i.test(url) && this.allowed(url)) wc.loadURL(url).catch(() => {});
       return { action: 'deny' };
     });
@@ -219,7 +220,7 @@ export class BrowserController {
     wc.on('will-redirect', (e, url, _inPlace, isMainFrame) => {
       if (isMainFrame && (!/^https?:/i.test(url) || !this.allowed(url))) e.preventDefault();
     });
-    const emit = () => this.onState(this.state());
+    const emit = () => this.host.changed(this);
     for (const ev of [
       'did-start-loading',
       'did-stop-loading',
@@ -232,8 +233,9 @@ export class BrowserController {
     // A real size even while hidden, so pages lay out and the agent can work in the background.
     view.setBounds({ x: 0, y: 0, width: 1280, height: 800 });
     view.setVisible(false);
-    this.win()?.contentView.addChildView(view);
+    this.host.attach(view);
     this.view = view;
+    this.host.layout();
     return view;
   }
 
@@ -249,14 +251,6 @@ export class BrowserController {
       canGoBack: wc.navigationHistory.canGoBack(),
       canGoForward: wc.navigationHistory.canGoForward(),
     };
-  }
-
-  /** Called by the renderer with the on-screen area reserved for the page. */
-  setBounds(rect: Rectangle | null): void {
-    const view = this.ensure();
-    this.visible = Boolean(rect && rect.width > 0 && rect.height > 0);
-    if (rect && this.visible) view.setBounds(rect);
-    view.setVisible(this.visible);
   }
 
   async navigate(input: string): Promise<BrowserState> {
@@ -392,12 +386,265 @@ export class BrowserController {
     await new Promise((r) => setTimeout(r, 300));
   }
 
+  toView(): BrowserTabView {
+    const st = this.state();
+    return {
+      id: this.id,
+      title: st.title,
+      url: st.url,
+      loading: st.loading,
+      owner: this.owner,
+      label: this.label,
+      ai: this.owner !== null,
+    };
+  }
+
+  destroy(): void {
+    this.closed = true;
+    if (this.view && !this.view.webContents.isDestroyed()) {
+      this.host.detach(this.view);
+      this.view.webContents.close();
+    }
+    this.view = null;
+  }
+}
+
+export interface BrowserTabView {
+  id: string;
+  title: string;
+  url: string;
+  loading: boolean;
+  /** Conversation that owns the tab (null: the user's own tab). */
+  owner: string | null;
+  /** Who uses it: "Tú" or the AI model of that conversation. */
+  label: string;
+  ai: boolean;
+}
+
+/** More tabs than this: the oldest idle AI tab is closed. */
+const MAX_TABS = 8;
+/** An AI tab used this recently belongs to a conversation that may still be working. */
+const BUSY_MS = 120_000;
+/** An AI that acted on the visible tab this recently is still "driving" it. */
+const DRIVING_MS = 5000;
+
+/**
+ * The embedded browser of one window: sandboxed WebContentsViews in their own session
+ * partition (no Node, no preload, no downloads, no device permissions), one per tab.
+ * Each AI conversation gets its own tab, so two agents working at the same time never
+ * fight over the same page; all tabs share cookies (a login done by the user serves them).
+ */
+export class BrowserController {
+  private readonly tabs = new Map<string, BrowserTab>();
+  private activeId: string | null = null;
+  private bounds: Rectangle | null = null;
+  private visible = false;
+  private seq = 0;
+
+  constructor(
+    private readonly win: () => BrowserWindow | undefined,
+    private readonly onState: (s: BrowserState) => void,
+    private readonly onShow: (tabId: string) => void = () => {},
+    private readonly onTabs: (v: {
+      tabs: BrowserTabView[];
+      active: string | null;
+    }) => void = () => {},
+  ) {}
+
+  /** @internal BrowserTab hooks. */
+  attach(view: WebContentsView): void {
+    this.win()?.contentView.addChildView(view);
+  }
+  detach(view: WebContentsView): void {
+    try {
+      this.win()?.contentView.removeChildView(view);
+    } catch {
+      // window already gone
+    }
+  }
+  changed(tab: BrowserTab): void {
+    if (tab.id === this.activeId) this.onState(tab.state());
+    this.emitTabs();
+  }
+
+  private emitTabs(): void {
+    this.onTabs(this.view());
+  }
+
+  view(): { tabs: BrowserTabView[]; active: string | null } {
+    return { tabs: [...this.tabs.values()].map((t) => t.toView()), active: this.activeId };
+  }
+
+  private create(owner: string | null, label: string): BrowserTab {
+    const tab = new BrowserTab(`t${++this.seq}`, owner, label, this);
+    if (owner !== null) tab.lastAgentAt = Date.now();
+    this.tabs.set(tab.id, tab);
+    this.prune(tab);
+    return tab;
+  }
+
+  /**
+   * Keeps the number of live pages bounded: closes the oldest AI tab that nobody is looking
+   * at and no AI used lately (never the one just opened). With none, the limit waits.
+   */
+  private prune(keep: BrowserTab): void {
+    const now = Date.now();
+    while (this.tabs.size > MAX_TABS) {
+      const victim = [...this.tabs.values()]
+        .filter(
+          (t) =>
+            t !== keep &&
+            t.id !== this.activeId &&
+            t.owner !== null &&
+            now - t.lastAgentAt > BUSY_MS,
+        )
+        .sort((a, b) => a.lastAgentAt - b.lastAgentAt)[0];
+      if (!victim) break;
+      this.close(victim.id);
+    }
+  }
+
+  /** The tab the user sees (a user tab is created when there is none). */
+  active(): BrowserTab {
+    const cur = this.activeId ? this.tabs.get(this.activeId) : undefined;
+    if (cur) return cur;
+    const first = this.tabs.values().next().value as BrowserTab | undefined;
+    const tab = first ?? this.create(null, 'Tú');
+    this.activeId = tab.id;
+    this.layout();
+    this.emitTabs();
+    return tab;
+  }
+
+  /** The tab of one AI conversation (created on first use). */
+  forOwner(owner: string, label: string): BrowserTab {
+    for (const t of this.tabs.values())
+      if (t.owner === owner) {
+        if (label) t.label = label;
+        return t;
+      }
+    const tab = this.create(owner, label || 'IA');
+    // The very first tab becomes the visible one.
+    if (!this.activeId) this.activeId = tab.id;
+    this.emitTabs();
+    return tab;
+  }
+
+  /**
+   * An AI is about to act on its tab: show it, unless another AI is driving the visible
+   * tab right now (two agents at once never yank the view back and forth).
+   */
+  reveal(tab: BrowserTab): void {
+    const now = Date.now();
+    const cur = this.activeId ? this.tabs.get(this.activeId) : undefined;
+    tab.lastAgentAt = now;
+    if (!cur || cur === tab || cur.owner === null || now - cur.lastAgentAt > DRIVING_MS)
+      this.select(tab.id);
+    this.onShow(tab.id);
+  }
+
+  select(id: string): void {
+    if (!this.tabs.has(id)) return;
+    this.activeId = id;
+    this.layout();
+    this.onState(this.state());
+    this.emitTabs();
+  }
+
+  close(id: string): void {
+    const tab = this.tabs.get(id);
+    if (!tab) return;
+    const order = [...this.tabs.keys()];
+    const idx = order.indexOf(id);
+    tab.destroy();
+    this.tabs.delete(id);
+    if (this.activeId === id) {
+      const rest = [...this.tabs.keys()];
+      this.activeId = rest[Math.min(idx, rest.length - 1)] ?? null;
+    }
+    this.layout();
+    this.onState(this.state());
+    this.emitTabs();
+  }
+
+  /** A new, empty tab for the user. */
+  newTab(): string {
+    const tab = this.create(null, 'Tú');
+    this.select(tab.id);
+    return tab.id;
+  }
+
+  /** Places the visible tab in the area the renderer reserved; null hides every page. */
+  layout(): void {
+    for (const t of this.tabs.values()) {
+      if (!t.view || t.view.webContents.isDestroyed()) continue;
+      const show = t.id === this.activeId && this.visible && this.bounds;
+      if (show) t.view.setBounds(this.bounds!);
+      t.view.setVisible(Boolean(show));
+    }
+  }
+
+  state(): BrowserState {
+    const cur = this.activeId ? this.tabs.get(this.activeId) : undefined;
+    return (
+      cur?.state() ?? { url: '', title: '', loading: false, canGoBack: false, canGoForward: false }
+    );
+  }
+
+  /** Called by the renderer with the on-screen area reserved for the page. */
+  setBounds(rect: Rectangle | null): void {
+    this.visible = Boolean(rect && rect.width > 0 && rect.height > 0);
+    if (rect && this.visible) this.bounds = rect;
+    if (this.visible) this.active().ensure();
+    this.layout();
+  }
+
+  // ---- the user's own navigation (address bar, buttons). It acts on the tab the user was
+  // looking at (the renderer says which: an AI may have switched the view meanwhile).
+
+  private userTarget(tabId: string | null): BrowserTab {
+    return (tabId ? this.tabs.get(tabId) : undefined) ?? this.active();
+  }
+
+  /**
+   * What the user types in the address bar opens in a tab of their own, never in an AI's:
+   * a page the user opens (their bank, their mail) must not end up where an agent reads.
+   */
+  navigate(input: string, tabId: string | null = null): Promise<BrowserState> {
+    let tab = this.userTarget(tabId);
+    if (tab.owner !== null) {
+      tab = [...this.tabs.values()].find((t) => t.owner === null) ?? this.create(null, 'Tú');
+      this.select(tab.id);
+    }
+    tab.setGuard(null);
+    return tab.navigate(input);
+  }
+
+  // Back, forward, reload and home stay within the tab's own history, so an AI tab keeps
+  // its site guard.
+  home(tabId: string | null = null): void {
+    this.userTarget(tabId).home();
+  }
+
+  back(tabId: string | null = null): void {
+    this.userTarget(tabId).back();
+  }
+
+  forward(tabId: string | null = null): void {
+    this.userTarget(tabId).forward();
+  }
+
+  reload(tabId: string | null = null): void {
+    this.userTarget(tabId).reload();
+  }
+
   isVisible(): boolean {
     return this.visible;
   }
 
   destroy(): void {
-    if (this.view && !this.view.webContents.isDestroyed()) this.view.webContents.close();
-    this.view = null;
+    for (const t of this.tabs.values()) t.destroy();
+    this.tabs.clear();
+    this.activeId = null;
   }
 }

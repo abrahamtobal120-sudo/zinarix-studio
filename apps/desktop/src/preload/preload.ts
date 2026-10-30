@@ -88,6 +88,10 @@ const api: OmniApi = {
     reload: call('browser:reload') as OmniApi['browser']['reload'],
     state: call('browser:state') as OmniApi['browser']['state'],
     home: call('browser:home') as OmniApi['browser']['home'],
+    tabs: call('browser:tabs') as OmniApi['browser']['tabs'],
+    selectTab: call('browser:selectTab') as OmniApi['browser']['selectTab'],
+    closeTab: call('browser:closeTab') as OmniApi['browser']['closeTab'],
+    newTab: call('browser:newTab') as OmniApi['browser']['newTab'],
   },
   terminal: {
     create: call('terminal:create') as OmniApi['terminal']['create'],
@@ -100,8 +104,15 @@ const api: OmniApi = {
     setPrefs: call('app:setPrefs') as OmniApi['app']['setPrefs'],
     openExternal: call('app:openExternal') as OmniApi['app']['openExternal'],
     quit: call('app:quit') as OmniApi['app']['quit'],
+    newWindow: call('app:newWindow') as OmniApi['app']['newWindow'],
+    installUpdate: call('app:installUpdate') as OmniApi['app']['installUpdate'],
     pathForFile: (file: File) => webUtils.getPathForFile(file),
     platform: process.platform,
+  },
+  license: {
+    status: call('license:status') as OmniApi['license']['status'],
+    activate: call('license:activate') as OmniApi['license']['activate'],
+    remove: call('license:remove') as OmniApi['license']['remove'],
   },
   on(listener) {
     const handler = (_e: unknown, ev: AppEvent) => listener(ev);

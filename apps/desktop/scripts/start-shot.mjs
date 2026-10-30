@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const out = process.argv[2] ?? tmpdir();
 const home = mkdtempSync(join(tmpdir(), 'zs-start-'));
-const proj = join(home, 'mi-proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'mi-proyecto');
 mkdirSync(proj);
 writeFileSync(join(proj, 'app.js'), 'console.log("hola");\n');
 writeFileSync(

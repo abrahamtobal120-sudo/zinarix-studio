@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-11",
+  "generatedAt": "2026-10-22",
   "providers": [
     {
       "id": "openai",
@@ -932,6 +932,58 @@
       "status": "active",
       "verifiedAt": "2026-10-06",
       "notes": "Endpoint is /chat/completions with OpenAI-like request shape (model, messages, Bearer auth) but docs do not explicitly state OpenAI compatibility; no models-list endpoint documented. Dated ids exist (jamba-large-1.7-2025-07, jamba-mini-2-2026-01); docs recommend pinning. Streaming incompatible with tools."
+    },
+    {
+      "id": "perplexity",
+      "name": "Perplexity AI",
+      "adapter": "openai-responses",
+      "baseUrl": "https://api.perplexity.ai/v1",
+      "baseUrlParams": [],
+      "auth": {
+        "type": "bearer",
+        "header": "Authorization"
+      },
+      "envVars": [
+        "PERPLEXITY_API_KEY"
+      ],
+      "docsUrl": "https://docs.perplexity.ai/docs/agent-api/openai-compatibility",
+      "keyUrl": "https://console.perplexity.ai",
+      "region": "global",
+      "category": "aggregator",
+      "modelsEndpoint": "/models",
+      "supports": {
+        "listModels": true,
+        "streaming": true,
+        "tools": true,
+        "vision": false,
+        "jsonMode": true,
+        "embeddings": false,
+        "fim": false
+      },
+      "fallbackModels": [
+        {
+          "id": "perplexity/sonar",
+          "label": "Perplexity Sonar",
+          "inputPrice": 0.25,
+          "outputPrice": 2.5,
+          "cachedInputPrice": 0.0625,
+          "tools": false,
+          "vision": false
+        },
+        {
+          "id": "perplexity/nemotron-3.5-super-120b-a12b",
+          "label": "Nemotron 3.5 Super",
+          "context": 1048576,
+          "inputPrice": 0.2,
+          "outputPrice": 0.5,
+          "cachedInputPrice": 0.04,
+          "vision": false,
+          "reasoning": true
+        }
+      ],
+      "status": "active",
+      "verifiedAt": "2026-10-22",
+      "notes": "Agent API via the documented /v1/responses alias for /v1/agent. Base URL, Bearer authentication, /models, streaming and model IDs/prices verified against official documentation; no live credential test. Legacy Sonar Chat Completions support ended 2026-09-27. Models have different capabilities; Search and Embeddings APIs are separate and are not exposed by this adapter. Token prices do not include server-side search/tool fees. Sources: https://docs.perplexity.ai/docs/agent-api/models and https://docs.perplexity.ai/docs/agent-api/openai-compatibility."
     },
     {
       "id": "openrouter",

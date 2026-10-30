@@ -9,7 +9,8 @@ import { execFileSync } from 'node:child_process';
 const out = process.argv[2] ?? tmpdir();
 const url = process.argv[3] ?? 'https://example.com';
 const home = mkdtempSync(join(tmpdir(), 'zs-bshot-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 mkdirSync(proj);
 writeFileSync(join(proj, 'index.html'), '<h1>hola</h1>');
 const app = await electron.launch({

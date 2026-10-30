@@ -7,6 +7,7 @@ import { Explorer } from './components/Explorer';
 import { GitPanel } from './components/GitPanel';
 import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
+import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
 import { RunPanel } from './components/RunPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
@@ -17,6 +18,7 @@ import {
   loadPrefs,
   openBrowserTab,
   refreshGitBadge,
+  refreshLicense,
   openDropped,
   refreshModels,
   refreshSettings,
@@ -57,6 +59,7 @@ export function App() {
   const sidebar = useStore((s) => s.sidebar);
   const panelOpen = useStore((s) => s.panelOpen);
   const chatOpen = useStore((s) => s.chatOpen);
+  const chatSplit = useStore((s) => Boolean(s.chatSplit));
   const toast = useStore((s) => s.toast);
   const [sideW, setSideW] = useState(260);
   const [chatW, setChatW] = useState(400);
@@ -112,6 +115,11 @@ export function App() {
     if (panelOpen) setTerminalMounted(true);
   }, [panelOpen]);
 
+  // Two chats side by side need room: widen the panel (the user can still drag it).
+  useEffect(() => {
+    if (chatSplit) setChatW((w) => Math.max(w, Math.min(760, window.innerWidth * 0.55)));
+  }, [chatSplit]);
+
   // Shortcuts customised in Settings (the built-in ones live in the app menu).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -139,10 +147,14 @@ export function App() {
 
   useEffect(() => {
     void (async () => {
-      await Promise.all([refreshSettings(), loadPrefs()]);
+      await Promise.all([refreshSettings(), loadPrefs(), refreshLicense()]);
       applyTheme(getState().settings.theme);
       setState({ workspace: await api().workspace.current() });
-      void refreshModels();
+      await refreshModels().catch(() => undefined);
+      // The guided setup (no AI connected yet) or what's new in this version, once.
+      const s = getState();
+      if (s.settings.intro)
+        introOnStart(s.settings.version, s.models.length > 0 || Boolean(s.settings.defaultModel));
     })();
     return api().on((ev) => {
       if (ev.type === 'workspace') {
@@ -151,7 +163,24 @@ export function App() {
       }
       if (ev.type === 'fs:changed') setState((s) => ({ fsVersion: s.fsVersion + 1 }));
       if (ev.type === 'command') void runCommand(ev.command);
+      if (ev.type === 'update')
+        setState((s) => ({
+          // "ready" (restart) wins over a later "available" for the same version.
+          update:
+            s.update?.state === 'ready' && s.update.version === ev.version
+              ? s.update
+              : { state: ev.state, version: ev.version, url: ev.url },
+        }));
+      if (ev.type === 'notice' && !noticeSeen(ev.id))
+        setState({ notice: { id: ev.id, text: ev.text, url: ev.url } });
       if (ev.type === 'browser:show') openBrowserTab();
+      // Another window changed models, keys, theme or preferences.
+      if (ev.type === 'settings:changed')
+        void (async () => {
+          await Promise.all([refreshSettings(), loadPrefs(), refreshLicense()]);
+          applyTheme(getState().settings.theme);
+          void refreshModels();
+        })();
     });
   }, []);
 
@@ -188,7 +217,10 @@ export function App() {
         </div>
         {/* Kept mounted while hidden so the conversation survives toggling the panel. */}
         {chatOpen && (
-          <Sash dir="x" onDrag={(d) => setChatW((w) => Math.min(900, Math.max(280, w - d)))} />
+          <Sash
+            dir="x"
+            onDrag={(d) => setChatW((w) => Math.min(chatSplit ? 1600 : 900, Math.max(280, w - d)))}
+          />
         )}
         <aside className="chat-wrap" style={{ width: chatW, display: chatOpen ? 'flex' : 'none' }}>
           <ChatPanel />
@@ -196,6 +228,10 @@ export function App() {
       </div>
       <StatusBar />
       <Modals />
+      <div className="app-banners">
+        <NoticeBanner />
+        <UpdateBanner />
+      </div>
       {toast && <div className="toast">{toast}</div>}
       {dragging && (
         <div className="drop-overlay">

@@ -47,7 +47,8 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.once('listening', r));
 
 const home = mkdtempSync(join(tmpdir(), 'zs-hist-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 mkdirSync(proj);
 writeFileSync(join(proj, 'a.txt'), 'hola');
 writeFileSync(
@@ -87,7 +88,7 @@ const launch = () =>
     env: { ...process.env, OMNI_HOME: home, OMNI_NO_KEYCHAIN: '1' },
   });
 const ask = async (win, text) => {
-  await win.locator('.chat-input textarea').fill(text);
+  await win.locator('.chat-session:visible .chat-input textarea').fill(text);
   await win.keyboard.press('Enter');
 };
 
@@ -96,31 +97,37 @@ let app = await launch();
 let win = await app.firstWindow();
 await win.waitForSelector('.tree-row');
 await ask(win, 'primer chat con el agente');
-await win.waitForSelector('text=Respuesta a:', { timeout: 20000 });
+await win.waitForSelector('.chat-session:visible >> text=Respuesta a:', { timeout: 20000 });
 await ask(win, 'segunda pregunta en el mismo chat');
 await win.waitForFunction(() => document.querySelectorAll('.turn.assistant').length === 2, null, {
   timeout: 20000,
 });
 await win.waitForTimeout(500);
-await win.locator('button[title="Nueva conversación"], button[title="New conversation"]').click();
-await win.locator('.agent-toggle input').uncheck();
+// A new chat opens in its own tab (the first one stays as it was).
+await win.locator('.chat-tabs-bar .sidebar-actions button').first().click();
+if (await win.locator('.chat-session:visible .agent-toggle input').isChecked())
+  await win.locator('.chat-session:visible .agent-toggle').click();
 await ask(win, 'otro chat distinto sin agente');
-await win.waitForSelector('text=Respuesta a:', { timeout: 20000 });
+await win.waitForSelector('.chat-session:visible >> text=Respuesta a:', { timeout: 20000 });
 await win.waitForTimeout(500);
 await app.close();
 
 // Session 2: the last conversation is restored; history lists both.
 app = await launch();
 win = await app.firstWindow();
-await win.waitForSelector('.turn.user', { timeout: 15000 });
+await win.waitForSelector('.chat-session:visible .turn.user', { timeout: 15000 });
 const restored = await win.locator('.turn-user').allTextContents();
-await win.locator('button[title="Historial de chats"], button[title="Chat history"]').click();
+await win
+  .locator(
+    '.chat-tabs-bar button[title="Historial de chats"], .chat-tabs-bar button[title="Chat history"]',
+  )
+  .click();
 await win.waitForSelector('.ch-item');
 const items = await win.locator('.ch-name').allTextContents();
 await win.waitForTimeout(300);
 await win.screenshot({ path: join(out, 'history-panel.png') });
 await win.locator('.ch-item', { hasText: 'primer chat' }).click();
-await win.waitForSelector('.tool-card');
+await win.waitForSelector('.chat-session:visible .tool-card');
 const agentTurns = await win.locator('.turn-user').allTextContents();
 const toolCards = await win.locator('.tool-card').count();
 await win.waitForTimeout(300);

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const home = mkdtempSync(join(tmpdir(), 'zs-replace-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 mkdirSync(join(proj, 'src'), { recursive: true });
 writeFileSync(join(proj, 'src', 'a.js'), 'const color = "rojo";\nlet rojoClaro = 1;\n');
 writeFileSync(join(proj, 'src', 'b.js'), 'export const rojo = "rojo";\n');

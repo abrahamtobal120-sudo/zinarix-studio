@@ -28,6 +28,7 @@ import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
 import { ProviderLogo } from './ProviderLogo';
 import type { PickItem } from './QuickPick';
+import { LicensePanel, Onboarding, UpgradeModal, WhatsNew } from './Plan';
 
 const close = () => setState({ modal: null });
 
@@ -38,7 +39,7 @@ export function Modals() {
     <>
       {modal?.kind === 'palette' && <Palette />}
       {modal?.kind === 'quickOpen' && <QuickOpen />}
-      {modal?.kind === 'models' && <ModelPicker role={modal.role} />}
+      {modal?.kind === 'models' && <ModelPicker role={modal.role} pick={modal.pick} />}
       {modal?.kind === 'providers' && <Providers focus={modal.focus} />}
       {modal?.kind === 'aiEdit' && <AiEdit />}
       {modal?.kind === 'shortcuts' && <Shortcuts />}
@@ -50,6 +51,10 @@ export function Modals() {
       {modal?.kind === 'commit' && <CommitView hash={modal.hash} subject={modal.subject} />}
       {modal?.kind === 'clone' && <CloneRepo />}
       {modal?.kind === 'publish' && <PublishRepo />}
+      {modal?.kind === 'license' && <LicensePanel />}
+      {modal?.kind === 'upgrade' && <UpgradeModal feature={modal.feature} />}
+      {modal?.kind === 'welcome' && <Onboarding />}
+      {modal?.kind === 'whatsNew' && <WhatsNew />}
       {inputBox && <InputBox />}
     </>
   );

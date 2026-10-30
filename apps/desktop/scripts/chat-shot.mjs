@@ -49,7 +49,8 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.once('listening', r));
 
 const home = mkdtempSync(join(tmpdir(), 'zs-chat-'));
-const proj = join(home, 'proyecto');
+// Outside OMNI_HOME: the agent never touches the app's own data folder.
+const proj = join(mkdtempSync(join(tmpdir(), 'zs-ws-')), 'proyecto');
 mkdirSync(proj);
 writeFileSync(join(proj, 'a.txt'), 'hola');
 writeFileSync(

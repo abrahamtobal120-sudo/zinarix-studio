@@ -6,6 +6,10 @@ import {
   askText,
   closeTab,
   dirtyCount,
+  newChat,
+  requirePro,
+  runningChats,
+  toggleChatSplit,
   getEditor,
   getState,
   openBrowserTab,
@@ -178,6 +182,38 @@ function baseCommands(): Command[] {
       run: () => sendTerminalToChat(),
     },
     {
+      id: 'chat.new',
+      label: t('chatNewTab'),
+      keys: `${mod}+Alt+N`,
+      run: () => newChat(),
+    },
+    {
+      id: 'chat.split',
+      label: `${t('chatSplit')} / ${t('chatUnsplit').toLowerCase()}`,
+      keys: `${mod}+Alt+D`,
+      run: () => toggleChatSplit(),
+    },
+    {
+      id: 'app.newWindow',
+      label: t('newWindow'),
+      keys: `${mod}+Shift+N`,
+      run: async () => {
+        if (!requirePro('windows')) return;
+        if (!(await api().app.newWindow()))
+          setState({ modal: { kind: 'upgrade', feature: 'windows' } });
+      },
+    },
+    {
+      id: 'license.open',
+      label: `${t('planTitle')}…`,
+      run: () => setState({ modal: { kind: 'license' } }),
+    },
+    {
+      id: 'app.whatsNew',
+      label: t('newsMenu'),
+      run: () => setState({ modal: { kind: 'whatsNew' } }),
+    },
+    {
       id: 'view.chat',
       label: t('cmdToggle', { what: t('chat').toLowerCase() }),
       keys: `${mod}+Alt+I`,
@@ -303,10 +339,14 @@ function baseCommands(): Command[] {
     },
     {
       id: 'app.requestClose',
-      label: t('cmdQuit'),
+      label: t('closeWindow'),
+      keys: `${mod}+Shift+W`,
       run: () => {
         const n = dirtyCount();
         if (n && !confirm(t('unsavedQuit', { n }))) return;
+        // Closing the window stops its chats: say so when some are still working.
+        const busy = runningChats();
+        if (busy && !confirm(t('chatsBusyQuit', { n: busy }))) return;
         void api().app.quit();
       },
     },
@@ -320,6 +360,9 @@ function askInChatWithSelection(path: string, text: string, from: number, to: nu
 }
 
 export async function runCommand(id: string): Promise<void> {
+  // From main: a Pro feature was asked for (menu, second launch) on a plan without it.
+  const up = /^license\.upgrade:(chats|split|windows)$/.exec(id);
+  if (up) return setState({ modal: { kind: 'upgrade', feature: up[1] as 'chats' } });
   const c = commands().find((x) => x.id === id);
   try {
     await c?.run();
