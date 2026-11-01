@@ -13,7 +13,7 @@ const errors = [];
 win.on('pageerror', (e) => errors.push(e.message));
 await win.waitForSelector('.drop-zone', { timeout: 20000 });
 const providers = await win.evaluate(() => window.omni.ai.providers().then((p) => p.length));
-const term = await win.evaluate(() => window.omni.terminal.create(80, 24));
+const term = await win.evaluate(() => window.omni.terminal.create(80, 24).then((t) => t?.id));
 console.log(
   'packaged app OK · providers:',
   providers,

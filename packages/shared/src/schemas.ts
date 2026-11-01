@@ -13,6 +13,8 @@ export const CliProfile = z.enum([
   'copilot',
   'opencode',
   'amp',
+  /** Any other CLI added by the user: prompt on stdin, plain-text answer, fixed extra args. */
+  'generic',
 ]);
 export type CliProfile = z.infer<typeof CliProfile>;
 
@@ -112,7 +114,15 @@ export const CatalogEntry = z.object({
    * catalog; the user may only point it at another path through the `command` param.
    */
   cli: z
-    .object({ profile: CliProfile, command: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/) })
+    .object({
+      profile: CliProfile,
+      command: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/),
+      /** Extra arguments, only for the "generic" profile (user-added CLIs). */
+      args: z
+        .array(z.string().regex(/^[A-Za-z0-9._:/@=+,-]+$/))
+        .max(20)
+        .optional(),
+    })
     .optional(),
   status: z.enum(['active', 'deprecated', 'unverified']),
   verifiedAt: z.string().nullable(),

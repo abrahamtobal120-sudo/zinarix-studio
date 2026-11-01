@@ -50,7 +50,34 @@ export interface ProviderView {
   /** Catalog models (shown even before the provider is connected). */
   models: CatalogModelView[];
   local: boolean;
+  /** Added by the user (API endpoint or CLI not in the catalog); can be deleted. */
+  custom: boolean;
 }
+
+/** A provider the user adds by hand: an API endpoint or a terminal agent (CLI). */
+export type CustomProviderSpec =
+  | {
+      kind: 'api';
+      name: string;
+      adapter: 'openai-compatible' | 'openai-responses' | 'anthropic' | 'google-gemini';
+      baseUrl: string;
+      /** Header that carries the key (e.g. x-api-key); empty = Authorization: Bearer. */
+      authHeader?: string;
+      noAuth?: boolean;
+      local?: boolean;
+      /** Model ids to offer when the endpoint cannot list them. */
+      models?: string[];
+    }
+  | {
+      kind: 'cli';
+      name: string;
+      /** Program name in the PATH (or file name; the full path goes in the "command" param). */
+      command: string;
+      /** Output format of a known CLI, or "generic" (prompt on stdin, plain-text answer). */
+      profile: string;
+      args?: string[];
+      models?: string[];
+    };
 
 export interface CatalogModelView {
   id: string;
@@ -179,6 +206,8 @@ export interface GitStatusView {
   files: GitFileView[];
   hasCommits: boolean;
   remotes: string[];
+  /** https page of the "origin" remote (GitHub, GitLab…), when it can be derived. */
+  webUrl: string | null;
 }
 export interface GitCommitView {
   hash: string;
@@ -194,6 +223,23 @@ export interface GitBranchView {
   remote: boolean;
   upstream?: string;
 }
+export interface GitStashView {
+  /** "stash@{0}" */
+  ref: string;
+  message: string;
+  date: string;
+}
+export interface GitHubPrView {
+  number: number;
+  title: string;
+  url: string;
+  state: 'OPEN' | 'CLOSED' | 'MERGED';
+  isDraft: boolean;
+  /** "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | "" */
+  review: string;
+  /** Combined CI checks of the PR head. */
+  checks: 'pass' | 'fail' | 'pending' | 'none';
+}
 export interface GitHubStatus {
   installed: boolean;
   loggedIn: boolean;
@@ -205,6 +251,98 @@ export interface GitHubRepoView {
   private: boolean;
   updatedAt: string;
   url: string;
+}
+
+export interface VercelStatus {
+  connected: boolean;
+  /** Where the token came from: pasted in the app, or the Vercel CLI login on this machine. */
+  source: 'app' | 'cli' | null;
+  user: string | null;
+  teams: { id: string; name: string; slug: string }[];
+  /** Vercel CLI on PATH (deploys run in the terminal). */
+  cli: boolean;
+}
+export interface VercelProjectView {
+  id: string;
+  name: string;
+  framework: string | null;
+  /** Team id, or null for the personal account. */
+  teamId: string | null;
+  repo: string | null;
+  updatedAt: number;
+}
+export interface VercelDeploymentView {
+  id: string;
+  url: string;
+  state: 'QUEUED' | 'INITIALIZING' | 'BUILDING' | 'READY' | 'ERROR' | 'CANCELED' | string;
+  target: 'production' | 'preview' | string;
+  created: number;
+  branch: string | null;
+  commit: string | null;
+  sha: string | null;
+  creator: string | null;
+  inspectorUrl: string | null;
+}
+export interface VercelEnvView {
+  key: string;
+  targets: string[];
+  type: string;
+}
+export interface VercelProjectInfo {
+  domains: { name: string; verified: boolean }[];
+  envs: VercelEnvView[];
+}
+
+export interface SupabaseStatus {
+  connected: boolean;
+  /** Where the token came from: pasted in the app, or the Supabase CLI login on this machine. */
+  source: 'app' | 'cli' | null;
+  orgs: { id: string; name: string }[];
+  /** Supabase CLI on PATH (migrations and functions run in the terminal). */
+  cli: boolean;
+}
+export interface SupabaseProjectView {
+  ref: string;
+  name: string;
+  orgId: string;
+  region: string;
+  /** ACTIVE_HEALTHY, INACTIVE (paused), COMING_UP, RESTORING… */
+  status: string;
+  created: number;
+  dbVersion: string | null;
+}
+export interface SupabaseHealthView {
+  name: string;
+  healthy: boolean;
+  status: string;
+}
+export interface SupabaseTableView {
+  schema: string;
+  name: string;
+  /** Estimated row count. */
+  rows: number;
+  /** Row level security enabled. */
+  rls: boolean;
+}
+export interface SupabaseQueryResult {
+  columns: string[];
+  /** Cells as text (null = SQL NULL); at most a few hundred rows. */
+  rows: (string | null)[][];
+  /** Rows the query returned (may be more than the rows sent). */
+  total: number;
+  ms: number;
+}
+export interface SupabaseFunctionView {
+  slug: string;
+  name: string;
+  status: string;
+  version: number;
+  updated: number;
+}
+export interface SupabaseBucketView {
+  id: string;
+  name: string;
+  public: boolean;
 }
 
 export interface CompletionRequestView {
@@ -304,6 +442,8 @@ export interface ChatRequestView {
   prompt: string;
   context: ChatContext[];
   conversationId?: string;
+  /** Folder this chat works in (absolute); omitted = the window's open folder. */
+  folder?: string;
 }
 
 export interface EditRequestView {
@@ -380,6 +520,8 @@ export interface OmniApi {
     openPath(path: string): Promise<{ workspace: WorkspaceInfo; file: string | null } | null>;
     close(): Promise<void>;
     recent(): Promise<{ path: string; name: string }[]>;
+    /** Asks for a folder for one chat (the window's open folder does not change). */
+    pickChatFolder(): Promise<{ path: string; name: string } | null>;
     readDir(path: string): Promise<DirEntry[]>;
     readFile(path: string): Promise<FileContent>;
     writeFile(path: string, content: string): Promise<void>;
@@ -398,6 +540,10 @@ export interface OmniApi {
       params: Record<string, string>,
     ): Promise<{ ok: boolean; error?: string; store?: string; models?: number }>;
     removeProvider(id: string): Promise<void>;
+    /** Adds (or replaces, same id) a user-defined provider; returns its id. */
+    addCustomProvider(spec: CustomProviderSpec, id?: string): Promise<string>;
+    /** Deletes a user-defined provider, its key and its settings. */
+    deleteCustomProvider(id: string): Promise<void>;
     models(refresh: boolean): Promise<{
       models: ModelInfo[];
       errors: { provider: string; error: string }[];
@@ -425,7 +571,7 @@ export interface OmniApi {
     /** Commit message for the staged changes (or all changes when nothing is staged). */
     commitMessage(): Promise<string>;
     /** Project rules file in use (.zinarix/rules.md, AGENTS.md…) or null. */
-    rulesFile(): Promise<string | null>;
+    rulesFile(folder?: string): Promise<string | null>;
     /** Forget the agent's model-side transcript (regenerate / edit a message); keeps undo data. */
     resetContext(conversationId: string): Promise<void>;
     chat(requestId: string, req: ChatRequestView): Promise<void>;
@@ -433,7 +579,7 @@ export interface OmniApi {
     abort(requestId: string): Promise<void>;
     toolDecision(requestId: string, toolCallId: string, decision: ToolDecision): Promise<void>;
     /** Undo every file change the agent made in a conversation. Returns restored paths. */
-    revert(conversationId: string): Promise<string[]>;
+    revert(conversationId: string, folder?: string): Promise<string[]>;
   };
   git: {
     status(): Promise<GitStatusView>;
@@ -450,8 +596,16 @@ export interface OmniApi {
     checkout(name: string, create: boolean): Promise<void>;
     deleteBranch(name: string, force: boolean): Promise<void>;
     sync(op: 'pull' | 'push' | 'fetch'): Promise<string>;
-    stash(op: 'push' | 'pop'): Promise<void>;
+    /** push (optional message) / pop · apply · drop (optional ref, default the latest). */
+    stash(op: 'push' | 'pop' | 'apply' | 'drop', arg?: string): Promise<void>;
+    stashList(): Promise<GitStashView[]>;
     addRemote(url: string): Promise<void>;
+    /** Undoes the last commit and keeps its changes staged (reset --soft). */
+    undoCommit(): Promise<void>;
+    /** New commit that reverts the given one. */
+    revert(hash: string): Promise<void>;
+    /** Merges a branch into the current one. */
+    merge(name: string): Promise<void>;
   };
   github: {
     status(): Promise<GitHubStatus>;
@@ -460,6 +614,41 @@ export interface OmniApi {
     clone(spec: string): Promise<WorkspaceInfo | null>;
     /** Creates the repository on GitHub from the open folder and pushes it. Returns its URL. */
     publish(name: string, visibility: 'private' | 'public', description: string): Promise<string>;
+    /** Pull request of the current branch (null when there is none or gh is not signed in). */
+    pr(): Promise<GitHubPrView | null>;
+  };
+  vercel: {
+    status(): Promise<VercelStatus>;
+    /** Saves an access token (encrypted with the OS keychain) and returns the new status. */
+    setToken(token: string): Promise<VercelStatus>;
+    logout(): Promise<VercelStatus>;
+    /** .vercel/project.json of the open folder (written by "vercel link"). */
+    linked(): Promise<{ projectId: string; teamId: string | null } | null>;
+    projects(teamId: string | null): Promise<VercelProjectView[]>;
+    project(projectId: string, teamId: string | null): Promise<VercelProjectInfo>;
+    deployments(projectId: string, teamId: string | null): Promise<VercelDeploymentView[]>;
+    /** Build log text of a deployment. */
+    logs(deploymentId: string, teamId: string | null): Promise<string>;
+    cancel(deploymentId: string, teamId: string | null): Promise<void>;
+    /** Redeploys a deployment (same source); returns the new deployment's URL. */
+    redeploy(deploymentId: string, teamId: string | null, production: boolean): Promise<string>;
+  };
+  supabase: {
+    status(): Promise<SupabaseStatus>;
+    /** Saves a personal access token (encrypted with the OS keychain). */
+    setToken(token: string): Promise<SupabaseStatus>;
+    logout(): Promise<SupabaseStatus>;
+    /** Project ref of the open folder (supabase/.temp/project-ref, written by "supabase link"). */
+    linked(): Promise<string | null>;
+    projects(): Promise<SupabaseProjectView[]>;
+    health(ref: string): Promise<SupabaseHealthView[]>;
+    tables(ref: string): Promise<SupabaseTableView[]>;
+    preview(ref: string, schema: string, table: string): Promise<SupabaseQueryResult>;
+    /** Runs SQL on the project's database. */
+    query(ref: string, sql: string): Promise<SupabaseQueryResult>;
+    functions(ref: string): Promise<SupabaseFunctionView[]>;
+    buckets(ref: string): Promise<SupabaseBucketView[]>;
+    restore(ref: string): Promise<void>;
   };
   security: {
     /**
@@ -500,7 +689,19 @@ export interface OmniApi {
     newTab(): Promise<void>;
   };
   terminal: {
-    create(cols: number, rows: number): Promise<number>;
+    /**
+     * Starts a shell. admin: an administrator shell (sudo; gsudo on Windows). profile: a
+     * shell from profiles() (default: the first that starts). null: Windows without gsudo,
+     * an elevated PowerShell window was opened instead.
+     */
+    create(
+      cols: number,
+      rows: number,
+      admin?: boolean,
+      profile?: string,
+    ): Promise<{ id: number; name: string } | null>;
+    /** Shells installed on this machine (PowerShell, cmd, Git Bash, WSL…), default first. */
+    profiles(): Promise<{ id: string; name: string }[]>;
     write(id: number, data: string): Promise<void>;
     resize(id: number, cols: number, rows: number): Promise<void>;
     kill(id: number): Promise<void>;
@@ -534,6 +735,7 @@ export interface OmniApi {
 export const CHANNELS = [
   'workspace:current',
   'workspace:openDialog',
+  'workspace:pickChatFolder',
   'workspace:openPath',
   'workspace:close',
   'workspace:recent',
@@ -549,6 +751,8 @@ export const CHANNELS = [
   'ai:providers',
   'ai:saveProvider',
   'ai:removeProvider',
+  'ai:addCustomProvider',
+  'ai:deleteCustomProvider',
   'ai:models',
   'ai:settings',
   'ai:setDefaultModel',
@@ -586,10 +790,37 @@ export const CHANNELS = [
   'git:sync',
   'git:stash',
   'git:addRemote',
+  'git:stashList',
+  'git:undoCommit',
+  'git:revert',
+  'git:merge',
   'github:status',
   'github:repos',
   'github:clone',
   'github:publish',
+  'github:pr',
+  'vercel:status',
+  'vercel:setToken',
+  'vercel:logout',
+  'vercel:linked',
+  'vercel:projects',
+  'vercel:project',
+  'vercel:deployments',
+  'vercel:logs',
+  'vercel:cancel',
+  'vercel:redeploy',
+  'supabase:status',
+  'supabase:setToken',
+  'supabase:logout',
+  'supabase:linked',
+  'supabase:projects',
+  'supabase:health',
+  'supabase:tables',
+  'supabase:preview',
+  'supabase:query',
+  'supabase:functions',
+  'supabase:buckets',
+  'supabase:restore',
   'app:prefs',
   'app:setPrefs',
   'security:run',
@@ -608,6 +839,7 @@ export const CHANNELS = [
   'browser:closeTab',
   'browser:newTab',
   'terminal:create',
+  'terminal:profiles',
   'terminal:write',
   'terminal:resize',
   'terminal:kill',

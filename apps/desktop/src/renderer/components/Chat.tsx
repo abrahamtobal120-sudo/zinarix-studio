@@ -13,6 +13,7 @@ import { monacoTheme } from '../themes';
 import {
   BROWSER_TAB,
   api,
+  chatFolder,
   chatTab,
   closeChat,
   focusedChat,
@@ -20,6 +21,7 @@ import {
   getState,
   isChatVisible,
   newChat,
+  newChatInFolder,
   newRequestId,
   reloadFromDisk,
   refreshSettings,
@@ -27,9 +29,11 @@ import {
   selectChat,
   setState,
   toast,
+  toggleChatList,
   toggleChatSplit,
   updateChat,
   useStore,
+  type ChatTab,
 } from '../store';
 import { runCommand } from '../commands';
 import { fileIcon } from './icons';
@@ -473,10 +477,17 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   /** Prompts sent in this session, for ↑ / ↓ in an empty box. */
   const sent = useRef<string[]>([]);
   const sentIdx = useRef(-1);
+  /** Messages written while the chat works; sent one by one when each answer ends. */
+  const queued = meta?.queued ?? [];
+  /** The user pressed Stop: the queue does not go out by itself. */
+  const stopped = useRef(false);
 
-  const root = workspace?.root;
+  /** This chat works in a folder of its own (not the window's open folder). */
+  const ownFolder = meta?.folder && meta.folder !== workspace?.root ? meta.folder : undefined;
+  const root = ownFolder ?? workspace?.root;
   useEffect(() => {
-    if (!root) {
+    // "@file" suggestions list the window's folder: not offered for a chat working elsewhere.
+    if (!root || ownFolder) {
       setFiles([]);
       setRulesFile(null);
       return;
@@ -485,14 +496,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       .workspace.listFiles()
       .then(setFiles)
       .catch(() => setFiles([]));
-  }, [root]);
+  }, [root, ownFolder]);
   useEffect(() => {
     if (!root) return;
     void api()
-      .ai.rulesFile()
+      .ai.rulesFile(ownFolder)
       .then(setRulesFile)
       .catch(() => setRulesFile(null));
-  }, [root, fsVersion, projectRules]);
+  }, [root, ownFolder, fsVersion, projectRules]);
 
   /** Aborts the in-flight request (if any) and stops listening to its events. */
   const cancelCurrent = () => {
@@ -632,6 +643,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     forceAgent = false,
     /** Turns to continue from (regenerate / edit drop the last exchange). */
     base?: Turn[],
+    /** A queued message: what the user is typing meanwhile stays in the box. */
+    fromQueue = false,
   ) => {
     if (!prompt.trim() || busy) return;
     setShowHistory(false);
@@ -665,7 +678,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       { role: 'user', content: prompt, context: context.map((c) => c.source) },
       { role: 'assistant', content: '', parts: [] },
     ]);
-    setInput('');
+    if (!fromQueue) setInput('');
     setBusy(requestId);
 
     const update = (fn: (turn: Turn) => Turn) =>
@@ -692,7 +705,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       current.current = null;
       setBusy(null);
       void refreshSettings();
-      textarea.current?.focus();
+      // Only the chat the user is in takes the cursor back (not one finishing in the background).
+      const el = document.activeElement;
+      if (focusedChat() === id && (!el || el === document.body)) textarea.current?.focus();
     };
     const off = api().on((ev) => {
       if (ev.type !== 'chat' || ev.requestId !== requestId) return;
@@ -770,6 +785,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         prompt,
         context,
         conversationId,
+        folder: ownFolder,
       });
     } catch (err) {
       // The request never reached the model (validation, IPC failure): show it and unlock the input.
@@ -819,6 +835,21 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     };
   }, [id]);
 
+  /** Sends the first queued message (by itself when an answer ends, or by hand). */
+  const sendQueued = () => {
+    const [next, ...rest] = chatTab(id)?.queued ?? [];
+    if (next === undefined || busy) return;
+    updateChat(id, { queued: rest });
+    void send(next, [], false, undefined, true);
+  };
+  const onFinished = useEffectEvent(() => {
+    const byUser = stopped.current;
+    stopped.current = false;
+    // Stopped by hand or ended in error: the queue waits for the user instead of piling up.
+    if (byUser || turnsNow.current.at(-1)?.error) return;
+    sendQueued();
+  });
+
   // The tab strip shows what each chat is doing.
   const waiting = Boolean(
     busy && turns.at(-1)?.parts?.some((p) => p.kind === 'tool' && p.status === 'approval'),
@@ -832,6 +863,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       waiting,
       ...(finished && !isChatVisible(id) ? { unread: true } : {}),
     });
+    if (finished) onFinished();
   }, [id, busy, waiting]);
 
   /** Sends one answer of this chat to another AI, in a new chat (the user reviews and sends). */
@@ -964,11 +996,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         void runCommand('ai.rules');
         return true;
       case 'commit':
-        if (!workspace) {
+        if (!root) {
           toast(t('noFolder'));
           return true;
         }
-        setState({ sidebar: 'git' });
+        if (!ownFolder) setState({ sidebar: 'git' });
         void send(t('slashCommitPrompt'), [], true);
         return true;
     }
@@ -1040,13 +1072,27 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   const submit = async () => {
     if (await runSlash(input)) return;
+    // Still working: the message waits its turn and goes out by itself when this one ends.
+    if (busy) {
+      if (!input.trim()) return;
+      updateChat(id, { queued: [...queued, input] });
+      setInput('');
+      return;
+    }
     void send(input);
+  };
+
+  /** Stops the running answer; queued messages wait until the user sends them. */
+  const stop = () => {
+    if (!busy) return;
+    stopped.current = true;
+    void api().ai.abort(busy);
   };
 
   const onInputKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Escape' && busy && !suggest) {
       e.preventDefault();
-      void api().ai.abort(busy);
+      stop();
       return;
     }
     if (suggest) {
@@ -1124,7 +1170,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (!confirm(t('revertConfirm', { n: changed.length }))) return;
     let restored: string[];
     try {
-      restored = await api().ai.revert(conversationId);
+      restored = await api().ai.revert(conversationId, ownFolder);
     } catch (err) {
       toast(String(err instanceof Error ? err.message : err));
       return;
@@ -1147,11 +1193,16 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         if (pane !== null && getState().chatFocus !== pane) setState({ chatFocus: pane });
       }}
     >
-      {split && (
+      {(split || ownFolder) && (
         <div className="chat-pane-head" title={meta?.title}>
           {shownModel && <ProviderLogo id={shownModel.split('/')[0]!} size={13} />}
           <span className="chat-pane-model">{shownModel ?? t('noModel')}</span>
           <span className="chat-pane-title">{meta?.title}</span>
+          {ownFolder && (
+            <span className="chat-pane-folder" title={ownFolder}>
+              <Icon name="folder" size={11} /> {folderName(ownFolder)}
+            </span>
+          )}
         </div>
       )}
       {showHistory && (
@@ -1454,11 +1505,45 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             ))}
           </div>
         )}
+        {queued.length > 0 && (
+          <div className="chat-queue" aria-label={t('chatQueued')}>
+            <div className="chat-queue-title">
+              <Icon name="clock" size={12} />{' '}
+              {busy ? t('chatQueuedNext', { n: queued.length }) : t('chatQueuedPaused')}
+            </div>
+            {queued.map((q, i) => (
+              <div key={i} className="chat-queue-item" title={q}>
+                <span className="chat-queue-text">{q}</span>
+                {!busy && i === 0 && (
+                  <button title={t('send')} onClick={sendQueued}>
+                    <Icon name="send" size={12} />
+                  </button>
+                )}
+                <button
+                  title={t('chatQueueEdit')}
+                  onClick={() => {
+                    updateChat(id, { queued: queued.filter((_, j) => j !== i) });
+                    setInput((cur) => (cur.trim() ? `${cur}\n${q}` : q));
+                    textarea.current?.focus();
+                  }}
+                >
+                  <Icon name="edit" size={12} />
+                </button>
+                <button
+                  title={t('chatQueueRemove')}
+                  onClick={() => updateChat(id, { queued: queued.filter((_, j) => j !== i) })}
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <textarea
           ref={textarea}
           value={input}
           rows={3}
-          placeholder={agentMode && workspace ? t('agentPlaceholder') : t('askPlaceholder')}
+          placeholder={agentMode && root ? t('agentPlaceholder') : t('askPlaceholder')}
           onChange={(e) => {
             setInput(e.target.value);
             updateSuggest(e.target.value, e.target.selectionStart);
@@ -1523,11 +1608,21 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             <span className="model-chip-label">{shownModel ?? t('noModel')}</span>
             <Icon name="chevronDown" size={12} />
           </button>
+          {busy && input.trim() && (
+            <button
+              className="primary send-btn"
+              title={t('chatQueueHint')}
+              aria-label={t('chatQueue')}
+              onClick={() => void submit()}
+            >
+              <Icon name="clock" size={15} />
+            </button>
+          )}
           {busy ? (
             <button
               className="danger stop-btn"
               title={t('chatStopHint')}
-              onClick={() => void api().ai.abort(busy)}
+              onClick={stop}
             >
               <Icon name="stop" size={13} /> {t('stop')}
             </button>
@@ -1559,6 +1654,103 @@ export function requestCloseChat(id: string): void {
   closeChat(id);
 }
 
+const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+
+/** What a chat is doing, as a small icon (tabs and the side list). */
+function ChatStatus({ c }: { c: ChatTab }) {
+  return (
+    <span className="chat-tab-status">
+      {c.waiting ? (
+        <Icon name="pause" size={11} />
+      ) : c.busy ? (
+        <span className="chat-tab-spin" />
+      ) : c.unread ? (
+        <span className="chat-tab-dot" />
+      ) : c.model ? (
+        <ProviderLogo id={c.model.split('/')[0]!} size={12} />
+      ) : (
+        <Icon name="message" size={12} />
+      )}
+    </span>
+  );
+}
+
+function chatStatusText(c: ChatTab): string {
+  return c.waiting ? t('chatWaiting') : c.busy ? t('chatRunning') : c.unread ? t('chatDoneBg') : '';
+}
+
+/** Every open chat beside the conversation, grouped by the folder it works in. */
+function ChatList({ focusedId }: { focusedId: string }) {
+  const chats = useStore((s) => s.chats);
+  const activeChat = useStore((s) => s.activeChat);
+  const split = useStore((s) => s.chatSplit);
+  const windowRoot = useStore((s) => s.workspace?.root);
+  const groups: { folder: string | undefined; items: { c: ChatTab; n: number }[] }[] = [];
+  chats.forEach((c, i) => {
+    const folder = chatFolder(c);
+    const g = groups.find((x) => x.folder === folder);
+    if (g) g.items.push({ c, n: i + 1 });
+    else groups.push({ folder, items: [{ c, n: i + 1 }] });
+  });
+  return (
+    <nav className="chat-list" aria-label={t('chatListTitle')}>
+      <div className="chat-list-scroll">
+        {groups.map((g) => (
+          <div key={g.folder ?? ''} className="chat-list-group">
+            <div className="chat-list-folder" title={g.folder ?? t('chatNoFolder')}>
+              <Icon name="folder" size={12} />
+              <span>{g.folder ? folderName(g.folder) : t('chatNoFolder')}</span>
+              <button
+                title={t('chatNewHere')}
+                onClick={() =>
+                  newChat({ folder: g.folder && g.folder !== windowRoot ? g.folder : undefined })
+                }
+              >
+                <Icon name="plus" size={12} />
+              </button>
+            </div>
+            {g.items.map(({ c, n }) => {
+              const label = c.title || t('chatTabN', { n });
+              const status = chatStatusText(c);
+              const shown = c.id === activeChat || c.id === split;
+              return (
+                <div
+                  key={c.id}
+                  className={`chat-list-item ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
+                  title={status ? `${label} · ${status}` : label}
+                  onClick={() => selectChat(c.id)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) requestCloseChat(c.id);
+                  }}
+                >
+                  <ChatStatus c={c} />
+                  <span className="chat-tab-label">{label}</span>
+                  {chats.length > 1 && (
+                    <button
+                      className="chat-tab-x"
+                      aria-label={t('chatCloseTab')}
+                      title={t('chatCloseTab')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        requestCloseChat(c.id);
+                      }}
+                    >
+                      <Icon name="x" size={11} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <button className="chat-list-new" onClick={() => void newChatInFolder()}>
+        <Icon name="folderPlus" size={13} /> {t('chatNewInFolder')}
+      </button>
+    </nav>
+  );
+}
+
 /**
  * The chat panel: a tab per chat (they all run at the same time), optionally two of them
  * side by side, each with its own model, mode and conversation.
@@ -1569,6 +1761,7 @@ export function ChatPanel() {
   const split = useStore((s) => s.chatSplit);
   const focus = useStore((s) => s.chatFocus);
   const historyFor = useStore((s) => s.chatHistoryFor);
+  const list = useStore((s) => s.chatList);
   const focusedId = focus === 1 && split ? split : activeChat;
   const strip = useRef<HTMLDivElement>(null);
 
@@ -1586,38 +1779,22 @@ export function ChatPanel() {
           {chats.map((c, i) => {
             const shown = c.id === activeChat || c.id === split;
             const label = c.title || t('chatTabN', { n: i + 1 });
-            const status = c.waiting
-              ? t('chatWaiting')
-              : c.busy
-                ? t('chatRunning')
-                : c.unread
-                  ? t('chatDoneBg')
-                  : '';
+            const status = chatStatusText(c);
             return (
               <div
                 key={c.id}
                 role="tab"
                 aria-selected={shown}
                 className={`chat-tab ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
-                title={status ? `${label} · ${status}` : label}
+                title={[label, c.folder && folderName(c.folder), status]
+                  .filter(Boolean)
+                  .join(' · ')}
                 onClick={() => selectChat(c.id)}
                 onAuxClick={(e) => {
                   if (e.button === 1) requestCloseChat(c.id);
                 }}
               >
-                <span className="chat-tab-status">
-                  {c.waiting ? (
-                    <Icon name="pause" size={11} />
-                  ) : c.busy ? (
-                    <span className="chat-tab-spin" />
-                  ) : c.unread ? (
-                    <span className="chat-tab-dot" />
-                  ) : c.model ? (
-                    <ProviderLogo id={c.model.split('/')[0]!} size={12} />
-                  ) : (
-                    <Icon name="message" size={12} />
-                  )}
-                </span>
+                <ChatStatus c={c} />
                 <span className="chat-tab-label">{label}</span>
                 {chats.length > 1 && (
                   <button
@@ -1637,8 +1814,14 @@ export function ChatPanel() {
           })}
         </div>
         <span className="sidebar-actions">
+          <button title={t('chatListToggle')} className={list ? 'on' : ''} onClick={toggleChatList}>
+            <Icon name="menu" size={15} />
+          </button>
           <button title={`${t('chatNewTab')} (Ctrl+Alt+N)`} onClick={() => newChat()}>
             <Icon name="plus" size={15} />
+          </button>
+          <button title={t('chatNewInFolder')} onClick={() => void newChatInFolder()}>
+            <Icon name="folderPlus" size={15} />
           </button>
           <button
             title={split ? t('chatUnsplit') : `${t('chatSplit')} (Ctrl+Alt+D)`}
@@ -1661,15 +1844,18 @@ export function ChatPanel() {
           </button>
         </span>
       </div>
-      <div className={`chat-panes ${split ? 'split' : ''}`}>
-        {chats.map((c) => (
-          <ChatSession
-            key={c.id}
-            id={c.id}
-            pane={c.id === activeChat ? 0 : c.id === split ? 1 : null}
-            split={Boolean(split)}
-          />
-        ))}
+      <div className="chat-body">
+        {list && <ChatList focusedId={focusedId} />}
+        <div className={`chat-panes ${split ? 'split' : ''}`}>
+          {chats.map((c) => (
+            <ChatSession
+              key={c.id}
+              id={c.id}
+              pane={c.id === activeChat ? 0 : c.id === split ? 1 : null}
+              split={Boolean(split)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -22,7 +22,7 @@
     "catalog:sign": "node scripts/sign-catalog.mjs sign",
     "omni": "node apps/cli/dist/index.js",
     "desktop": "pnpm --filter @omni/desktop build && pnpm --filter @omni/desktop start",
-    "desktop:install": "pnpm --filter @omni/desktop build && bash apps/desktop/scripts/install-linux.sh"
+    "desktop:install": "pnpm --filter @omni/desktop build && node apps/desktop/scripts/install-local.mjs"
   },
   "devDependencies": {
     "@lobehub/icons-static-svg": "1.95.1",

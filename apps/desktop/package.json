@@ -18,6 +18,8 @@
     "dist": "pnpm build && electron-builder --publish never",
     "typecheck": "tsc -p tsconfig.json",
     "install:linux": "bash scripts/install-linux.sh",
+    "install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows.ps1",
+    "install:local": "node scripts/install-local.mjs",
     "smoke": "node scripts/smoke.mjs /tmp"
   },
   "dependencies": {

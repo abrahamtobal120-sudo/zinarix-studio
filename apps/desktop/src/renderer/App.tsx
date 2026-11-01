@@ -9,6 +9,8 @@ import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
 import { RunPanel } from './components/RunPanel';
+import { SupabasePanel } from './components/SupabasePanel';
+import { VercelPanel } from './components/VercelPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
 import {
@@ -60,8 +62,9 @@ export function App() {
   const panelOpen = useStore((s) => s.panelOpen);
   const chatOpen = useStore((s) => s.chatOpen);
   const chatSplit = useStore((s) => Boolean(s.chatSplit));
+  const chatList = useStore((s) => s.chatList);
   const toast = useStore((s) => s.toast);
-  const [sideW, setSideW] = useState(260);
+  const [sideW, setSideW] = useState(320);
   const [chatW, setChatW] = useState(400);
   const [panelH, setPanelH] = useState(260);
   const [terminalMounted, setTerminalMounted] = useState(false);
@@ -119,6 +122,11 @@ export function App() {
   useEffect(() => {
     if (chatSplit) setChatW((w) => Math.max(w, Math.min(760, window.innerWidth * 0.55)));
   }, [chatSplit]);
+
+  // The list of open chats takes room from the conversation: widen the panel for it.
+  useEffect(() => {
+    if (chatList) setChatW((w) => Math.max(w, Math.min(600, window.innerWidth * 0.45)));
+  }, [chatList]);
 
   // Shortcuts customised in Settings (the built-in ones live in the app menu).
   useEffect(() => {
@@ -197,11 +205,15 @@ export function App() {
                 <GitPanel />
               ) : sidebar === 'run' ? (
                 <RunPanel />
+              ) : sidebar === 'vercel' ? (
+                <VercelPanel />
+              ) : sidebar === 'supabase' ? (
+                <SupabasePanel />
               ) : (
                 <SearchView />
               )}
             </aside>
-            <Sash dir="x" onDrag={(d) => setSideW((w) => Math.min(600, Math.max(160, w + d)))} />
+            <Sash dir="x" onDrag={(d) => setSideW((w) => Math.min(900, Math.max(160, w + d)))} />
           </>
         )}
         <div className="center">

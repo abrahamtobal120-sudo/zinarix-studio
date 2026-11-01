@@ -33,3 +33,16 @@ jobs:
       # Known-vulnerable dependencies that ship in the app (dev/build tools excluded).
       - run: pnpm audit --prod --audit-level=high
       - run: pnpm vitest run --coverage
+      # The local launcher (pnpm desktop:install) installs and uninstalls cleanly on Windows.
+      - name: Local launcher (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          node apps/desktop/scripts/install-local.mjs
+          $dir = Join-Path $env:LOCALAPPDATA 'zinarix-studio-dev'
+          if (-not (Test-Path "$dir\bin\zinarix-studio.cmd")) { throw 'launcher missing' }
+          $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Zinarix Studio (dev).lnk'
+          if (-not (Test-Path $lnk)) { throw 'start menu shortcut missing' }
+          if (-not ([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' -contains "$dir\bin")) { throw 'not on PATH' }
+          node apps/desktop/scripts/install-local.mjs --uninstall
+          if ((Test-Path $dir) -or (Test-Path $lnk)) { throw 'still installed' }

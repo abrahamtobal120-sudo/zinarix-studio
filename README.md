@@ -51,6 +51,7 @@ El script descarga la última versión desde GitHub Releases y comprueba su SHA-
 pnpm install
 pnpm build
 pnpm desktop        # compila y abre la app
+pnpm desktop:install  # compila y crea el lanzador (Linux: menú de aplicaciones; Windows: menú Inicio, escritorio y comando zinarix-studio)
 pnpm test           # pruebas
 ```
 

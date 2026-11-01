@@ -13,7 +13,7 @@ import {
   usageByProvider,
 } from '@omni/core';
 import type { OmniEvent } from '@omni/core';
-import { OmniError, t } from '@omni/shared';
+import { CatalogEntry, CliProfile, OmniError, t } from '@omni/shared';
 import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact, StreamRedactor } from '@omni/security';
 import { Agent } from './agent.js';
@@ -31,6 +31,7 @@ import type {
   UsageReport,
   CompletionRequestView,
   ConversationView,
+  CustomProviderSpec,
   SavedMessageView,
 } from '../shared/api.js';
 
@@ -180,7 +181,160 @@ export class AiService {
       implemented: isAdapterImplemented(p.adapter),
       models: p.fallbackModels,
       local: p.category === 'local' || p.region === 'local',
+      custom: this.core.config.customProviders.some((c) => c.id === p.id),
     }));
+  }
+
+  /** Free kebab-case id for a new custom provider ("Mi servidor" -> "mi-servidor-2"). */
+  private customId(name: string): string {
+    const base =
+      name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40) || 'custom';
+    const taken = new Set(this.core.providers().map((p) => p.id));
+    if (!taken.has(base)) return base;
+    for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
+  }
+
+  addCustomProvider(spec: CustomProviderSpec, id?: string): string {
+    const existing = id ? this.core.config.customProviders.find((c) => c.id === id) : undefined;
+    if (id && !existing)
+      throw new OmniError('config', `"${id}" no es un proveedor personalizado`, {
+        retryable: false,
+      });
+    const pid = existing?.id ?? this.customId(spec.name);
+    const models = [...new Set((spec.models ?? []).map((m) => m.trim()).filter(Boolean))];
+    const supports = {
+      listModels: true,
+      streaming: true,
+      tools: spec.kind === 'api',
+      vision: false,
+      jsonMode: spec.kind === 'api',
+      embeddings: false,
+      fim: false,
+    };
+    let entry: CatalogEntry;
+    let providers = this.core.config.providers;
+    if (spec.kind === 'api') {
+      const header = spec.authHeader?.trim();
+      entry = CatalogEntry.parse({
+        id: pid,
+        name: spec.name.trim(),
+        adapter: spec.adapter,
+        baseUrl: spec.baseUrl.trim().replace(/\/+$/, ''),
+        auth: spec.noAuth
+          ? { type: 'none', optional: true }
+          : header && header.toLowerCase() !== 'authorization'
+            ? { type: 'header', header }
+            : { type: 'bearer', header: 'Authorization' },
+        region: spec.local ? 'local' : 'global',
+        category: spec.local ? 'local' : 'custom',
+        modelsEndpoint: '/models',
+        supports,
+        fallbackModels: models.map((m) => ({ id: m })),
+        status: 'active',
+        verifiedAt: null,
+        notes: 'user-defined endpoint',
+      });
+    } else {
+      const profile = CliProfile.parse(spec.profile);
+      const raw = spec.command.trim();
+      // A full path goes in the "command" param; the entry keeps only the program name.
+      const name = raw
+        .split(/[\\/]/)
+        .pop()!
+        .replace(/\.(exe|cmd|bat)$/i, '');
+      const program = name
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '-')
+        .replace(/^[^a-z0-9]+/, '');
+      if (!program)
+        throw new OmniError('config', `nombre de programa no válido: "${raw}"`, {
+          retryable: false,
+        });
+      entry = CatalogEntry.parse({
+        id: pid,
+        name: spec.name.trim(),
+        adapter: 'cli-agent',
+        baseUrl: 'http://localhost',
+        baseUrlParams: [
+          ...(profile === 'generic'
+            ? []
+            : [
+                {
+                  name: 'mode',
+                  label:
+                    'Permisos en modo agente: read (solo responde), edit (edita archivos del proyecto), full (todo, sin preguntar)',
+                  default: 'edit',
+                  optional: true,
+                },
+              ]),
+          {
+            name: 'command',
+            label: 'Ruta del programa (si no está en el PATH)',
+            default: program,
+            optional: true,
+          },
+        ],
+        auth: { type: 'none' },
+        region: 'local',
+        category: 'cli',
+        modelsEndpoint: null,
+        supports,
+        fallbackModels: [
+          { id: 'default', label: 'Modelo por defecto del CLI' },
+          ...models.filter((m) => m !== 'default').map((m) => ({ id: m })),
+        ],
+        cli: {
+          profile,
+          command: program,
+          ...(profile === 'generic' && spec.args?.length ? { args: spec.args } : {}),
+        },
+        status: 'active',
+        verifiedAt: null,
+        notes: 'user-defined CLI',
+      });
+      if (raw !== program) {
+        const prev = providers[pid];
+        providers = {
+          ...providers,
+          [pid]: {
+            ...prev,
+            params: { ...prev?.params, command: raw },
+            headers: prev?.headers ?? {},
+          },
+        };
+      }
+    }
+    const others = this.core.config.customProviders.filter((c) => c.id !== pid);
+    this.core.saveConfig({ ...this.core.config, providers, customProviders: [...others, entry] });
+    this.core.models.invalidate(pid);
+    return pid;
+  }
+
+  async deleteCustomProvider(id: string): Promise<void> {
+    if (!this.core.config.customProviders.some((c) => c.id === id)) return;
+    await this.core.vault.delete(id);
+    const { [id]: _gone, ...providers } = this.core.config.providers;
+    const roles = Object.fromEntries(
+      Object.entries(this.core.config.roles).filter(([, ref]) => !ref?.startsWith(`${id}/`)),
+    );
+    const defaultModel = this.core.config.defaultModel?.startsWith(`${id}/`)
+      ? undefined
+      : this.core.config.defaultModel;
+    this.core.saveConfig({
+      ...this.core.config,
+      providers,
+      roles,
+      defaultModel,
+      fallbacks: this.core.config.fallbacks.filter((r) => !r.startsWith(`${id}/`)),
+      customProviders: this.core.config.customProviders.filter((c) => c.id !== id),
+    });
+    this.core.models.invalidate(id);
   }
 
   async saveProvider(

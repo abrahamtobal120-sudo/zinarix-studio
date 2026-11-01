@@ -159,6 +159,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--bg-2': '#eee8d5',
       '--bg-3': '#e8e1cc',
       '--bg-4': '#ddd6c1',
+      '--activity': '#e8e1cc',
       '--border': '#d3cbb7',
       '--fg': '#586e75',
       '--fg-dim': '#93a1a1',

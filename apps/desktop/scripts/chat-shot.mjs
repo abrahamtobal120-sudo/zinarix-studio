@@ -102,6 +102,9 @@ await win
 await win.keyboard.press('Enter');
 await win.waitForTimeout(2500);
 await win.screenshot({ path: join(out, `chat-${width}.png`) });
+await win.locator('.chat-scroll').evaluate((e) => (e.scrollTop = 0));
+await win.waitForTimeout(200);
+await win.screenshot({ path: join(out, `chat-${width}-top.png`) });
 const overflow = await win.evaluate(() =>
   [...document.querySelectorAll('.chat *')]
     .filter(

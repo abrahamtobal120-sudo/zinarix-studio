@@ -58,6 +58,12 @@ export function ActivityBar() {
       {item(sidebar === 'run', t('runTitle'), 'run', () =>
         setState({ sidebar: sidebar === 'run' ? null : 'run' }),
       )}
+      {item(sidebar === 'vercel', 'Vercel', 'vercel', () =>
+        setState({ sidebar: sidebar === 'vercel' ? null : 'vercel' }),
+      )}
+      {item(sidebar === 'supabase', 'Supabase', 'supabase', () =>
+        setState({ sidebar: sidebar === 'supabase' ? null : 'supabase' }),
+      )}
       {item(chatOpen, t('chat'), 'sparkles', () => setState({ chatOpen: !chatOpen }))}
       {item(panelOpen, t('terminal'), 'terminal', () => setState({ panelOpen: !panelOpen }))}
       {item(browserActive, t('browser'), 'globe', () => {

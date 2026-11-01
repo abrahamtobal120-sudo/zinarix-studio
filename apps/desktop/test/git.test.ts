@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Git, checkRepoSpec, repoName, run } from '../src/main/git.js';
+import { Git, checkRepoSpec, repoName, run, webUrl } from '../src/main/git.js';
 import { cleanCompletion } from '../src/main/ai.js';
 import { Workspace } from '../src/main/workspace.js';
 
@@ -54,6 +54,42 @@ describe('Git panel backend', () => {
     expect(() => checkRepoSpec('ext::sh -c touch /tmp/x')).toThrow();
     expect(() => checkRepoSpec('--upload-pack=x')).toThrow();
     expect(repoName('https://github.com/a/proyecto.git')).toBe('proyecto');
+  });
+});
+
+describe('Git panel extras', () => {
+  it('named stash list, apply/drop, undo commit and revert', async () => {
+    const g = await repo();
+    const root = (g as unknown as { ws: Workspace }).ws.root;
+    writeFileSync(join(root, 'a.txt'), 'uno\n');
+    await g.stage([]);
+    await g.commit('primero', false);
+    writeFileSync(join(root, 'a.txt'), 'dos\n');
+    await g.stash('push', 'mi trabajo');
+    const list = await g.stashList();
+    expect(list).toMatchObject([{ ref: 'stash@{0}', message: 'mi trabajo' }]);
+    await g.stash('apply', 'stash@{0}');
+    expect((await g.status()).files).toHaveLength(1);
+    await g.stash('drop', 'stash@{0}');
+    expect(await g.stashList()).toEqual([]);
+    await expect(g.stash('pop', '--all')).rejects.toThrow();
+
+    await g.stage([]);
+    await g.commit('segundo', false);
+    await g.undoCommit();
+    expect((await g.log()).map((c) => c.subject)).toEqual(['primero']);
+    expect((await g.status()).files[0]).toMatchObject({ index: 'M' });
+    await g.commit('segundo', false);
+    await g.revert((await g.log())[0]!.hash);
+    expect((await g.log())[0]!.subject).toContain('Revert');
+    await expect(g.revert('-n')).rejects.toThrow();
+  });
+
+  it('derives the web page of a remote without credentials', () => {
+    expect(webUrl('git@github.com:me/app.git')).toBe('https://github.com/me/app');
+    expect(webUrl('https://tok@github.com/me/app.git')).toBe('https://github.com/me/app');
+    expect(webUrl('ssh://git@gitlab.com/g/sub/app.git')).toBe('https://gitlab.com/g/sub/app');
+    expect(webUrl('/tmp/local')).toBeNull();
   });
 });
 

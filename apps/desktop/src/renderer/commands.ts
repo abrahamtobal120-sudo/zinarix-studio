@@ -7,8 +7,10 @@ import {
   closeTab,
   dirtyCount,
   newChat,
+  newChatInFolder,
   requirePro,
   runningChats,
+  toggleChatList,
   toggleChatSplit,
   getEditor,
   getState,
@@ -170,6 +172,16 @@ function baseCommands(): Command[] {
       run: () => setState((s) => ({ sidebar: s.sidebar === 'run' ? null : 'run' })),
     },
     {
+      id: 'view.vercel',
+      label: t('vcTitle'),
+      run: () => setState((s) => ({ sidebar: s.sidebar === 'vercel' ? null : 'vercel' })),
+    },
+    {
+      id: 'view.supabase',
+      label: t('sbTitle'),
+      run: () => setState((s) => ({ sidebar: s.sidebar === 'supabase' ? null : 'supabase' })),
+    },
+    {
       id: 'view.terminal',
       label: t('cmdToggle', { what: t('terminal').toLowerCase() }),
       keys: 'Ctrl+`',
@@ -192,6 +204,16 @@ function baseCommands(): Command[] {
       label: `${t('chatSplit')} / ${t('chatUnsplit').toLowerCase()}`,
       keys: `${mod}+Alt+D`,
       run: () => toggleChatSplit(),
+    },
+    {
+      id: 'chat.newInFolder',
+      label: t('chatNewInFolder'),
+      run: () => void newChatInFolder(),
+    },
+    {
+      id: 'chat.list',
+      label: t('chatListToggle'),
+      run: () => toggleChatList(),
     },
     {
       id: 'app.newWindow',

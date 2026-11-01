@@ -282,6 +282,24 @@ describe('CliStreamParser', () => {
 });
 
 describe('cli-agent adapter (fake CLI processes)', () => {
+  it('generic (user-added) CLI: prompt on stdin, its extra args, plain-text answer', async () => {
+    const bin = fakeCli('my-agent', ['primera línea', 'segunda']);
+    const c = cfg('generic', bin);
+    c.entry.cli = { profile: 'generic', command: 'my-agent', args: ['--quiet', '--format=text'] };
+    const out = await collect(c, {
+      model: 'default',
+      messages: [{ role: 'user', content: 'hola' }],
+      cwd: dir,
+    });
+    expect(text(out)).toContain('primera línea');
+    expect(text(out)).toContain('segunda');
+    const call = JSON.parse(
+      await import('node:fs').then((fs) => fs.readFileSync(bin + '.call.json', 'utf8')),
+    );
+    expect(call.input).toBe('hola');
+    expect(call.argv).toEqual(['--quiet', '--format=text']);
+  });
+
   it('runs Claude Code with the prompt on stdin, in the project folder, with edit permission in agent mode', async () => {
     const bin = fakeCli('claude', [
       JSON.stringify({

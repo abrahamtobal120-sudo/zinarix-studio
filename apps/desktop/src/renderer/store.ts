@@ -64,7 +64,7 @@ export interface State {
   workspace: WorkspaceInfo | null;
   tabs: Tab[];
   active: string | null;
-  sidebar: 'explorer' | 'search' | 'git' | 'run' | null;
+  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | null;
   panelOpen: boolean;
   chatOpen: boolean;
   modal: Modal | null;
@@ -90,6 +90,8 @@ export interface State {
   chatFocus: 0 | 1;
   /** Chat whose history list is open. */
   chatHistoryFor: string | null;
+  /** List of the open chats beside the conversation (grouped by folder). */
+  chatList: boolean;
   /** Plan of this installation (until main answers, everything is allowed). */
   license: LicenseStatus;
   /** A new version (downloaded in the background, or to download). */
@@ -107,11 +109,15 @@ export interface ChatTab {
   /** Model of this chat ("provider/model"); null = the app default for the mode. */
   model: string | null;
   agent: boolean;
+  /** Folder this chat works in (absolute); undefined = the window's open folder. */
+  folder?: string;
   busy: boolean;
   /** An action of the AI waits for the user's approval. */
   waiting: boolean;
   /** Finished while the user was looking at another chat. */
   unread: boolean;
+  /** Messages waiting for the current answer to end; each one is sent by itself in turn. */
+  queued: string[];
   /** Sent (or put in the box) once the chat opens: a handoff or a task from elsewhere. */
   initial?: { prompt: string; context?: ChatContext[]; send: boolean };
 }
@@ -148,6 +154,7 @@ let state: State = {
   chatSplit: null,
   chatFocus: 0,
   chatHistoryFor: null,
+  chatList: false,
   license: {
     plan: 'open',
     features: PRO_FEATURES,
@@ -455,6 +462,7 @@ export const newRequestId = (): string =>
 // ---------------- chats (tabs of the chat panel) ----------------
 
 const CHATS_KEY = 'zs.chats';
+const LIST_KEY = 'zs.chatList';
 const LAST_KEY = 'zs.lastConversation';
 const AGENT_KEY = 'zs.agentMode';
 
@@ -474,6 +482,30 @@ export function saveAgentMode(on: boolean): void {
   }
 }
 
+function savedChatList(): boolean {
+  try {
+    return localStorage.getItem(LIST_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+/** Shows or hides the list of open chats beside the conversation. */
+export function toggleChatList(): void {
+  const on = !state.chatList;
+  setState({ chatList: on, chatOpen: true });
+  try {
+    localStorage.setItem(LIST_KEY, on ? 'on' : 'off');
+  } catch {
+    // storage unavailable: the list just starts hidden next time
+  }
+}
+
+/** Folder a chat works in: its own, or the window's open folder. */
+export function chatFolder(c: Pick<ChatTab, 'folder'> | undefined): string | undefined {
+  return c?.folder ?? state.workspace?.root;
+}
+
 const newChatId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function blankChat(patch: Partial<ChatTab> = {}): ChatTab {
@@ -485,6 +517,7 @@ function blankChat(patch: Partial<ChatTab> = {}): ChatTab {
     busy: false,
     waiting: false,
     unread: false,
+    queued: [],
     ...patch,
   };
 }
@@ -519,6 +552,7 @@ function restoreChats(): Pick<State, 'chats' | 'activeChat' | 'chatSplit' | 'cha
             conversationId: typeof x.conversationId === 'string' ? x.conversationId : undefined,
             model: typeof x.model === 'string' ? x.model : null,
             agent: typeof x.agent === 'boolean' ? x.agent : savedAgentMode(),
+            folder: typeof x.folder === 'string' && x.folder ? x.folder : undefined,
           }),
         );
       if (chats.length) {
@@ -553,6 +587,7 @@ function persistChats(): void {
           conversationId: c.conversationId,
           model: c.model,
           agent: c.agent,
+          folder: c.folder,
         })),
         active: state.activeChat,
         split: state.chatSplit,
@@ -573,7 +608,13 @@ export function updateChat(id: string, patch: Partial<ChatTab>): void {
   const changed = (Object.keys(patch) as (keyof ChatTab)[]).some((k) => cur[k] !== patch[k]);
   if (!changed) return;
   setState((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
-  if ('title' in patch || 'conversationId' in patch || 'model' in patch || 'agent' in patch)
+  if (
+    'title' in patch ||
+    'conversationId' in patch ||
+    'model' in patch ||
+    'agent' in patch ||
+    'folder' in patch
+  )
     persistChats();
 }
 
@@ -633,6 +674,14 @@ export function newChat(patch: Partial<ChatTab> = {}, always = false): string {
   return tab.id;
 }
 
+/** Asks for a folder and opens a new chat that works there (the window's folder stays). */
+export async function newChatInFolder(): Promise<string | null> {
+  if (!requirePro('chats')) return null;
+  const picked = await api().workspace.pickChatFolder();
+  if (!picked) return null;
+  return newChat({ folder: picked.path === state.workspace?.root ? undefined : picked.path });
+}
+
 /** Closes a chat (the caller has already stopped it if it was working). */
 export function closeChat(id: string): void {
   const idx = state.chats.findIndex((c) => c.id === id);
@@ -675,4 +724,4 @@ export function runningChats(): number {
   return state.chats.filter((c) => c.busy).length;
 }
 
-state = { ...state, ...restoreChats() };
+state = { ...state, ...restoreChats(), chatList: savedChatList() };

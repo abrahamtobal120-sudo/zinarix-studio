@@ -135,6 +135,13 @@ const PROFILES: Record<CliProfile, Profile> = {
     install: 'npm install -g @sourcegraph/amp',
     login: 'ejecuta `amp login` en una terminal',
   },
+  generic: {
+    output: 'text',
+    prompt: 'stdin',
+    args: () => [],
+    install: 'instala el programa y asegúrate de que está en el PATH',
+    login: 'ejecútalo una vez en una terminal e inicia sesión si lo pide',
+  },
 };
 
 /** "default" (or nothing) lets the CLI use the model the user picked in it. */
@@ -149,9 +156,11 @@ function cli(cfg: ProviderConfig): { profile: CliProfile; spec: Profile; command
       provider: cfg.entry.id,
       retryable: false,
     });
+  const base = PROFILES[c.profile];
+  const extra = c.profile === 'generic' ? (c.args ?? []) : [];
   return {
     profile: c.profile,
-    spec: PROFILES[c.profile],
+    spec: extra.length ? { ...base, args: (o) => [...extra, ...base.args(o)] } : base,
     command: cfg.params?.command || c.command,
   };
 }

@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import type { OmniApi, ProviderView } from '../../shared/api';
+import type { CustomProviderSpec, OmniApi, ProviderView } from '../../shared/api';
 import { commands, runCommand } from '../commands';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
@@ -108,6 +108,219 @@ function QuickOpen() {
   );
 }
 
+const CLI_PROFILES: [string, string][] = [
+  ['claude', 'Claude Code'],
+  ['codex', 'Codex'],
+  ['gemini', 'Gemini CLI'],
+  ['qwen', 'Qwen Code'],
+  ['cursor', 'Cursor Agent'],
+  ['copilot', 'Copilot CLI'],
+  ['opencode', 'OpenCode'],
+  ['amp', 'Amp'],
+];
+
+/** Form to add an API endpoint or a terminal agent that is not in the catalog. */
+function AddProvider({
+  onAdded,
+  onCancel,
+}: {
+  onAdded: (id: string, key: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [kind, setKind] = useState<'api' | 'cli'>('api');
+  const [name, setName] = useState('');
+  const [adapter, setAdapter] =
+    useState<Extract<CustomProviderSpec, { kind: 'api' }>['adapter']>('openai-compatible');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [authHeader, setAuthHeader] = useState('');
+  const [noAuth, setNoAuth] = useState(false);
+  const [local, setLocal] = useState(false);
+  const [models, setModels] = useState('');
+  const [key, setKey] = useState('');
+  const [command, setCommand] = useState('');
+  const [profile, setProfile] = useState('generic');
+  const [args, setArgs] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const list = (v: string, sep: RegExp) =>
+    v
+      .split(sep)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  const ready = name.trim() && (kind === 'api' ? baseUrl.trim() : command.trim());
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    const spec: CustomProviderSpec =
+      kind === 'api'
+        ? {
+            kind,
+            name: name.trim(),
+            adapter,
+            baseUrl: baseUrl.trim(),
+            authHeader: authHeader.trim() || undefined,
+            noAuth,
+            local,
+            models: list(models, /,/),
+          }
+        : {
+            kind,
+            name: name.trim(),
+            command: command.trim(),
+            profile,
+            args: profile === 'generic' ? list(args, /\s+/) : undefined,
+            models: list(models, /,/),
+          };
+    try {
+      const id = await api().ai.addCustomProvider(spec);
+      await onAdded(id, kind === 'api' && !noAuth ? key : '');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    setBusy(false);
+  };
+
+  return (
+    <>
+      <h2>{t('provAddTitle')}</h2>
+      <div className="prov-chips">
+        <button
+          className={`prov-chip ${kind === 'api' ? 'on' : ''}`}
+          onClick={() => setKind('api')}
+        >
+          {t('provAddApi')}
+        </button>
+        <button
+          className={`prov-chip ${kind === 'cli' ? 'on' : ''}`}
+          onClick={() => setKind('cli')}
+        >
+          {t('provAddCli')}
+        </button>
+      </div>
+      <label className="field">
+        {t('provAddName')}
+        <input
+          autoFocus
+          value={name}
+          placeholder={kind === 'api' ? 'Mi servidor' : 'Mi agente'}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </label>
+      {kind === 'api' ? (
+        <>
+          <label className="field">
+            {t('provAddAdapter')}
+            <select
+              value={adapter}
+              onChange={(e) => {
+                const v = e.target.value as typeof adapter;
+                setAdapter(v);
+                if (!authHeader || ['x-api-key', 'x-goog-api-key'].includes(authHeader))
+                  setAuthHeader(
+                    v === 'anthropic' ? 'x-api-key' : v === 'google-gemini' ? 'x-goog-api-key' : '',
+                  );
+              }}
+            >
+              <option value="openai-compatible">OpenAI-compatible (/chat/completions)</option>
+              <option value="openai-responses">OpenAI Responses (/responses)</option>
+              <option value="anthropic">Anthropic (/messages)</option>
+              <option value="google-gemini">Google Gemini</option>
+            </select>
+          </label>
+          <label className="field">
+            {t('provAddBaseUrl')}
+            <input
+              value={baseUrl}
+              placeholder="https://…/v1"
+              onChange={(e) => setBaseUrl(e.target.value)}
+            />
+          </label>
+          <label className="settings-toggle">
+            <span>{t('provAddNoAuth')}</span>
+            <input type="checkbox" checked={noAuth} onChange={(e) => setNoAuth(e.target.checked)} />
+          </label>
+          {!noAuth && (
+            <>
+              <label className="field">
+                {t('apiKey')}
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={key}
+                  placeholder="sk-…"
+                  onChange={(e) => setKey(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                {t('provAddAuthHeader')}
+                <input
+                  value={authHeader}
+                  placeholder="Authorization"
+                  onChange={(e) => setAuthHeader(e.target.value)}
+                />
+              </label>
+            </>
+          )}
+          <label className="settings-toggle">
+            <span>{t('provAddLocal')}</span>
+            <input type="checkbox" checked={local} onChange={(e) => setLocal(e.target.checked)} />
+          </label>
+        </>
+      ) : (
+        <>
+          <p className="provider-notes">{t('provAddCliHint')}</p>
+          <label className="field">
+            {t('provAddCommand')}
+            <input
+              value={command}
+              placeholder="aider, /usr/local/bin/mi-agente…"
+              onChange={(e) => setCommand(e.target.value)}
+            />
+          </label>
+          <label className="field">
+            {t('provAddProfile')}
+            <select value={profile} onChange={(e) => setProfile(e.target.value)}>
+              <option value="generic">{t('provAddGeneric')}</option>
+              {CLI_PROFILES.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {t('provAddLike', { name: label })}
+                </option>
+              ))}
+            </select>
+          </label>
+          {profile === 'generic' && (
+            <label className="field">
+              {t('provAddArgs')}
+              <input
+                value={args}
+                placeholder="--message-stdin --no-color"
+                onChange={(e) => setArgs(e.target.value)}
+              />
+            </label>
+          )}
+        </>
+      )}
+      <label className="field">
+        {t('provAddModels')}
+        <input
+          value={models}
+          placeholder={kind === 'api' ? 'llama-3.3-70b, qwen-2.5-coder' : 'sonnet, gpt-5'}
+          onChange={(e) => setModels(e.target.value)}
+        />
+      </label>
+      <div className="row">
+        <button className="primary" disabled={busy || !ready} onClick={() => void submit()}>
+          {t('provAddSave')}
+        </button>
+        <button onClick={onCancel}>{t('provAddCancel')}</button>
+      </div>
+      {error && <div className="err">{error}</div>}
+    </>
+  );
+}
+
 function Providers({ focus }: { focus?: string }) {
   const [list, setList] = useState<ProviderView[]>([]);
   const [selected, setSelected] = useState<string | undefined>(focus);
@@ -151,13 +364,15 @@ function Providers({ focus }: { focus?: string }) {
         Number(b.status === 'active') - Number(a.status === 'active'),
     );
 
-  const save = async () => {
-    if (!p) return;
+  const [adding, setAdding] = useState(false);
+
+  const save = () => (p ? connect(p.id, key, params) : Promise.resolve());
+  const connect = async (id: string, key: string, params: Record<string, string>) => {
     setBusy(true);
     setStatus({ ok: true, text: t('testing') });
     let r: Awaited<ReturnType<OmniApi['ai']['saveProvider']>>;
     try {
-      r = await api().ai.saveProvider(p.id, key || null, params);
+      r = await api().ai.saveProvider(id, key || null, params);
     } catch (err) {
       setBusy(false);
       setStatus({ ok: false, text: err instanceof Error ? err.message : String(err) });
@@ -174,7 +389,7 @@ function Providers({ focus }: { focus?: string }) {
     await refreshModels();
     await refreshSettings();
     if (r.ok && !getState().settings.defaultModel) {
-      const first = getState().models.find((m) => m.provider === p.id);
+      const first = getState().models.find((m) => m.provider === id);
       if (first) await chooseModel(`${first.provider}/${first.id}`);
     }
   };
@@ -189,6 +404,9 @@ function Providers({ focus }: { focus?: string }) {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+          <button className="prov-add" onClick={() => setAdding(true)}>
+            {t('provAdd')}
+          </button>
           <div className="prov-chips">
             {(
               [
@@ -239,7 +457,7 @@ function Providers({ focus }: { focus?: string }) {
                     <div
                       key={x.id}
                       className={`provider-row ${x.id === selected ? 'active' : ''}`}
-                      onClick={() => setSelected(x.id)}
+                      onClick={() => (setAdding(false), setSelected(x.id))}
                     >
                       <ProviderLogo id={x.id} name={x.name} size={22} />
                       <span className="provider-name">{x.name}</span>
@@ -257,7 +475,17 @@ function Providers({ focus }: { focus?: string }) {
           <button className="modal-x" onClick={close}>
             ×
           </button>
-          {!p ? (
+          {adding ? (
+            <AddProvider
+              onCancel={() => setAdding(false)}
+              onAdded={async (id, newKey) => {
+                await reload();
+                setAdding(false);
+                setSelected(id);
+                await connect(id, newKey, {});
+              }}
+            />
+          ) : !p ? (
             <div className="dim">
               <h2>{t('providers')}</h2>
               <p>
@@ -273,6 +501,7 @@ function Providers({ focus }: { focus?: string }) {
               </h2>
               <div className="dim">
                 {p.category} · {p.adapter} · {p.status}
+                {p.custom && ` · ${t('provCustom')}`}
               </div>
               {p.notes && <p className="provider-notes">{p.notes}</p>}
               {!p.implemented && <p className="err">{t('notImplemented')}</p>}
@@ -371,6 +600,20 @@ function Providers({ focus }: { focus?: string }) {
                     }}
                   >
                     {t('disconnect')}
+                  </button>
+                )}
+                {p.custom && (
+                  <button
+                    className="danger"
+                    onClick={async () => {
+                      await api().ai.deleteCustomProvider(p.id);
+                      setSelected(undefined);
+                      await reload();
+                      await refreshModels();
+                      await refreshSettings();
+                    }}
+                  >
+                    🗑 {t('provDelete')}
                   </button>
                 )}
               </div>

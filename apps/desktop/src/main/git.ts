@@ -5,8 +5,10 @@ import type {
   GitBranchView,
   GitCommitView,
   GitFileView,
+  GitHubPrView,
   GitHubStatus,
   GitHubRepoView,
+  GitStashView,
   GitStatusView,
 } from '../shared/api.js';
 import type { Workspace } from './workspace.js';
@@ -130,6 +132,11 @@ export class Git {
       .split('\n')
       .map((r) => r.trim())
       .filter(Boolean);
+    if (st.remotes.length) {
+      const name = st.remotes.includes('origin') ? 'origin' : st.remotes[0]!;
+      const url = await this.git(['remote', 'get-url', name]).catch(() => '');
+      st.webUrl = webUrl(url.trim());
+    }
     return st;
   }
 
@@ -268,9 +275,113 @@ export class Git {
     else await this.git(['remote', 'add', 'origin', value]);
   }
 
-  async stash(op: 'push' | 'pop'): Promise<void> {
-    await this.git(op === 'push' ? ['stash', 'push', '-u'] : ['stash', 'pop']);
+  /** push takes an optional message; pop/apply/drop an optional "stash@{n}" (default: latest). */
+  async stash(op: 'push' | 'pop' | 'apply' | 'drop', arg?: string): Promise<void> {
+    if (op === 'push') {
+      const msg = arg?.trim();
+      await this.git(msg ? ['stash', 'push', '-u', '-m', msg] : ['stash', 'push', '-u']);
+      return;
+    }
+    if (arg !== undefined && !/^stash@\{\d+\}$/.test(arg)) throw new Error('stash no válido');
+    await this.git(arg ? ['stash', op, '-q', arg] : ['stash', op, '-q']);
   }
+
+  async stashList(): Promise<GitStashView[]> {
+    const out = await this.git(['stash', 'list', '--format=%gd%x1f%gs%x1f%cr']).catch(() => '');
+    return out
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => {
+        const [ref, message, date] = l.split('\x1f');
+        return {
+          ref: ref!,
+          message: (message ?? '').replace(/^(WIP )?[Oo]n [^:]+: /, ''),
+          date: date ?? '',
+        };
+      });
+  }
+
+  /** Last commit back into the staging area; the very first commit just loses its ref. */
+  async undoCommit(): Promise<void> {
+    const parent = await this.git(['rev-parse', '--verify', '-q', 'HEAD~1'])
+      .then(() => true)
+      .catch(() => false);
+    if (parent) await this.git(['reset', '--soft', 'HEAD~1']);
+    else await this.git(['update-ref', '-d', 'HEAD']);
+  }
+
+  async revert(hash: string): Promise<void> {
+    if (!/^[0-9a-f]{4,64}$/i.test(hash)) throw new Error('commit no válido');
+    await this.git(['revert', '--no-edit', hash]);
+  }
+
+  async merge(name: string): Promise<void> {
+    const n = await checkBranch(name, this.ws.root);
+    await this.git(['merge', '--no-edit', n], 300_000);
+  }
+
+  /** Pull request of the current branch through the user's gh login. */
+  async pr(): Promise<GitHubPrView | null> {
+    let out: string;
+    try {
+      out = await run(
+        'gh',
+        ['pr', 'view', '--json', 'number,title,url,state,isDraft,reviewDecision,statusCheckRollup'],
+        this.ws.root,
+        20_000,
+      );
+    } catch {
+      return null;
+    }
+    const p = JSON.parse(out) as {
+      number: number;
+      title: string;
+      url: string;
+      state: GitHubPrView['state'];
+      isDraft: boolean;
+      reviewDecision: string | null;
+      statusCheckRollup:
+        { conclusion?: string | null; state?: string | null; status?: string }[] | null;
+    };
+    return {
+      number: p.number,
+      title: p.title,
+      url: p.url,
+      state: p.state,
+      isDraft: p.isDraft,
+      review: p.reviewDecision ?? '',
+      checks: rollup(p.statusCheckRollup ?? []),
+    };
+  }
+}
+
+/** CheckRuns report conclusion/status, StatusContexts report state. */
+function rollup(
+  list: { conclusion?: string | null; state?: string | null; status?: string }[],
+): GitHubPrView['checks'] {
+  if (!list.length) return 'none';
+  const results = list.map((c) => (c.conclusion || c.state || '').toUpperCase());
+  if (
+    results.some((r) =>
+      ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED'].includes(r),
+    )
+  )
+    return 'fail';
+  if (
+    list.some((c) => c.status && c.status !== 'COMPLETED') ||
+    results.some((r) => r === 'PENDING' || r === 'EXPECTED' || r === '')
+  )
+    return 'pending';
+  return 'pass';
+}
+
+/** "git@github.com:me/app.git" / "https://user@gitlab.com/me/app.git" → "https://github.com/me/app". */
+export function webUrl(remote: string): string | null {
+  const ssh = /^(?:ssh:\/\/)?git@([\w.-]+)[:/](.+?)(?:\.git)?\/?$/.exec(remote);
+  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
+  const https = /^https:\/\/(?:[^@/]+@)?([\w.-]+(?::\d+)?)\/(.+?)(?:\.git)?\/?$/.exec(remote);
+  if (https) return `https://${https[1]}/${https[2]}`;
+  return null;
 }
 
 function emptyStatus(isRepo: boolean): GitStatusView {
@@ -283,6 +394,7 @@ function emptyStatus(isRepo: boolean): GitStatusView {
     files: [],
     hasCommits: false,
     remotes: [],
+    webUrl: null,
   };
 }
 

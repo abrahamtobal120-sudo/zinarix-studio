@@ -11,6 +11,8 @@ import { AiService } from './ai.js';
 import type { Scope } from './ai.js';
 import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName } from './git.js';
 import { BrowserController } from './browser.js';
+import { Supabase, linkedSupabase } from './supabase.js';
+import { Vercel, linkedProject } from './vercel.js';
 import { isOwnerCode, licenseStatus, normalizeKey, parseLicense } from './license.js';
 import type { StoredLicense } from './license.js';
 import { startUpdates } from './updates.js';
@@ -26,7 +28,7 @@ import {
   runScan,
   scanProject,
 } from './security.js';
-import { Terminals } from './terminal.js';
+import { shellProfiles, Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -58,6 +60,8 @@ interface Win {
   id: number;
   win: BrowserWindow;
   workspace?: Workspace;
+  /** Folders of chats that work somewhere else than the open folder (one per path). */
+  chatFolders: Map<string, Workspace>;
   browser: BrowserController;
   /** Terminals created by this window (only it may write to them). */
   terminals: Set<number>;
@@ -141,9 +145,23 @@ function broadcastSettings(from: Win): void {
   for (const w of wins.values()) if (w !== from) send(w, { type: 'settings:changed' });
 }
 
-/** What the AI sees of a window: its folder and its browser. */
-function scope(w: Win): Scope {
-  return { workspace: () => w.workspace, browser: w.browser };
+/**
+ * What the AI sees of a window: its folder and its browser. A chat may work in a folder of
+ * its own (`folder`, absolute): the agent then reads, edits and runs commands there.
+ */
+function scope(w: Win, folder?: string): Scope {
+  if (!folder) return { workspace: () => w.workspace, browser: w.browser };
+  const abs = resolve(folder);
+  if (w.workspace?.root === abs) return { workspace: () => w.workspace, browser: w.browser };
+  if (!existsSync(abs) || !statSync(abs).isDirectory())
+    throw new Error(`La carpeta del chat ya no existe: ${abs}`);
+  let ws = w.chatFolders.get(abs);
+  if (!ws) {
+    ws = new Workspace(abs);
+    w.chatFolders.set(abs, ws);
+  }
+  const fixed = ws;
+  return { workspace: () => fixed, browser: w.browser };
 }
 
 /** Request ids come from each renderer: namespaced so two windows never collide. */
@@ -253,6 +271,15 @@ function registerIpc(): void {
     w.win.setTitle('Zinarix Studio');
     send(w, { type: 'workspace', workspace: null });
   });
+  // A folder for one chat only: the window keeps its open folder.
+  handle('workspace:pickChatFolder', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Carpeta para este chat',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    const abs = r.canceled || !r.filePaths[0] ? null : resolve(r.filePaths[0]);
+    return abs ? { path: abs, name: basename(abs) } : null;
+  });
   handle('workspace:recent', z.tuple([]), () =>
     (loadState().recentFolders ?? [])
       .filter((f) => existsSync(f))
@@ -282,6 +309,42 @@ function registerIpc(): void {
   );
   handle('ai:removeProvider', z.tuple([str]), async (w, p) => {
     await ai.removeProvider(p);
+    broadcastSettings(w);
+  });
+  const models = z.array(z.string().min(1).max(200)).max(100).optional();
+  handle(
+    'ai:addCustomProvider',
+    z.tuple([
+      z.discriminatedUnion('kind', [
+        z.object({
+          kind: z.literal('api'),
+          name: z.string().min(1).max(80),
+          adapter: z.enum(['openai-compatible', 'openai-responses', 'anthropic', 'google-gemini']),
+          baseUrl: z.string().url().max(2048),
+          authHeader: z.string().max(100).optional(),
+          noAuth: z.boolean().optional(),
+          local: z.boolean().optional(),
+          models,
+        }),
+        z.object({
+          kind: z.literal('cli'),
+          name: z.string().min(1).max(80),
+          command: z.string().min(1).max(200),
+          profile: z.string().min(1).max(40),
+          args: z.array(z.string().min(1).max(200)).max(20).optional(),
+          models,
+        }),
+      ]),
+      str.optional(),
+    ]),
+    (w, spec, id) => {
+      const out = ai.addCustomProvider(spec, id);
+      broadcastSettings(w);
+      return out;
+    },
+  );
+  handle('ai:deleteCustomProvider', z.tuple([str]), async (w, p) => {
+    await ai.deleteCustomProvider(p);
     broadcastSettings(w);
   });
   handle('ai:models', z.tuple([z.boolean()]), (_w, r) => ai.models(r));
@@ -337,7 +400,9 @@ function registerIpc(): void {
     const staged = st.files.some((f) => !f.untracked && f.index !== ' ');
     return ai.commitMessage(await g.patch(staged));
   });
-  handle('ai:rulesFile', z.tuple([]), (w) => ai.rulesFile(scope(w)));
+  handle('ai:rulesFile', z.tuple([z.string().min(1).max(4096).optional()]), (w, folder) =>
+    ai.rulesFile(scope(w, folder)),
+  );
   handle('ai:resetContext', z.tuple([conv]), (_w, c) => ai.resetContext(c));
 
   const paths = z.array(rel).max(5000);
@@ -369,11 +434,61 @@ function registerIpc(): void {
     git(w).deleteBranch(n, f),
   );
   handle('git:sync', z.tuple([z.enum(['pull', 'push', 'fetch'])]), (w, op) => git(w).sync(op));
-  handle('git:stash', z.tuple([z.enum(['push', 'pop'])]), (w, op) => git(w).stash(op));
+  handle(
+    'git:stash',
+    z.tuple([z.enum(['push', 'pop', 'apply', 'drop']), z.string().max(500).optional()]),
+    (w, op, arg) => git(w).stash(op, arg),
+  );
+  handle('git:stashList', z.tuple([]), (w) => git(w).stashList());
+  handle('git:undoCommit', z.tuple([]), (w) => git(w).undoCommit());
+  handle('git:revert', z.tuple([z.string().max(64)]), (w, h) => git(w).revert(h));
+  handle('git:merge', z.tuple([z.string().min(1).max(255)]), (w, n) => git(w).merge(n));
   handle('git:addRemote', z.tuple([z.string().min(1).max(2048)]), (w, u) => git(w).addRemote(u));
 
   handle('github:status', z.tuple([]), () => githubStatus());
   handle('github:repos', z.tuple([]), () => githubRepos());
+  handle('github:pr', z.tuple([]), (w) => git(w).pr());
+
+  const vercel = new Vercel(app.getPath('userData'));
+  const vid = z.string().min(1).max(128);
+  const team = z.string().max(128).nullable();
+  handle('vercel:status', z.tuple([]), () => vercel.status());
+  handle('vercel:setToken', z.tuple([z.string().min(1).max(500)]), (_w, t) => vercel.setToken(t));
+  handle('vercel:logout', z.tuple([]), () => vercel.logout());
+  handle('vercel:linked', z.tuple([]), (w) =>
+    w.workspace ? linkedProject(w.workspace.root) : null,
+  );
+  handle('vercel:projects', z.tuple([team]), (_w, t) => vercel.projects(t));
+  handle('vercel:project', z.tuple([vid, team]), (_w, p, t) => vercel.project(p, t));
+  handle('vercel:deployments', z.tuple([vid, team]), (_w, p, t) => vercel.deployments(p, t));
+  handle('vercel:logs', z.tuple([vid, team]), (_w, d, t) => vercel.logs(d, t));
+  handle('vercel:cancel', z.tuple([vid, team]), (_w, d, t) => vercel.cancel(d, t));
+  handle('vercel:redeploy', z.tuple([vid, team, z.boolean()]), (_w, d, t, prod) =>
+    vercel.redeploy(d, t, prod),
+  );
+  const supabase = new Supabase(app.getPath('userData'));
+  const ref = z.string().min(1).max(40);
+  const pgName = z.string().min(1).max(128);
+  handle('supabase:status', z.tuple([]), () => supabase.status());
+  handle('supabase:setToken', z.tuple([z.string().min(1).max(500)]), (_w, t) =>
+    supabase.setToken(t),
+  );
+  handle('supabase:logout', z.tuple([]), () => supabase.logout());
+  handle('supabase:linked', z.tuple([]), (w) =>
+    w.workspace ? linkedSupabase(w.workspace.root) : null,
+  );
+  handle('supabase:projects', z.tuple([]), () => supabase.projects());
+  handle('supabase:health', z.tuple([ref]), (_w, r) => supabase.health(r));
+  handle('supabase:tables', z.tuple([ref]), (_w, r) => supabase.tables(r));
+  handle('supabase:preview', z.tuple([ref, pgName, pgName]), (_w, r, sc, tb) =>
+    supabase.preview(r, sc, tb),
+  );
+  handle('supabase:query', z.tuple([ref, z.string().min(1).max(200_000)]), (_w, r, q) =>
+    supabase.query(r, q),
+  );
+  handle('supabase:functions', z.tuple([ref]), (_w, r) => supabase.functions(r));
+  handle('supabase:buckets', z.tuple([ref]), (_w, r) => supabase.buckets(r));
+  handle('supabase:restore', z.tuple([ref]), (_w, r) => supabase.restore(r));
   handle('github:clone', z.tuple([z.string().min(1).max(2048)]), async (w, spec) => {
     const r = await dialog.showOpenDialog(w.win, {
       title: 'Carpeta donde clonar el repositorio',
@@ -430,15 +545,17 @@ function registerIpc(): void {
         context: ctx,
         conversationId: conv.optional(),
         agent: z.boolean().optional(),
+        folder: z.string().min(1).max(4096).optional(),
       }),
     ]),
-    (w, requestId, req) => {
+    (w, requestId, { folder, ...req }) => {
       // Several chats of the same window (or of other windows) run at the same time: each
       // request is independent and only its own window hears its events.
       const id = rid(w, requestId);
+      const where = scope(w, folder);
       w.requests.add(id);
       void ai
-        .chat(id, req, (_r, event) => send(w, { type: 'chat', requestId, event }), scope(w))
+        .chat(id, req, (_r, event) => send(w, { type: 'chat', requestId, event }), where)
         .finally(() => w.requests.delete(id));
     },
   );
@@ -509,7 +626,9 @@ function registerIpc(): void {
     z.tuple([str, str, z.enum(['approve', 'deny', 'always'])]),
     (w, r, id, d) => ai.toolDecision(rid(w, r), id, d),
   );
-  handle('ai:revert', z.tuple([conv]), (w, c) => ai.revert(c, scope(w)));
+  handle('ai:revert', z.tuple([conv, z.string().min(1).max(4096).optional()]), (w, c, folder) =>
+    ai.revert(c, scope(w, folder)),
+  );
 
   const rect = z
     .object({
@@ -635,12 +754,19 @@ function registerIpc(): void {
   handle('browser:closeTab', z.tuple([z.string().max(64)]), (w, id) => w.browser.close(id));
   handle('browser:newTab', z.tuple([]), (w) => void w.browser.newTab());
 
-  handle('terminal:create', z.tuple([dim, dim]), (w, cols, rows) => {
-    const tid = terminals.create(w.workspace?.root ?? app.getPath('home'), cols, rows);
-    termOwner.set(tid, w);
-    w.terminals.add(tid);
-    return tid;
-  });
+  handle('terminal:profiles', z.tuple([]), () => shellProfiles());
+  handle(
+    'terminal:create',
+    z.tuple([dim, dim, z.boolean().optional(), z.string().max(64).optional()]),
+    (w, cols, rows, admin, profile) => {
+      const cwd = w.workspace?.root ?? app.getPath('home');
+      const t = terminals.create(cwd, cols, rows, admin ?? false, profile);
+      if (t === null) return null;
+      termOwner.set(t.id, w);
+      w.terminals.add(t.id);
+      return t;
+    },
+  );
   // A window only reaches its own terminals.
   handle('terminal:write', z.tuple([id, z.string().max(1024 * 1024)]), (w, i, d) => {
     if (w.terminals.has(i)) terminals.write(i, d);
@@ -908,6 +1034,7 @@ async function createWindow(
     id: win.webContents.id,
     win,
     browser: undefined as unknown as BrowserController,
+    chatFolders: new Map(),
     terminals: new Set(),
     requests: new Set(),
     allowClose: false,
@@ -942,6 +1069,7 @@ async function createWindow(
       termOwner.delete(t);
     }
     w.workspace?.dispose();
+    for (const f of w.chatFolders.values()) f.dispose();
     wins.delete(w.id);
   });
   await win
@@ -973,10 +1101,16 @@ app.on('second-instance', (_e, argv) => {
     } else void createWindow({ folder, near: focused() });
     return;
   }
+  // Launching the app again (dock, menu, terminal) opens another window, like other
+  // editors; focusing the old one does nothing visible on Wayland. Without the multi-window
+  // feature, the current window is shown instead.
   const w = focused();
-  if (!w) return void createWindow();
-  if (w.win.isMinimized()) w.win.restore();
-  w.win.focus();
+  if (w && !license().features.windows) {
+    if (w.win.isMinimized()) w.win.restore();
+    w.win.focus();
+    return;
+  }
+  void createWindow({ near: w });
 });
 
 app.on('web-contents-created', (_e, contents) => {

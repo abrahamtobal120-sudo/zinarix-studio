@@ -4,7 +4,9 @@ import type {
   GitBranchView,
   GitCommitView,
   GitFileView,
+  GitHubPrView,
   GitHubStatus,
+  GitStashView,
   GitStatusView,
 } from '../../shared/api';
 import { t } from '../i18n';
@@ -38,11 +40,14 @@ export function GitPanel() {
   const [st, setSt] = useState<GitStatusView | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
-  const [view, setView] = useState<'changes' | 'history' | 'branches'>('changes');
+  const [view, setView] = useState<'changes' | 'history' | 'branches' | 'stash'>('changes');
   const [log, setLog] = useState<GitCommitView[]>([]);
   const [branches, setBranches] = useState<GitBranchView[]>([]);
   const [gh, setGh] = useState<GitHubStatus | null>(null);
   const [amend, setAmend] = useState(false);
+  const [stashes, setStashes] = useState<GitStashView[]>([]);
+  const [pr, setPr] = useState<GitHubPrView | null>(null);
+  const [filter, setFilter] = useState('');
 
   const refresh = useCallback(async () => {
     if (!workspace) return;
@@ -65,7 +70,29 @@ export function GitPanel() {
     if (!st?.isRepo) return;
     if (view === 'history') void api().git.log().then(setLog);
     if (view === 'branches') void api().git.branches().then(setBranches);
+    if (view === 'stash') void api().git.stashList().then(setStashes);
   }, [view, st?.isRepo, st?.branch, fsVersion]);
+  useEffect(() => setFilter(''), [view]);
+
+  // Quiet fetch when the panel opens, so "↓ behind" is real without pressing anything.
+  const hasRemoteNow = (st?.remotes.length ?? 0) > 0;
+  useEffect(() => {
+    if (!hasRemoteNow) return;
+    void api()
+      .git.sync('fetch')
+      .then(() => refresh())
+      .catch(() => {});
+  }, [hasRemoteNow, refresh]);
+
+  // Pull request of the current branch (needs gh signed in).
+  useEffect(() => {
+    setPr(null);
+    if (!gh?.loggedIn || !st?.upstream) return;
+    void api()
+      .github.pr()
+      .then(setPr)
+      .catch(() => {});
+  }, [gh?.loggedIn, st?.branch, st?.upstream, st?.ahead]);
 
   const act = async (label: string, fn: () => Promise<unknown>, done?: string) => {
     setBusy(label);
@@ -124,7 +151,7 @@ export function GitPanel() {
   const unstaged =
     st?.files.filter((f) => f.untracked || (f.work !== ' ' && f.work !== '?') || f.conflict) ?? [];
 
-  const commit = () =>
+  const commit = (push = false) =>
     act(
       'commit',
       async () => {
@@ -132,8 +159,9 @@ export function GitPanel() {
         await api().git.commit(message, amend);
         setMessage('');
         setAmend(false);
+        if (push) await api().git.sync('push');
       },
-      t('gitCommitted'),
+      push ? t('gitCommittedPushed') : t('gitCommitted'),
     );
 
   const generate = () =>
@@ -208,6 +236,22 @@ export function GitPanel() {
           {hasRemote && (
             <>
               <button
+                title={t('gitSyncTitle')}
+                disabled={busy !== null}
+                onClick={() =>
+                  void act(
+                    'sync',
+                    async () => {
+                      if (st?.behind) await api().git.sync('pull');
+                      if (st?.ahead || !st?.upstream) await api().git.sync('push');
+                    },
+                    t('gitSynced'),
+                  )
+                }
+              >
+                <Icon name="sync" size={15} />
+              </button>
+              <button
                 title={t('gitPull')}
                 disabled={busy !== null}
                 onClick={() => void sync('pull')}
@@ -225,16 +269,20 @@ export function GitPanel() {
           )}
           <button
             title={t('gitStash')}
-            onClick={() => void act('stash', () => api().git.stash('push'), t('gitStashed'))}
+            disabled={!st?.files.length}
+            onClick={async () => {
+              const msg = await askText(t('gitStashMessage'));
+              if (msg === null || msg === undefined) return;
+              void act('stash', () => api().git.stash('push', msg), t('gitStashed'));
+            }}
           >
             <Icon name="stash" size={15} />
           </button>
-          <button
-            title={t('gitStashPop')}
-            onClick={() => void act('stash', () => api().git.stash('pop'), t('gitStashPopped'))}
-          >
-            <Icon name="download" size={15} />
-          </button>
+          {st?.webUrl && (
+            <button title={t('gitOpenWeb')} onClick={() => void api().app.openExternal(st.webUrl!)}>
+              <Icon name="external" size={15} />
+            </button>
+          )}
         </span>
       </div>
 
@@ -252,11 +300,51 @@ export function GitPanel() {
             {st.ahead ? `↑${st.ahead}` : ''}
           </span>
         ) : null}
+        {pr ? (
+          <button
+            className={`git-pr ${pr.checks}`}
+            title={`#${pr.number} ${pr.title}\n${prState(pr)}`}
+            onClick={() => void api().app.openExternal(pr.url)}
+          >
+            <Icon name="github" size={12} /> #{pr.number}{' '}
+            {pr.checks === 'pass'
+              ? '✓'
+              : pr.checks === 'fail'
+                ? '✗'
+                : pr.checks === 'pending'
+                  ? '…'
+                  : ''}
+          </button>
+        ) : (
+          gh?.loggedIn &&
+          st?.upstream &&
+          st.webUrl?.startsWith('https://github.com/') && (
+            <button
+              className="link git-pr-new"
+              title={t('gitPrCreateTitle')}
+              onClick={() => {
+                setState({ panelOpen: true });
+                setTimeout(() => void runInTerminal('gh pr create --web'), 300);
+              }}
+            >
+              {t('gitPrCreate')}
+            </button>
+          )
+        )}
         <span className="spacer" />
         <div className="git-tabs">
-          {(['changes', 'history', 'branches'] as const).map((v) => (
+          {(['changes', 'history', 'branches', 'stash'] as const).map((v) => (
             <button key={v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>
-              {t(v === 'changes' ? 'gitChanges' : v === 'history' ? 'gitHistory' : 'gitBranches')}
+              {t(
+                v === 'changes'
+                  ? 'gitChanges'
+                  : v === 'history'
+                    ? 'gitHistory'
+                    : v === 'branches'
+                      ? 'gitBranches'
+                      : 'gitStashTab',
+              )}
+              {v === 'changes' && st?.files.length ? ` ${st.files.length}` : ''}
             </button>
           ))}
         </div>
@@ -334,6 +422,15 @@ export function GitPanel() {
                 <Icon name="check" size={14} />{' '}
                 {staged.length || amend ? t('gitCommit') : t('gitCommitAll')}
               </button>
+              {hasRemote && !amend && (
+                <button
+                  disabled={busy !== null || !message.trim() || !st?.files.length}
+                  onClick={() => void commit(true)}
+                  title={t('gitCommitPushTitle')}
+                >
+                  <Icon name="push" size={14} /> {t('gitCommitPush')}
+                </button>
+              )}
               <button
                 disabled={busy !== null || !st?.files.length}
                 onClick={() => void generate()}
@@ -410,38 +507,104 @@ export function GitPanel() {
 
       {view === 'history' && (
         <div className="tree git-list">
-          {log.length === 0 && <div className="git-clean">{t('gitNoCommits')}</div>}
-          {log.map((c) => (
-            <div
-              key={c.hash}
-              className="git-commit-row"
-              title={`${c.hash}\n${c.author} · ${c.date}`}
-              onClick={() =>
-                setState({ modal: { kind: 'commit', hash: c.hash, subject: c.subject } })
-              }
-            >
-              <div className="git-commit-subject">
-                {c.subject}
-                {c.refs && (
-                  <span className="git-refs">
-                    {c.refs
-                      .split(',')
-                      .map((r) => r.trim().replace(/^HEAD -> /, ''))
-                      .filter(Boolean)
-                      .slice(0, 3)
-                      .map((r) => (
-                        <span key={r} className="git-ref">
-                          {r}
-                        </span>
-                      ))}
-                  </span>
-                )}
-              </div>
-              <div className="git-commit-meta">
-                <code>{c.short}</code> · {c.author} · {c.date}
-              </div>
+          {log.length > 0 && (
+            <div className="git-filter">
+              <input
+                value={filter}
+                placeholder={t('gitFilterCommits')}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+              <button
+                title={t('gitUndoCommitTitle')}
+                disabled={busy !== null || (st?.ahead === 0 && Boolean(st?.upstream))}
+                onClick={() => {
+                  if (!confirm(t('gitUndoCommitConfirm', { subject: log[0]!.subject }))) return;
+                  void act(
+                    'undo',
+                    async () => {
+                      await api().git.undoCommit();
+                      setLog(await api().git.log());
+                    },
+                    t('gitUndoneCommit'),
+                  );
+                }}
+              >
+                <Icon name="undo" size={14} /> {t('gitUndoCommit')}
+              </button>
             </div>
-          ))}
+          )}
+          {log.length === 0 && <div className="git-clean">{t('gitNoCommits')}</div>}
+          {log
+            .filter((c) => matches(filter, c.subject, c.author, c.short, c.refs))
+            .map((c) => (
+              <div
+                key={c.hash}
+                className="git-commit-row"
+                title={`${c.hash}\n${c.author} · ${c.date}`}
+                onClick={() =>
+                  setState({ modal: { kind: 'commit', hash: c.hash, subject: c.subject } })
+                }
+              >
+                <div className="git-commit-subject">
+                  {c.subject}
+                  {c.refs && (
+                    <span className="git-refs">
+                      {c.refs
+                        .split(',')
+                        .map((r) => r.trim().replace(/^HEAD -> /, ''))
+                        .filter(Boolean)
+                        .slice(0, 3)
+                        .map((r) => (
+                          <span key={r} className="git-ref">
+                            {r}
+                          </span>
+                        ))}
+                    </span>
+                  )}
+                </div>
+                <div className="git-commit-meta">
+                  <code>{c.short}</code> · {c.author} · {c.date}
+                </div>
+                <span
+                  className="git-row-actions git-commit-actions"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    title={t('gitCopyHash')}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(c.hash);
+                      toast(t('gitCopiedHash', { hash: c.short }));
+                    }}
+                  >
+                    <Icon name="copy" size={14} />
+                  </button>
+                  {st?.webUrl && (
+                    <button
+                      title={t('gitOpenWeb')}
+                      onClick={() => void api().app.openExternal(`${st.webUrl}/commit/${c.hash}`)}
+                    >
+                      <Icon name="external" size={14} />
+                    </button>
+                  )}
+                  <button
+                    title={t('gitRevert')}
+                    onClick={() => {
+                      if (!confirm(t('gitRevertConfirm', { subject: c.subject }))) return;
+                      void act(
+                        'revert',
+                        async () => {
+                          await api().git.revert(c.hash);
+                          setLog(await api().git.log());
+                        },
+                        t('gitReverted'),
+                      );
+                    }}
+                  >
+                    <Icon name="undo" size={14} />
+                  </button>
+                </span>
+              </div>
+            ))}
         </div>
       )}
 
@@ -463,51 +626,80 @@ export function GitPanel() {
               <Icon name="plus" size={15} />
             </button>
           </div>
-          {branches.map((b) => (
-            <div
-              key={(b.remote ? 'r:' : 'l:') + b.name}
-              className={`git-row ${b.current ? 'current' : ''}`}
-              onClick={() => {
-                if (b.current) return;
-                void act(
-                  'checkout',
-                  async () => {
-                    await api().git.checkout(b.name, false);
-                    setBranches(await api().git.branches());
-                  },
-                  t('gitSwitched', { name: b.name }),
-                );
-              }}
-            >
-              <span className="git-icon">
-                <Icon name={b.remote ? 'cloud' : 'branch'} size={14} />
-              </span>
-              <span className="git-name">{b.name}</span>
-              <span className="git-dir">{b.upstream ?? ''}</span>
-              {!b.current && !b.remote && (
-                <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    title={t('gitDeleteBranch')}
-                    onClick={() => {
-                      if (!confirm(t('gitDeleteBranchConfirm', { name: b.name }))) return;
-                      void act('branch', async () => {
-                        await api()
-                          .git.deleteBranch(b.name, false)
-                          .catch(async (e) => {
-                            if (!confirm(t('gitForceDelete'))) throw e;
-                            await api().git.deleteBranch(b.name, true);
-                          });
-                        setBranches(await api().git.branches());
-                      });
-                    }}
-                  >
-                    <Icon name="trash" size={14} />
-                  </button>
-                </span>
-              )}
-              {b.current && <span className="git-badge added">●</span>}
+          {branches.length > 6 && (
+            <div className="git-filter">
+              <input
+                value={filter}
+                placeholder={t('gitFilterBranches')}
+                onChange={(e) => setFilter(e.target.value)}
+              />
             </div>
-          ))}
+          )}
+          {branches
+            .filter((b) => matches(filter, b.name))
+            .map((b) => (
+              <div
+                key={(b.remote ? 'r:' : 'l:') + b.name}
+                className={`git-row ${b.current ? 'current' : ''}`}
+                onClick={() => {
+                  if (b.current) return;
+                  void act(
+                    'checkout',
+                    async () => {
+                      await api().git.checkout(b.name, false);
+                      setBranches(await api().git.branches());
+                    },
+                    t('gitSwitched', { name: b.name }),
+                  );
+                }}
+              >
+                <span className="git-icon">
+                  <Icon name={b.remote ? 'cloud' : 'branch'} size={14} />
+                </span>
+                <span className="git-name">{b.name}</span>
+                <span className="git-dir">{b.upstream ?? ''}</span>
+                {!b.current && (
+                  <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      title={t('gitMerge', { branch: st?.branch ?? '' })}
+                      onClick={() => {
+                        if (
+                          !confirm(t('gitMergeConfirm', { name: b.name, branch: st?.branch ?? '' }))
+                        )
+                          return;
+                        void act(
+                          'merge',
+                          () => api().git.merge(b.name),
+                          t('gitMerged', { name: b.name }),
+                        );
+                      }}
+                    >
+                      <Icon name="git" size={14} />
+                    </button>
+                    {!b.remote && (
+                      <button
+                        title={t('gitDeleteBranch')}
+                        onClick={() => {
+                          if (!confirm(t('gitDeleteBranchConfirm', { name: b.name }))) return;
+                          void act('branch', async () => {
+                            await api()
+                              .git.deleteBranch(b.name, false)
+                              .catch(async (e) => {
+                                if (!confirm(t('gitForceDelete'))) throw e;
+                                await api().git.deleteBranch(b.name, true);
+                              });
+                            setBranches(await api().git.branches());
+                          });
+                        }}
+                      >
+                        <Icon name="trash" size={14} />
+                      </button>
+                    )}
+                  </span>
+                )}
+                {b.current && <span className="git-badge added">●</span>}
+              </div>
+            ))}
           {hasRemote && (
             <button className="link git-fetch" onClick={() => void sync('fetch')}>
               ⟳ {t('gitFetch')}
@@ -515,6 +707,99 @@ export function GitPanel() {
           )}
         </div>
       )}
+
+      {view === 'stash' && (
+        <div className="tree git-list">
+          {stashes.length === 0 && <div className="git-clean">{t('gitNoStash')}</div>}
+          {stashes.map((x) => {
+            const reload = async () => setStashes(await api().git.stashList());
+            return (
+              <div key={x.ref} className="git-commit-row" title={x.ref}>
+                <div className="git-commit-subject">{x.message || x.ref}</div>
+                <div className="git-commit-meta">
+                  <code>{x.ref}</code> · {x.date}
+                </div>
+                <span className="git-row-actions git-commit-actions">
+                  <button
+                    title={t('gitStashPop')}
+                    onClick={() =>
+                      void act(
+                        'stash',
+                        async () => {
+                          await api().git.stash('pop', x.ref);
+                          await reload();
+                        },
+                        t('gitStashPopped'),
+                      )
+                    }
+                  >
+                    <Icon name="download" size={14} />
+                  </button>
+                  <button
+                    title={t('gitStashApply')}
+                    onClick={() =>
+                      void act(
+                        'stash',
+                        async () => {
+                          await api().git.stash('apply', x.ref);
+                          await reload();
+                        },
+                        t('gitStashApplied'),
+                      )
+                    }
+                  >
+                    <Icon name="copy" size={14} />
+                  </button>
+                  <button
+                    title={t('gitStashDrop')}
+                    onClick={() => {
+                      if (!confirm(t('gitStashDropConfirm', { name: x.message || x.ref }))) return;
+                      void act('stash', async () => {
+                        await api().git.stash('drop', x.ref);
+                        await reload();
+                      });
+                    }}
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
+}
+
+/** Case-insensitive match of every word of `q` against any of the fields. */
+function matches(q: string, ...fields: string[]): boolean {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = fields.join(' ').toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+
+function prState(pr: GitHubPrView): string {
+  const state = pr.isDraft
+    ? t('gitPrDraft')
+    : pr.state === 'OPEN'
+      ? t('gitPrOpen')
+      : pr.state === 'MERGED'
+        ? t('gitPrMerged')
+        : t('gitPrClosed');
+  const review =
+    pr.review === 'APPROVED'
+      ? t('gitPrApproved')
+      : pr.review === 'CHANGES_REQUESTED'
+        ? t('gitPrChanges')
+        : '';
+  const checks =
+    pr.checks === 'pass'
+      ? t('gitPrChecksPass')
+      : pr.checks === 'fail'
+        ? t('gitPrChecksFail')
+        : pr.checks === 'pending'
+          ? t('gitPrChecksPending')
+          : '';
+  return [state, review, checks].filter(Boolean).join(' · ');
 }
