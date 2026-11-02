@@ -586,6 +586,14 @@ function registerIpc(): void {
   handle('ai:conversations', z.tuple([z.string().max(500), z.boolean()]), (w, q, p) =>
     ai.conversations(q, p, scope(w)),
   );
+  // Saved chats of one project (the side list of the chat panel).
+  handle('ai:projectConversations', z.tuple([z.string().min(1).max(4096)]), (w, folder) => {
+    try {
+      return ai.conversations('', true, scope(w, folder)).slice(0, 30);
+    } catch {
+      return []; // the folder is gone
+    }
+  });
   handle('ai:conversation', z.tuple([conv]), (_w, id) => ai.conversation(id));
   handle('ai:renameConversation', z.tuple([conv, z.string().max(200)]), (_w, id, t) =>
     ai.renameConversation(id, t),

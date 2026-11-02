@@ -165,59 +165,56 @@ export function BrowserPane({ visible }: { visible: boolean }) {
 
   const parts = splitUrl(st.url);
   // Tabs: one per AI conversation that used the browser (two agents never share a page),
-  // plus the user's own. Shown once there is more than the user's single tab.
-  const showTabs = tabs.tabs.length > 1 || tabs.tabs.some((x) => x.ai);
+  // plus the user's own. Always shown, so the user can open more tabs with "+".
   return (
     <div className="browser-pane" style={{ display: visible ? 'flex' : 'none' }}>
-      {showTabs && (
-        <div className="browser-tabs" role="tablist">
-          {tabs.tabs.map((x) => {
-            const title = x.title || (x.url ? splitUrl(x.url).host : t('browserNewTab'));
-            const who = x.ai ? x.label : t('browserYou');
-            return (
-              <div
-                key={x.id}
-                role="tab"
-                aria-selected={x.id === tabs.active}
-                className={`browser-tab ${x.id === tabs.active ? 'on' : ''} ${x.ai ? 'ai' : ''}`}
-                title={`${title}\n${who}${x.url ? `\n${x.url}` : ''}`}
-                onClick={() => void api().browser.selectTab(x.id)}
-                onAuxClick={(e) => {
-                  if (e.button === 1) void api().browser.closeTab(x.id);
+      <div className="browser-tabs" role="tablist">
+        {tabs.tabs.map((x) => {
+          const title = x.title || (x.url ? splitUrl(x.url).host : t('browserNewTab'));
+          const who = x.ai ? x.label : t('browserYou');
+          return (
+            <div
+              key={x.id}
+              role="tab"
+              aria-selected={x.id === tabs.active}
+              className={`browser-tab ${x.id === tabs.active ? 'on' : ''} ${x.ai ? 'ai' : ''}`}
+              title={`${title}\n${who}${x.url ? `\n${x.url}` : ''}`}
+              onClick={() => void api().browser.selectTab(x.id)}
+              onAuxClick={(e) => {
+                if (e.button === 1) void api().browser.closeTab(x.id);
+              }}
+            >
+              <span className={`browser-tab-who ${x.loading ? 'loading' : ''}`}>
+                {x.ai ? (
+                  <ProviderLogo id={x.label.replace(/^🤝\s*/, '').split('/')[0]!} size={12} />
+                ) : (
+                  <Icon d={ICON.globe} size={12} />
+                )}
+              </span>
+              <span className="browser-tab-title">{title}</span>
+              {x.ai && <span className="browser-tab-owner">{who.split('/').pop()}</span>}
+              <button
+                className="browser-tab-x"
+                title={t('browserCloseTab')}
+                aria-label={t('browserCloseTab')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void api().browser.closeTab(x.id);
                 }}
               >
-                <span className={`browser-tab-who ${x.loading ? 'loading' : ''}`}>
-                  {x.ai ? (
-                    <ProviderLogo id={x.label.replace(/^🤝\s*/, '').split('/')[0]!} size={12} />
-                  ) : (
-                    <Icon d={ICON.globe} size={12} />
-                  )}
-                </span>
-                <span className="browser-tab-title">{title}</span>
-                {x.ai && <span className="browser-tab-owner">{who.split('/').pop()}</span>}
-                <button
-                  className="browser-tab-x"
-                  title={t('browserCloseTab')}
-                  aria-label={t('browserCloseTab')}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void api().browser.closeTab(x.id);
-                  }}
-                >
-                  <Icon d={ICON.stop} size={10} />
-                </button>
-              </div>
-            );
-          })}
-          <button
-            className="bicon browser-tab-new"
-            title={t('browserNewTab')}
-            onClick={() => void api().browser.newTab()}
-          >
-            <UiIcon name="plus" size={14} />
-          </button>
-        </div>
-      )}
+                <Icon d={ICON.stop} size={10} />
+              </button>
+            </div>
+          );
+        })}
+        <button
+          className="bicon browser-tab-new"
+          title={t('browserNewTab')}
+          onClick={() => void api().browser.newTab()}
+        >
+          <UiIcon name="plus" size={14} />
+        </button>
+      </div>
       <div className="browser-bar">
         <div className="browser-nav">
           <button

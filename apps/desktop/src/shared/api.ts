@@ -552,6 +552,8 @@ export interface OmniApi {
     }>;
     setRole(role: AiRole, ref: string | null): Promise<void>;
     conversations(query: string, onlyProject: boolean): Promise<ConversationView[]>;
+    /** Saved conversations of one folder, newest first. */
+    projectConversations(folder: string): Promise<ConversationView[]>;
     conversation(
       id: string,
     ): Promise<{ conversation: ConversationView; messages: SavedMessageView[] } | null>;
@@ -758,6 +760,7 @@ export const CHANNELS = [
   'ai:setDefaultModel',
   'ai:setRole',
   'ai:conversations',
+  'ai:projectConversations',
   'ai:conversation',
   'ai:renameConversation',
   'ai:deleteConversation',

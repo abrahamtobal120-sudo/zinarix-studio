@@ -36,6 +36,7 @@ const api: OmniApi = {
     setDefaultModel: call('ai:setDefaultModel') as OmniApi['ai']['setDefaultModel'],
     setRole: call('ai:setRole') as OmniApi['ai']['setRole'],
     conversations: call('ai:conversations') as OmniApi['ai']['conversations'],
+    projectConversations: call('ai:projectConversations') as OmniApi['ai']['projectConversations'],
     conversation: call('ai:conversation') as OmniApi['ai']['conversation'],
     renameConversation: call('ai:renameConversation') as OmniApi['ai']['renameConversation'],
     deleteConversation: call('ai:deleteConversation') as OmniApi['ai']['deleteConversation'],
@@ -93,7 +94,8 @@ const api: OmniApi = {
     logs: call('vercel:logs') as OmniApi['vercel']['logs'],
     cancel: call('vercel:cancel') as OmniApi['vercel']['cancel'],
     redeploy: call('vercel:redeploy') as OmniApi['vercel']['redeploy'],
-  },  supabase: {
+  },
+  supabase: {
     status: call('supabase:status') as OmniApi['supabase']['status'],
     setToken: call('supabase:setToken') as OmniApi['supabase']['setToken'],
     logout: call('supabase:logout') as OmniApi['supabase']['logout'],

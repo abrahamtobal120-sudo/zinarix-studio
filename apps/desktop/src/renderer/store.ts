@@ -92,6 +92,8 @@ export interface State {
   chatHistoryFor: string | null;
   /** List of the open chats beside the conversation (grouped by folder). */
   chatList: boolean;
+  /** Folders shown as projects in that list (also when none of their chats is open). */
+  chatProjects: string[];
   /** Plan of this installation (until main answers, everything is allowed). */
   license: LicenseStatus;
   /** A new version (downloaded in the background, or to download). */
@@ -155,6 +157,7 @@ let state: State = {
   chatFocus: 0,
   chatHistoryFor: null,
   chatList: false,
+  chatProjects: [],
   license: {
     plan: 'open',
     features: PRO_FEATURES,
@@ -385,8 +388,10 @@ export async function openDropped(path: string): Promise<void> {
   const r = await api().workspace.openPath(path);
   if (!r) return toast(t('dropInvalid'));
   // Switch workspace state here so the 'workspace' event cannot close the file we open next.
-  if (state.workspace?.root !== r.workspace.root) resetDocs();
-  setState({ workspace: r.workspace });
+  if (state.workspace?.root !== r.workspace.root) {
+    resetDocs();
+    setState({ workspace: r.workspace, sidebar: 'explorer' });
+  } else setState({ workspace: r.workspace });
   if (r.file) await openFile(r.file);
 }
 
@@ -499,6 +504,36 @@ export function toggleChatList(): void {
   } catch {
     // storage unavailable: the list just starts hidden next time
   }
+}
+
+const PROJECTS_KEY = 'zs.chatProjects';
+
+function savedProjects(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(PROJECTS_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 40) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveProjects(list: string[]): void {
+  setState({ chatProjects: list });
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(list));
+  } catch {
+    // storage unavailable: projects show while their chats are open
+  }
+}
+
+/** Keeps a folder in the projects of the chat list. */
+export function rememberProject(folder: string | undefined): void {
+  if (folder && !state.chatProjects.includes(folder)) saveProjects([...state.chatProjects, folder]);
+}
+
+/** Takes a project out of the chat list (its saved chats stay in the history). */
+export function forgetProject(folder: string): void {
+  saveProjects(state.chatProjects.filter((f) => f !== folder));
 }
 
 /** Folder a chat works in: its own, or the window's open folder. */
@@ -669,6 +704,7 @@ export function requirePro(feature: ProFeature): boolean {
 export function newChat(patch: Partial<ChatTab> = {}, always = false): string {
   if (!always && !requirePro('chats')) return state.activeChat;
   const tab = blankChat(patch);
+  rememberProject(tab.folder);
   setState((s) => ({ chats: [...s.chats, tab], chatHistoryFor: null }));
   selectChat(tab.id);
   return tab.id;
@@ -724,4 +760,9 @@ export function runningChats(): number {
   return state.chats.filter((c) => c.busy).length;
 }
 
-state = { ...state, ...restoreChats(), chatList: savedChatList() };
+state = {
+  ...state,
+  ...restoreChats(),
+  chatList: savedChatList(),
+  chatProjects: savedProjects(),
+};

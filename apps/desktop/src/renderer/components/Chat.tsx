@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ChatContext,
   ChatEventView,
+  ConversationView,
   OmniApi,
   ToolDecision,
   ToolPreview,
@@ -17,6 +18,7 @@ import {
   chatTab,
   closeChat,
   focusedChat,
+  forgetProject,
   getEditor,
   getState,
   isChatVisible,
@@ -1619,11 +1621,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             </button>
           )}
           {busy ? (
-            <button
-              className="danger stop-btn"
-              title={t('chatStopHint')}
-              onClick={stop}
-            >
+            <button className="danger stop-btn" title={t('chatStopHint')} onClick={stop}>
               <Icon name="stop" size={13} /> {t('stop')}
             </button>
           ) : (
@@ -1679,69 +1677,200 @@ function chatStatusText(c: ChatTab): string {
   return c.waiting ? t('chatWaiting') : c.busy ? t('chatRunning') : c.unread ? t('chatDoneBg') : '';
 }
 
-/** Every open chat beside the conversation, grouped by the folder it works in. */
-function ChatList({ focusedId }: { focusedId: string }) {
+const OPEN_KEY = 'zs.chatProjectsOpen';
+
+function savedOpen(): Record<string, boolean> {
+  try {
+    return (JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, boolean>) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** One project of the side list: its open chats and, when unfolded, its saved ones. */
+function ChatProject({
+  folder,
+  items,
+  focusedId,
+  open,
+  onToggle,
+}: {
+  folder: string | undefined;
+  items: { c: ChatTab; n: number }[];
+  focusedId: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const chats = useStore((s) => s.chats);
   const activeChat = useStore((s) => s.activeChat);
   const split = useStore((s) => s.chatSplit);
   const windowRoot = useStore((s) => s.workspace?.root);
+  const [saved, setSaved] = useState<ConversationView[] | null>(null);
+  const own = folder && folder !== windowRoot ? folder : undefined;
+  // Reloaded when a chat of the project ends (its conversation was just saved).
+  const running = items.filter((x) => x.c.busy).length;
+  useEffect(() => {
+    if (!open || !folder) return;
+    void api()
+      .ai.projectConversations(folder)
+      .then(setSaved)
+      .catch(() => setSaved([]));
+  }, [open, folder, running, items.length]);
+
+  const busy = items.some((x) => x.c.busy);
+  const waiting = items.some((x) => x.c.waiting);
+  const unread = items.some((x) => x.c.unread);
+  const past = (saved ?? []).filter((v) => !chats.some((c) => c.conversationId === v.id));
+
+  return (
+    <div className={`chat-list-group ${open ? 'open' : ''}`}>
+      <div
+        className={`chat-list-folder ${items.some((x) => x.c.id === focusedId) ? 'has-focus' : ''}`}
+        title={folder ?? t('chatNoFolder')}
+        onClick={onToggle}
+      >
+        <Icon name={open ? 'chevronDown' : 'chevron'} size={11} />
+        <Icon name="folder" size={13} />
+        <span>{folder ? folderName(folder) : t('chatNoFolder')}</span>
+        {!open && (waiting || busy || unread) && (
+          <span className="chat-tab-status">
+            {waiting ? (
+              <Icon name="pause" size={11} />
+            ) : busy ? (
+              <span className="chat-tab-spin" />
+            ) : (
+              <span className="chat-tab-dot" />
+            )}
+          </span>
+        )}
+        {items.length > 0 && <em className="chat-list-count">{items.length}</em>}
+        <button
+          title={t('chatNewHere')}
+          onClick={(e) => {
+            e.stopPropagation();
+            newChat({ folder: own });
+          }}
+        >
+          <Icon name="plus" size={12} />
+        </button>
+        {!items.length && folder && folder !== windowRoot && (
+          <button
+            title={t('chatProjectHide')}
+            onClick={(e) => {
+              e.stopPropagation();
+              forgetProject(folder);
+            }}
+          >
+            <Icon name="x" size={11} />
+          </button>
+        )}
+      </div>
+      {open && (
+        <>
+          {items.map(({ c, n }) => {
+            const label = c.title || t('chatTabN', { n });
+            const status = chatStatusText(c);
+            const shown = c.id === activeChat || c.id === split;
+            return (
+              <div
+                key={c.id}
+                className={`chat-list-item ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
+                title={status ? `${label} · ${status}` : label}
+                onClick={() => selectChat(c.id)}
+                onAuxClick={(e) => {
+                  if (e.button === 1) requestCloseChat(c.id);
+                }}
+              >
+                <ChatStatus c={c} />
+                <span className="chat-tab-label">{label}</span>
+                {c.queued.length > 0 && (
+                  <em className="chat-list-count" title={t('chatQueued')}>
+                    +{c.queued.length}
+                  </em>
+                )}
+                {chats.length > 1 && (
+                  <button
+                    className="chat-tab-x"
+                    aria-label={t('chatCloseTab')}
+                    title={t('chatCloseTab')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      requestCloseChat(c.id);
+                    }}
+                  >
+                    <Icon name="x" size={11} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {past.slice(0, 8).map((v) => (
+            <div
+              key={v.id}
+              className="chat-list-item past"
+              title={`${v.title} · ${new Date(v.updatedAt).toLocaleString()}`}
+              onClick={() =>
+                newChat({ conversationId: v.id, title: v.title.slice(0, 60), folder: own })
+              }
+            >
+              <span className="chat-tab-status">
+                <Icon name="history" size={11} />
+              </span>
+              <span className="chat-tab-label">{v.title}</span>
+            </div>
+          ))}
+          {!items.length && saved !== null && !past.length && (
+            <div className="chat-list-empty">{t('chatProjectEmpty')}</div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The open chats beside the conversation, as projects: one per folder. A click on a project
+ * shows its chats (the open ones and the saved ones) and a click on a chat opens it.
+ */
+function ChatList({ focusedId }: { focusedId: string }) {
+  const chats = useStore((s) => s.chats);
+  const windowRoot = useStore((s) => s.workspace?.root);
+  const known = useStore((s) => s.chatProjects);
+  const [openMap, setOpenMap] = useState(savedOpen);
   const groups: { folder: string | undefined; items: { c: ChatTab; n: number }[] }[] = [];
-  chats.forEach((c, i) => {
-    const folder = chatFolder(c);
-    const g = groups.find((x) => x.folder === folder);
-    if (g) g.items.push({ c, n: i + 1 });
-    else groups.push({ folder, items: [{ c, n: i + 1 }] });
-  });
+  const group = (folder: string | undefined) => {
+    let g = groups.find((x) => x.folder === folder);
+    if (!g) groups.push((g = { folder, items: [] }));
+    return g;
+  };
+  chats.forEach((c, i) => group(chatFolder(c)).items.push({ c, n: i + 1 }));
+  if (windowRoot) group(windowRoot);
+  for (const f of known) group(f);
+  const focusedFolder = chatFolder(chats.find((c) => c.id === focusedId));
+  // Unfolded by the user, or (until they choose) the project of the chat they are in.
+  const isOpen = (f: string | undefined) => openMap[f ?? ''] ?? f === focusedFolder;
+  const toggle = (f: string | undefined) => {
+    const next = { ...openMap, [f ?? '']: !isOpen(f) };
+    setOpenMap(next);
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+    } catch {
+      // storage unavailable: projects just unfold as before next time
+    }
+  };
   return (
     <nav className="chat-list" aria-label={t('chatListTitle')}>
+      <div className="chat-list-head">{t('chatProjects')}</div>
       <div className="chat-list-scroll">
         {groups.map((g) => (
-          <div key={g.folder ?? ''} className="chat-list-group">
-            <div className="chat-list-folder" title={g.folder ?? t('chatNoFolder')}>
-              <Icon name="folder" size={12} />
-              <span>{g.folder ? folderName(g.folder) : t('chatNoFolder')}</span>
-              <button
-                title={t('chatNewHere')}
-                onClick={() =>
-                  newChat({ folder: g.folder && g.folder !== windowRoot ? g.folder : undefined })
-                }
-              >
-                <Icon name="plus" size={12} />
-              </button>
-            </div>
-            {g.items.map(({ c, n }) => {
-              const label = c.title || t('chatTabN', { n });
-              const status = chatStatusText(c);
-              const shown = c.id === activeChat || c.id === split;
-              return (
-                <div
-                  key={c.id}
-                  className={`chat-list-item ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
-                  title={status ? `${label} · ${status}` : label}
-                  onClick={() => selectChat(c.id)}
-                  onAuxClick={(e) => {
-                    if (e.button === 1) requestCloseChat(c.id);
-                  }}
-                >
-                  <ChatStatus c={c} />
-                  <span className="chat-tab-label">{label}</span>
-                  {chats.length > 1 && (
-                    <button
-                      className="chat-tab-x"
-                      aria-label={t('chatCloseTab')}
-                      title={t('chatCloseTab')}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        requestCloseChat(c.id);
-                      }}
-                    >
-                      <Icon name="x" size={11} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <ChatProject
+            key={g.folder ?? ''}
+            folder={g.folder}
+            items={g.items}
+            focusedId={focusedId}
+            open={isOpen(g.folder)}
+            onToggle={() => toggle(g.folder)}
+          />
         ))}
       </div>
       <button className="chat-list-new" onClick={() => void newChatInFolder()}>

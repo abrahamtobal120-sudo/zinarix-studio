@@ -298,7 +298,7 @@ describe('S7: sensitive browser fields', () => {
     expect(normalizeUrl('127.0.0.1:8080/app')).toBe('http://127.0.0.1:8080/app');
     expect(normalizeUrl('example.com:8443/x')).toBe('https://example.com:8443/x');
     expect(normalizeUrl('https://example.com')).toBe('https://example.com/');
-    expect(normalizeUrl('rust traits')).toMatch(/^https:\/\/duckduckgo\.com\/\?q=rust/);
+    expect(normalizeUrl('rust traits')).toMatch(/^https:\/\/www\.google\.com\/search\?q=rust/);
     expect(() => normalizeUrl('file:///etc/passwd')).toThrow();
   });
 });

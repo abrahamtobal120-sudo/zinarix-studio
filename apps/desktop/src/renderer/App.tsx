@@ -166,8 +166,14 @@ export function App() {
     })();
     return api().on((ev) => {
       if (ev.type === 'workspace') {
-        if (getState().workspace?.root !== ev.workspace?.root) resetDocs();
-        setState({ workspace: ev.workspace });
+        const switched = getState().workspace?.root !== ev.workspace?.root;
+        if (switched) resetDocs();
+        // A new project shows its folder in the explorer.
+        setState(
+          switched && ev.workspace
+            ? { workspace: ev.workspace, sidebar: 'explorer' }
+            : { workspace: ev.workspace },
+        );
       }
       if (ev.type === 'fs:changed') setState((s) => ({ fsVersion: s.fsVersion + 1 }));
       if (ev.type === 'command') void runCommand(ev.command);

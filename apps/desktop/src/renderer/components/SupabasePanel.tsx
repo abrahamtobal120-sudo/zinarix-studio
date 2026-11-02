@@ -326,9 +326,7 @@ export function SupabasePanel() {
             <button className="primary" onClick={() => open(`${DASH}/new`)}>
               {t('sbNewProject')}
             </button>
-            {workspace && (
-              <button onClick={() => inTerminal(st.cli, 'link')}>{t('sbLink')}</button>
-            )}
+            {workspace && <button onClick={() => inTerminal(st.cli, 'link')}>{t('sbLink')}</button>}
           </div>
         </div>
         <div className="vc-toolbar">
@@ -452,7 +450,10 @@ export function SupabasePanel() {
             </>
           )}
           {!linked && workspace && (
-            <button title={t('sbLinkTitle')} onClick={() => inTerminal(st.cli, `link --project-ref ${ref}`)}>
+            <button
+              title={t('sbLinkTitle')}
+              onClick={() => inTerminal(st.cli, `link --project-ref ${ref}`)}
+            >
               <Icon name="link" size={14} />
             </button>
           )}
@@ -482,10 +483,7 @@ export function SupabasePanel() {
               >
                 {t('sbFunctions')}
               </button>
-              <button
-                className={view === 'storage' ? 'on' : ''}
-                onClick={() => setView('storage')}
-              >
+              <button className={view === 'storage' ? 'on' : ''} onClick={() => setView('storage')}>
                 Storage
               </button>
             </div>
@@ -561,7 +559,11 @@ export function SupabasePanel() {
                 }}
               />
               <div className="git-connect-actions">
-                <button className="primary" disabled={!sql.trim() || busy !== null} onClick={runSql}>
+                <button
+                  className="primary"
+                  disabled={!sql.trim() || busy !== null}
+                  onClick={runSql}
+                >
                   <Icon name="play" size={14} /> {t('sbRun')} (Ctrl+Enter)
                 </button>
                 {result && (
@@ -593,7 +595,10 @@ export function SupabasePanel() {
                 </div>
               ))}
               {workspace && (
-                <button className="link git-fetch" onClick={() => inTerminal(st.cli, 'functions deploy')}>
+                <button
+                  className="link git-fetch"
+                  onClick={() => inTerminal(st.cli, 'functions deploy')}
+                >
                   {t('sbDeployFunctions')}
                 </button>
               )}

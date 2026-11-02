@@ -86,6 +86,33 @@ export const SENSITIVE_FIELD_JS = `((el) => {
 const SENSITIVE = SENSITIVE_FIELD_JS;
 
 /**
+ * Where to click the element the AI picked, measured right before the click: the center of
+ * its first visible box if nothing covers it there, or null when another element (a cookie
+ * banner, a sticky header, an overlay) would get the click instead.
+ */
+const CLICK_POINT_JS = `(() => {
+  const el = globalThis.__zxPicked;
+  if (!el || !el.isConnected) return null;
+  const boxes = [...el.getClientRects()].filter((r) => r.width >= 2 && r.height >= 2);
+  for (const r of boxes.length ? boxes : [el.getBoundingClientRect()]) {
+    const x = Math.round(Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 2));
+    const y = Math.round(Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 2));
+    const top = document.elementFromPoint(x, y);
+    if (top && (top === el || el.contains(top) || top.contains(el))) return { x, y };
+  }
+  return null;
+})()`;
+
+/** Fallback when the element can't be reached with the mouse: a DOM click on it. */
+const DOM_CLICK_JS = `(() => {
+  const el = globalThis.__zxPicked;
+  if (!el || !el.isConnected) return false;
+  if (typeof el.focus === 'function') el.focus();
+  el.click();
+  return true;
+})()`;
+
+/**
  * Right before typing: the focused element must still be the one the AI chose and must not
  * be sensitive. The page owns its DOM and can move the ref attribute, change an input's
  * type or put another field under the click point after the first check.
@@ -99,12 +126,16 @@ const FOCUS_CHECK_JS = (ref: number) => `(() => {
   return ${SENSITIVE}(el) ? 'sensitive' : 'ok';
 })()`;
 
-/** Briefly outlines the element the AI is acting on, so the user can follow along. */
+/**
+ * Briefly outlines the element the AI is acting on, so the user can follow along. The
+ * scroll is instant (a page with "scroll-behavior: smooth" would still be moving when the
+ * click point is measured, and the click would land elsewhere).
+ */
 const HIGHLIGHT_JS = (ref: number) => `(() => {
   const el = document.querySelector('[data-zx-ref="${ref}"]');
   if (!el) return null;
   globalThis.__zxPicked = el;
-  el.scrollIntoView({ block: 'center', inline: 'center' });
+  el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
   const prev = el.style.outline;
   el.style.outline = '3px solid #8b3dff';
   el.style.outlineOffset = '2px';
@@ -126,7 +157,7 @@ export function normalizeUrl(input: string): string {
       ? `https://${s}`
       : /^[a-z][a-z0-9+.-]*:/i.test(s)
         ? s
-        : `https://duckduckgo.com/?q=${encodeURIComponent(s)}`;
+        : `https://www.google.com/search?q=${encodeURIComponent(s)}`;
   const url = new URL(withScheme);
   if (url.protocol !== 'https:' && url.protocol !== 'http:')
     throw new Error(`Solo se permiten páginas http(s), no ${url.protocol}`);
@@ -210,8 +241,12 @@ export class BrowserTab {
     view.setBorderRadius(10);
     const wc = view.webContents;
     wc.setWindowOpenHandler(({ url }) => {
-      // Popups open in the same tab.
-      if (/^https?:/i.test(url) && this.allowed(url)) wc.loadURL(url).catch(() => {});
+      // Links that open a new window: a new tab for the user; an AI keeps working in its own
+      // tab (the same tab, behind its site guard).
+      if (/^https?:/i.test(url)) {
+        if (this.owner === null) this.host.openTab(url);
+        else if (this.allowed(url)) wc.loadURL(url).catch(() => {});
+      }
       return { action: 'deny' };
     });
     wc.on('will-navigate', (e, url) => {
@@ -329,13 +364,26 @@ export class BrowserTab {
     return hit;
   }
 
-  /** Real mouse click at the element center (works with JS frameworks). */
+  /**
+   * Real mouse click on the element (works with JS frameworks), at a point measured after
+   * the scroll and checked to be the element itself; if something covers it, a DOM click.
+   */
   async click(ref: number): Promise<BrowserState> {
     const wc = this.ensure().webContents;
-    const { x, y } = await this.locate(ref);
-    wc.sendInputEvent({ type: 'mouseMove', x, y });
-    wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
-    wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+    await this.locate(ref);
+    const at = (await wc.executeJavaScriptInIsolatedWorld(999, [{ code: CLICK_POINT_JS }])) as {
+      x: number;
+      y: number;
+    } | null;
+    if (at) {
+      const { x, y } = at;
+      wc.sendInputEvent({ type: 'mouseMove', x, y });
+      wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+      wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+    } else if (!(await wc.executeJavaScriptInIsolatedWorld(999, [{ code: DOM_CLICK_JS }])))
+      throw new Error(
+        `El elemento [${ref}] ya no está en la página. Usa browser_read para ver la lista actualizada.`,
+      );
     await this.settle(900);
     return this.state();
   }
@@ -572,6 +620,13 @@ export class BrowserController {
     const tab = this.create(null, 'Tú');
     this.select(tab.id);
     return tab.id;
+  }
+
+  /** A link of a user tab asked for a new window: it opens in a new user tab. */
+  openTab(url: string): void {
+    const tab = this.create(null, 'Tú');
+    this.select(tab.id);
+    tab.navigate(url).catch(() => {});
   }
 
   /** Places the visible tab in the area the renderer reserved; null hides every page. */

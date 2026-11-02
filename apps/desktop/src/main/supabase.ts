@@ -72,7 +72,8 @@ function cliInstalled(): Promise<boolean> {
 
 /** Project refs are 20 lowercase letters; only those go into URLs. */
 function checkRef(ref: string): string {
-  if (!/^[a-z0-9]{8,40}$/.test(ref)) throw new Error('Referencia de proyecto de Supabase no válida.');
+  if (!/^[a-z0-9]{8,40}$/.test(ref))
+    throw new Error('Referencia de proyecto de Supabase no válida.');
   return ref;
 }
 
@@ -131,7 +132,8 @@ export class Supabase {
       } catch {
         if (text.trim()) msg = text.trim().slice(0, 500);
       }
-      if (r.status === 401) msg = `Supabase rechazó el token (${msg}). Vuelve a conectar tu cuenta.`;
+      if (r.status === 401)
+        msg = `Supabase rechazó el token (${msg}). Vuelve a conectar tu cuenta.`;
       throw new Error(msg);
     }
     return (text ? JSON.parse(text) : null) as T;
