@@ -6605,3 +6605,11 @@ button.primary:hover,
   border: 3px solid transparent;
   background-clip: padding-box;
 }
+/* A bold line on its own reads as a small label: space above, close to its text below. */
+.md p.md-label {
+  margin: 18px 0 4px;
+  color: var(--fg-strong);
+}
+.md > p.md-label:first-child {
+  margin-top: 0;
+}

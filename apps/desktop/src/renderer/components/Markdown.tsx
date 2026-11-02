@@ -108,6 +108,13 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
       !(TABLE_ROW.test(lines[i]!) && TABLE_SEP.test(lines[i + 1] ?? ''))
     )
       para.push(lines[i++]!);
+    // A bold line on its own ("**1. Step**") is a small label, set apart from the text under it.
+    if (para.length > 1 && /^\*\*[^*]+\*\*:?$/.test(para[0]!.trim()))
+      blocks.push(
+        <p key={key++} className="md-label">
+          {inline(para.shift()!.trim())}
+        </p>,
+      );
     blocks.push(<p key={key++}>{inline(para.join('\n'))}</p>);
   }
   return <div className="md">{blocks}</div>;
