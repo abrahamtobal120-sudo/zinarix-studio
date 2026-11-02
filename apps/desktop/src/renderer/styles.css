@@ -422,7 +422,8 @@ kbd {
 .run-label {
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 1;
+  flex-shrink: 0;
+  max-width: 100%;
 }
 .run-badge {
   margin-left: 6px;
@@ -439,7 +440,8 @@ kbd {
   text-overflow: ellipsis;
   direction: rtl;
   text-align: right;
-  flex-shrink: 2;
+  min-width: 0;
+  flex-shrink: 10;
 }
 .run-file:hover {
   text-decoration: underline;
@@ -2161,6 +2163,9 @@ button.big {
   border-bottom: 1px solid var(--border);
 }
 .mp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border-radius: 14px;
   padding: 3px 11px;
   font-size: 12px;
@@ -2295,12 +2300,16 @@ button.big {
 }
 .mp-caps {
   display: flex;
+  align-items: center;
   gap: 6px;
   font-size: 13px;
 }
+.mp-caps > span {
+  display: grid;
+  place-items: center;
+}
 .mp-caps .off {
   opacity: 0.15;
-  filter: grayscale(1);
 }
 .mp-star {
   background: transparent;
@@ -5834,7 +5843,8 @@ button.big {
   border: none;
   border-bottom: 1px solid var(--border);
   padding: 7px 10px;
-  overflow-wrap: anywhere;
+  /* break-word (not anywhere): a word never splits mid-letter; long tables scroll instead. */
+  overflow-wrap: break-word;
   word-break: normal;
   min-width: 92px;
 }
@@ -6235,4 +6245,66 @@ button.big {
 .md-h6 {
   font-size: 13.5px;
   color: var(--fg);
+}
+
+/* A narrow chat shows the answer actions as icons only (the label stays in the tooltip). */
+.chat-scroll {
+  container-type: inline-size;
+}
+@container (max-width: 480px) {
+  .turn-actions .turn-action-label {
+    display: none;
+  }
+  .turn-actions button {
+    padding: 4px 6px;
+  }
+}
+/* Table columns size to their text up to a cap; wider tables scroll sideways. */
+.md-table table {
+  width: max-content;
+  min-width: 100%;
+}
+.md-table .md-cell {
+  max-width: 360px;
+}
+.md-table th .md-cell {
+  max-width: 200px;
+}
+
+/* ---------- colored icons ---------- */
+.activity {
+  color: var(--tone, var(--fg));
+  opacity: 0.8;
+  filter: none;
+}
+:root[data-theme='light'] .activity {
+  opacity: 0.9;
+}
+.activity:hover {
+  background: color-mix(in srgb, var(--tone, var(--fg)) 12%, transparent);
+}
+.activity.active {
+  color: var(--tone, var(--fg-strong));
+  background: color-mix(in srgb, var(--tone, var(--fg)) 18%, transparent);
+}
+.tone-badge {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--tone, var(--brand));
+  background: color-mix(in srgb, var(--tone, var(--brand)) 16%, transparent);
+}
+.chat-suggestion {
+  gap: 10px;
+}
+.chat-suggestion .tone-badge .icon {
+  color: inherit;
+}
+.welcome-row-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }

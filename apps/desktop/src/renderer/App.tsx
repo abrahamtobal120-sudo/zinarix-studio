@@ -57,6 +57,15 @@ function Sash({ dir, onDrag }: { dir: 'x' | 'y'; onDrag: (delta: number) => void
   );
 }
 
+const CHAT_W_KEY = 'zs.chatWidth';
+
+/** The width the user last dragged the chat to; otherwise about a third of the window. */
+function initialChatWidth(): number {
+  const saved = Number(localStorage.getItem(CHAT_W_KEY));
+  if (saved >= 280) return Math.min(saved, window.innerWidth - 200);
+  return Math.round(Math.min(640, Math.max(400, window.innerWidth * 0.36)));
+}
+
 export function App() {
   const sidebar = useStore((s) => s.sidebar);
   const panelOpen = useStore((s) => s.panelOpen);
@@ -65,7 +74,7 @@ export function App() {
   const chatList = useStore((s) => s.chatList);
   const toast = useStore((s) => s.toast);
   const [sideW, setSideW] = useState(320);
-  const [chatW, setChatW] = useState(400);
+  const [chatW, setChatW] = useState(initialChatWidth);
   const [panelH, setPanelH] = useState(260);
   const [terminalMounted, setTerminalMounted] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -228,7 +237,13 @@ export function App() {
         {chatOpen && (
           <Sash
             dir="x"
-            onDrag={(d) => setChatW((w) => Math.min(chatSplit ? 1600 : 900, Math.max(280, w - d)))}
+            onDrag={(d) =>
+              setChatW((w) => {
+                const next = Math.min(chatSplit ? 1600 : 900, Math.max(280, w - d));
+                localStorage.setItem(CHAT_W_KEY, String(Math.round(next)));
+                return next;
+              })
+            }
           />
         )}
         <aside className="chat-wrap" style={{ width: chatW, display: chatOpen ? 'flex' : 'none' }}>

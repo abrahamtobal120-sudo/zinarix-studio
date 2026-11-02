@@ -715,8 +715,8 @@ export function SecuritySection() {
           <div className="sv-panel">
             <div className="sv-panel-head">
               <h2>
-              <SvgOf k="history" size={18} /> {labelOf('history')}
-            </h2>
+                <SvgOf k="history" size={18} /> {labelOf('history')}
+              </h2>
               {history.length > 0 && (
                 <button
                   onClick={() => {

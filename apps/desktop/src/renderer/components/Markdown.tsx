@@ -64,7 +64,9 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
             <thead>
               <tr>
                 {head.map((c, j) => (
-                  <th key={j}>{inline(c)}</th>
+                  <th key={j}>
+                    <div className="md-cell">{inline(c)}</div>
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -72,7 +74,9 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
               {rows.map((r, j) => (
                 <tr key={j}>
                   {head.map((_, k) => (
-                    <td key={k}>{inline(r[k] ?? '')}</td>
+                    <td key={k}>
+                      <div className="md-cell">{inline(r[k] ?? '')}</div>
+                    </td>
                   ))}
                 </tr>
               ))}

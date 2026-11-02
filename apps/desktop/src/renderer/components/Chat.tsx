@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ChatContext,
   ChatEventView,
@@ -39,7 +39,7 @@ import {
 } from '../store';
 import { runCommand } from '../commands';
 import { fileIcon } from './icons';
-import { Icon, type IconName } from './Icon';
+import { Icon, TONE, type IconName } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory } from './ChatHistory';
 import { Markdown } from './Markdown';
@@ -205,6 +205,13 @@ function fmtUsd(n: number | null): string {
   if (n === null) return '–';
   return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
 }
+
+const SUGGEST_ICON = {
+  chatSuggest1: 'books',
+  chatSuggest2: 'search',
+  chatSuggest3: 'check',
+  chatSuggest4: 'play',
+} as const satisfies Record<string, IconName>;
 
 const TOOL_ICON: Record<string, IconName> = {
   list_dir: 'folder',
@@ -1262,7 +1269,12 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                           textarea.current?.focus();
                         }}
                       >
-                        <Icon name="sparkles" size={13} />
+                        <span
+                          className="tone-badge"
+                          style={{ '--tone': TONE[SUGGEST_ICON[k]] } as CSSProperties}
+                        >
+                          <Icon name={SUGGEST_ICON[k]} size={14} />
+                        </span>
                         {t(k)}
                       </button>
                     ))}
@@ -1365,27 +1377,32 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                     <div className="turn-actions">
                       {turn.content && (
                         <button title={t('copy')} onClick={() => copyTurn(turn)}>
-                          <Icon name="copy" size={13} /> {t('copy')}
+                          <Icon name="copy" size={13} />
+                          <span className="turn-action-label">{t('copy')}</span>
                         </button>
                       )}
                       {turn.content && (
                         <button title={t('chatQuote')} onClick={() => quoteTurn(turn)}>
-                          <Icon name="quote" size={13} /> {t('chatQuote')}
+                          <Icon name="quote" size={13} />
+                          <span className="turn-action-label">{t('chatQuote')}</span>
                         </button>
                       )}
                       {turn.content && (
                         <button title={t('chatHandoffTitle')} onClick={() => handoff(turn)}>
-                          <Icon name="handoff" size={13} /> {t('chatHandoff')}
+                          <Icon name="handoff" size={13} />
+                          <span className="turn-action-label">{t('chatHandoff')}</span>
                         </button>
                       )}
                       {last && (
                         <button title={t('chatRegenerate')} onClick={() => void regenerate()}>
-                          <Icon name="refresh" size={13} /> {t('chatRegenerate')}
+                          <Icon name="refresh" size={13} />
+                          <span className="turn-action-label">{t('chatRegenerate')}</span>
                         </button>
                       )}
                       {last && turn.content && !turn.error && (
                         <button title={t('chatContinue')} onClick={continueLast}>
-                          <Icon name="continue" size={13} /> {t('chatContinue')}
+                          <Icon name="continue" size={13} />
+                          <span className="turn-action-label">{t('chatContinue')}</span>
                         </button>
                       )}
                     </div>

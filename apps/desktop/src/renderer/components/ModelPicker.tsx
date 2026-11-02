@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AiRole, ProviderView } from '../../shared/api';
 import { t } from '../i18n';
 import { api, refreshModels, refreshSettings, setState, toast, useStore } from '../store';
+import { Icon, type IconName } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { fuzzy } from './QuickPick';
 import { isLegacyModel, siblingIds } from '../legacyModels';
@@ -320,8 +321,9 @@ export function ModelPicker({
     }
   };
 
-  const chip = (f: Filter, label: string) => (
+  const chip = (f: Filter, icon: IconName, label: string) => (
     <button className={`mp-chip ${filters.has(f) ? 'on' : ''}`} onClick={() => toggleFilter(f)}>
+      <Icon name={icon} size={13} />
       {label}
     </button>
   );
@@ -401,21 +403,22 @@ export function ModelPicker({
           </button>
         </div>
         <div className="mp-chips">
-          {chip('connected', `✓ ${t('fConnected')}`)}
-          {chip('fav', `★ ${t('fFavorites')}`)}
-          {chip('tools', `🛠 ${t('fTools')}`)}
-          {chip('vision', `👁 ${t('fVision')}`)}
-          {chip('reasoning', `🧠 ${t('fReasoning')}`)}
-          {chip('long', `📚 ≥200k`)}
-          {chip('cheap', `💲 ${t('fCheap')}`)}
-          {chip('local', `🏠 ${t('fLocal')}`)}
+          {chip('connected', 'check', t('fConnected'))}
+          {chip('fav', 'star', t('fFavorites'))}
+          {chip('tools', 'wrench', t('fTools'))}
+          {chip('vision', 'eye', t('fVision'))}
+          {chip('reasoning', 'brain', t('fReasoning'))}
+          {chip('long', 'books', '≥200k')}
+          {chip('cheap', 'dollar', t('fCheap'))}
+          {chip('local', 'home', t('fLocal'))}
           {(hiddenCount > 0 || showOld) && (
             <button
               className={`mp-chip ${showOld ? 'on' : ''}`}
               onClick={() => setShowOld((v) => !v)}
               title={t('mpOldHint')}
             >
-              🕘 {showOld ? t('mpHideOld') : t('mpShowOld', { n: hiddenCount })}
+              <Icon name="clock" size={13} />
+              {showOld ? t('mpHideOld') : t('mpShowOld', { n: hiddenCount })}
             </button>
           )}
           {pick?.current && (
@@ -563,13 +566,13 @@ export function ModelPicker({
                   <span className="num">{r.local ? t('free') : fmtPrice(r.outputPrice)}</span>
                   <span className="mp-caps">
                     <span className={r.tools ? '' : 'off'} title={t('fTools')}>
-                      🛠
+                      <Icon name="wrench" size={14} />
                     </span>
                     <span className={r.vision ? '' : 'off'} title={t('fVision')}>
-                      👁
+                      <Icon name="eye" size={14} />
                     </span>
                     <span className={r.reasoning ? '' : 'off'} title={t('fReasoning')}>
-                      🧠
+                      <Icon name="brain" size={14} />
                     </span>
                   </span>
                   <button

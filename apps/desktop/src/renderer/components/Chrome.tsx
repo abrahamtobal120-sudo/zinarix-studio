@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { runCommand } from '../commands';
 import { t } from '../i18n';
-import { Icon, type IconName } from './Icon';
+import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
 import {
   BROWSER_TAB,
@@ -32,6 +32,7 @@ export function ActivityBar() {
   ) => (
     <button
       className={`activity ${active ? 'active' : ''}`}
+      style={{ '--tone': TONE[icon] ?? 'var(--fg)' } as CSSProperties}
       title={title}
       aria-label={title}
       onClick={onClick}
@@ -163,9 +164,17 @@ export function Welcome() {
   useEffect(() => {
     if (!workspace) void api().workspace.recent().then(setRecent);
   }, [workspace]);
-  const row = (label: string, keys: string, id: string) => (
+  const row = (label: string, keys: string, id: string, icon: IconName) => (
     <div className="welcome-row" onClick={() => void runCommand(id)}>
-      <span>{label}</span>
+      <span className="welcome-row-label">
+        <span
+          className="tone-badge"
+          style={{ '--tone': TONE[icon] ?? 'var(--brand)' } as CSSProperties}
+        >
+          <Icon name={icon} size={14} />
+        </span>
+        {label}
+      </span>
       <kbd>{keys}</kbd>
     </div>
   );
@@ -216,12 +225,12 @@ export function Welcome() {
             </button>
           </div>
           <div className="welcome-keys">
-            {row(t('welcomeQuickOpen'), 'Ctrl+P', 'quickOpen')}
-            {row(t('cmdPalette'), 'Ctrl+Shift+P', 'palette')}
-            {row(t('aiEdit'), 'Ctrl+K', 'ai.edit')}
-            {row(t('welcomeAsk'), 'Ctrl+L', 'ai.askSelection')}
-            {row(t('pickModel'), 'Ctrl+Alt+M', 'ai.pickModel')}
-            {row(t('terminal'), 'Ctrl+`', 'view.terminal')}
+            {row(t('welcomeQuickOpen'), 'Ctrl+P', 'quickOpen', 'search')}
+            {row(t('cmdPalette'), 'Ctrl+Shift+P', 'palette', 'menu')}
+            {row(t('aiEdit'), 'Ctrl+K', 'ai.edit', 'edit')}
+            {row(t('welcomeAsk'), 'Ctrl+L', 'ai.askSelection', 'message')}
+            {row(t('pickModel'), 'Ctrl+Alt+M', 'ai.pickModel', 'brain')}
+            {row(t('terminal'), 'Ctrl+`', 'view.terminal', 'terminal')}
           </div>
         </>
       )}
