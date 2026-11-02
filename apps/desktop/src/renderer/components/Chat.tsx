@@ -24,6 +24,7 @@ import {
   isChatVisible,
   newChat,
   newChatInFolder,
+  newQuestionChat,
   newRequestId,
   rememberProject,
   reloadFromDisk,
@@ -494,7 +495,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   /** This chat works in a folder of its own (not the window's open folder). */
   const ownFolder = meta?.folder && meta.folder !== workspace?.root ? meta.folder : undefined;
-  const root = ownFolder ?? workspace?.root;
+  /** A chat in no folder (questions only) does not see the window's open folder either. */
+  const noFolder = Boolean(meta?.noFolder);
+  const root = noFolder ? undefined : (ownFolder ?? workspace?.root);
   useEffect(() => {
     // "@file" suggestions list the window's folder: not offered for a chat working elsewhere.
     if (!root || ownFolder) {
@@ -802,6 +805,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         context,
         conversationId,
         folder: ownFolder,
+        noFolder: noFolder || undefined,
       });
     } catch (err) {
       // The request never reached the model (validation, IPC failure): show it and unlock the input.
@@ -1829,7 +1833,8 @@ function ChatProject({
           title={t('chatNewHere')}
           onClick={(e) => {
             e.stopPropagation();
-            newChat({ folder: own });
+            // "No folder" with a folder open in the window: a chat that stays without one.
+            newChat(folder ? { folder: own } : windowRoot ? { noFolder: true } : {});
           }}
         >
           <Icon name="plus" size={12} />
@@ -1959,7 +1964,8 @@ function ChatList({ focusedId }: { focusedId: string }) {
       toast(String((err as Error).message ?? err));
       return;
     }
-    if (tab) updateChat(tab.id, { folder: to === windowRoot ? undefined : to });
+    if (tab)
+      updateChat(tab.id, { folder: to === windowRoot ? undefined : to, noFolder: undefined });
     if (!isOpen(to)) toggle(to);
     setMoved((n) => n + 1);
     toast(t('chatMoved', { folder: folderName(to) }));
@@ -2056,6 +2062,9 @@ export function ChatPanel() {
           </button>
           <button title={`${t('chatNewTab')} (Ctrl+Alt+N)`} onClick={() => newChat()}>
             <Icon name="plus" size={15} />
+          </button>
+          <button title={t('chatNewQuestion')} onClick={() => newQuestionChat()}>
+            <Icon name="message" size={15} />
           </button>
           <button title={t('chatNewInFolder')} onClick={() => void newChatInFolder()}>
             <Icon name="folderPlus" size={15} />

@@ -8,6 +8,7 @@ import type {
   VercelEnvView,
   VercelProjectInfo,
   VercelProjectView,
+  VercelSettings,
   VercelStatus,
 } from '../shared/api.js';
 
@@ -56,6 +57,26 @@ function checkId(id: string): string {
   if (!/^[\w-]{1,128}$/.test(id)) throw new Error('Identificador de Vercel no válido.');
   return id;
 }
+
+function checkDomain(name: string): string {
+  const d = name.trim().toLowerCase();
+  if (!/^(?=.{3,253}$)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/.test(d))
+    throw new Error('Dominio no válido.');
+  return d;
+}
+
+const ENV_TARGETS = ['production', 'preview', 'development'] as const;
+
+/** Build settings the panel can read and change (null = Vercel's default for the framework). */
+const SETTING_KEYS = [
+  'framework',
+  'buildCommand',
+  'installCommand',
+  'devCommand',
+  'outputDirectory',
+  'rootDirectory',
+  'nodeVersion',
+] as const;
 
 /**
  * Vercel REST API with the user's token. The token stays in the main process: either one
@@ -107,7 +128,9 @@ export class Vercel {
         msg = `Vercel rechazó el token (${msg}). Vuelve a conectar tu cuenta.`;
       throw new Error(msg);
     }
-    return (init.text ? await r.text() : await r.json()) as T;
+    const body = await r.text();
+    if (init.text) return body as T;
+    return (body ? JSON.parse(body) : null) as T;
   }
 
   async status(): Promise<VercelStatus> {
@@ -189,21 +212,40 @@ export class Vercel {
   async project(projectId: string, teamId: string | null): Promise<VercelProjectInfo> {
     const id = checkId(projectId);
     const [d, e] = await Promise.all([
-      this.req<{ domains: { name: string; verified: boolean }[] }>(
-        `/v9/projects/${id}/domains?limit=20`,
-        teamId,
-      ).catch(() => ({ domains: [] })),
-      this.req<{ envs: { key: string; target?: string[] | string; type: string }[] }>(
-        `/v9/projects/${id}/env`,
-        teamId,
-      ).catch(() => ({ envs: [] })),
+      this.req<{
+        domains: {
+          name: string;
+          verified: boolean;
+          redirect?: string | null;
+          gitBranch?: string | null;
+        }[];
+      }>(`/v9/projects/${id}/domains?limit=50`, teamId).catch(() => ({ domains: [] })),
+      this.req<{
+        envs: {
+          id: string;
+          key: string;
+          target?: string[] | string;
+          type: string;
+          gitBranch?: string;
+        }[];
+      }>(`/v9/projects/${id}/env`, teamId).catch(() => ({ envs: [] })),
     ]);
     const envs: VercelEnvView[] = e.envs.map((x) => ({
+      id: x.id,
       key: x.key,
+      branch: x.gitBranch ?? null,
       targets: Array.isArray(x.target) ? x.target : x.target ? [x.target] : [],
       type: x.type,
     }));
-    return { domains: d.domains.map((x) => ({ name: x.name, verified: x.verified })), envs };
+    return {
+      domains: d.domains.map((x) => ({
+        name: x.name,
+        verified: x.verified,
+        redirect: x.redirect ?? null,
+        branch: x.gitBranch ?? null,
+      })),
+      envs,
+    };
   }
 
   async deployments(projectId: string, teamId: string | null): Promise<VercelDeploymentView[]> {
@@ -270,6 +312,90 @@ export class Vercel {
       body: { name: d.name, deploymentId: id, ...(production ? { target: 'production' } : {}) },
     });
     return `https://${r.url}`;
+  }
+
+  /** Makes a READY deployment the production one again (instant rollback, no rebuild). */
+  async promote(projectId: string, deploymentId: string, teamId: string | null): Promise<void> {
+    await this.req(`/v10/projects/${checkId(projectId)}/promote/${checkId(deploymentId)}`, teamId, {
+      method: 'POST',
+    });
+  }
+
+  async removeDeployment(deploymentId: string, teamId: string | null): Promise<void> {
+    await this.req(`/v13/deployments/${checkId(deploymentId)}`, teamId, { method: 'DELETE' });
+  }
+
+  /** Creates or replaces a variable (stored encrypted by Vercel; the value is never read back). */
+  async setEnv(
+    projectId: string,
+    teamId: string | null,
+    key: string,
+    value: string,
+    targets: string[],
+  ): Promise<void> {
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,255}$/.test(key))
+      throw new Error('Nombre de variable no válido (letras, números y _).');
+    const target = targets.filter((x) => (ENV_TARGETS as readonly string[]).includes(x));
+    if (!target.length) throw new Error('Elige al menos un entorno.');
+    await this.req(`/v10/projects/${checkId(projectId)}/env?upsert=true`, teamId, {
+      method: 'POST',
+      body: { key, value, type: 'encrypted', target },
+    });
+  }
+
+  async deleteEnv(projectId: string, teamId: string | null, envId: string): Promise<void> {
+    await this.req(`/v9/projects/${checkId(projectId)}/env/${checkId(envId)}`, teamId, {
+      method: 'DELETE',
+    });
+  }
+
+  async addDomain(projectId: string, teamId: string | null, name: string): Promise<void> {
+    await this.req(`/v10/projects/${checkId(projectId)}/domains`, teamId, {
+      method: 'POST',
+      body: { name: checkDomain(name) },
+    });
+  }
+
+  async removeDomain(projectId: string, teamId: string | null, name: string): Promise<void> {
+    await this.req(
+      `/v9/projects/${checkId(projectId)}/domains/${encodeURIComponent(checkDomain(name))}`,
+      teamId,
+      { method: 'DELETE' },
+    );
+  }
+
+  /** Asks Vercel to check the DNS of a domain again. */
+  async verifyDomain(projectId: string, teamId: string | null, name: string): Promise<boolean> {
+    const r = await this.req<{ verified?: boolean }>(
+      `/v9/projects/${checkId(projectId)}/domains/${encodeURIComponent(checkDomain(name))}/verify`,
+      teamId,
+      { method: 'POST' },
+    );
+    return r?.verified ?? false;
+  }
+
+  async settings(projectId: string, teamId: string | null): Promise<VercelSettings> {
+    const p = await this.req<Record<string, unknown>>(`/v9/projects/${checkId(projectId)}`, teamId);
+    const str = (k: string) => (typeof p[k] === 'string' && p[k] ? (p[k] as string) : null);
+    return Object.fromEntries(SETTING_KEYS.map((k) => [k, str(k)])) as unknown as VercelSettings;
+  }
+
+  /** Changes build settings; an empty value goes back to Vercel's default. */
+  async updateSettings(
+    projectId: string,
+    teamId: string | null,
+    patch: Partial<VercelSettings>,
+  ): Promise<void> {
+    const body: Record<string, string | null> = {};
+    for (const k of SETTING_KEYS) {
+      if (!(k in patch)) continue;
+      const v = patch[k]?.trim() ?? '';
+      if (v.length > 256) throw new Error('Valor demasiado largo.');
+      body[k] = v || null;
+    }
+    if (body.nodeVersion === null) delete body.nodeVersion;
+    if (!Object.keys(body).length) return;
+    await this.req(`/v9/projects/${checkId(projectId)}`, teamId, { method: 'PATCH', body });
   }
 }
 

@@ -8,6 +8,7 @@ import {
   dirtyCount,
   newChat,
   newChatInFolder,
+  newQuestionChat,
   requirePro,
   runningChats,
   toggleChatList,
@@ -204,6 +205,11 @@ function baseCommands(): Command[] {
       label: `${t('chatSplit')} / ${t('chatUnsplit').toLowerCase()}`,
       keys: `${mod}+Alt+D`,
       run: () => toggleChatSplit(),
+    },
+    {
+      id: 'chat.newQuestion',
+      label: t('chatNewQuestion'),
+      run: () => newQuestionChat(),
     },
     {
       id: 'chat.newInFolder',

@@ -284,13 +284,26 @@ export interface VercelDeploymentView {
   inspectorUrl: string | null;
 }
 export interface VercelEnvView {
+  id: string;
   key: string;
+  /** Git branch the variable is limited to (preview only). */
+  branch: string | null;
   targets: string[];
   type: string;
 }
 export interface VercelProjectInfo {
-  domains: { name: string; verified: boolean }[];
+  domains: { name: string; verified: boolean; redirect: string | null; branch: string | null }[];
   envs: VercelEnvView[];
+}
+
+export interface VercelSettings {
+  framework: string | null;
+  buildCommand: string | null;
+  installCommand: string | null;
+  devCommand: string | null;
+  outputDirectory: string | null;
+  rootDirectory: string | null;
+  nodeVersion: string | null;
 }
 
 export interface SupabaseStatus {
@@ -343,6 +356,69 @@ export interface SupabaseBucketView {
   id: string;
   name: string;
   public: boolean;
+}
+export interface SupabaseColumnView {
+  name: string;
+  type: string;
+  nullable: boolean;
+  default: string | null;
+  pk: boolean;
+}
+export interface SupabaseUserView {
+  id: string;
+  /** Email, or phone for phone sign-ups. */
+  email: string | null;
+  provider: string;
+  confirmed: boolean;
+  created: number;
+  lastSignIn: number | null;
+}
+export interface SupabaseMigrationView {
+  version: string;
+  name: string | null;
+}
+export interface SupabaseAuthConfig {
+  siteUrl: string;
+  /** Extra URLs auth may redirect to after login. */
+  redirectUrls: string[];
+  disableSignup: boolean;
+  /** Users can sign in without confirming their email. */
+  autoconfirm: boolean;
+}
+/** Auth emails Supabase sends; each has a subject and an HTML template. */
+export type SupabaseEmailKind =
+  | 'confirmation'
+  | 'invite'
+  | 'magic_link'
+  | 'recovery'
+  | 'email_change'
+  | 'reauthentication';
+export interface SupabaseSmtpConfig {
+  host: string;
+  port: string;
+  user: string;
+  /** Empty keeps the saved password (it is never read back). */
+  pass: string;
+  senderEmail: string;
+  senderName: string;
+}
+export interface SupabaseEmailConfig {
+  /** null: Supabase's built-in mailer (only for team members, a few emails per hour). */
+  smtp: Omit<SupabaseSmtpConfig, 'pass'> | null;
+  hasPass: boolean;
+  /** Emails per hour the project may send. */
+  rateLimit: number | null;
+  templates: Record<SupabaseEmailKind, { subject: string; content: string }>;
+}
+export interface SupabaseBackupsView {
+  /** Point in time recovery is on. */
+  pitr: boolean;
+  list: { at: number; status: string }[];
+}
+export interface SupabaseApiInfo {
+  url: string;
+  /** Public keys only (anon / publishable). */
+  keys: { name: string; key: string }[];
 }
 
 export interface CompletionRequestView {
@@ -444,6 +520,8 @@ export interface ChatRequestView {
   conversationId?: string;
   /** Folder this chat works in (absolute); omitted = the window's open folder. */
   folder?: string;
+  /** Works in no folder at all (not even the window's open folder). */
+  noFolder?: boolean;
 }
 
 export interface EditRequestView {
@@ -636,6 +714,29 @@ export interface OmniApi {
     cancel(deploymentId: string, teamId: string | null): Promise<void>;
     /** Redeploys a deployment (same source); returns the new deployment's URL. */
     redeploy(deploymentId: string, teamId: string | null, production: boolean): Promise<string>;
+    /** Makes a deployment the production one (instant rollback). */
+    promote(projectId: string, deploymentId: string, teamId: string | null): Promise<void>;
+    removeDeployment(deploymentId: string, teamId: string | null): Promise<void>;
+    /** Creates or replaces an environment variable for the given targets. */
+    setEnv(
+      projectId: string,
+      teamId: string | null,
+      key: string,
+      value: string,
+      targets: string[],
+    ): Promise<void>;
+    deleteEnv(projectId: string, teamId: string | null, envId: string): Promise<void>;
+    addDomain(projectId: string, teamId: string | null, name: string): Promise<void>;
+    removeDomain(projectId: string, teamId: string | null, name: string): Promise<void>;
+    /** Checks the domain's DNS again; true when it is verified now. */
+    verifyDomain(projectId: string, teamId: string | null, name: string): Promise<boolean>;
+    settings(projectId: string, teamId: string | null): Promise<VercelSettings>;
+    /** Changes build settings; an empty value goes back to the framework default. */
+    updateSettings(
+      projectId: string,
+      teamId: string | null,
+      patch: Partial<VercelSettings>,
+    ): Promise<void>;
   };
   supabase: {
     status(): Promise<SupabaseStatus>;
@@ -647,12 +748,47 @@ export interface OmniApi {
     projects(): Promise<SupabaseProjectView[]>;
     health(ref: string): Promise<SupabaseHealthView[]>;
     tables(ref: string): Promise<SupabaseTableView[]>;
-    preview(ref: string, schema: string, table: string): Promise<SupabaseQueryResult>;
+    /** One page of 100 rows. */
+    preview(ref: string, schema: string, table: string, page: number): Promise<SupabaseQueryResult>;
     /** Runs SQL on the project's database. */
     query(ref: string, sql: string): Promise<SupabaseQueryResult>;
     functions(ref: string): Promise<SupabaseFunctionView[]>;
     buckets(ref: string): Promise<SupabaseBucketView[]>;
     restore(ref: string): Promise<void>;
+    pause(ref: string): Promise<void>;
+    columns(ref: string, schema: string, table: string): Promise<SupabaseColumnView[]>;
+    setRls(ref: string, schema: string, table: string, on: boolean): Promise<void>;
+    users(ref: string): Promise<SupabaseUserView[]>;
+    userCount(ref: string): Promise<number>;
+    migrations(ref: string): Promise<SupabaseMigrationView[]>;
+    /** Files of a storage bucket. */
+    files(ref: string, bucket: string): Promise<SupabaseQueryResult>;
+    apiInfo(ref: string): Promise<SupabaseApiInfo>;
+    deleteFunction(ref: string, slug: string): Promise<void>;
+    deleteUser(ref: string, id: string): Promise<void>;
+    /** Names of the Edge Function secrets. */
+    secrets(ref: string): Promise<string[]>;
+    setSecret(ref: string, name: string, value: string): Promise<void>;
+    deleteSecret(ref: string, name: string): Promise<void>;
+    authConfig(ref: string): Promise<SupabaseAuthConfig>;
+    setAuthConfig(ref: string, config: SupabaseAuthConfig): Promise<void>;
+    backups(ref: string): Promise<SupabaseBackupsView>;
+    emailConfig(ref: string): Promise<SupabaseEmailConfig>;
+    /** null switches back to Supabase's built-in mailer. */
+    setSmtp(ref: string, smtp: SupabaseSmtpConfig | null, rateLimit: number | null): Promise<void>;
+    setEmailTemplate(
+      ref: string,
+      kind: SupabaseEmailKind,
+      subject: string,
+      content: string,
+    ): Promise<void>;
+    /** Sends an auth email (invite, magic link, password reset) to an address. */
+    sendEmail(
+      ref: string,
+      kind: 'invite' | 'magiclink' | 'recovery',
+      email: string,
+      redirectTo: string,
+    ): Promise<void>;
   };
   security: {
     /**
@@ -815,6 +951,15 @@ export const CHANNELS = [
   'vercel:logs',
   'vercel:cancel',
   'vercel:redeploy',
+  'vercel:promote',
+  'vercel:removeDeployment',
+  'vercel:setEnv',
+  'vercel:deleteEnv',
+  'vercel:addDomain',
+  'vercel:removeDomain',
+  'vercel:verifyDomain',
+  'vercel:settings',
+  'vercel:updateSettings',
   'supabase:status',
   'supabase:setToken',
   'supabase:logout',
@@ -827,6 +972,26 @@ export const CHANNELS = [
   'supabase:functions',
   'supabase:buckets',
   'supabase:restore',
+  'supabase:pause',
+  'supabase:columns',
+  'supabase:setRls',
+  'supabase:users',
+  'supabase:userCount',
+  'supabase:migrations',
+  'supabase:files',
+  'supabase:apiInfo',
+  'supabase:deleteFunction',
+  'supabase:deleteUser',
+  'supabase:secrets',
+  'supabase:setSecret',
+  'supabase:deleteSecret',
+  'supabase:authConfig',
+  'supabase:setAuthConfig',
+  'supabase:backups',
+  'supabase:emailConfig',
+  'supabase:setSmtp',
+  'supabase:setEmailTemplate',
+  'supabase:sendEmail',
   'app:prefs',
   'app:setPrefs',
   'security:run',

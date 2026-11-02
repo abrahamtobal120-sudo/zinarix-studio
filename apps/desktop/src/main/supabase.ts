@@ -4,16 +4,33 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { TokenStore } from './token-store.js';
 import type {
+  SupabaseApiInfo,
+  SupabaseAuthConfig,
+  SupabaseBackupsView,
   SupabaseBucketView,
+  SupabaseColumnView,
+  SupabaseEmailConfig,
+  SupabaseEmailKind,
+  SupabaseSmtpConfig,
   SupabaseFunctionView,
+  SupabaseMigrationView,
   SupabaseHealthView,
   SupabaseProjectView,
   SupabaseQueryResult,
   SupabaseStatus,
   SupabaseTableView,
+  SupabaseUserView,
 } from '../shared/api.js';
 
 const API = 'https://api.supabase.com';
+const EMAIL_KINDS: SupabaseEmailKind[] = [
+  'confirmation',
+  'invite',
+  'magic_link',
+  'recovery',
+  'email_change',
+  'reauthentication',
+];
 /** Rows sent back to the UI for one query (the rest is counted, not sent). */
 const MAX_ROWS = 500;
 const MAX_CELL = 2000;
@@ -78,6 +95,7 @@ function checkRef(ref: string): string {
 }
 
 const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
+const lit = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
 /** A cell as short text for the result grid. */
 function cell(v: unknown): string | null {
@@ -233,9 +251,13 @@ export class Supabase {
     }));
   }
 
-  /** First rows of a table. */
-  preview(ref: string, schema: string, table: string): Promise<SupabaseQueryResult> {
-    return this.query(ref, `select * from ${ident(schema)}.${ident(table)} limit 100`);
+  /** One page (100 rows) of a table. */
+  preview(ref: string, schema: string, table: string, page = 0): Promise<SupabaseQueryResult> {
+    const offset = Math.max(0, Math.floor(page)) * 100;
+    return this.query(
+      ref,
+      `select * from ${ident(schema)}.${ident(table)} limit 100 offset ${offset}`,
+    );
   }
 
   async functions(ref: string): Promise<SupabaseFunctionView[]> {
@@ -260,6 +282,290 @@ export class Supabase {
 
   async restore(ref: string): Promise<void> {
     await this.req(`/v1/projects/${checkRef(ref)}/restore`, { method: 'POST' });
+  }
+
+  async pause(ref: string): Promise<void> {
+    await this.req(`/v1/projects/${checkRef(ref)}/pause`, { method: 'POST' });
+  }
+
+  /** Rows of a query as objects keyed by column name. */
+  private async objects(ref: string, sql: string): Promise<Record<string, string | null>[]> {
+    const r = await this.query(ref, sql);
+    return r.rows.map((row) => Object.fromEntries(r.columns.map((c, i) => [c, row[i] ?? null])));
+  }
+
+  async columns(ref: string, schema: string, table: string): Promise<SupabaseColumnView[]> {
+    const rows = await this.objects(
+      ref,
+      `select c.column_name as name, c.data_type as type, c.is_nullable = 'YES' as nullable,
+  c.column_default as "default",
+  exists (select 1 from information_schema.table_constraints tc
+    join information_schema.key_column_usage k
+      on k.constraint_name = tc.constraint_name and k.table_schema = tc.table_schema
+    where tc.constraint_type = 'PRIMARY KEY' and tc.table_schema = c.table_schema
+      and tc.table_name = c.table_name and k.column_name = c.column_name) as pk
+from information_schema.columns c
+where c.table_schema = ${lit(schema)} and c.table_name = ${lit(table)}
+order by c.ordinal_position`,
+    );
+    return rows.map((r) => ({
+      name: r.name ?? '',
+      type: r.type ?? '',
+      nullable: r.nullable === 'true',
+      default: r.default ?? null,
+      pk: r.pk === 'true',
+    }));
+  }
+
+  /** Turns row level security of a table on or off. */
+  async setRls(ref: string, schema: string, table: string, on: boolean): Promise<void> {
+    await this.query(
+      ref,
+      `alter table ${ident(schema)}.${ident(table)} ${on ? 'enable' : 'disable'} row level security`,
+    );
+  }
+
+  /** Last sign-ups of the project (auth.users, read with the management API). */
+  async users(ref: string): Promise<SupabaseUserView[]> {
+    const rows = await this.objects(
+      ref,
+      `select id, email, phone, created_at, last_sign_in_at, email_confirmed_at is not null as confirmed,
+  coalesce(raw_app_meta_data->>'provider', 'email') as provider
+from auth.users order by created_at desc limit 200`,
+    );
+    return rows.map((r) => ({
+      id: r.id ?? '',
+      email: r.email || r.phone || null,
+      provider: r.provider ?? 'email',
+      confirmed: r.confirmed === 'true',
+      created: Date.parse(r.created_at ?? '') || 0,
+      lastSignIn: Date.parse(r.last_sign_in_at ?? '') || null,
+    }));
+  }
+
+  async userCount(ref: string): Promise<number> {
+    const [r] = await this.objects(ref, 'select count(*) as n from auth.users');
+    return Number(r?.n ?? 0);
+  }
+
+  /** Migrations applied with the CLI (none when the project never used `supabase db push`). */
+  async migrations(ref: string): Promise<SupabaseMigrationView[]> {
+    const rows = await this.objects(
+      ref,
+      `select version, name from supabase_migrations.schema_migrations order by version desc limit 200`,
+    ).catch(() => []);
+    return rows.map((r) => ({ version: r.version ?? '', name: r.name ?? null }));
+  }
+
+  /** Files of a bucket (storage.objects). */
+  async files(ref: string, bucket: string): Promise<SupabaseQueryResult> {
+    return this.query(
+      ref,
+      `select name, metadata->>'mimetype' as type, pg_size_pretty((metadata->>'size')::bigint) as size,
+  updated_at from storage.objects where bucket_id = ${lit(bucket)} order by updated_at desc limit 200`,
+    );
+  }
+
+  /** Project URL and the public (anon / publishable) keys. Secret keys are never sent to the UI. */
+  async apiInfo(ref: string): Promise<SupabaseApiInfo> {
+    const list = await this.req<{ name: string; api_key?: string | null; type?: string }[]>(
+      `/v1/projects/${checkRef(ref)}/api-keys?reveal=false`,
+    );
+    const keys = list
+      .filter((k) => k.api_key && (k.name === 'anon' || k.type === 'publishable'))
+      .map((k) => ({ name: k.name, key: k.api_key! }));
+    return { url: `https://${ref}.supabase.co`, keys };
+  }
+
+  async deleteUser(ref: string, id: string): Promise<void> {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('ID de usuario no válido.');
+    await this.query(ref, `delete from auth.users where id = ${lit(id)}`);
+  }
+
+  /** Names of the Edge Function secrets (values are never read back). */
+  async secrets(ref: string): Promise<string[]> {
+    const list = await this.req<{ name: string }[]>(`/v1/projects/${checkRef(ref)}/secrets`);
+    return list.map((s) => s.name).sort();
+  }
+
+  async setSecret(ref: string, name: string, value: string): Promise<void> {
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,255}$/.test(name) || /^SUPABASE_/i.test(name))
+      throw new Error('Nombre no válido (letras, números y _; no puede empezar por SUPABASE_).');
+    await this.req(`/v1/projects/${checkRef(ref)}/secrets`, {
+      method: 'POST',
+      body: [{ name, value }],
+    });
+  }
+
+  async deleteSecret(ref: string, name: string): Promise<void> {
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,255}$/.test(name)) throw new Error('Nombre no válido.');
+    await this.req(`/v1/projects/${checkRef(ref)}/secrets`, { method: 'DELETE', body: [name] });
+  }
+
+  async authConfig(ref: string): Promise<SupabaseAuthConfig> {
+    const c = await this.req<{
+      site_url?: string | null;
+      uri_allow_list?: string | null;
+      disable_signup?: boolean | null;
+      mailer_autoconfirm?: boolean | null;
+    }>(`/v1/projects/${checkRef(ref)}/config/auth`);
+    return {
+      siteUrl: c.site_url ?? '',
+      redirectUrls: (c.uri_allow_list ?? '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+      disableSignup: !!c.disable_signup,
+      autoconfirm: !!c.mailer_autoconfirm,
+    };
+  }
+
+  async setAuthConfig(ref: string, c: SupabaseAuthConfig): Promise<void> {
+    await this.req(`/v1/projects/${checkRef(ref)}/config/auth`, {
+      method: 'PATCH',
+      body: {
+        site_url: c.siteUrl.trim(),
+        uri_allow_list: c.redirectUrls
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .join(','),
+        disable_signup: c.disableSignup,
+        mailer_autoconfirm: c.autoconfirm,
+      },
+    });
+  }
+
+  async backups(ref: string): Promise<SupabaseBackupsView> {
+    const r = await this.req<{
+      pitr_enabled?: boolean;
+      backups?: { inserted_at: string; status: string; is_physical_backup?: boolean }[];
+    }>(`/v1/projects/${checkRef(ref)}/database/backups`);
+    return {
+      pitr: !!r.pitr_enabled,
+      list: (r.backups ?? [])
+        .map((b) => ({ at: Date.parse(b.inserted_at) || 0, status: b.status }))
+        .sort((a, b) => b.at - a.at),
+    };
+  }
+
+  async emailConfig(ref: string): Promise<SupabaseEmailConfig> {
+    const c = await this.req<Record<string, string | number | boolean | null | undefined>>(
+      `/v1/projects/${checkRef(ref)}/config/auth`,
+    );
+    const str = (k: string) => (c[k] == null ? '' : String(c[k]));
+    const templates = Object.fromEntries(
+      EMAIL_KINDS.map((k) => [
+        k,
+        { subject: str(`mailer_subjects_${k}`), content: str(`mailer_templates_${k}_content`) },
+      ]),
+    ) as SupabaseEmailConfig['templates'];
+    return {
+      smtp: str('smtp_host')
+        ? {
+            host: str('smtp_host'),
+            port: str('smtp_port'),
+            user: str('smtp_user'),
+            senderEmail: str('smtp_admin_email'),
+            senderName: str('smtp_sender_name'),
+          }
+        : null,
+      hasPass: !!c.smtp_pass,
+      rateLimit: typeof c.rate_limit_email_sent === 'number' ? c.rate_limit_email_sent : null,
+      templates,
+    };
+  }
+
+  async setSmtp(
+    ref: string,
+    smtp: SupabaseSmtpConfig | null,
+    rateLimit: number | null,
+  ): Promise<void> {
+    const body: Record<string, string | number | null> = smtp
+      ? {
+          smtp_host: smtp.host.trim(),
+          smtp_port: smtp.port.trim(),
+          smtp_user: smtp.user.trim(),
+          smtp_admin_email: smtp.senderEmail.trim(),
+          smtp_sender_name: smtp.senderName.trim(),
+          ...(smtp.pass ? { smtp_pass: smtp.pass } : {}),
+        }
+      : {
+          smtp_host: null,
+          smtp_port: null,
+          smtp_user: null,
+          smtp_pass: null,
+          smtp_admin_email: null,
+          smtp_sender_name: null,
+        };
+    // The email rate limit can only be raised with a custom SMTP.
+    if (smtp && rateLimit) body.rate_limit_email_sent = rateLimit;
+    await this.req(`/v1/projects/${checkRef(ref)}/config/auth`, { method: 'PATCH', body });
+  }
+
+  async setEmailTemplate(
+    ref: string,
+    kind: SupabaseEmailKind,
+    subject: string,
+    content: string,
+  ): Promise<void> {
+    if (!EMAIL_KINDS.includes(kind)) throw new Error('Plantilla no válida.');
+    await this.req(`/v1/projects/${checkRef(ref)}/config/auth`, {
+      method: 'PATCH',
+      body: {
+        [`mailer_subjects_${kind}`]: subject,
+        [`mailer_templates_${kind}_content`]: content,
+      },
+    });
+  }
+
+  /**
+   * Invite, magic link or password reset through the project's Auth API. It needs the secret
+   * (service_role) key, which is read here and never leaves the main process.
+   */
+  async sendEmail(
+    ref: string,
+    kind: 'invite' | 'magiclink' | 'recovery',
+    email: string,
+    redirectTo: string,
+  ): Promise<void> {
+    const list = await this.req<{ name: string; api_key?: string | null; type?: string }[]>(
+      `/v1/projects/${checkRef(ref)}/api-keys?reveal=true`,
+    );
+    const legacy = list.find((k) => k.name === 'service_role' && k.api_key)?.api_key;
+    const secret = legacy ?? list.find((k) => k.type === 'secret' && k.api_key)?.api_key;
+    if (!secret) throw new Error('El proyecto no tiene una clave secreta (service_role).');
+    const url = new URL(
+      `/auth/v1/${kind === 'magiclink' ? 'otp' : kind === 'recovery' ? 'recover' : 'invite'}`,
+      `https://${ref}.supabase.co`,
+    );
+    if (redirectTo.trim()) url.searchParams.set('redirect_to', redirectTo.trim());
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: secret,
+        // Legacy keys are JWTs and go in Authorization too; new sb_secret_ keys only as apikey.
+        ...(legacy ? { Authorization: `Bearer ${legacy}` } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(kind === 'magiclink' ? { email, create_user: false } : { email }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!r.ok) {
+      const text = await r.text();
+      let msg = `${r.status} ${r.statusText}`;
+      try {
+        const e = JSON.parse(text) as { msg?: string; message?: string; error_description?: string };
+        msg = e.msg || e.message || e.error_description || msg;
+      } catch {
+        if (text.trim()) msg = text.trim().slice(0, 500);
+      }
+      throw new Error(msg);
+    }
+  }
+
+  async deleteFunction(ref: string, slug: string): Promise<void> {
+    if (!/^[\w-]{1,128}$/.test(slug)) throw new Error('Nombre de función no válido.');
+    await this.req(`/v1/projects/${checkRef(ref)}/functions/${slug}`, { method: 'DELETE' });
   }
 }
 

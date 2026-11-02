@@ -113,6 +113,8 @@ export interface ChatTab {
   agent: boolean;
   /** Folder this chat works in (absolute); undefined = the window's open folder. */
   folder?: string;
+  /** Works in no folder at all (questions only): not even the window's open folder. */
+  noFolder?: boolean;
   busy: boolean;
   /** An action of the AI waits for the user's approval. */
   waiting: boolean;
@@ -401,7 +403,7 @@ export function switchWorkspace(next: WorkspaceInfo | null): void {
   if (old === next?.root) return setState({ workspace: next });
   const focused = focusedChat();
   for (const c of state.chats) {
-    if (c.folder || c.id === focused || !old) continue;
+    if (c.folder || c.noFolder || c.id === focused || !old) continue;
     if (c.conversationId || c.busy) {
       updateChat(c.id, { folder: old });
       rememberProject(old);
@@ -566,7 +568,10 @@ export function forgetProject(folder: string): void {
 }
 
 /** Folder a chat works in: its own, or the window's open folder. */
-export function chatFolder(c: Pick<ChatTab, 'folder'> | undefined): string | undefined {
+export function chatFolder(
+  c: Pick<ChatTab, 'folder' | 'noFolder'> | undefined,
+): string | undefined {
+  if (c?.noFolder) return undefined;
   return c?.folder ?? state.workspace?.root;
 }
 
@@ -617,6 +622,7 @@ function restoreChats(): Pick<State, 'chats' | 'activeChat' | 'chatSplit' | 'cha
             model: typeof x.model === 'string' ? x.model : null,
             agent: typeof x.agent === 'boolean' ? x.agent : savedAgentMode(),
             folder: typeof x.folder === 'string' && x.folder ? x.folder : undefined,
+            noFolder: x.noFolder === true || undefined,
           }),
         );
       if (chats.length) {
@@ -652,6 +658,7 @@ function persistChats(): void {
           model: c.model,
           agent: c.agent,
           folder: c.folder,
+          noFolder: c.noFolder,
         })),
         active: state.activeChat,
         split: state.chatSplit,
@@ -677,7 +684,8 @@ export function updateChat(id: string, patch: Partial<ChatTab>): void {
     'conversationId' in patch ||
     'model' in patch ||
     'agent' in patch ||
-    'folder' in patch
+    'folder' in patch ||
+    'noFolder' in patch
   )
     persistChats();
 }
@@ -738,6 +746,14 @@ export function newChat(patch: Partial<ChatTab> = {}, always = false): string {
   setState((s) => ({ chats: [...s.chats, tab], chatHistoryFor: null }));
   selectChat(tab.id);
   return tab.id;
+}
+
+/**
+ * Opens a new chat just for questions: chat mode (no tools), without changing the saved mode,
+ * and in no folder (it does not see the open project).
+ */
+export function newQuestionChat(): string {
+  return newChat({ agent: false, noFolder: true });
 }
 
 /** Asks for a folder and opens a new chat that works there (the window moves to it). */

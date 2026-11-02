@@ -468,6 +468,56 @@ function registerIpc(): void {
   handle('vercel:redeploy', z.tuple([vid, team, z.boolean()]), (_w, d, t, prod) =>
     vercel.redeploy(d, t, prod),
   );
+  handle('vercel:promote', z.tuple([vid, vid, team]), (_w, p, d, t) => vercel.promote(p, d, t));
+  handle('vercel:removeDeployment', z.tuple([vid, team]), (_w, d, t) =>
+    vercel.removeDeployment(d, t),
+  );
+  handle(
+    'vercel:setEnv',
+    z.tuple([
+      vid,
+      team,
+      z.string().min(1).max(256),
+      z.string().max(65_536),
+      z
+        .array(z.enum(['production', 'preview', 'development']))
+        .min(1)
+        .max(3),
+    ]),
+    (_w, p, t, k, v, targets) => vercel.setEnv(p, t, k, v, targets),
+  );
+  handle('vercel:deleteEnv', z.tuple([vid, team, vid]), (_w, p, t, e) => vercel.deleteEnv(p, t, e));
+  const domain = z.string().min(3).max(253);
+  handle('vercel:addDomain', z.tuple([vid, team, domain]), (_w, p, t, d) =>
+    vercel.addDomain(p, t, d),
+  );
+  handle('vercel:removeDomain', z.tuple([vid, team, domain]), (_w, p, t, d) =>
+    vercel.removeDomain(p, t, d),
+  );
+  handle('vercel:verifyDomain', z.tuple([vid, team, domain]), (_w, p, t, d) =>
+    vercel.verifyDomain(p, t, d),
+  );
+  handle('vercel:settings', z.tuple([vid, team]), (_w, p, t) => vercel.settings(p, t));
+  const setting = z.string().max(256).nullable().optional();
+  handle(
+    'vercel:updateSettings',
+    z.tuple([
+      vid,
+      team,
+      z
+        .object({
+          framework: setting,
+          buildCommand: setting,
+          installCommand: setting,
+          devCommand: setting,
+          outputDirectory: setting,
+          rootDirectory: setting,
+          nodeVersion: setting,
+        })
+        .strict(),
+    ]),
+    (_w, p, t, patch) => vercel.updateSettings(p, t, patch),
+  );
   const supabase = new Supabase(app.getPath('userData'));
   const ref = z.string().min(1).max(40);
   const pgName = z.string().min(1).max(128);
@@ -482,8 +532,10 @@ function registerIpc(): void {
   handle('supabase:projects', z.tuple([]), () => supabase.projects());
   handle('supabase:health', z.tuple([ref]), (_w, r) => supabase.health(r));
   handle('supabase:tables', z.tuple([ref]), (_w, r) => supabase.tables(r));
-  handle('supabase:preview', z.tuple([ref, pgName, pgName]), (_w, r, sc, tb) =>
-    supabase.preview(r, sc, tb),
+  handle(
+    'supabase:preview',
+    z.tuple([ref, pgName, pgName, z.number().int().min(0).max(1_000_000)]),
+    (_w, r, sc, tb, page) => supabase.preview(r, sc, tb, page),
   );
   handle('supabase:query', z.tuple([ref, z.string().min(1).max(200_000)]), (_w, r, q) =>
     supabase.query(r, q),
@@ -491,6 +543,91 @@ function registerIpc(): void {
   handle('supabase:functions', z.tuple([ref]), (_w, r) => supabase.functions(r));
   handle('supabase:buckets', z.tuple([ref]), (_w, r) => supabase.buckets(r));
   handle('supabase:restore', z.tuple([ref]), (_w, r) => supabase.restore(r));
+  handle('supabase:pause', z.tuple([ref]), (_w, r) => supabase.pause(r));
+  handle('supabase:columns', z.tuple([ref, pgName, pgName]), (_w, r, sc, tb) =>
+    supabase.columns(r, sc, tb),
+  );
+  handle('supabase:setRls', z.tuple([ref, pgName, pgName, z.boolean()]), (_w, r, sc, tb, on) =>
+    supabase.setRls(r, sc, tb, on),
+  );
+  handle('supabase:users', z.tuple([ref]), (_w, r) => supabase.users(r));
+  handle('supabase:userCount', z.tuple([ref]), (_w, r) => supabase.userCount(r));
+  handle('supabase:migrations', z.tuple([ref]), (_w, r) => supabase.migrations(r));
+  handle('supabase:files', z.tuple([ref, z.string().min(1).max(100)]), (_w, r, b) =>
+    supabase.files(r, b),
+  );
+  handle('supabase:apiInfo', z.tuple([ref]), (_w, r) => supabase.apiInfo(r));
+  handle('supabase:deleteFunction', z.tuple([ref, vid]), (_w, r, s) =>
+    supabase.deleteFunction(r, s),
+  );
+  handle('supabase:deleteUser', z.tuple([ref, z.string().length(36)]), (_w, r, id) =>
+    supabase.deleteUser(r, id),
+  );
+  const secretName = z.string().min(1).max(256);
+  handle('supabase:secrets', z.tuple([ref]), (_w, r) => supabase.secrets(r));
+  handle('supabase:setSecret', z.tuple([ref, secretName, z.string().max(65_536)]), (_w, r, n, v) =>
+    supabase.setSecret(r, n, v),
+  );
+  handle('supabase:deleteSecret', z.tuple([ref, secretName]), (_w, r, n) =>
+    supabase.deleteSecret(r, n),
+  );
+  handle('supabase:authConfig', z.tuple([ref]), (_w, r) => supabase.authConfig(r));
+  handle(
+    'supabase:setAuthConfig',
+    z.tuple([
+      ref,
+      z
+        .object({
+          siteUrl: z.string().max(2048),
+          redirectUrls: z.array(z.string().max(2048)).max(100),
+          disableSignup: z.boolean(),
+          autoconfirm: z.boolean(),
+        })
+        .strict(),
+    ]),
+    (_w, r, c) => supabase.setAuthConfig(r, c),
+  );
+  handle('supabase:backups', z.tuple([ref]), (_w, r) => supabase.backups(r));
+  handle('supabase:emailConfig', z.tuple([ref]), (_w, r) => supabase.emailConfig(r));
+  handle(
+    'supabase:setSmtp',
+    z.tuple([
+      ref,
+      z
+        .object({
+          host: z.string().min(1).max(255),
+          port: z.string().regex(/^\d{1,5}$/),
+          user: z.string().max(255),
+          pass: z.string().max(1024),
+          senderEmail: z.email().max(320),
+          senderName: z.string().max(255),
+        })
+        .strict()
+        .nullable(),
+      z.number().int().min(1).max(100_000).nullable(),
+    ]),
+    (_w, r, smtp, limit) => supabase.setSmtp(r, smtp, limit),
+  );
+  handle(
+    'supabase:setEmailTemplate',
+    z.tuple([
+      ref,
+      z.enum(['confirmation', 'invite', 'magic_link', 'recovery', 'email_change', 'reauthentication']),
+      z.string().max(1000),
+      z.string().max(200_000),
+    ]),
+    (_w, r, kind, subject, content) => supabase.setEmailTemplate(r, kind, subject, content),
+  );
+  handle(
+    'supabase:sendEmail',
+    z.tuple([
+      ref,
+      z.enum(['invite', 'magiclink', 'recovery']),
+      z.email().max(320),
+      z.string().max(2048),
+    ]),
+    (_w, r, kind, email, redirect) => supabase.sendEmail(r, kind, email, redirect),
+  );
   handle('github:clone', z.tuple([z.string().min(1).max(2048)]), async (w, spec) => {
     const r = await dialog.showOpenDialog(w.win, {
       title: 'Carpeta donde clonar el repositorio',
@@ -548,13 +685,17 @@ function registerIpc(): void {
         conversationId: conv.optional(),
         agent: z.boolean().optional(),
         folder: z.string().min(1).max(4096).optional(),
+        noFolder: z.boolean().optional(),
       }),
     ]),
-    (w, requestId, { folder, ...req }) => {
+    (w, requestId, { folder, noFolder, ...req }) => {
       // Several chats of the same window (or of other windows) run at the same time: each
       // request is independent and only its own window hears its events.
       const id = rid(w, requestId);
-      const where = scope(w, folder);
+      // A chat in no folder sees no project at all (only the window's browser).
+      const where: Scope = noFolder
+        ? { workspace: () => undefined, browser: w.browser }
+        : scope(w, folder);
       w.requests.add(id);
       void ai
         .chat(id, req, (_r, event) => send(w, { type: 'chat', requestId, event }), where)
