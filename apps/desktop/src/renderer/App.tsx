@@ -5,6 +5,7 @@ import { ActivityBar, StatusBar } from './components/Chrome';
 import { EditorArea } from './components/Editor';
 import { Explorer } from './components/Explorer';
 import { GitPanel } from './components/GitPanel';
+import { Icon } from './components/Icon';
 import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
@@ -58,6 +59,16 @@ function Sash({ dir, onDrag }: { dir: 'x' | 'y'; onDrag: (delta: number) => void
 }
 
 const CHAT_W_KEY = 'zs.chatWidth';
+const SIDE_W_KEY = 'zs.sideWidth';
+/** Room the editor keeps between the side bar and the chat, so neither squeezes it flat. */
+const CENTER_MIN = 360;
+
+/** The width the user last dragged the side bar to; otherwise a fifth of the window. */
+function initialSideWidth(): number {
+  const saved = Number(localStorage.getItem(SIDE_W_KEY));
+  if (saved >= 160) return saved;
+  return Math.round(Math.min(280, Math.max(200, window.innerWidth * 0.18)));
+}
 
 /** The width the user last dragged the chat to; otherwise about a third of the window. */
 function initialChatWidth(): number {
@@ -74,11 +85,20 @@ export function App() {
   const chatList = useStore((s) => s.chatList);
   const noTabs = useStore((s) => s.tabs.length === 0);
   const toast = useStore((s) => s.toast);
-  const [sideW, setSideW] = useState(320);
+  const [sideW, setSideW] = useState(initialSideWidth);
   const [chatW, setChatW] = useState(initialChatWidth);
+  const [winW, setWinW] = useState(window.innerWidth);
   const [panelH, setPanelH] = useState(260);
   const [terminalMounted, setTerminalMounted] = useState(false);
   const chatWide = chatOpen && noTabs && !panelOpen;
+  // On a narrow window the side bar gives way first, then the chat, so the editor keeps
+  // CENTER_MIN. The dragged widths are kept and come back when the window grows.
+  const room = winW - 48 - CENTER_MIN;
+  const chatShown = chatOpen && !chatWide;
+  const sideShown = sidebar
+    ? Math.max(160, Math.min(sideW, room - (chatShown ? Math.min(chatW, 400) : 0)))
+    : 0;
+  const chatShownW = Math.max(280, Math.min(chatW, room - sideShown));
   const [dragging, setDragging] = useState(false);
 
   // Drop a folder (or a file) anywhere in the window to open it. Capture phase so the
@@ -123,6 +143,12 @@ export function App() {
       window.removeEventListener('dragover', over, true);
       window.removeEventListener('drop', drop, true);
     };
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setWinW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   useEffect(() => {
@@ -206,7 +232,7 @@ export function App() {
         <ActivityBar />
         {sidebar && (
           <>
-            <aside className="sidebar" style={{ width: sideW }}>
+            <aside className="sidebar" style={{ width: sideShown }}>
               {sidebar === 'explorer' ? (
                 <Explorer />
               ) : sidebar === 'git' ? (
@@ -221,7 +247,16 @@ export function App() {
                 <SearchView />
               )}
             </aside>
-            <Sash dir="x" onDrag={(d) => setSideW((w) => Math.min(900, Math.max(160, w + d)))} />
+            <Sash
+              dir="x"
+              onDrag={(d) =>
+                setSideW(() => {
+                  const next = Math.min(900, Math.max(160, sideShown + d));
+                  localStorage.setItem(SIDE_W_KEY, String(Math.round(next)));
+                  return next;
+                })
+              }
+            />
           </>
         )}
         {/* With no file open the chat takes the whole center, like a chat app. */}
@@ -241,8 +276,8 @@ export function App() {
           <Sash
             dir="x"
             onDrag={(d) =>
-              setChatW((w) => {
-                const next = Math.min(chatSplit ? 1600 : 900, Math.max(280, w - d));
+              setChatW(() => {
+                const next = Math.min(chatSplit ? 1600 : 900, Math.max(280, chatShownW - d));
                 localStorage.setItem(CHAT_W_KEY, String(Math.round(next)));
                 return next;
               })
@@ -251,7 +286,7 @@ export function App() {
         )}
         <aside
           className={chatWide ? 'chat-wrap chat-wide' : 'chat-wrap'}
-          style={{ width: chatWide ? undefined : chatW, display: chatOpen ? 'flex' : 'none' }}
+          style={{ width: chatWide ? undefined : chatShownW, display: chatOpen ? 'flex' : 'none' }}
         >
           <ChatPanel />
         </aside>
@@ -266,7 +301,9 @@ export function App() {
       {dragging && (
         <div className="drop-overlay">
           <div className="drop-box">
-            <div className="drop-icon">📂</div>
+            <div className="drop-icon">
+              <Icon name="folder" size={30} />
+            </div>
             {t('dropRelease')}
           </div>
         </div>

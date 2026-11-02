@@ -111,7 +111,7 @@ export function StatusBar() {
           onClick={() => setState({ sidebar: 'git' })}
         >
           <Icon name="branch" size={13} /> {workspace.branch}
-          {gitChanges > 0 ? ` · ${gitChanges}✎` : ''}
+          {gitChanges > 0 ? ` · ${gitChanges}` : ''}
         </span>
       )}
       {dirty > 0 && (
@@ -130,7 +130,7 @@ export function StatusBar() {
           title={t('setInlineHint')}
           onClick={() => void runCommand('ai.toggleInline')}
         >
-          {prefs.inlineCompletions ? '✨' : '✧'} {t('inlineShort')}
+          <Icon name="sparkles" size={13} /> {t('inlineShort')}
         </span>
       )}
       {settings.localOnly && (
@@ -186,7 +186,9 @@ export function Welcome() {
       {!workspace ? (
         <>
           <div className="drop-zone" onClick={() => void api().workspace.openDialog()}>
-            <div className="drop-icon">📂</div>
+            <div className="drop-icon">
+              <Icon name="folder" size={30} />
+            </div>
             <div className="drop-title">{t('dropHere')}</div>
             <div className="dim">{t('dropOr')}</div>
             <button className="primary big">{t('openFolder')}</button>
@@ -201,14 +203,16 @@ export function Welcome() {
                   onClick={() => void openDropped(r.path)}
                   title={r.path}
                 >
-                  <span>📁 {r.name}</span>
+                  <span>
+                    <Icon name="folder" size={13} /> {r.name}
+                  </span>
                   <span className="dim">{r.path}</span>
                 </div>
               ))}
             </div>
           )}
           <button className="link" onClick={() => setState({ modal: { kind: 'providers' } })}>
-            🔑 {t('connectProvider')}
+            <Icon name="key" size={13} /> {t('connectProvider')}
           </button>
         </>
       ) : (

@@ -437,7 +437,7 @@ export async function refreshSettings(): Promise<void> {
 export async function refreshModels(refresh = false): Promise<void> {
   const r = await api().ai.models(refresh);
   setState({ models: r.models, modelErrors: r.errors });
-  if (r.detected.length) toast(`🏠 Detectado y conectado: ${r.detected.join(', ')}`);
+  if (r.detected.length) toast(`Detectado y conectado: ${r.detected.join(', ')}`);
 }
 
 export async function chooseModel(ref: string): Promise<void> {

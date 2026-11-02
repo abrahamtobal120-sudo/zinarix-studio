@@ -6360,3 +6360,248 @@ button.big {
   outline: 1px dashed var(--accent);
   outline-offset: -1px;
 }
+
+/* ---------- polish: calmer, more professional look ---------- */
+/* Inter (SIL Open Font License 1.1, rsms.me/inter) gives the UI one crisp typeface on every OS. */
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/Inter-roman.var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+body {
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 13px;
+  font-feature-settings: 'cv11', 'ss01', 'calt';
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.003em;
+}
+/* Neutral grays with one accent color, instead of blue buttons next to purple highlights. */
+:root,
+:root[data-theme='dark'] {
+  --bg: #1b1b1f;
+  --bg-2: #17171a;
+  --bg-3: #222226;
+  --bg-4: #2c2c31;
+  --activity: #131316;
+  --border: #2a2a2f;
+  --fg: #d6d6dc;
+  --fg-dim: #8c8c96;
+  --fg-strong: #f4f4f6;
+  --accent: #6d5ef6;
+  --accent-hover: #7d6ff8;
+  --focus: #7d6ff8;
+  --sel: #2a2840;
+  --hover: #26262b;
+  --status: #131316;
+  --status-fg: #9a9aa4;
+  --brand: #7d6ff8;
+  --radius: 7px;
+  --radius-sm: 5px;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-2: #f7f7f8;
+  --bg-3: #f1f1f3;
+  --bg-4: #e9e9ec;
+  --activity: #f0f0f2;
+  --border: #e3e3e7;
+  --fg: #2b2b31;
+  --fg-dim: #6e6e78;
+  --fg-strong: #0f0f12;
+  --accent: #5b4cf0;
+  --accent-hover: #4d3fe0;
+  --hover: #ececef;
+  --status: #f0f0f2;
+  --status-fg: #5b5b65;
+  --radius: 7px;
+  --radius-sm: 5px;
+}
+
+/* Activity bar: one quiet color for every icon; the selected one is bright with an accent bar. */
+.activity,
+:root[data-theme='light'] .activity {
+  color: var(--fg-dim);
+  opacity: 1;
+  filter: none;
+  width: 38px;
+  height: 38px;
+}
+.activity:hover {
+  color: var(--fg-strong);
+  background: var(--hover);
+}
+.activity.active {
+  color: var(--fg-strong);
+  background: transparent;
+}
+.activity.active::before {
+  left: -7px;
+  width: 2px;
+  height: 20px;
+  background: var(--brand);
+}
+.activity-bar {
+  width: 48px;
+  padding-top: 8px;
+  gap: 4px;
+}
+
+/* Sidebar and panel headers. */
+.sidebar-title,
+.panel-header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.sidebar {
+  border-right: 1px solid var(--border);
+}
+
+/* Tabs: flat, with a thin accent line under the open one. */
+.tabs {
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  border-right: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.tab.active {
+  background: var(--bg);
+  box-shadow: inset 0 -2px 0 0 var(--brand);
+}
+
+/* Status bar blends with the chrome instead of a bright colored strip. */
+.status-bar {
+  height: 24px;
+  font-size: 11.5px;
+  border-top: 1px solid var(--border);
+}
+.status-item:hover {
+  color: var(--fg-strong);
+  background: var(--hover);
+}
+
+/* Notifications slide in at the top right, under the tabs and clear of the message box. */
+.toast {
+  top: 46px;
+  bottom: auto;
+  left: auto;
+  right: 16px;
+  transform: none;
+  max-width: min(420px, 80vw);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 14px 10px 30px;
+  color: var(--fg-strong);
+  font-size: 12.5px;
+}
+.toast::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Chat welcome: smaller logo without the glow, tidy suggestion list. */
+.chat-empty {
+  margin-top: 12%;
+}
+.chat-logo {
+  width: 44px;
+  height: 44px;
+  filter: none;
+}
+.chat-suggestion {
+  background: transparent;
+  border-color: var(--border);
+  border-radius: 9px;
+  padding: 9px 12px;
+}
+.chat-suggestion:hover {
+  background: var(--hover);
+  border-color: color-mix(in srgb, var(--fg-dim) 40%, var(--border));
+}
+.tone-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--fg-dim);
+  background: var(--bg-4);
+}
+.chat-suggestion:hover .tone-badge {
+  color: var(--brand);
+}
+
+/* Message box: a single raised surface; toggles are quiet until switched on. */
+.chat-input {
+  background: var(--bg-3);
+  border-color: var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.chat-input:focus-within {
+  border-color: color-mix(in srgb, var(--focus) 60%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 16%, transparent);
+}
+.chat-input-bar .pill {
+  border-color: transparent;
+  color: var(--fg-dim);
+  background: transparent;
+}
+.chat-input-bar .pill:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+.chat-input-bar .pill.on {
+  color: var(--fg-strong);
+  background: var(--bg-4);
+  border-color: transparent;
+}
+.turn-user {
+  background: var(--bg-3);
+  border-color: var(--border);
+}
+
+/* Primary buttons share the accent color. */
+button.primary,
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+button.primary:hover,
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Thinner, quieter scrollbars. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--fg-dim) 26%, transparent);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}

@@ -561,20 +561,26 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     stick.current = true;
   };
 
-  /** Opens a saved conversation without interrupting anything that is running. */
-  const openConversation = (cid: string) => {
+  /**
+   * Opens a saved conversation without interrupting anything that is running, in the folder it
+   * was saved in (the window opens that folder too).
+   */
+  const openConversation = (cid: string, project: string | null = null) => {
     const there = getState().chats.find((c) => c.conversationId === cid);
     if (there) {
       selectChat(there.id);
       setShowHistory(false);
       return;
     }
+    const folder = project && project !== getState().workspace?.root ? project : undefined;
     if (busy) {
       setShowHistory(false);
-      newChat({ conversationId: cid });
+      newChat({ conversationId: cid, ...(project ? { folder } : {}) });
       return;
     }
+    if (project) updateChat(id, { folder });
     void loadConversation(cid);
+    selectChat(id);
   };
 
   // When the chat opens: its saved conversation (reopened after a restart), or the task it
@@ -1222,7 +1228,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       {showHistory && (
         <ChatHistory
           current={conversationId}
-          onOpen={(cid) => openConversation(cid)}
+          onOpen={(cid, project) => openConversation(cid, project)}
           onClose={() => setShowHistory(false)}
           onDeleted={(cid) => {
             // The deleted conversation may be open in any chat: empty those.
@@ -1795,7 +1801,10 @@ function ChatProject({
     : {};
 
   return (
-    <div className={`chat-list-group ${open ? 'open' : ''} ${dropHere ? 'drop' : ''}`} {...dropProps}>
+    <div
+      className={`chat-list-group ${open ? 'open' : ''} ${dropHere ? 'drop' : ''}`}
+      {...dropProps}
+    >
       <div
         className={`chat-list-folder ${items.some((x) => x.c.id === focusedId) ? 'has-focus' : ''}`}
         title={folder ?? t('chatNoFolder')}

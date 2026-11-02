@@ -89,7 +89,7 @@ const es = {
   agentTitle:
     'Modo agente: la IA puede leer y buscar archivos del proyecto, y editar archivos o ejecutar comandos con tu aprobación',
   agentHint:
-    '🤖 Modo agente activo: la IA puede leer tu proyecto, editar archivos y ejecutar comandos en la terminal (siempre con tu aprobación).',
+    'Modo agente activo: la IA puede leer tu proyecto, editar archivos y ejecutar comandos en la terminal (siempre con tu aprobación).',
   chatHint: 'Chat simple: la IA solo ve lo que adjuntas.',
   chatTry: 'Prueba con',
   chatContinue: 'Continuar',
@@ -168,8 +168,8 @@ const es = {
   provConnectedCount: '{n} conectados',
   providersApi: 'Proveedores de API',
   cliHint:
-    'Agente de terminal: Zinarix ejecuta el programa instalado en tu equipo con tu propia sesión o suscripción (no necesita API key; inicia sesión una vez en la terminal). En el chat solo responde; con 🤖 Agente trabaja en la carpeta abierta con sus propias herramientas.',
-  cliModeSaved: 'Modo guardado: {mode}. Se aplica en tu próximo mensaje con 🤖 Agente.',
+    'Agente de terminal: Zinarix ejecuta el programa instalado en tu equipo con tu propia sesión o suscripción (no necesita API key; inicia sesión una vez en la terminal). En el chat solo responde; con Agente trabaja en la carpeta abierta con sus propias herramientas.',
+  cliModeSaved: 'Modo guardado: {mode}. Se aplica en tu próximo mensaje con Agente.',
   cliModeRead: 'read — solo responde, no cambia nada',
   cliModeEdit: 'edit — puede editar archivos del proyecto, no ejecuta comandos (recomendado)',
   cliModeFull: 'full — todo, incluidos comandos, sin preguntar',
@@ -350,7 +350,7 @@ const es = {
   provDelete: 'Eliminar proveedor',
   provCustom: 'personalizado',
   optional: '(opcional)',
-  keyStoredNote: '🔒 La llave se guarda en el llavero del sistema y nunca vuelve a esta ventana.',
+  keyStoredNote: 'La llave se guarda en el llavero del sistema y nunca vuelve a esta ventana.',
   chkSecretsTitle: 'Secretos y código inseguro',
   chkSecretsDesc:
     'Busca llaves, tokens y contraseñas filtradas, archivos .env subidos a git y patrones peligrosos (inyección SQL, eval, TLS desactivado…).',
@@ -956,7 +956,7 @@ const en: Record<Key, string> = {
   agentTitle:
     'Agent mode: the AI can read and search project files, and edit files or run commands with your approval',
   agentHint:
-    '🤖 Agent mode on: the AI can read your project, edit files and run terminal commands (always with your approval).',
+    'Agent mode on: the AI can read your project, edit files and run terminal commands (always with your approval).',
   chatHint: 'Plain chat: the AI only sees what you attach.',
   chatTry: 'Try',
   chatContinue: 'Continue',
@@ -1036,8 +1036,8 @@ const en: Record<Key, string> = {
   provConnectedCount: '{n} connected',
   providersApi: 'API providers',
   cliHint:
-    'Terminal agent: Zinarix runs the program installed on your computer with your own login or subscription (no API key; sign in once in a terminal). In chat it only answers; with 🤖 Agent it works in the open folder with its own tools.',
-  cliModeSaved: 'Mode saved: {mode}. It applies to your next message with 🤖 Agent.',
+    'Terminal agent: Zinarix runs the program installed on your computer with your own login or subscription (no API key; sign in once in a terminal). In chat it only answers; with Agent it works in the open folder with its own tools.',
+  cliModeSaved: 'Mode saved: {mode}. It applies to your next message with Agent.',
   cliModeRead: 'read — answers only, changes nothing',
   cliModeEdit: 'edit — may edit project files, runs no commands (recommended)',
   cliModeFull: 'full — everything, including commands, without asking',
@@ -1217,7 +1217,7 @@ const en: Record<Key, string> = {
   provDelete: 'Delete provider',
   provCustom: 'custom',
   optional: '(optional)',
-  keyStoredNote: '🔒 The key is stored in the system keychain and never comes back to this window.',
+  keyStoredNote: 'The key is stored in the system keychain and never comes back to this window.',
   chkSecretsTitle: 'Secrets and insecure code',
   chkSecretsDesc:
     'Finds leaked keys, tokens and passwords, .env files committed to git and dangerous patterns (SQL injection, eval, disabled TLS…).',

@@ -33,7 +33,8 @@ export function ChatHistory({
   onDeleted,
 }: {
   current?: string;
-  onOpen: (id: string) => void;
+  /** `project`: the folder the conversation was saved in (opened with it). */
+  onOpen: (id: string, project: string | null) => void;
   onClose: () => void;
   onDeleted: (id: string) => void;
 }) {
@@ -130,7 +131,7 @@ export function ChatHistory({
               <div
                 key={c.id}
                 className={`ch-item ${c.id === current ? 'active' : ''}`}
-                onClick={() => onOpen(c.id)}
+                onClick={() => onOpen(c.id, c.project)}
                 title={c.project ?? ''}
               >
                 {c.model ? (
