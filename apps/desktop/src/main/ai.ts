@@ -18,6 +18,7 @@ import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact, StreamRedactor } from '@omni/security';
 import { Agent } from './agent.js';
 import { setCredentialEnvNames } from './env.js';
+import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
 import type { BrowserController } from './browser.js';
 import type { Workspace } from './workspace.js';
@@ -79,19 +80,26 @@ export function describeError(e: unknown): { message: string; code: string } {
 /**
  * Keychain-less fallback for the desktop app: the encrypted vault's master password is a
  * random secret protected by Electron safeStorage (DPAPI / Keychain / libsecret / kwallet),
- * so the user is never prompted.
+ * or, on systems with none of those, by a locally encrypted file; the user is never prompted.
  */
 function vaultPassword(home: string): () => Promise<string> {
   return async () => {
-    if (!safeStorage.isEncryptionAvailable())
+    const file = join(home, 'desktop-vault.key');
+    if (safeStorage.isEncryptionAvailable()) {
+      if (existsSync(file)) return safeStorage.decryptString(readFileSync(file));
+      const pw = randomBytes(32).toString('base64');
+      writeFileSync(file, safeStorage.encryptString(pw), { mode: 0o600 });
+      return pw;
+    }
+    const local = `${file}.local`;
+    if (existsSync(local)) return openLocal(home, readFileSync(local));
+    if (existsSync(file))
       throw new OmniError(
         'config',
-        'no OS keychain or safeStorage available; set OMNI_VAULT_PASSWORD',
+        'the OS keychain that protected the vault is unavailable; open it or set OMNI_VAULT_PASSWORD',
       );
-    const file = join(home, 'desktop-vault.key');
-    if (existsSync(file)) return safeStorage.decryptString(readFileSync(file));
     const pw = randomBytes(32).toString('base64');
-    writeFileSync(file, safeStorage.encryptString(pw), { mode: 0o600 });
+    writeFileSync(local, sealLocal(home, pw), { mode: 0o600 });
     return pw;
   };
 }
