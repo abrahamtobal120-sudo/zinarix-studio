@@ -18,20 +18,26 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
   let key = 0;
   while (i < lines.length) {
     const line = lines[i]!;
-    const fence = /^\s*```\s*([\w+#.-]*)\s*$/.exec(line);
+    const fence = FENCE.exec(line);
     if (fence) {
-      const lang = fence[1] ?? '';
-      const code: string[] = [];
-      i++;
-      while (i < lines.length && !/^\s*```\s*$/.test(lines[i]!)) code.push(lines[i++]!);
-      const closed = i < lines.length;
-      i++;
+      const code = readFence(lines, i);
+      i = code.next;
       blocks.push(
-        <CodeBlock key={key++} lang={lang} code={code.join('\n')} done={closed || !streaming} />,
+        <CodeBlock
+          key={key++}
+          lang={code.lang}
+          code={code.text}
+          done={code.closed || !streaming}
+        />,
       );
       continue;
     }
-    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (HR.test(line)) {
+      blocks.push(<hr key={key++} className="md-hr" />);
+      i++;
+      continue;
+    }
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
     if (h) {
       blocks.push(
         <div key={key++} className={`md-h md-h${h[1]!.length}`}>
@@ -41,17 +47,10 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
       i++;
       continue;
     }
-    if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i]!))
-        items.push(lines[i++]!.replace(/^\s*([-*+]|\d+\.)\s+/, ''));
-      blocks.push(
-        <ul key={key++} className="md-list">
-          {items.map((it, j) => (
-            <li key={j}>{inline(it)}</li>
-          ))}
-        </ul>,
-      );
+    if (LIST_ITEM.test(line)) {
+      const list = readList(lines, i, indentOf(line));
+      i = list.next;
+      blocks.push(<List key={key++} list={list} streaming={streaming} />);
       continue;
     }
     if (TABLE_ROW.test(line) && TABLE_SEP.test(lines[i + 1] ?? '')) {
@@ -98,14 +97,131 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
       i < lines.length &&
       lines[i]!.trim() &&
       !/^\s*```/.test(lines[i]!) &&
-      !/^(#{1,4})\s/.test(lines[i]!) &&
-      !/^\s*([-*+]|\d+\.)\s+/.test(lines[i]!) &&
+      !/^(#{1,6})\s/.test(lines[i]!) &&
+      !LIST_ITEM.test(lines[i]!) &&
+      !HR.test(lines[i]!) &&
+      !/^>\s?/.test(lines[i]!) &&
       !(TABLE_ROW.test(lines[i]!) && TABLE_SEP.test(lines[i + 1] ?? ''))
     )
       para.push(lines[i++]!);
     blocks.push(<p key={key++}>{inline(para.join('\n'))}</p>);
   }
   return <div className="md">{blocks}</div>;
+}
+
+const FENCE = /^(\s*)```\s*([\w+#.-]*)\s*$/;
+const HR = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
+const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+
+const indentOf = (line: string) => /^\s*/.exec(line)![0].replace(/\t/g, '    ').length;
+
+/** A ``` fence starting at `start`; the body loses the fence's own indentation (fences inside lists). */
+function readFence(lines: string[], start: number) {
+  const [, pad = '', lang = ''] = FENCE.exec(lines[start]!)!;
+  const code: string[] = [];
+  let i = start + 1;
+  while (i < lines.length && !/^\s*```\s*$/.test(lines[i]!)) {
+    const l = lines[i++]!;
+    code.push(l.startsWith(pad) ? l.slice(pad.length) : l.trimStart());
+  }
+  const closed = i < lines.length;
+  return { lang, text: code.join('\n'), closed, next: closed ? i + 1 : i };
+}
+
+type Fence = ReturnType<typeof readFence>;
+/** What follows an item's first line: more text, a nested list or a code block. */
+type ItemPart = { text: string } | { list: ParsedList } | { fence: Fence };
+type ListItem = { text: string; parts: ItemPart[] };
+type ParsedList = { ordered: boolean; start: number; items: ListItem[]; next: number };
+
+/**
+ * A list at `indent`: deeper items become nested lists, indented text continues the item and
+ * indented fences stay inside it, so "1. … ```code``` 2. …" keeps its numbering.
+ */
+function readList(lines: string[], start: number, indent: number): ParsedList {
+  const first = LIST_ITEM.exec(lines[start]!)!;
+  const ordered = /\d/.test(first[2]!);
+  const list: ParsedList = {
+    ordered,
+    start: ordered ? parseInt(first[2]!, 10) : 1,
+    items: [],
+    next: start,
+  };
+  let i = start;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    const m = LIST_ITEM.exec(line);
+    const ind = indentOf(line);
+    if (m && ind === indent) {
+      if (/\d/.test(m[2]!) !== ordered) break;
+      list.items.push({ text: m[3]!, parts: [] });
+      i++;
+      continue;
+    }
+    const item = list.items[list.items.length - 1];
+    if (!item) break;
+    if (m && ind > indent) {
+      const sub = readList(lines, i, ind);
+      item.parts.push({ list: sub });
+      i = sub.next;
+      continue;
+    }
+    if (!line.trim()) {
+      // A blank line ends the list unless the next line is still part of it.
+      const nxt = lines[i + 1];
+      if (
+        nxt !== undefined &&
+        nxt.trim() &&
+        (indentOf(nxt) > indent || (LIST_ITEM.test(nxt) && indentOf(nxt) === indent))
+      ) {
+        i++;
+        continue;
+      }
+      break;
+    }
+    if (ind <= indent) break;
+    if (FENCE.test(line)) {
+      const fence = readFence(lines, i);
+      item.parts.push({ fence });
+      i = fence.next;
+      continue;
+    }
+    item.parts.push({ text: line.trim() });
+    i++;
+  }
+  list.next = i;
+  return list;
+}
+
+function List({ list, streaming }: { list: ParsedList; streaming?: boolean }) {
+  const items = list.items.map((it, j) => (
+    <li key={j}>
+      {inline(it.text)}
+      {it.parts.map((part, k) =>
+        'list' in part ? (
+          <List key={k} list={part.list} streaming={streaming} />
+        ) : 'fence' in part ? (
+          <CodeBlock
+            key={k}
+            lang={part.fence.lang}
+            code={part.fence.text}
+            done={part.fence.closed || !streaming}
+          />
+        ) : (
+          <div key={k} className="md-li-text">
+            {inline(part.text)}
+          </div>
+        ),
+      )}
+    </li>
+  ));
+  return list.ordered ? (
+    <ol className="md-list" start={list.start}>
+      {items}
+    </ol>
+  ) : (
+    <ul className="md-list">{items}</ul>
+  );
 }
 
 const TABLE_ROW = /^\s*\|.*\|\s*$/;

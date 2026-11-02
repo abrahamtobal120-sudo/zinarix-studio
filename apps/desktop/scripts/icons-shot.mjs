@@ -34,7 +34,12 @@ const detect = () => {
     if (!r.width || !svg.parentElement) continue;
     const p = svg.parentElement;
     const pr = p.getBoundingClientRect();
-    if (r.left < pr.left - 1 || r.right > pr.right + 1 || r.top < pr.top - 1 || r.bottom > pr.bottom + 1)
+    if (
+      r.left < pr.left - 1 ||
+      r.right > pr.right + 1 ||
+      r.top < pr.top - 1 ||
+      r.bottom > pr.bottom + 1
+    )
       out.push(
         `CLIP ${name(p)} > ${name(svg)} ${r.width}x${r.height} in ${pr.width.toFixed(0)}x${pr.height.toFixed(0)}`,
       );

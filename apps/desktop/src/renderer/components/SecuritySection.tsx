@@ -3,6 +3,7 @@ import type { FindingView, ScanResultView, SecKind, SecReportView } from '../../
 import { t } from '../i18n';
 import { api, newRequestId, toast, useStore } from '../store';
 import { askAgent } from './Chat';
+import { Icon, type IconName } from './Icon';
 
 type Sev = FindingView['severity'];
 const SEV_ORDER: Sev[] = ['crítico', 'alto', 'medio', 'bajo'];
@@ -59,18 +60,26 @@ function counts(f: FindingView[]): Record<Sev, number> {
 const scoreOf = (f: FindingView[]) =>
   Math.max(0, 100 - SEV_ORDER.reduce((n, s) => n + counts(f)[s] * WEIGHT[s], 0));
 
-const CATS: { id: SecKind | 'dashboard' | 'network' | 'history'; icon: string; label: string }[] = [
-  { id: 'dashboard', icon: '🛡️', label: 'Panel' },
-  { id: 'project', icon: '🔑', label: 'Proyecto' },
-  { id: 'deps', icon: '📦', label: 'Dependencias' },
-  { id: 'system', icon: '💻', label: 'Mi equipo' },
-  { id: 'network', icon: '📡', label: 'Red (nmap)' },
-  { id: 'site', icon: '🌐', label: 'Sitios web' },
-  { id: 'hash', icon: '🧾', label: 'Archivos' },
-  { id: 'history', icon: '🕘', label: 'Historial' },
+const CATS: {
+  id: SecKind | 'dashboard' | 'network' | 'history';
+  icon: string;
+  svg: IconName;
+  label: string;
+}[] = [
+  { id: 'dashboard', icon: '🛡️', svg: 'shield', label: 'Panel' },
+  { id: 'project', icon: '🔑', svg: 'key', label: 'Proyecto' },
+  { id: 'deps', icon: '📦', svg: 'package', label: 'Dependencias' },
+  { id: 'system', icon: '💻', svg: 'monitor', label: 'Mi equipo' },
+  { id: 'network', icon: '📡', svg: 'wifi', label: 'Red (nmap)' },
+  { id: 'site', icon: '🌐', svg: 'globe', label: 'Sitios web' },
+  { id: 'hash', icon: '🧾', svg: 'hash', label: 'Archivos' },
+  { id: 'history', icon: '🕘', svg: 'history', label: 'Historial' },
 ];
 const labelOf = (k: string) => CATS.find((c) => c.id === k)?.label ?? k;
 const iconOf = (k: string) => CATS.find((c) => c.id === k)?.icon ?? '•';
+const SvgOf = ({ k, size = 15 }: { k: string; size?: number }) => (
+  <Icon name={CATS.find((c) => c.id === k)?.svg ?? 'shield'} size={size} />
+);
 
 function Badge({ sev, n }: { sev: Sev; n: number }) {
   if (!n) return null;
@@ -440,7 +449,9 @@ export function SecuritySection() {
   return (
     <div className="sec-section">
       <nav className="sv-nav">
-        <div className="sv-brand">🛡️ {t('securityTitle')}</div>
+        <div className="sv-brand">
+          <Icon name="shield" size={16} /> {t('securityTitle')}
+        </div>
         {CATS.map((c) => {
           const saved =
             c.id !== 'dashboard' && c.id !== 'network' && c.id !== 'history'
@@ -453,7 +464,9 @@ export function SecuritySection() {
               className={`sv-nav-item ${cat === c.id ? 'on' : ''}`}
               onClick={() => setCat(c.id)}
             >
-              <span className="sv-nav-icon">{c.icon}</span>
+              <span className="sv-nav-icon">
+                <SvgOf k={c.id} />
+              </span>
               <span className="sv-nav-label">{c.label}</span>
               {cc && cc.crítico + cc.alto > 0 && (
                 <span
@@ -550,7 +563,7 @@ export function SecuritySection() {
                 return (
                   <button key={k} className="sv-card" onClick={() => setCat(k)}>
                     <div className="sv-card-top">
-                      <span>{iconOf(k)}</span>
+                      <SvgOf k={k} />
                       <strong>{labelOf(k)}</strong>
                     </div>
                     {cc ? (
@@ -585,7 +598,7 @@ export function SecuritySection() {
           <div className="sv-panel">
             <div className="sv-panel-head">
               <h2>
-                {iconOf(cat)} {labelOf(cat)}
+                <SvgOf k={cat} size={18} /> {labelOf(cat)}
               </h2>
               <div className="sv-panel-actions">
                 {(cat === 'project' || cat === 'deps') && !workspace && (
@@ -629,14 +642,18 @@ export function SecuritySection() {
 
         {cat === 'network' && (
           <div className="sv-panel">
-            <h2>📡 {t('scannerTitle')}</h2>
+            <h2>
+              <SvgOf k="network" size={18} /> {t('scannerTitle')}
+            </h2>
             <ScanTab />
           </div>
         )}
 
         {cat === 'site' && (
           <div className="sv-panel">
-            <h2>🌐 {labelOf('site')}</h2>
+            <h2>
+              <SvgOf k="site" size={18} /> {labelOf('site')}
+            </h2>
             <div className="sv-scan-row">
               <input
                 value={siteUrl}
@@ -665,7 +682,9 @@ export function SecuritySection() {
 
         {cat === 'hash' && (
           <div className="sv-panel">
-            <h2>🧾 {labelOf('hash')}</h2>
+            <h2>
+              <SvgOf k="hash" size={18} /> {labelOf('hash')}
+            </h2>
             <p className="dim">{t('secHashIntro')}</p>
             <div className="sv-scan-row">
               <input
@@ -695,7 +714,9 @@ export function SecuritySection() {
         {cat === 'history' && (
           <div className="sv-panel">
             <div className="sv-panel-head">
-              <h2>🕘 {labelOf('history')}</h2>
+              <h2>
+              <SvgOf k="history" size={18} /> {labelOf('history')}
+            </h2>
               {history.length > 0 && (
                 <button
                   onClick={() => {
@@ -727,7 +748,7 @@ export function SecuritySection() {
                       {h.score}
                     </span>
                     <span className="sv-hist-kind">
-                      {iconOf(h.kind)} {labelOf(h.kind)}
+                      <SvgOf k={h.kind} size={13} /> {labelOf(h.kind)}
                     </span>
                     <span className="sv-hist-counts">
                       {SEV_ORDER.map((s) => (h.c[s] ? <Badge key={s} sev={s} n={h.c[s]} /> : null))}

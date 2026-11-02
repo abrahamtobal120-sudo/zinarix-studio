@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { safeStorage } from 'electron';
+import { TokenStore } from './token-store.js';
 import type {
   VercelDeploymentView,
   VercelEnvView,
@@ -59,25 +59,20 @@ function checkId(id: string): string {
 
 /**
  * Vercel REST API with the user's token. The token stays in the main process: either one
- * pasted in the app (encrypted with safeStorage) or the Vercel CLI login of this machine.
+ * pasted in the app (kept by TokenStore) or the Vercel CLI login of this machine.
  */
 export class Vercel {
   private cli: boolean | null = null;
 
   constructor(private readonly dir: string) {}
 
-  private get file(): string {
-    return join(this.dir, 'vercel-token.bin');
+  private get store(): TokenStore {
+    return new TokenStore(join(this.dir, 'vercel-token.bin'), 'vercel');
   }
 
   private token(): { token: string; source: 'app' | 'cli' } | null {
-    if (existsSync(this.file) && safeStorage.isEncryptionAvailable()) {
-      try {
-        return { token: safeStorage.decryptString(readFileSync(this.file)), source: 'app' };
-      } catch {
-        /* keychain changed: fall back to the CLI login */
-      }
-    }
+    const saved = this.store.get();
+    if (saved) return { token: saved, source: 'app' };
     const t = cliToken();
     return t ? { token: t, source: 'cli' } : null;
   }
@@ -147,20 +142,18 @@ export class Vercel {
   async setToken(token: string): Promise<VercelStatus> {
     const t = token.trim();
     if (!/^[\w-]{8,200}$/.test(t)) throw new Error('El token no tiene un formato válido.');
-    if (!safeStorage.isEncryptionAvailable())
-      throw new Error('Este sistema no tiene llavero para guardar el token cifrado.');
     const r = await fetch(`${API}/v2/user`, {
       headers: { Authorization: `Bearer ${t}` },
       signal: AbortSignal.timeout(20_000),
     });
     if (!r.ok) throw new Error('Vercel rechazó ese token.');
-    writeFileSync(this.file, safeStorage.encryptString(t), { mode: 0o600 });
+    this.store.set(t);
     return this.status();
   }
 
   /** Forgets the app's token (the CLI login, if any, is the CLI's: `vercel logout`). */
   async logout(): Promise<VercelStatus> {
-    rmSync(this.file, { force: true });
+    this.store.delete();
     return this.status();
   }
 

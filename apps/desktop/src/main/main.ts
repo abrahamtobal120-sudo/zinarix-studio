@@ -150,9 +150,11 @@ function broadcastSettings(from: Win): void {
  * its own (`folder`, absolute): the agent then reads, edits and runs commands there.
  */
 function scope(w: Win, folder?: string): Scope {
-  if (!folder) return { workspace: () => w.workspace, browser: w.browser };
+  // The window's folder as it is now: a turn under way stays there if the window opens another.
+  const current = w.workspace;
+  if (!folder) return { workspace: () => current, browser: w.browser };
   const abs = resolve(folder);
-  if (w.workspace?.root === abs) return { workspace: () => w.workspace, browser: w.browser };
+  if (current?.root === abs) return { workspace: () => current, browser: w.browser };
   if (!existsSync(abs) || !statSync(abs).isDirectory())
     throw new Error(`La carpeta del chat ya no existe: ${abs}`);
   let ws = w.chatFolders.get(abs);

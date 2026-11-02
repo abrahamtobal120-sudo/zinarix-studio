@@ -388,11 +388,40 @@ export async function openDropped(path: string): Promise<void> {
   const r = await api().workspace.openPath(path);
   if (!r) return toast(t('dropInvalid'));
   // Switch workspace state here so the 'workspace' event cannot close the file we open next.
-  if (state.workspace?.root !== r.workspace.root) {
-    resetDocs();
-    setState({ workspace: r.workspace, sidebar: 'explorer' });
-  } else setState({ workspace: r.workspace });
+  switchWorkspace(r.workspace);
   if (r.file) await openFile(r.file);
+}
+
+/**
+ * The window's open folder changed (or closed). The chats that were already working in the old
+ * folder stay there (they get it as their own); the chat in front follows the window.
+ */
+export function switchWorkspace(next: WorkspaceInfo | null): void {
+  const old = state.workspace?.root;
+  if (old === next?.root) return setState({ workspace: next });
+  const focused = focusedChat();
+  for (const c of state.chats) {
+    if (c.folder || c.id === focused || !old) continue;
+    if (c.conversationId || c.busy) {
+      updateChat(c.id, { folder: old });
+      rememberProject(old);
+    }
+  }
+  // An empty chat in front, tied to another folder, simply moves to the one just opened.
+  const f = chatTab(focused);
+  if (f?.folder && next && f.folder !== next.root && !f.conversationId && !f.busy)
+    updateChat(f.id, { folder: undefined });
+  resetDocs();
+  setState(next ? { workspace: next, sidebar: 'explorer' } : { workspace: next });
+}
+
+/** Opening a chat that works in another folder opens that folder in the window too. */
+async function followChat(id: string): Promise<void> {
+  const folder = chatTab(id)?.folder;
+  if (!folder || folder === state.workspace?.root) return;
+  if (dirtyCount()) return toast(t('chatFolderUnsaved'));
+  const r = await api().workspace.openPath(folder);
+  if (r) switchWorkspace(r.workspace);
 }
 
 export function dirtyCount(): number {
@@ -672,6 +701,7 @@ export function selectChat(id: string): void {
   updateChat(id, { unread: false });
   setState({ chatOpen: true });
   persistChats();
+  void followChat(id);
 }
 
 // ---------------- plan (Pro features) ----------------
@@ -710,7 +740,7 @@ export function newChat(patch: Partial<ChatTab> = {}, always = false): string {
   return tab.id;
 }
 
-/** Asks for a folder and opens a new chat that works there (the window's folder stays). */
+/** Asks for a folder and opens a new chat that works there (the window moves to it). */
 export async function newChatInFolder(): Promise<string | null> {
   if (!requirePro('chats')) return null;
   const picked = await api().workspace.pickChatFolder();

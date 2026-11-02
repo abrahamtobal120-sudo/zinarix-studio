@@ -707,6 +707,9 @@ const es = {
   chatListToggle: 'Lista de chats abiertos',
   chatListTitle: 'Chats abiertos',
   chatNoFolder: 'Sin carpeta',
+  chatFolderUnsaved:
+    'Guarda los archivos abiertos para que la ventana pase a la carpeta de este chat',
+  chatFolderRelease: 'Este chat trabaja en {path}. Clic: que use la carpeta abierta en la ventana',
   chatQueue: 'Poner en cola',
   chatQueueHint: 'Poner en cola: se envía solo cuando termine la respuesta actual (Enter)',
   chatQueued: 'Mensajes en cola',
@@ -1566,6 +1569,8 @@ const en: Record<Key, string> = {
   chatListToggle: 'List of open chats',
   chatListTitle: 'Open chats',
   chatNoFolder: 'No folder',
+  chatFolderUnsaved: "Save the open files so the window can move to this chat's folder",
+  chatFolderRelease: 'This chat works in {path}. Click: use the folder open in the window',
   chatQueue: 'Queue',
   chatQueueHint: 'Queue: sent by itself when the current answer ends (Enter)',
   chatQueued: 'Queued messages',

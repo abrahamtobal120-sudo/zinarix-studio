@@ -24,8 +24,8 @@ import {
   openDropped,
   refreshModels,
   refreshSettings,
-  resetDocs,
   setState,
+  switchWorkspace,
   useStore,
 } from './store';
 import { t } from './i18n';
@@ -165,16 +165,7 @@ export function App() {
         introOnStart(s.settings.version, s.models.length > 0 || Boolean(s.settings.defaultModel));
     })();
     return api().on((ev) => {
-      if (ev.type === 'workspace') {
-        const switched = getState().workspace?.root !== ev.workspace?.root;
-        if (switched) resetDocs();
-        // A new project shows its folder in the explorer.
-        setState(
-          switched && ev.workspace
-            ? { workspace: ev.workspace, sidebar: 'explorer' }
-            : { workspace: ev.workspace },
-        );
-      }
+      if (ev.type === 'workspace') switchWorkspace(ev.workspace);
       if (ev.type === 'fs:changed') setState((s) => ({ fsVersion: s.fsVersion + 1 }));
       if (ev.type === 'command') void runCommand(ev.command);
       if (ev.type === 'update')

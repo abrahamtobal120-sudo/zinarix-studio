@@ -927,6 +927,14 @@ kbd {
   border-top-color: transparent;
   box-shadow: inset 0 2px 0 0 var(--brand);
 }
+.tab-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab-name > svg {
+  flex-shrink: 0;
+}
 .tab-close {
   background: transparent;
   padding: 0 4px;
@@ -3315,8 +3323,6 @@ button.link {
   filter: blur(4px);
 }
 .tab-globe {
-  vertical-align: -2px;
-  margin-right: 5px;
   color: #8f7bff;
 }
 /* Quick open (Ctrl+P) rows */
@@ -3683,9 +3689,15 @@ button.link {
   overflow-y: auto;
 }
 .sv-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
   color: var(--fg-strong);
   padding: 6px 10px 12px;
+}
+.sv-brand .icon {
+  color: var(--brand);
 }
 .sv-nav-item {
   display: flex;
@@ -3706,7 +3718,10 @@ button.link {
 }
 .sv-nav-icon {
   width: 18px;
-  text-align: center;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 .sv-nav-label {
   flex: 1;
@@ -3810,6 +3825,16 @@ button.link {
   gap: 8px;
   color: var(--fg-strong);
 }
+.sv-card-top .icon,
+.sv-panel h2 .icon {
+  flex-shrink: 0;
+  color: var(--brand);
+}
+.sv-hist-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .sv-card-counts {
   display: flex;
   flex-wrap: wrap;
@@ -3828,6 +3853,9 @@ button.link {
   margin-bottom: 8px;
 }
 .sv-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 10px;
   color: var(--fg-strong);
   font-weight: 500;
@@ -3953,17 +3981,20 @@ button.link {
 }
 .activity-badge {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  min-width: 16px;
-  height: 16px;
+  right: 1px;
+  top: 1px;
+  min-width: 15px;
+  height: 15px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--status);
-  color: var(--status-fg);
-  font-size: 10px;
-  line-height: 16px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 15px;
   text-align: center;
+  box-shadow: 0 0 0 2px var(--activity);
+  pointer-events: none;
 }
 .status-item.off {
   opacity: 0.6;
@@ -4290,11 +4321,17 @@ button.link {
   gap: 2px;
 }
 .settings-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
   padding: 0 8px 10px;
   color: var(--fg-strong);
 }
 .settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-align: left;
   background: transparent;
   padding: 6px 10px;
@@ -5072,6 +5109,14 @@ kbd.custom {
   margin-left: auto;
   color: var(--fg);
   flex-shrink: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.chat-pane-folder:hover {
+  color: var(--accent);
 }
 .model-chip {
   display: inline-flex;
@@ -6157,4 +6202,37 @@ button.big {
 }
 .sb-sql .git-connect-actions {
   padding: 0 8px;
+}
+/* Markdown extras: numbered lists, nested lists, rules and small headings. */
+.md ol.md-list {
+  list-style: decimal;
+}
+.md ul.md-list {
+  list-style: disc;
+}
+.md-list .md-list {
+  margin: 3px 0 4px;
+}
+.md-list ul.md-list {
+  list-style: circle;
+}
+.md-list .code-block {
+  margin: 6px 0 8px;
+}
+.md-li-text {
+  margin-top: 2px;
+}
+.md-hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+.md-h3 {
+  font-size: 14px;
+}
+.md-h4,
+.md-h5,
+.md-h6 {
+  font-size: 13.5px;
+  color: var(--fg);
 }

@@ -6,6 +6,7 @@ import { t } from '../i18n';
 import { comboFromEvent } from '../keys';
 import { api, refreshSettings, setState, setTheme, updatePrefs, useStore } from '../store';
 import { THEMES } from '../themes';
+import { Icon, type IconName } from './Icon';
 
 const close = () => setState({ modal: null });
 
@@ -73,9 +74,9 @@ export function SettingsPanel() {
   const [recording, setRecording] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
 
-  const nav = (id: Section, label: string, icon: string) => (
+  const nav = (id: Section, label: string, icon: IconName) => (
     <button className={section === id ? 'on' : ''} onClick={() => setSection(id)}>
-      {icon} {label}
+      <Icon name={icon} size={16} /> {label}
     </button>
   );
 
@@ -90,11 +91,13 @@ export function SettingsPanel() {
     <div className="modal-backdrop" onMouseDown={close}>
       <div className="settings" onMouseDown={(e) => e.stopPropagation()}>
         <nav className="settings-nav">
-          <div className="settings-title">⚙ {t('settings')}</div>
-          {nav('appearance', t('setAppearance'), '🎨')}
-          {nav('editor', t('setEditor'), '📝')}
-          {nav('ai', t('setAi'), '✨')}
-          {nav('keys', t('shortcuts'), '⌨')}
+          <div className="settings-title">
+            <Icon name="settings" size={16} /> {t('settings')}
+          </div>
+          {nav('appearance', t('setAppearance'), 'palette')}
+          {nav('editor', t('setEditor'), 'edit')}
+          {nav('ai', t('setAi'), 'sparkles')}
+          {nav('keys', t('shortcuts'), 'keyboard')}
         </nav>
         <div className="settings-body">
           <button className="modal-x" onClick={close} aria-label={t('close')}>

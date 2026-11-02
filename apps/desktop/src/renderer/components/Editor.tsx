@@ -142,7 +142,7 @@ export function EditorArea() {
           ))}
         </div>
       )}
-      {activeTab && !isBrowser && (
+      {activeTab && !isBrowser && !isSecurity && (
         <div className="breadcrumbs">{activeTab.path.split('/').join(' › ')}</div>
       )}
       <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />

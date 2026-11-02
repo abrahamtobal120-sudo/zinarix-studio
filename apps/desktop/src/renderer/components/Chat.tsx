@@ -1201,9 +1201,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           <span className="chat-pane-model">{shownModel ?? t('noModel')}</span>
           <span className="chat-pane-title">{meta?.title}</span>
           {ownFolder && (
-            <span className="chat-pane-folder" title={ownFolder}>
+            <button
+              className="chat-pane-folder"
+              title={t('chatFolderRelease', { path: ownFolder })}
+              onClick={() => updateChat(id, { folder: undefined })}
+            >
               <Icon name="folder" size={11} /> {folderName(ownFolder)}
-            </span>
+            </button>
           )}
         </div>
       )}
