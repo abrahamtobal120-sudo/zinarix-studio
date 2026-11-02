@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ChatContext,
   ChatEventView,
@@ -25,6 +25,7 @@ import {
   newChat,
   newChatInFolder,
   newRequestId,
+  rememberProject,
   reloadFromDisk,
   refreshSettings,
   saveAgentMode,
@@ -1708,6 +1709,28 @@ function savedOpen(): Record<string, boolean> {
   }
 }
 
+/** A chat being dragged between projects of the side list: an open one or a saved one. */
+interface ChatDrag {
+  chat?: string;
+  conv?: string;
+  from: string | undefined;
+}
+
+const CHAT_DRAG = 'application/x-zinarix-chat';
+
+function startChatDrag(e: DragEvent, drag: ChatDrag): void {
+  e.dataTransfer.setData(CHAT_DRAG, JSON.stringify(drag));
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function readChatDrag(e: DragEvent): ChatDrag | null {
+  try {
+    return JSON.parse(e.dataTransfer.getData(CHAT_DRAG)) as ChatDrag;
+  } catch {
+    return null;
+  }
+}
+
 /** One project of the side list: its open chats and, when unfolded, its saved ones. */
 function ChatProject({
   folder,
@@ -1715,18 +1738,24 @@ function ChatProject({
   focusedId,
   open,
   onToggle,
+  moved,
+  onMove,
 }: {
   folder: string | undefined;
   items: { c: ChatTab; n: number }[];
   focusedId: string;
   open: boolean;
   onToggle: () => void;
+  /** Bumped when a chat moves between projects, so the saved list reloads. */
+  moved: number;
+  onMove: (drag: ChatDrag, to: string) => void;
 }) {
   const chats = useStore((s) => s.chats);
   const activeChat = useStore((s) => s.activeChat);
   const split = useStore((s) => s.chatSplit);
   const windowRoot = useStore((s) => s.workspace?.root);
   const [saved, setSaved] = useState<ConversationView[] | null>(null);
+  const [dropHere, setDropHere] = useState(false);
   const own = folder && folder !== windowRoot ? folder : undefined;
   // Reloaded when a chat of the project ends (its conversation was just saved).
   const running = items.filter((x) => x.c.busy).length;
@@ -1736,15 +1765,37 @@ function ChatProject({
       .ai.projectConversations(folder)
       .then(setSaved)
       .catch(() => setSaved([]));
-  }, [open, folder, running, items.length]);
+  }, [open, folder, running, items.length, moved]);
 
   const busy = items.some((x) => x.c.busy);
   const waiting = items.some((x) => x.c.waiting);
   const unread = items.some((x) => x.c.unread);
   const past = (saved ?? []).filter((v) => !chats.some((c) => c.conversationId === v.id));
 
+  // A chat of another project dropped here moves to this folder.
+  const dropProps = folder
+    ? {
+        onDragOver: (e: DragEvent) => {
+          if (!e.dataTransfer.types.includes(CHAT_DRAG)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setDropHere(true);
+        },
+        onDragLeave: (e: DragEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropHere(false);
+        },
+        onDrop: (e: DragEvent) => {
+          setDropHere(false);
+          const drag = readChatDrag(e);
+          if (!drag) return;
+          e.preventDefault();
+          if (drag.from !== folder) onMove(drag, folder);
+        },
+      }
+    : {};
+
   return (
-    <div className={`chat-list-group ${open ? 'open' : ''}`}>
+    <div className={`chat-list-group ${open ? 'open' : ''} ${dropHere ? 'drop' : ''}`} {...dropProps}>
       <div
         className={`chat-list-folder ${items.some((x) => x.c.id === focusedId) ? 'has-focus' : ''}`}
         title={folder ?? t('chatNoFolder')}
@@ -1797,6 +1848,8 @@ function ChatProject({
                 key={c.id}
                 className={`chat-list-item ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
                 title={status ? `${label} · ${status}` : label}
+                draggable={Boolean(folder)}
+                onDragStart={(e) => startChatDrag(e, { chat: c.id, from: folder })}
                 onClick={() => selectChat(c.id)}
                 onAuxClick={(e) => {
                   if (e.button === 1) requestCloseChat(c.id);
@@ -1829,7 +1882,9 @@ function ChatProject({
             <div
               key={v.id}
               className="chat-list-item past"
-              title={`${v.title} · ${new Date(v.updatedAt).toLocaleString()}`}
+              title={`${v.title} · ${new Date(v.updatedAt).toLocaleString()}\n${t('chatDragHint')}`}
+              draggable
+              onDragStart={(e) => startChatDrag(e, { conv: v.id, from: folder })}
               onClick={() =>
                 newChat({ conversationId: v.id, title: v.title.slice(0, 60), folder: own })
               }
@@ -1858,6 +1913,7 @@ function ChatList({ focusedId }: { focusedId: string }) {
   const windowRoot = useStore((s) => s.workspace?.root);
   const known = useStore((s) => s.chatProjects);
   const [openMap, setOpenMap] = useState(savedOpen);
+  const [moved, setMoved] = useState(0);
   const groups: { folder: string | undefined; items: { c: ChatTab; n: number }[] }[] = [];
   const group = (folder: string | undefined) => {
     let g = groups.find((x) => x.folder === folder);
@@ -1879,6 +1935,26 @@ function ChatList({ focusedId }: { focusedId: string }) {
       // storage unavailable: projects just unfold as before next time
     }
   };
+  const move = async (drag: ChatDrag, to: string) => {
+    const tab = drag.chat ? chats.find((c) => c.id === drag.chat) : undefined;
+    if (tab?.busy || tab?.waiting) {
+      toast(t('chatMoveBusy'));
+      return;
+    }
+    // The project it leaves stays in the list, even with no chat open there.
+    if (drag.from !== windowRoot) rememberProject(drag.from);
+    try {
+      const conv = tab ? tab.conversationId : drag.conv;
+      if (conv) await api().ai.moveConversation(conv, to);
+    } catch (err) {
+      toast(String((err as Error).message ?? err));
+      return;
+    }
+    if (tab) updateChat(tab.id, { folder: to === windowRoot ? undefined : to });
+    if (!isOpen(to)) toggle(to);
+    setMoved((n) => n + 1);
+    toast(t('chatMoved', { folder: folderName(to) }));
+  };
   return (
     <nav className="chat-list" aria-label={t('chatListTitle')}>
       <div className="chat-list-head">{t('chatProjects')}</div>
@@ -1891,6 +1967,8 @@ function ChatList({ focusedId }: { focusedId: string }) {
             focusedId={focusedId}
             open={isOpen(g.folder)}
             onToggle={() => toggle(g.folder)}
+            moved={moved}
+            onMove={(drag, to) => void move(drag, to)}
           />
         ))}
       </div>

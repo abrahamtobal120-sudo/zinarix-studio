@@ -132,6 +132,11 @@ export class History {
     this.db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);
   }
 
+  /** Moves a conversation to another project (folder). */
+  move(id: string, project: string): void {
+    this.db.prepare('UPDATE conversations SET project = ? WHERE id = ?').run(project, id);
+  }
+
   delete(id: string): void {
     this.db.prepare('DELETE FROM conversations WHERE id = ?').run(id);
   }

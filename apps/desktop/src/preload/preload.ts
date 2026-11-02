@@ -39,6 +39,7 @@ const api: OmniApi = {
     projectConversations: call('ai:projectConversations') as OmniApi['ai']['projectConversations'],
     conversation: call('ai:conversation') as OmniApi['ai']['conversation'],
     renameConversation: call('ai:renameConversation') as OmniApi['ai']['renameConversation'],
+    moveConversation: call('ai:moveConversation') as OmniApi['ai']['moveConversation'],
     deleteConversation: call('ai:deleteConversation') as OmniApi['ai']['deleteConversation'],
     exportConversation: call('ai:exportConversation') as OmniApi['ai']['exportConversation'],
     usage: call('ai:usage') as OmniApi['ai']['usage'],

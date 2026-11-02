@@ -746,6 +746,10 @@ export class AiService {
     this.core.history.rename(id, title.trim().slice(0, 120) || 'Sin título');
   }
 
+  moveConversation(id: string, folder: string): void {
+    this.core.history.move(id, folder);
+  }
+
   deleteConversation(id: string): void {
     this.core.history.delete(id);
     this.agent.forget(id);

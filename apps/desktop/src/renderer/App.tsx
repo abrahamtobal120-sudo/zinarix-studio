@@ -72,11 +72,13 @@ export function App() {
   const chatOpen = useStore((s) => s.chatOpen);
   const chatSplit = useStore((s) => Boolean(s.chatSplit));
   const chatList = useStore((s) => s.chatList);
+  const noTabs = useStore((s) => s.tabs.length === 0);
   const toast = useStore((s) => s.toast);
   const [sideW, setSideW] = useState(320);
   const [chatW, setChatW] = useState(initialChatWidth);
   const [panelH, setPanelH] = useState(260);
   const [terminalMounted, setTerminalMounted] = useState(false);
+  const chatWide = chatOpen && noTabs && !panelOpen;
   const [dragging, setDragging] = useState(false);
 
   // Drop a folder (or a file) anywhere in the window to open it. Capture phase so the
@@ -222,7 +224,8 @@ export function App() {
             <Sash dir="x" onDrag={(d) => setSideW((w) => Math.min(900, Math.max(160, w + d)))} />
           </>
         )}
-        <div className="center">
+        {/* With no file open the chat takes the whole center, like a chat app. */}
+        <div className="center" style={chatWide ? { display: 'none' } : undefined}>
           <EditorArea />
           {terminalMounted && (
             <div style={{ display: panelOpen ? 'flex' : 'none', flexDirection: 'column' }}>
@@ -234,7 +237,7 @@ export function App() {
           )}
         </div>
         {/* Kept mounted while hidden so the conversation survives toggling the panel. */}
-        {chatOpen && (
+        {chatOpen && !chatWide && (
           <Sash
             dir="x"
             onDrag={(d) =>
@@ -246,7 +249,10 @@ export function App() {
             }
           />
         )}
-        <aside className="chat-wrap" style={{ width: chatW, display: chatOpen ? 'flex' : 'none' }}>
+        <aside
+          className={chatWide ? 'chat-wrap chat-wide' : 'chat-wrap'}
+          style={{ width: chatWide ? undefined : chatW, display: chatOpen ? 'flex' : 'none' }}
+        >
           <ChatPanel />
         </aside>
       </div>

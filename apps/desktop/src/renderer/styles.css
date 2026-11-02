@@ -6308,3 +6308,55 @@ button.big {
   align-items: center;
   gap: 10px;
 }
+
+/* ---------- roomier chat ---------- */
+/* No file open: the chat fills the center and its text sits in a readable centered column. */
+.chat-wrap.chat-wide {
+  flex: 1;
+  border-left: none;
+}
+.chat-wide .chat-scroll {
+  padding-inline: max(16px, calc((100% - 760px) / 2));
+}
+.chat-wide .chat-input {
+  margin-inline: max(10px, calc((100% - 780px) / 2));
+}
+/* More air between blocks so long answers read in sections, not one wall of text. */
+.chat-scroll {
+  line-height: 1.65;
+}
+.md p {
+  margin: 0 0 12px;
+}
+.md-h {
+  margin: 24px 0 8px;
+}
+.md-h2 {
+  font-size: 16px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.md-list {
+  margin: 0 0 14px;
+}
+.md-list li {
+  margin: 5px 0;
+}
+.md-table,
+.code-block {
+  margin: 12px 0 16px;
+}
+.turn {
+  margin-bottom: 28px;
+}
+
+/* ---------- moving chats between projects ---------- */
+.chat-list-item[draggable='true'] {
+  cursor: grab;
+}
+.chat-list-group.drop {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+}

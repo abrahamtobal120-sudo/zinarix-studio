@@ -600,6 +600,11 @@ function registerIpc(): void {
   handle('ai:renameConversation', z.tuple([conv, z.string().max(200)]), (_w, id, t) =>
     ai.renameConversation(id, t),
   );
+  // A chat dragged to another project of the side list.
+  handle('ai:moveConversation', z.tuple([conv, z.string().min(1).max(4096)]), (w, id, folder) => {
+    const root = scope(w, folder).workspace()?.root;
+    if (root) ai.moveConversation(id, root);
+  });
   handle('ai:deleteConversation', z.tuple([conv]), (_w, id) => ai.deleteConversation(id));
   handle('ai:exportConversation', z.tuple([conv]), async (w, id) => {
     const md = ai.exportMarkdown(id);

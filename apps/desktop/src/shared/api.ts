@@ -558,6 +558,8 @@ export interface OmniApi {
       id: string,
     ): Promise<{ conversation: ConversationView; messages: SavedMessageView[] } | null>;
     renameConversation(id: string, title: string): Promise<void>;
+    /** Moves a saved conversation to another folder (project). */
+    moveConversation(id: string, folder: string): Promise<void>;
     deleteConversation(id: string): Promise<void>;
     /** Asks where to save and writes the conversation as Markdown. Returns the path or null. */
     exportConversation(id: string): Promise<string | null>;
@@ -763,6 +765,7 @@ export const CHANNELS = [
   'ai:projectConversations',
   'ai:conversation',
   'ai:renameConversation',
+  'ai:moveConversation',
   'ai:deleteConversation',
   'ai:exportConversation',
   'ai:usage',
