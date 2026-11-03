@@ -656,6 +656,8 @@ export type AppEvent =
   | { type: 'scan:progress'; requestId: string; done: number; total: number }
   /** Another window changed shared settings (models, keys, theme, preferences, license). */
   | { type: 'settings:changed' }
+  /** A conversation got its short AI-written title. */
+  | { type: 'chat:title'; conversationId: string; title: string }
   /**
    * A new version: downloading / ready to restart into (installers that update themselves),
    * or just available, with where to download it (other installs).

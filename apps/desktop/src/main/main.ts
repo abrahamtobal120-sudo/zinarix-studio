@@ -1414,6 +1414,9 @@ app.whenReady().then(async () => {
   if (!isPrimary) return;
   ai = new AiService();
   ai.useRules = prefs().projectRules;
+  ai.onTitle = (conversationId, title) => {
+    for (const w of wins.values()) send(w, { type: 'chat:title', conversationId, title });
+  };
   // The trial counts from the first launch.
   if (!loadState().firstRun) saveState({ firstRun: Date.now() });
   ai.features = () => license().features;

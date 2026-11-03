@@ -53,6 +53,10 @@ const COMMIT_SYSTEM =
   '(max 72 characters, imperative mood) and, if useful, a blank line and a short bullet list of the main changes. ' +
   'Write it in the language the project already uses in its code comments or, if unclear, in Spanish. No markdown fences.';
 
+const TITLE_SYSTEM =
+  'You name chat conversations. Given the first message of a chat, output only a short title for it ' +
+  '(2 to 6 words, no quotes, no final period), in the same language as the message.';
+
 /** Project rules files, first match wins (paths relative to the workspace root). */
 export const RULES_FILES = ['.zinarix/rules.md', 'AGENTS.md', 'CLAUDE.md', '.cursorrules'];
 const MAX_RULES = 20_000;
@@ -147,6 +151,8 @@ export class AiService {
   readonly agent: Agent;
   /** Settings toggle: include the project rules file in prompts. */
   useRules = true;
+  /** Told when a new conversation gets its AI-written title (main sends it to the windows). */
+  onTitle?: (conversationId: string, title: string) => void;
   /** What the plan includes (delegation between AIs is Pro). */
   features: () => { delegation: boolean } = () => ({ delegation: true });
 
@@ -504,6 +510,7 @@ export class AiService {
         req.model,
         scope.workspace()?.root,
       ).id;
+      void this.autoTitle(id, req.prompt, req.model);
     }
     // Tell the UI right away, so the conversation is known even if the request fails.
     emit(requestId, { type: 'conversation', id });
@@ -704,6 +711,36 @@ export class AiService {
       ctrl.signal,
     );
     return r.text.replace(/^```[\w-]*\n?|```\s*$/g, '').trim();
+  }
+
+  /** Names a new conversation after what it is about, in a few words; quiet on failure. */
+  private async autoTitle(id: string, prompt: string, model?: string): Promise<void> {
+    if (!prompt.trim()) return;
+    try {
+      const r = await this.core.complete(
+        {
+          model,
+          role: 'chat',
+          maxTokens: 30,
+          messages: [
+            { role: 'system', content: TITLE_SYSTEM },
+            { role: 'user', content: prompt.slice(0, 2000) },
+          ],
+        },
+        new AbortController().signal,
+      );
+      const title = r.text
+        .split('\n')
+        .map((l) => l.trim())
+        .find(Boolean)
+        ?.replace(/^["'`*#\s]+|["'`*.\s]+$/g, '')
+        .slice(0, 60);
+      if (!title || !this.core.history.get(id)) return;
+      this.core.history.rename(id, title);
+      this.onTitle?.(id, title);
+    } catch {
+      // No title from the AI: the first line of the message stays as the name.
+    }
   }
 
   conversations(

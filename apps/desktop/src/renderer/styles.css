@@ -323,6 +323,26 @@ kbd {
   border-top: 1px solid var(--border);
   display: flex;
 }
+/* The terminal fills the window: the editor steps aside. */
+.center-max-panel > .editor-area {
+  display: none;
+}
+/* Toggle that makes an area fill the window. */
+.max-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--fg-dim);
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.max-btn:hover,
+.max-btn.on {
+  color: var(--fg);
+}
 
 /* ---------- sidebar ---------- */
 .sidebar-title,

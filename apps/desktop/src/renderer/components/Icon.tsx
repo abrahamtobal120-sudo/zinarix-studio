@@ -8,6 +8,18 @@ import { createElement } from 'react';
 type IconNode = readonly (readonly [string, Record<string, string>])[];
 
 const ICONS = {
+  maximize: [
+    ['path', { d: 'M15 3h6v6' }],
+    ['path', { d: 'm21 3-7 7' }],
+    ['path', { d: 'm3 21 7-7' }],
+    ['path', { d: 'M9 21H3v-6' }],
+  ],
+  minimize: [
+    ['path', { d: 'm14 10 7-7' }],
+    ['path', { d: 'M20 10h-6V4' }],
+    ['path', { d: 'm3 21 7-7' }],
+    ['path', { d: 'M4 14h6v6' }],
+  ],
   files: [
     [
       'path',

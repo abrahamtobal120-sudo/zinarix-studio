@@ -66,6 +66,8 @@ export interface State {
   active: string | null;
   sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | 'mail' | null;
   panelOpen: boolean;
+  /** One area takes the whole window: the side panel, the terminal or the editor/browser. */
+  maximized: 'side' | 'panel' | 'editor' | null;
   chatOpen: boolean;
   modal: Modal | null;
   settings: Settings;
@@ -132,6 +134,7 @@ let state: State = {
   active: null,
   sidebar: 'explorer',
   panelOpen: false,
+  maximized: null,
   chatOpen: true,
   modal: null,
   settings: {
@@ -812,3 +815,8 @@ state = {
   chatList: savedChatList(),
   chatProjects: savedProjects(),
 };
+
+/** Makes one area fill the window, or puts the layout back if it already does. */
+export function toggleMaximized(area: 'side' | 'panel' | 'editor'): void {
+  setState((s) => ({ maximized: s.maximized === area ? null : area }));
+}

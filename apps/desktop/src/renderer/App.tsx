@@ -28,6 +28,7 @@ import {
   refreshSettings,
   setState,
   switchWorkspace,
+  updateChat,
   useStore,
 } from './store';
 import { t } from './i18n';
@@ -91,7 +92,15 @@ export function App() {
   const [winW, setWinW] = useState(window.innerWidth);
   const [panelH, setPanelH] = useState(260);
   const [terminalMounted, setTerminalMounted] = useState(false);
-  const chatWide = chatOpen && noTabs && !panelOpen;
+  const maxWanted = useStore((s) => s.maximized);
+  // Only an area that is showing can fill the window.
+  const max =
+    (maxWanted === 'side' && sidebar) ||
+    (maxWanted === 'panel' && panelOpen) ||
+    (maxWanted === 'editor' && !noTabs)
+      ? maxWanted
+      : null;
+  const chatWide = chatOpen && noTabs && !panelOpen && !max;
   // On a narrow window the side bar gives way first, then the chat, so the editor keeps
   // CENTER_MIN. The dragged widths are kept and come back when the window grows.
   const room = winW - 48 - CENTER_MIN;
@@ -156,6 +165,11 @@ export function App() {
     if (panelOpen) setTerminalMounted(true);
   }, [panelOpen]);
 
+  // The maximized area was closed: the next time it opens it comes back at its usual size.
+  useEffect(() => {
+    if (maxWanted && !max) setState({ maximized: null });
+  }, [maxWanted, max]);
+
   // Two chats side by side need room: widen the panel (the user can still drag it).
   useEffect(() => {
     if (chatSplit) setChatW((w) => Math.max(w, Math.min(760, window.innerWidth * 0.55)));
@@ -217,6 +231,9 @@ export function App() {
       if (ev.type === 'notice' && !noticeSeen(ev.id))
         setState({ notice: { id: ev.id, text: ev.text, url: ev.url } });
       if (ev.type === 'browser:show') openBrowserTab();
+      if (ev.type === 'chat:title')
+        for (const c of getState().chats)
+          if (c.conversationId === ev.conversationId) updateChat(c.id, { title: ev.title });
       // Another window changed models, keys, theme or preferences.
       if (ev.type === 'settings:changed')
         void (async () => {
@@ -231,9 +248,12 @@ export function App() {
     <div className="app">
       <div className="main-row">
         <ActivityBar />
-        {sidebar && (
+        {sidebar && (!max || max === 'side') && (
           <>
-            <aside className="sidebar" style={{ width: sideShown }}>
+            <aside
+              className="sidebar"
+              style={max === 'side' ? { flex: 1, borderRight: 'none' } : { width: sideShown }}
+            >
               {sidebar === 'explorer' ? (
                 <Explorer />
               ) : sidebar === 'git' ? (
@@ -250,6 +270,7 @@ export function App() {
                 <SearchView />
               )}
             </aside>
+            {!max && (
             <Sash
               dir="x"
               onDrag={(d) =>
@@ -260,22 +281,40 @@ export function App() {
                 })
               }
             />
+            )}
           </>
         )}
         {/* With no file open the chat takes the whole center, like a chat app. */}
-        <div className="center" style={chatWide ? { display: 'none' } : undefined}>
+        <div
+          className={max === 'panel' ? 'center center-max-panel' : 'center'}
+          style={chatWide || max === 'side' ? { display: 'none' } : undefined}
+        >
           <EditorArea />
           {terminalMounted && (
-            <div style={{ display: panelOpen ? 'flex' : 'none', flexDirection: 'column' }}>
-              <Sash dir="y" onDrag={(d) => setPanelH((h) => Math.min(800, Math.max(100, h - d)))} />
-              <div style={{ height: panelH }} className="panel-wrap">
+            <div
+              style={{
+                display: panelOpen && max !== 'editor' ? 'flex' : 'none',
+                flexDirection: 'column',
+                ...(max === 'panel' ? { flex: 1, minHeight: 0 } : {}),
+              }}
+            >
+              {!max && (
+                <Sash
+                  dir="y"
+                  onDrag={(d) => setPanelH((h) => Math.min(800, Math.max(100, h - d)))}
+                />
+              )}
+              <div
+                style={max === 'panel' ? { flex: 1, minHeight: 0 } : { height: panelH }}
+                className="panel-wrap"
+              >
                 <TerminalPanel />
               </div>
             </div>
           )}
         </div>
         {/* Kept mounted while hidden so the conversation survives toggling the panel. */}
-        {chatOpen && !chatWide && (
+        {chatOpen && !chatWide && !max && (
           <Sash
             dir="x"
             onDrag={(d) =>
@@ -289,7 +328,7 @@ export function App() {
         )}
         <aside
           className={chatWide ? 'chat-wrap chat-wide' : 'chat-wrap'}
-          style={{ width: chatWide ? undefined : chatShownW, display: chatOpen ? 'flex' : 'none' }}
+          style={{ width: chatWide ? undefined : chatShownW, display: chatOpen && !max ? 'flex' : 'none' }}
         >
           <ChatPanel />
         </aside>
