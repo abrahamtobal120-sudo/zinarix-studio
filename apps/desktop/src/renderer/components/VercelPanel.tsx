@@ -134,6 +134,13 @@ export function VercelPanel() {
     void api().vercel.status().then(setSt);
   }, []);
 
+  // Saved login but no answer (offline, startup): keep retrying instead of asking for a token.
+  useEffect(() => {
+    if (!st?.offline) return;
+    const id = setInterval(() => void api().vercel.status().then(setSt), 20_000);
+    return () => clearInterval(id);
+  }, [st?.offline]);
+
   // Project of the open folder: the `vercel link` file first, then a project picked here.
   useEffect(() => {
     setPick(null);
@@ -267,6 +274,25 @@ export function VercelPanel() {
         {title}
         <div className="git-clean">
           <Icon name="clock" size={13} className="spin-slow" /> {t('vcLoading')}
+        </div>
+      </div>
+    );
+  }
+
+  if (!st.connected && st.offline) {
+    return (
+      <div className="explorer">
+        {title}
+        <div className="sidebar-empty vc-connect">
+          <p>{t('svcOffline', { name: 'Vercel' })}</p>
+          <p className="vc-hint">{st.offline}</p>
+          <button
+            className="primary"
+            disabled={busy !== null}
+            onClick={() => void act('recheck', async () => setSt(await api().vercel.status()))}
+          >
+            {busy === 'recheck' ? '…' : t('svcRetry')}
+          </button>
         </div>
       </div>
     );

@@ -245,6 +245,13 @@ const TOOL_ICON: Record<string, IconName> = {
   file_hash: 'hash',
   list_ai_models: 'cpu',
   delegate_to_ai: 'users',
+  mail_folders: 'folder',
+  mail_list: 'mail',
+  mail_read: 'mail',
+  mail_mark: 'star',
+  mail_move: 'archive',
+  mail_save_draft: 'mail',
+  mail_send: 'send',
 };
 
 const STATUS_ICON: Record<ToolStep['status'], IconName> = {
@@ -291,6 +298,18 @@ function toolTitle(step: ToolStep): string {
       return '';
     case 'delegate_to_ai':
       return `${String(a.model ?? '')} · ${String(a.task ?? '').slice(0, 120)}`;
+    case 'mail_folders':
+      return '';
+    case 'mail_list':
+      return `${String(a.folder ?? 'INBOX')}${a.query ? ` · "${String(a.query)}"` : ''}`;
+    case 'mail_read':
+    case 'mail_mark':
+      return `${String(a.folder ?? 'INBOX')} #${String(a.uid ?? '')}`;
+    case 'mail_move':
+      return `${String(a.folder ?? 'INBOX')} #${String(a.uid ?? '')} → ${String(a.to ?? '')}`;
+    case 'mail_save_draft':
+    case 'mail_send':
+      return `${String(a.to ?? '')} · ${String(a.subject ?? '')}`;
     default:
       return String(a.path ?? '.');
   }

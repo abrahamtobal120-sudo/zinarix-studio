@@ -9,6 +9,7 @@ import { Icon } from './components/Icon';
 import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
+import { MailPanel } from './components/MailPanel';
 import { RunPanel } from './components/RunPanel';
 import { SupabasePanel } from './components/SupabasePanel';
 import { VercelPanel } from './components/VercelPanel';
@@ -243,6 +244,8 @@ export function App() {
                 <VercelPanel />
               ) : sidebar === 'supabase' ? (
                 <SupabasePanel />
+              ) : sidebar === 'mail' ? (
+                <MailPanel />
               ) : (
                 <SearchView />
               )}

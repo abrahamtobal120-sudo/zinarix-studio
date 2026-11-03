@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zinarix Studio Pro — Varias IAs trabajando a la vez para ti</title>
+    <meta
+      name="description"
+      content="Zinarix Studio Pro: chats ilimitados en paralelo, dos IAs lado a lado para comparar y varias ventanas, cada una con su proyecto. Pago único, actualizaciones incluidas."
+    />
+    <meta property="og:title" content="Zinarix Studio Pro" />
+    <meta
+      property="og:description"
+      content="Chats ilimitados en paralelo, comparación de IAs lado a lado y varias ventanas. Pago único."
+    />
+    <meta property="og:image" content="assets/logo-512.png" />
+    <meta name="theme-color" content="#070a18" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true">
+      <span class="blob b1"></span>
+      <span class="blob b2"></span>
+      <span class="blob b3"></span>
+      <div class="grid-overlay"></div>
+    </div>
+
+    <header class="nav" id="nav">
+      <a class="brand" href="/" aria-label="Zinarix Studio, inicio">
+        <img src="assets/logo.svg" alt="" width="34" height="34" />
+        <span>Zinarix <b>Studio</b></span>
+      </a>
+      <nav aria-label="Principal">
+        <a href="#beneficios">Beneficios</a>
+        <a href="#comparar">Comparar</a>
+        <a href="#faq">Preguntas</a>
+        <a class="btn btn-sm btn-primary buy-pro" href="#comprar">Obtener Pro</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <!-- HERO -->
+      <section class="hero sales-hero">
+        <div class="hero-copy">
+          <span class="badge"><span class="badge-dot"></span> Zinarix Studio Pro</span>
+          <h1>Pon a <span class="shine">varias IAs</span> a trabajar a la vez</h1>
+          <p class="lead">
+            Con Pro no esperas a que un modelo termine para empezar otra tarea:
+            <b>chats ilimitados en paralelo</b>, <b>dos IAs lado a lado</b> para comparar respuestas
+            y <b>varias ventanas</b>, cada una con su proyecto.
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary btn-lg buy-pro" id="buy-hero" href="#comprar"
+              >Obtener Pro · <span class="pro-price">US$29</span></a
+            >
+            <a class="btn btn-glass btn-lg" href="/#descargar">Probar gratis</a>
+          </div>
+          <ul class="trust">
+            <li>💳 <span class="pro-note">pago único · actualizaciones incluidas</span></li>
+            <li>🔑 Clave al instante</li>
+            <li>🔒 Pago seguro con Stripe</li>
+          </ul>
+        </div>
+        <div class="hero-visual">
+          <div class="window">
+            <div class="window-bar"><i></i><i></i><i></i><span>Zinarix Studio Pro</span></div>
+            <img
+              src="assets/screenshot-agent.png"
+              alt="Zinarix Studio con varios chats de IA trabajando"
+              width="1600"
+              height="932"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- BENEFITS -->
+      <section id="beneficios" class="section">
+        <div class="section-head reveal">
+          <span class="eyebrow">Lo que ganas</span>
+          <h2>Más trabajo hecho, en menos tiempo</h2>
+          <p>
+            El plan gratis ya trae el editor completo y el agente. Pro quita los límites para que
+            trabajes como un equipo, no como una fila.
+          </p>
+        </div>
+        <div class="bento">
+          <article class="card reveal glow-card">
+            <span class="icon">⚡</span>
+            <h3>Chats ilimitados en paralelo</h3>
+            <p>
+              Un agente arregla pruebas, otro escribe la documentación y otro investiga en la web,
+              <b>todo al mismo tiempo</b>. Sin el límite de <span class="free-chats">2</span> chats
+              del plan gratis.
+            </p>
+          </article>
+          <article class="card reveal glow-card" style="--d: 0.05s">
+            <span class="icon">⚖️</span>
+            <h3>Dos IAs lado a lado</h3>
+            <p>
+              Manda la misma pregunta a Claude y a GPT (o a un modelo local) y
+              <b>quédate con la mejor respuesta</b>. Ideal para elegir el modelo correcto y ahorrar.
+            </p>
+          </article>
+          <article class="card reveal glow-card" style="--d: 0.1s">
+            <span class="icon">🪟</span>
+            <h3>Varias ventanas</h3>
+            <p>
+              Abre cada proyecto en su propia ventana, con sus chats, su terminal y su agente.
+              <b>Cambia de proyecto sin perder el hilo.</b>
+            </p>
+          </article>
+          <article class="card span-2 reveal glow-card">
+            <div class="card-copy">
+              <span class="icon">💸</span>
+              <h3>Paga una vez, no cada mes</h3>
+              <p>
+                Nada de suscripciones: un <b>pago único</b> con actualizaciones incluidas. Sigues
+                usando tus propias llaves de IA (o modelos locales gratis), así que no pagas dos
+                veces por los mismos tokens.
+              </p>
+            </div>
+            <img
+              class="card-shot"
+              src="assets/screenshot-usage.png"
+              alt="Panel de consumo por proveedor"
+              loading="lazy"
+            />
+          </article>
+          <article class="card reveal glow-card" style="--d: 0.05s">
+            <span class="icon">🛡️</span>
+            <h3>Tú sigues al mando</h3>
+            <p>
+              Cada edición y cada comando del agente esperan tu aprobación, y con un clic reviertes
+              todo. Tus llaves quedan en el llavero de tu sistema.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- COMPARISON -->
+      <section id="comparar" class="section">
+        <div class="section-head reveal">
+          <span class="eyebrow">Comparar</span>
+          <h2>Gratis vs. Pro</h2>
+        </div>
+        <div class="compare reveal">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                <th scope="col">Gratis</th>
+                <th scope="col" class="pro-col">Pro</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Editor completo con 60+ proveedores y modelos locales</th>
+                <td>✓</td>
+                <td class="pro-col">✓</td>
+              </tr>
+              <tr>
+                <th scope="row">Modo agente: archivos, terminal y navegador</th>
+                <td>✓</td>
+                <td class="pro-col">✓</td>
+              </tr>
+              <tr>
+                <th scope="row">Una IA le pasa trabajo a otra</th>
+                <td>✓</td>
+                <td class="pro-col">✓</td>
+              </tr>
+              <tr>
+                <th scope="row">Chats trabajando a la vez</th>
+                <td><span class="free-chats">2</span></td>
+                <td class="pro-col"><b>Ilimitados</b></td>
+              </tr>
+              <tr>
+                <th scope="row">Dos chats a la par para comparar IAs</th>
+                <td>—</td>
+                <td class="pro-col">✓</td>
+              </tr>
+              <tr>
+                <th scope="row">Varias ventanas, cada una con su proyecto</th>
+                <td>—</td>
+                <td class="pro-col">✓</td>
+              </tr>
+              <tr>
+                <th scope="row">Precio</th>
+                <td>US$0</td>
+                <td class="pro-col"><b class="pro-price">US$29</b></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- BUY -->
+      <section id="comprar" class="section pricing">
+        <div class="plans single reveal">
+          <article class="plan pro">
+            <span class="plan-tag">Pago único</span>
+            <h3>Zinarix Studio Pro</h3>
+            <div class="price"><span class="pro-price">US$29</span></div>
+            <p class="muted small pro-note">pago único · actualizaciones incluidas</p>
+            <ul>
+              <li>Todo lo del plan gratis</li>
+              <li>Chats ilimitados trabajando en paralelo</li>
+              <li>Dos chats a la par para comparar IAs</li>
+              <li>Varias ventanas, cada una con su proyecto</li>
+              <li>Una clave para tus computadoras</li>
+            </ul>
+            <a class="btn btn-primary btn-lg buy-pro" id="buy-main" href="/#descargar"
+              >Descargar gratis</a
+            >
+            <p class="muted small" id="buy-note">Hoy Pro está incluido gratis para todos.</p>
+          </article>
+        </div>
+        <ol class="steps buy-steps reveal">
+          <li>
+            <span>1</span>
+            <h3>Paga con Stripe</h3>
+            <p>Tarjeta de crédito o débito, en un pago seguro.</p>
+          </li>
+          <li>
+            <span>2</span>
+            <h3>Recibe tu clave</h3>
+            <p>Aparece al instante en la página de confirmación.</p>
+          </li>
+          <li>
+            <span>3</span>
+            <h3>Actívala</h3>
+            <p>En Zinarix Studio: <b>Ayuda → Plan y licencia…</b>, pega la clave y listo.</p>
+          </li>
+        </ol>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq" class="section faq">
+        <div class="section-head reveal">
+          <span class="eyebrow">Preguntas</span>
+          <h2>Antes de comprar</h2>
+        </div>
+        <details class="reveal" open>
+          <summary>¿Es una suscripción?</summary>
+          <p>
+            No. Pagas una sola vez y las actualizaciones están incluidas. No hay cobros mensuales.
+          </p>
+        </details>
+        <details class="reveal">
+          <summary>¿Pro incluye los tokens de las IAs?</summary>
+          <p>
+            No: usas tus propias llaves y pagas directamente a cada proveedor lo que consumes, sin
+            sobreprecio. Con modelos locales (Ollama, LM Studio, vLLM) no pagas nada.
+          </p>
+        </details>
+        <details class="reveal">
+          <summary>¿Puedo probar antes de pagar?</summary>
+          <p>
+            Sí. Cada instalación trae <span class="trial-days">14</span> días de Pro gratis. Después
+            sigues con el plan gratis o activas tu clave Pro.
+          </p>
+        </details>
+        <details class="reveal">
+          <summary>¿En cuántas computadoras puedo usarlo?</summary>
+          <p>
+            La clave es para ti: actívala en tus computadoras (Windows, macOS y Linux) desde
+            <b>Ayuda → Plan y licencia…</b>
+          </p>
+        </details>
+        <details class="reveal">
+          <summary>Perdí mi clave, ¿qué hago?</summary>
+          <p>
+            Vuelve a abrir el enlace de confirmación de tu compra para verla de nuevo, o escríbenos
+            al correo de soporte de tu recibo de Stripe con tu número de recibo.
+          </p>
+        </details>
+      </section>
+
+      <!-- FINAL CTA -->
+      <section class="final reveal">
+        <img src="assets/logo.svg" alt="" width="90" height="90" />
+        <h2>Trabaja con todas tus IAs a la vez</h2>
+        <p><span class="pro-price">US$29</span> · <span class="pro-note">pago único</span></p>
+        <a class="btn btn-light btn-lg buy-pro" href="#comprar">Obtener Zinarix Studio Pro</a>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="brand">
+        <img src="assets/logo.svg" alt="" width="26" height="26" /> Zinarix Studio
+      </div>
+      <span class="muted">Código abierto · Licencia MIT · Hecho con ❤️ en México</span>
+      <a href="/">Inicio</a>
+    </footer>
+    <script src="pro.js" defer></script>
+  </body>
+</html>

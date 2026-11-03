@@ -65,6 +65,9 @@ export function ActivityBar() {
       {item(sidebar === 'supabase', 'Supabase', 'supabase', () =>
         setState({ sidebar: sidebar === 'supabase' ? null : 'supabase' }),
       )}
+      {item(sidebar === 'mail', t('mlTitle'), 'mail', () =>
+        setState({ sidebar: sidebar === 'mail' ? null : 'mail' }),
+      )}
       {item(chatOpen, t('chat'), 'sparkles', () => setState({ chatOpen: !chatOpen }))}
       {item(panelOpen, t('terminal'), 'terminal', () => setState({ panelOpen: !panelOpen }))}
       {item(browserActive, t('browser'), 'globe', () => {

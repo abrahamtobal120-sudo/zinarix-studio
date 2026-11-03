@@ -11,6 +11,7 @@ import { AiService } from './ai.js';
 import type { Scope } from './ai.js';
 import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName } from './git.js';
 import { BrowserController } from './browser.js';
+import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
 import { Vercel, linkedProject } from './vercel.js';
 import { isOwnerCode, licenseStatus, normalizeKey, parseLicense } from './license.js';
@@ -518,6 +519,79 @@ function registerIpc(): void {
     ]),
     (_w, p, t, patch) => vercel.updateSettings(p, t, patch),
   );
+  const mail = new Mail(app.getPath('userData'));
+  ai.agent.mail = mail;
+  const box = z.string().min(1).max(1000);
+  const uid = z.number().int().positive();
+  const host = z.string().trim().min(1).max(253);
+  const port = z.number().int().min(1).max(65535);
+  handle('mail:status', z.tuple([]), () => mail.status());
+  handle('mail:preset', z.tuple([z.string().max(320)]), (_w, e) => mail.preset(e));
+  handle(
+    'mail:connect',
+    z.tuple([
+      z.object({
+        email: z.string().trim().email().max(320),
+        name: z.string().trim().max(200).optional(),
+        user: z.string().trim().min(1).max(320),
+        imapHost: host,
+        imapPort: port,
+        smtpHost: host,
+        smtpPort: port,
+      }),
+      z.string().min(1).max(1000),
+    ]),
+    (_w, acc, pass) => mail.connect(acc, pass),
+  );
+  handle('mail:logout', z.tuple([]), () => mail.logout());
+  handle('mail:folders', z.tuple([]), () => mail.folders());
+  handle(
+    'mail:list',
+    z.tuple([box, z.number().int().min(0).max(100_000), z.string().max(200)]),
+    (_w, f, p, q) => mail.list(f, p, q),
+  );
+  handle('mail:open', z.tuple([box, uid]), (_w, f, u) => mail.open(f, u));
+  handle(
+    'mail:setFlag',
+    z.tuple([box, uid, z.enum(['seen', 'flagged']), z.boolean()]),
+    (_w, f, u, flag, on) => mail.setFlag(f, u, flag, on),
+  );
+  handle('mail:trash', z.tuple([box, uid]), (_w, f, u) => mail.trash(f, u));
+  const draft = z.object({
+    to: z.string().max(5000),
+    cc: z.string().max(5000).optional(),
+    subject: z.string().max(1000),
+    text: z.string().max(2_000_000),
+    inReplyTo: z.string().max(1000).nullable().optional(),
+    references: z.array(z.string().max(1000)).max(200).optional(),
+    draftUid: uid.nullable().optional(),
+  });
+  handle(
+    'mail:move',
+    z.tuple([box, uid, z.enum(['inbox', 'junk', 'trash', 'archive'])]),
+    (_w, f, u, to) => mail.move(f, u, to),
+  );
+  handle(
+    'mail:send',
+    z.tuple([draft.extend({ to: z.string().trim().min(3).max(5000) })]),
+    (_w, d) => mail.send(d),
+  );
+  handle('mail:saveDraft', z.tuple([draft]), (_w, d) => mail.saveDraft(d));
+  handle('mail:deleteDraft', z.tuple([uid]), (_w, u) => mail.deleteDraft(u));
+  handle(
+    'mail:saveAttachment',
+    z.tuple([box, uid, z.number().int().min(0)]),
+    async (w, f, u, i) => {
+      const a = mail.attachment(f, u, i);
+      const r = await dialog.showSaveDialog(w.win, {
+        defaultPath: join(app.getPath('downloads'), basename(a.filename)),
+      });
+      if (r.canceled || !r.filePath) return null;
+      writeFileSync(r.filePath, a.content);
+      return r.filePath;
+    },
+  );
+
   const supabase = new Supabase(app.getPath('userData'));
   const ref = z.string().min(1).max(40);
   const pgName = z.string().min(1).max(128);
@@ -612,7 +686,14 @@ function registerIpc(): void {
     'supabase:setEmailTemplate',
     z.tuple([
       ref,
-      z.enum(['confirmation', 'invite', 'magic_link', 'recovery', 'email_change', 'reauthentication']),
+      z.enum([
+        'confirmation',
+        'invite',
+        'magic_link',
+        'recovery',
+        'email_change',
+        'reauthentication',
+      ]),
       z.string().max(1000),
       z.string().max(200_000),
     ]),

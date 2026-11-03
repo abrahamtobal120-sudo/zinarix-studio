@@ -243,6 +243,13 @@ export function SupabasePanel() {
     void api().supabase.status().then(setSt);
   }, []);
 
+  // Saved login but no answer (offline, startup): keep retrying instead of asking for a token.
+  useEffect(() => {
+    if (!st?.offline) return;
+    const id = setInterval(() => void api().supabase.status().then(setSt), 20_000);
+    return () => clearInterval(id);
+  }, [st?.offline]);
+
   // Project of the open folder: the `supabase link` file first, then a project picked here.
   useEffect(() => {
     setRef(null);
@@ -542,6 +549,25 @@ export function SupabasePanel() {
         {title}
         <div className="git-clean">
           <Icon name="clock" size={13} className="spin-slow" /> {t('sbLoading')}
+        </div>
+      </div>
+    );
+  }
+
+  if (!st.connected && st.offline) {
+    return (
+      <div className="explorer">
+        {title}
+        <div className="sidebar-empty vc-connect">
+          <p>{t('svcOffline', { name: 'Supabase' })}</p>
+          <p className="vc-hint">{st.offline}</p>
+          <button
+            className="primary"
+            disabled={busy !== null}
+            onClick={() => void act('recheck', async () => setSt(await api().supabase.status()))}
+          >
+            {busy === 'recheck' ? '…' : t('svcRetry')}
+          </button>
         </div>
       </div>
     );
@@ -1123,6 +1149,11 @@ export function SupabasePanel() {
               )}
               {emailCfg && (
                 <>
+                  <div className="git-connect-actions ml-open-inbox">
+                    <button onClick={() => setState({ sidebar: 'mail' })}>
+                      <Icon name="mail" size={14} /> {t('mlOpenInbox')}
+                    </button>
+                  </div>
                   <div className="git-group">
                     <span>{t('sbMailSend')}</span>
                   </div>

@@ -37,11 +37,32 @@ export function openLocal(dir: string, data: Buffer): string {
   return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString('utf8');
 }
 
+/** The OS keychain entry, read directly (a failed probe at startup must not hide a saved token). */
+function fromKeychain(account: string): string | null {
+  try {
+    return new Entry(SERVICE, account).getPassword() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Writes to the OS keychain and reads it back (a locked or broken keychain may accept and drop it). */
+function toKeychain(account: string, token: string): boolean {
+  try {
+    new Entry(SERVICE, account).setPassword(token);
+    return fromKeychain(account) === token;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * One service token kept by the app, in the best store the system offers, picked
- * automatically: Electron safeStorage (encrypted into `file`), else the OS keychain directly
- * (Secret Service / Keychain / Credential Manager; e.g. KDE without KWallet but with
- * gnome-keyring), else a locally encrypted file (`file.local`).
+ * automatically: the OS keychain (Secret Service / Keychain / Credential Manager), else
+ * Electron safeStorage (encrypted into `file`), else a locally encrypted file (`file.local`).
+ * The keychain goes first because on Linux safeStorage depends on which wallet answers at
+ * startup (KWallet one day, none the next), and a token sealed by one can't be opened later.
+ * Reads try every store, so tokens saved by older versions keep working.
  */
 export class TokenStore {
   private readonly localFile: string;
@@ -54,19 +75,13 @@ export class TokenStore {
   }
 
   get(): string | null {
+    const v = fromKeychain(this.account);
+    if (v) return v;
     if (existsSync(this.file) && safeStorage.isEncryptionAvailable()) {
       try {
         return safeStorage.decryptString(readFileSync(this.file));
       } catch {
-        /* keychain changed: try the other stores */
-      }
-    }
-    if (keychain.available()) {
-      try {
-        const v = new Entry(SERVICE, this.account).getPassword();
-        if (v) return v;
-      } catch {
-        /* nothing stored there */
+        /* sealed by another wallet: try the local file */
       }
     }
     if (existsSync(this.localFile)) {
@@ -81,17 +96,10 @@ export class TokenStore {
 
   set(token: string): void {
     this.delete();
+    if (keychain.available() && toKeychain(this.account, token)) return;
     if (safeStorage.isEncryptionAvailable()) {
       writeFileSync(this.file, safeStorage.encryptString(token), { mode: 0o600 });
       return;
-    }
-    if (keychain.available()) {
-      try {
-        new Entry(SERVICE, this.account).setPassword(token);
-        return;
-      } catch {
-        /* keychain refused: fall back to the local file */
-      }
     }
     writeFileSync(this.localFile, sealLocal(dirname(this.file), token), { mode: 0o600 });
   }
@@ -99,7 +107,6 @@ export class TokenStore {
   delete(): void {
     rmSync(this.file, { force: true });
     rmSync(this.localFile, { force: true });
-    if (!keychain.available()) return;
     try {
       new Entry(SERVICE, this.account).deletePassword();
     } catch {

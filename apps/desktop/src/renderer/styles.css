@@ -6709,3 +6709,204 @@ button.primary:hover,
 .sb-grid-meta .link {
   font-size: 11px;
 }
+
+/* Mail panel */
+.ml-connect input {
+  text-align: left;
+}
+.ml-servers {
+  display: flex;
+  flex-direction: column;
+}
+.ml-hostport {
+  display: flex;
+  gap: 6px;
+}
+.ml-hostport input:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.ml-hostport input:last-child {
+  width: 70px;
+  flex: 0 0 auto;
+}
+.ml-open-inbox {
+  padding: 6px 10px 2px 12px;
+}
+.ml-folders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 10px 8px 12px;
+}
+.ml-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+.ml-folder:hover {
+  background: var(--hover);
+  color: var(--fg-strong);
+}
+.ml-folder.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.ml-folder-icon {
+  font-size: 11px;
+}
+.ml-folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ml-folder-count {
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--hover);
+  color: var(--fg-strong);
+  font-size: 10px;
+  font-weight: 600;
+}
+.ml-folder.active .ml-folder-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: inherit;
+}
+.ml-row {
+  padding: 5px 10px 5px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.ml-row:hover {
+  background: var(--hover);
+}
+.ml-row.busy {
+  opacity: 0.6;
+}
+.ml-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ml-from {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ml-date {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.ml-star {
+  color: #f5a524;
+}
+.ml-subj {
+  font-size: 12px;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ml-row.unread .ml-from,
+.ml-row.unread .ml-subj {
+  font-weight: 600;
+  color: var(--fg-strong);
+}
+.ml-row.unread .ml-from::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent, #4c8dff);
+  vertical-align: middle;
+}
+.ml-actions {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+.ml-actions button {
+  background: transparent;
+  padding: 2px 5px;
+  flex: 0 0 auto;
+}
+.ml-head {
+  padding: 6px 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.ml-subject {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+.ml-meta {
+  font-size: 11px;
+  color: var(--fg-dim);
+  word-break: break-word;
+}
+.ml-meta strong {
+  color: var(--fg);
+}
+.ml-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.ml-attachments button {
+  font-size: 11px;
+  padding: 2px 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ml-body {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+.ml-text {
+  background: transparent;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+}
+.ml-note {
+  font-size: 10px;
+  color: var(--fg-dim);
+  padding: 3px 12px;
+  border-top: 1px solid var(--border);
+}
+.ml-compose {
+  flex: 1;
+  min-height: 0;
+}
+.ml-compose textarea {
+  flex: 1;
+  min-height: 160px;
+  font-family: inherit;
+  font-size: 13px;
+}

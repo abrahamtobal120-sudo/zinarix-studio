@@ -24,6 +24,15 @@ import { isSecretFile, protectedWrite } from './guard.js';
 
 export { globToRegExp };
 import type { Workspace } from './workspace.js';
+import type { Mail } from './mail.js';
+import {
+  MAIL_PROMPT_PART,
+  MAIL_READ_ONLY,
+  MAIL_TOOL_NAMES,
+  MAIL_TOOLS,
+  mailPreview,
+  runMailTool,
+} from './mailTools.js';
 import {
   SYSTEM_PROMPT_PART,
   SYSTEM_TOOLS,
@@ -79,6 +88,7 @@ You can inspect and change the project with tools:
 - edit_file (exact string replacement) and write_file (new or fully rewritten file): the user approves every change.
 - run_command: runs a shell command in the workspace (tests, builds, git, package managers). The user approves every command; prefer non-interactive flags.
 - browser_open, browser_read, browser_click, browser_type, browser_scroll, browser_back: a real web browser the user can watch (this conversation has its own browser tab). Use it to read documentation, check a local dev server (e.g. http://localhost:3000) or follow web steps the user asks for. browser_read returns the page text and numbered interactive elements; use those numbers as "ref". Opening a site, clicking and typing need the user's approval per site. Never enter passwords, payment data or personal data; ask the user to do that.
+${MAIL_PROMPT_PART}
 - list_ai_models and delegate_to_ai: other AI models connected in Zinarix Studio can work for you as helpers (e.g. a second opinion, a cheaper model for a long chore, a model with a skill you lack). The user approves every delegation and every action the helper takes. Give the helper a complete, self-contained task; it does not see this conversation.
 ${SYSTEM_PROMPT_PART}
 ${SECURITY_PROMPT_PART}
@@ -266,6 +276,7 @@ export const TOOLS: ToolDefinition[] = [
     description: 'Go back to the previous page in the browser.',
     parameters: { type: 'object', properties: {} },
   },
+  ...MAIL_TOOLS,
   ...SYSTEM_TOOLS,
   ...SECURITY_TOOLS,
 ];
@@ -307,6 +318,7 @@ const CLI_TOOL_NAMES = new Set([
   'browser_type',
   'browser_scroll',
   'browser_back',
+  ...MAIL_TOOL_NAMES,
   'list_ai_models',
   'delegate_to_ai',
 ]);
@@ -328,6 +340,7 @@ const READ_ONLY = new Set([
   'search',
   'security_scan_project',
   'list_ai_models',
+  ...MAIL_READ_ONLY,
 ]);
 
 /**
@@ -600,6 +613,9 @@ export class Agent {
   private readonly sessions = new Map<string, Session>();
   /** Conversations with a run in progress (never trimmed). */
   private readonly active = new Set<string>();
+
+  /** The user's mailbox (mail_* tools), set once the app has it. */
+  mail?: Mail;
 
   constructor(
     private readonly core: OmniCore,
@@ -1051,6 +1067,7 @@ export class Agent {
         !ws &&
         !call.name.startsWith('browser_') &&
         !NO_FOLDER.has(call.name) &&
+        !MAIL_TOOL_NAMES.has(call.name) &&
         !SYSTEM_TOOL_NAMES.has(call.name) &&
         !SECURITY_NO_PROJECT.has(call.name)
       )
@@ -1065,9 +1082,11 @@ export class Agent {
         ? await systemPreview(call.name, a)
         : SECURITY_APPROVAL.has(call.name)
           ? securityPreview(call.name, a)
-          : call.name === 'run_command'
-            ? commandWarning(a, ws?.root)
-            : null;
+          : MAIL_TOOL_NAMES.has(call.name)
+            ? mailPreview(call.name, a)
+            : call.name === 'run_command'
+              ? commandWarning(a, ws?.root)
+              : null;
       if (sys) {
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));
@@ -1168,6 +1187,12 @@ export class Agent {
         );
         tab.setGuard((site) => site === here || browserSiteAllowed(s, site));
         tab.takeBlocked();
+      }
+
+      if (MAIL_TOOL_NAMES.has(call.name)) {
+        if (!this.mail) return finish(false, 'Email is not available.', 'sin correo');
+        const r = await runMailTool(this.mail, call.name, a);
+        return finish(true, r.content, r.summary);
       }
 
       if (call.name === 'list_ai_models') {

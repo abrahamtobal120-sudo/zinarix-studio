@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { TokenStore } from './token-store.js';
@@ -15,6 +15,9 @@ import type {
 const API = 'https://api.vercel.com';
 const MAX_LOG = 400_000;
 
+/** The service refused the token (as opposed to a network or server failure). */
+class AuthError extends Error {}
+
 /** Where the Vercel CLI keeps its login (`vercel login`), per platform. */
 function cliAuthFiles(): string[] {
   const home = homedir();
@@ -29,16 +32,82 @@ function cliAuthFiles(): string[] {
   ];
 }
 
-function cliToken(): string | null {
-  for (const f of cliAuthFiles()) {
+interface CliAuth {
+  token?: unknown;
+  refreshToken?: unknown;
+  /** Seconds since the epoch. */
+  expiresAt?: unknown;
+  dpop?: unknown;
+}
+
+function cliAuth(): { file: string; auth: CliAuth } | null {
+  for (const file of cliAuthFiles()) {
     try {
-      const t = (JSON.parse(readFileSync(f, 'utf8')) as { token?: unknown }).token;
-      if (typeof t === 'string' && t) return t;
+      const auth = JSON.parse(readFileSync(file, 'utf8')) as CliAuth;
+      if (typeof auth.token === 'string' && auth.token) return { file, auth };
     } catch {
       /* missing or unreadable */
     }
   }
   return null;
+}
+
+/** OAuth client of the Vercel CLI: its logins last hours and are renewed with the refresh token. */
+const CLI_CLIENT_ID = 'cl_HYyOPBNtFMfHhaUn9L4QPfTZz6TP47bp';
+const TOKEN_URL = 'https://api.vercel.com/login/oauth/token';
+
+let renewing: Promise<string | null> | null = null;
+
+/**
+ * Renews the CLI login like the CLI does and writes it back to its auth.json (the refresh token
+ * rotates, so the CLI has to get the new one too). null: there is nothing to renew with.
+ */
+function renewCli(): Promise<string | null> {
+  renewing ??= (async () => {
+    const found = cliAuth();
+    const refresh = found?.auth.refreshToken;
+    // Logins bound to a DPoP key need that key to renew: only the CLI can do it.
+    if (!found || typeof refresh !== 'string' || !refresh || found.auth.dpop) return null;
+    const r = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: CLI_CLIENT_ID,
+        grant_type: 'refresh_token',
+        refresh_token: refresh,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as {
+      access_token?: unknown;
+      refresh_token?: unknown;
+      expires_in?: unknown;
+    };
+    if (typeof j.access_token !== 'string' || !j.access_token) return null;
+    const auth: CliAuth = {
+      ...found.auth,
+      token: j.access_token,
+      refreshToken: typeof j.refresh_token === 'string' ? j.refresh_token : refresh,
+      expiresAt:
+        Math.floor(Date.now() / 1000) + (typeof j.expires_in === 'number' ? j.expires_in : 3600),
+    };
+    writeFileSync(found.file, `${JSON.stringify(auth, null, 2)}\n`, { mode: 0o600 });
+    return j.access_token;
+  })()
+    .catch(() => null)
+    .finally(() => (renewing = null));
+  return renewing;
+}
+
+/** The CLI login, renewed first when it is about to expire. */
+async function cliToken(): Promise<string | null> {
+  const found = cliAuth();
+  if (!found) return null;
+  const exp = found.auth.expiresAt;
+  if (typeof exp === 'number' && exp * 1000 < Date.now() + 60_000)
+    return (await renewCli()) ?? (found.auth.token as string);
+  return found.auth.token as string;
 }
 
 function cliInstalled(): Promise<boolean> {
@@ -91,10 +160,10 @@ export class Vercel {
     return new TokenStore(join(this.dir, 'vercel-token.bin'), 'vercel');
   }
 
-  private token(): { token: string; source: 'app' | 'cli' } | null {
+  private async token(): Promise<{ token: string; source: 'app' | 'cli' } | null> {
     const saved = this.store.get();
     if (saved) return { token: saved, source: 'app' };
-    const t = cliToken();
+    const t = await cliToken();
     return t ? { token: t, source: 'cli' } : null;
   }
 
@@ -103,19 +172,26 @@ export class Vercel {
     teamId: string | null,
     init: { method?: string; body?: unknown; text?: boolean } = {},
   ): Promise<T> {
-    const tok = this.token();
+    const tok = await this.token();
     if (!tok) throw new Error('Conecta tu cuenta de Vercel primero.');
     const url = new URL(path, API);
     if (teamId) url.searchParams.set('teamId', checkId(teamId));
-    const r = await fetch(url, {
-      method: init.method ?? 'GET',
-      headers: {
-        Authorization: `Bearer ${tok.token}`,
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      },
-      body: init.body ? JSON.stringify(init.body) : undefined,
-      signal: AbortSignal.timeout(30_000),
-    });
+    const call = (token: string) =>
+      fetch(url, {
+        method: init.method ?? 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        body: init.body ? JSON.stringify(init.body) : undefined,
+        signal: AbortSignal.timeout(30_000),
+      });
+    let r = await call(tok.token);
+    // The CLI login expired before its date: renew it once and retry.
+    if (r.status === 401 && tok.source === 'cli') {
+      const fresh = await renewCli();
+      if (fresh) r = await call(fresh);
+    }
     if (!r.ok) {
       let msg = `${r.status} ${r.statusText}`;
       try {
@@ -125,7 +201,7 @@ export class Vercel {
         /* not JSON */
       }
       if (r.status === 401 || r.status === 403)
-        msg = `Vercel rechazó el token (${msg}). Vuelve a conectar tu cuenta.`;
+        throw new AuthError(`Vercel rechazó el token (${msg}). Vuelve a conectar tu cuenta.`);
       throw new Error(msg);
     }
     const body = await r.text();
@@ -135,7 +211,7 @@ export class Vercel {
 
   async status(): Promise<VercelStatus> {
     this.cli ??= await cliInstalled();
-    const tok = this.token();
+    const tok = await this.token();
     const base: VercelStatus = {
       connected: false,
       source: null,
@@ -145,7 +221,14 @@ export class Vercel {
     };
     if (!tok) return base;
     try {
-      const { user } = await this.req<{ user: { username: string } }>('/v2/user', null);
+      // A network hiccup (e.g. right after startup) gets a second try before giving up.
+      const { user } = await this.req<{ user: { username: string } }>('/v2/user', null).catch(
+        async (e: unknown) => {
+          if (e instanceof AuthError) throw e;
+          await new Promise((r) => setTimeout(r, 2000));
+          return this.req<{ user: { username: string } }>('/v2/user', null);
+        },
+      );
       const { teams } = await this.req<{ teams: { id: string; name: string; slug: string }[] }>(
         '/v2/teams?limit=50',
         null,
@@ -157,8 +240,10 @@ export class Vercel {
         user: user.username,
         teams: teams.map((t) => ({ id: t.id, name: t.name || t.slug, slug: t.slug })),
       };
-    } catch {
-      return { ...base, source: tok.source };
+    } catch (e) {
+      // Not reachable is not logged out: the token stays and the panel retries.
+      if (e instanceof AuthError) return { ...base, source: tok.source };
+      return { ...base, source: tok.source, offline: (e as Error).message || String(e) };
     }
   }
 

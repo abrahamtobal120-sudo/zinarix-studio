@@ -64,7 +64,7 @@ export interface State {
   workspace: WorkspaceInfo | null;
   tabs: Tab[];
   active: string | null;
-  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | null;
+  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | 'mail' | null;
   panelOpen: boolean;
   chatOpen: boolean;
   modal: Modal | null;

@@ -64,6 +64,9 @@ where c.relkind in ('r', 'p') and n.nspname not like 'pg\\_%'
   and n.nspname not in (${SYSTEM_SCHEMAS.map((s) => `'${s}'`).join(', ')})
 order by 1, 2`;
 
+/** The service refused the token (as opposed to a network or server failure). */
+class AuthError extends Error {}
+
 /** Where the Supabase CLI keeps its login (`supabase login`) when there is no keychain. */
 function cliToken(): string | null {
   const env = process.env.SUPABASE_ACCESS_TOKEN;
@@ -146,7 +149,7 @@ export class Supabase {
         if (text.trim()) msg = text.trim().slice(0, 500);
       }
       if (r.status === 401)
-        msg = `Supabase rechazó el token (${msg}). Vuelve a conectar tu cuenta.`;
+        throw new AuthError(`Supabase rechazó el token (${msg}). Vuelve a conectar tu cuenta.`);
       throw new Error(msg);
     }
     return (text ? JSON.parse(text) : null) as T;
@@ -158,15 +161,24 @@ export class Supabase {
     const base: SupabaseStatus = { connected: false, source: null, orgs: [], cli: this.cli };
     if (!tok) return base;
     try {
-      const orgs = await this.req<{ id: string; name: string }[]>('/v1/organizations');
+      // A network hiccup (e.g. right after startup) gets a second try before giving up.
+      const orgs = await this.req<{ id: string; name: string }[]>('/v1/organizations').catch(
+        async (e: unknown) => {
+          if (e instanceof AuthError) throw e;
+          await new Promise((r) => setTimeout(r, 2000));
+          return this.req<{ id: string; name: string }[]>('/v1/organizations');
+        },
+      );
       return {
         ...base,
         connected: true,
         source: tok.source,
         orgs: orgs.map((o) => ({ id: o.id, name: o.name })),
       };
-    } catch {
-      return { ...base, source: tok.source };
+    } catch (e) {
+      // Not reachable is not logged out: the token stays and the panel retries.
+      if (e instanceof AuthError) return { ...base, source: tok.source };
+      return { ...base, source: tok.source, offline: (e as Error).message || String(e) };
     }
   }
 
@@ -554,7 +566,11 @@ from auth.users order by created_at desc limit 200`,
       const text = await r.text();
       let msg = `${r.status} ${r.statusText}`;
       try {
-        const e = JSON.parse(text) as { msg?: string; message?: string; error_description?: string };
+        const e = JSON.parse(text) as {
+          msg?: string;
+          message?: string;
+          error_description?: string;
+        };
         msg = e.msg || e.message || e.error_description || msg;
       } catch {
         if (text.trim()) msg = text.trim().slice(0, 500);

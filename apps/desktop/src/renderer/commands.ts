@@ -183,6 +183,11 @@ function baseCommands(): Command[] {
       run: () => setState((s) => ({ sidebar: s.sidebar === 'supabase' ? null : 'supabase' })),
     },
     {
+      id: 'view.mail',
+      label: t('mlTitle'),
+      run: () => setState((s) => ({ sidebar: s.sidebar === 'mail' ? null : 'mail' })),
+    },
+    {
       id: 'view.terminal',
       label: t('cmdToggle', { what: t('terminal').toLowerCase() }),
       keys: 'Ctrl+`',

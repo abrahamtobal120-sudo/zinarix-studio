@@ -261,6 +261,8 @@ export interface VercelStatus {
   teams: { id: string; name: string; slug: string }[];
   /** Vercel CLI on PATH (deploys run in the terminal). */
   cli: boolean;
+  /** The token is kept but the service could not be reached (why); the panel retries. */
+  offline?: string;
 }
 export interface VercelProjectView {
   id: string;
@@ -306,6 +308,71 @@ export interface VercelSettings {
   nodeVersion: string | null;
 }
 
+export interface MailAccount {
+  email: string;
+  /** Sender name shown to recipients (optional). */
+  name?: string;
+  /** Login user (usually the email itself). */
+  user: string;
+  imapHost: string;
+  imapPort: number;
+  smtpHost: string;
+  smtpPort: number;
+}
+export interface MailStatus {
+  connected: boolean;
+  account: MailAccount | null;
+}
+export interface MailFolderView {
+  path: string;
+  name: string;
+  /** \Inbox, \Sent, \Trash, \Junk, \Drafts, \Archive… (null for ordinary folders). */
+  specialUse: string | null;
+  unseen: number;
+  messages: number;
+}
+export interface MailSummaryView {
+  uid: number;
+  from: string;
+  to: string;
+  subject: string;
+  date: number;
+  seen: boolean;
+  flagged: boolean;
+  attachments: boolean;
+}
+export interface MailListView {
+  total: number;
+  messages: MailSummaryView[];
+}
+export interface MailMessageView {
+  uid: number;
+  messageId: string | null;
+  references: string[];
+  from: string;
+  replyTo: string;
+  to: string;
+  cc: string;
+  subject: string;
+  date: number;
+  /** HTML body (inline images embedded); null for plain-text mail. */
+  html: string | null;
+  text: string;
+  attachments: { index: number; filename: string; size: number; contentType: string }[];
+}
+export interface MailDraft {
+  to: string;
+  cc?: string;
+  subject: string;
+  text: string;
+  inReplyTo?: string | null;
+  references?: string[];
+  /** UID in the Drafts folder this draft was opened from (replaced on save, removed on send). */
+  draftUid?: number | null;
+}
+/** Where `mail.move` puts a message: special folders, found by their IMAP role. */
+export type MailTarget = 'inbox' | 'junk' | 'trash' | 'archive';
+
 export interface SupabaseStatus {
   connected: boolean;
   /** Where the token came from: pasted in the app, or the Supabase CLI login on this machine. */
@@ -313,6 +380,8 @@ export interface SupabaseStatus {
   orgs: { id: string; name: string }[];
   /** Supabase CLI on PATH (migrations and functions run in the terminal). */
   cli: boolean;
+  /** The token is kept but the service could not be reached (why); the panel retries. */
+  offline?: string;
 }
 export interface SupabaseProjectView {
   ref: string;
@@ -387,12 +456,7 @@ export interface SupabaseAuthConfig {
 }
 /** Auth emails Supabase sends; each has a subject and an HTML template. */
 export type SupabaseEmailKind =
-  | 'confirmation'
-  | 'invite'
-  | 'magic_link'
-  | 'recovery'
-  | 'email_change'
-  | 'reauthentication';
+  'confirmation' | 'invite' | 'magic_link' | 'recovery' | 'email_change' | 'reauthentication';
 export interface SupabaseSmtpConfig {
   host: string;
   port: string;
@@ -738,6 +802,30 @@ export interface OmniApi {
       patch: Partial<VercelSettings>,
     ): Promise<void>;
   };
+  mail: {
+    status(): Promise<MailStatus>;
+    /** IMAP/SMTP servers of a known provider for this address (null when unknown). */
+    preset(email: string): Promise<MailAccount | null>;
+    /** Checks both servers, then saves the account (password in the OS keychain). */
+    connect(account: MailAccount, password: string): Promise<MailStatus>;
+    logout(): Promise<MailStatus>;
+    folders(): Promise<MailFolderView[]>;
+    /** Page 0 = newest messages; `query` searches sender, recipient and subject. */
+    list(folder: string, page: number, query: string): Promise<MailListView>;
+    /** Downloads the message and marks it read. */
+    open(folder: string, uid: number): Promise<MailMessageView>;
+    setFlag(folder: string, uid: number, flag: 'seen' | 'flagged', on: boolean): Promise<void>;
+    trash(folder: string, uid: number): Promise<void>;
+    /** Moves a message to the inbox, spam, trash or archive. */
+    move(folder: string, uid: number, to: MailTarget): Promise<void>;
+    send(draft: MailDraft): Promise<void>;
+    /** Saves the draft in the Drafts folder (replacing `draftUid`); returns its new UID if known. */
+    saveDraft(draft: MailDraft): Promise<number | null>;
+    /** Deletes a saved draft for good. */
+    deleteDraft(uid: number): Promise<void>;
+    /** Asks where to save an attachment of the open message. Returns the path (null: cancelled). */
+    saveAttachment(folder: string, uid: number, index: number): Promise<string | null>;
+  };
   supabase: {
     status(): Promise<SupabaseStatus>;
     /** Saves a personal access token (encrypted with the OS keychain). */
@@ -960,6 +1048,20 @@ export const CHANNELS = [
   'vercel:verifyDomain',
   'vercel:settings',
   'vercel:updateSettings',
+  'mail:status',
+  'mail:preset',
+  'mail:connect',
+  'mail:logout',
+  'mail:folders',
+  'mail:list',
+  'mail:open',
+  'mail:setFlag',
+  'mail:trash',
+  'mail:move',
+  'mail:saveDraft',
+  'mail:deleteDraft',
+  'mail:send',
+  'mail:saveAttachment',
   'supabase:status',
   'supabase:setToken',
   'supabase:logout',
