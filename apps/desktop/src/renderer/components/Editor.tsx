@@ -14,6 +14,7 @@ import {
   getDoc,
   getState,
   setState,
+  toggleMaximized,
   useStore,
 } from '../store';
 import { BrowserPane } from './Browser';
@@ -34,6 +35,7 @@ function prefOptions(p: Prefs): monaco.editor.IEditorOptions {
 export function EditorArea() {
   const prefs = useStore((s) => s.prefs);
   const tabs = useStore((s) => s.tabs);
+  const maximized = useStore((s) => s.maximized === 'editor');
   const active = useStore((s) => s.active);
   const host = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -140,6 +142,15 @@ export function EditorArea() {
               </button>
             </div>
           ))}
+          <div className="spacer" />
+          <button
+            className={`max-btn ${maximized ? 'on' : ''}`}
+            title={maximized ? t('restoreSize') : t('maximize')}
+            aria-label={maximized ? t('restoreSize') : t('maximize')}
+            onClick={() => toggleMaximized('editor')}
+          >
+            <Icon name={maximized ? 'minimize' : 'maximize'} size={14} />
+          </button>
         </div>
       )}
       {activeTab && !isBrowser && !isSecurity && (

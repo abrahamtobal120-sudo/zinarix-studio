@@ -271,16 +271,16 @@ export function App() {
               )}
             </aside>
             {!max && (
-            <Sash
-              dir="x"
-              onDrag={(d) =>
-                setSideW(() => {
-                  const next = Math.min(900, Math.max(160, sideShown + d));
-                  localStorage.setItem(SIDE_W_KEY, String(Math.round(next)));
-                  return next;
-                })
-              }
-            />
+              <Sash
+                dir="x"
+                onDrag={(d) =>
+                  setSideW(() => {
+                    const next = Math.min(900, Math.max(160, sideShown + d));
+                    localStorage.setItem(SIDE_W_KEY, String(Math.round(next)));
+                    return next;
+                  })
+                }
+              />
             )}
           </>
         )}
@@ -328,7 +328,10 @@ export function App() {
         )}
         <aside
           className={chatWide ? 'chat-wrap chat-wide' : 'chat-wrap'}
-          style={{ width: chatWide ? undefined : chatShownW, display: chatOpen && !max ? 'flex' : 'none' }}
+          style={{
+            width: chatWide ? undefined : chatShownW,
+            display: chatOpen && !max ? 'flex' : 'none',
+          }}
         >
           <ChatPanel />
         </aside>

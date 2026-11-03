@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { ChatContext } from '../../shared/api';
 import { t } from '../i18n';
-import { api, attachToChat, getState, setState, toast, useStore } from '../store';
+import { api, attachToChat, getState, setState, toast, toggleMaximized, useStore } from '../store';
 import { Icon } from './Icon';
 
 interface Term {
@@ -147,6 +147,7 @@ export let runInTerminal: (text: string) => Promise<void> = async () => {};
 
 export function TerminalPanel() {
   const theme = useStore((s) => s.settings.theme);
+  const maximized = useStore((s) => s.maximized === 'panel');
   const host = useRef<HTMLDivElement>(null);
   const [ids, setIds] = useState<number[]>([]);
   const isWindows = navigator.userAgent.includes('Windows');
@@ -338,6 +339,14 @@ export function TerminalPanel() {
           <span className="term-split">
             <button title={t('termNew')} aria-label={t('termNew')} onClick={() => void create()}>
               <Icon name="plus" size={15} />
+            </button>
+            <button
+              className={maximized ? 'on' : ''}
+              title={maximized ? t('restoreSize') : t('maximize')}
+              aria-label={maximized ? t('restoreSize') : t('maximize')}
+              onClick={() => toggleMaximized('panel')}
+            >
+              <Icon name={maximized ? 'minimize' : 'maximize'} size={14} />
             </button>
             {profiles.length > 1 && (
               <button

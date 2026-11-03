@@ -18,6 +18,7 @@ import { isOwnerCode, licenseStatus, normalizeKey, parseLicense, planCode } from
 import type { StoredLicense } from './license.js';
 import { startUpdates } from './updates.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
+import { PhoneRemote } from './phone.js';
 import type { RemoteNotice } from '../shared/plans.js';
 import { DOWNLOAD_URL } from '../shared/plans.js';
 import {
@@ -88,6 +89,48 @@ const terminals = new Terminals(
     if (w) send(w, { type: 'term:exit', id, code });
   },
 );
+
+// ---------------- phone remote ----------------
+
+/** The window the phone controls (the one that started the remote). */
+let phoneOwner: Win | undefined;
+const phone = new PhoneRemote(
+  (action) => {
+    if (phoneOwner) send(phoneOwner, { type: 'phone', action });
+  },
+  (status) => {
+    if (phoneOwner) send(phoneOwner, { type: 'phone:status', status });
+  },
+);
+const toolState = z.enum(['running', 'approval', 'ok', 'error']);
+const id200 = z.string().max(200);
+const PhoneSnapshot = z.object({
+  chats: z
+    .array(
+      z.object({
+        id: id200,
+        title: z.string().max(500),
+        busy: z.boolean(),
+        waiting: z.boolean(),
+      }),
+    )
+    .max(200),
+  chatId: id200,
+  agent: z.boolean(),
+  busy: z.boolean(),
+  turns: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        text: z.string().max(100_000),
+        error: z.string().max(5000).optional(),
+        tools: z
+          .array(z.object({ id: id200, title: z.string().max(500), status: toolState }))
+          .max(200),
+      }),
+    )
+    .max(100),
+});
 
 // ---------------- desktop state (last folder, theme) ----------------
 
@@ -1043,6 +1086,32 @@ function registerIpc(): void {
   });
   handle('app:installUpdate', z.tuple([]), () => updates?.install());
 
+  handle('phone:status', z.tuple([]), (w) =>
+    phoneOwner === w ? phone.status() : { running: false, phones: 0 },
+  );
+  handle('phone:start', z.tuple([]), async (w) => {
+    // One window at a time: starting it here takes it from the other one.
+    if (phoneOwner && phoneOwner !== w) {
+      send(phoneOwner, { type: 'phone:status', status: { running: false, phones: 0 } });
+      phone.stop();
+    }
+    phoneOwner = w;
+    try {
+      return await phone.start();
+    } catch (e) {
+      phoneOwner = undefined;
+      return { running: false, phones: 0, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+  handle('phone:stop', z.tuple([]), (w) => {
+    if (phoneOwner !== w) return { running: false, phones: 0 };
+    phoneOwner = undefined;
+    return phone.stop();
+  });
+  handle('phone:push', z.tuple([PhoneSnapshot]), (w, snapshot) => {
+    if (phoneOwner === w) phone.push(snapshot);
+  });
+
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {
     const code = planCode(input);
@@ -1319,6 +1388,10 @@ async function createWindow(
     }
     w.workspace?.dispose();
     for (const f of w.chatFolders.values()) f.dispose();
+    if (phoneOwner === w) {
+      phoneOwner = undefined;
+      phone.stop();
+    }
     wins.delete(w.id);
   });
   await win
@@ -1436,6 +1509,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  phone.stop();
   terminals.killAll();
   ai?.close();
   app.quit();

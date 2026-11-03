@@ -195,6 +195,12 @@ const api: OmniApi = {
     pathForFile: (file: File) => webUtils.getPathForFile(file),
     platform: process.platform,
   },
+  phone: {
+    status: call('phone:status') as OmniApi['phone']['status'],
+    start: call('phone:start') as OmniApi['phone']['start'],
+    stop: call('phone:stop') as OmniApi['phone']['stop'],
+    push: call('phone:push') as OmniApi['phone']['push'],
+  },
   license: {
     status: call('license:status') as OmniApi['license']['status'],
     activate: call('license:activate') as OmniApi['license']['activate'],

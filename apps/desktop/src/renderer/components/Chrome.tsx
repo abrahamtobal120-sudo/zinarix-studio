@@ -13,6 +13,7 @@ import {
   openDropped,
   openSecurityTab,
   setState,
+  toggleMaximized,
   useStore,
 } from '../store';
 
@@ -23,6 +24,7 @@ export function ActivityBar() {
   const browserActive = useStore((s) => s.active === BROWSER_TAB);
   const active = useStore((s) => s.active);
   const gitChanges = useStore((s) => s.gitChanges);
+  const sideMax = useStore((s) => s.maximized === 'side');
   const item = (
     active: boolean,
     title: string,
@@ -77,6 +79,13 @@ export function ActivityBar() {
         } else openBrowserTab();
       })}
       <div className="spacer" />
+      {sidebar &&
+        item(
+          sideMax,
+          sideMax ? t('restoreSize') : t('maximizeSide'),
+          sideMax ? 'minimize' : 'maximize',
+          () => toggleMaximized('side'),
+        )}
       {item(active === '::security', t('securityTitle'), 'shield', () => openSecurityTab())}
       {item(false, t('usageTitle'), 'chart', () => setState({ modal: { kind: 'usage' } }))}
       {item(false, t('providers'), 'key', () => setState({ modal: { kind: 'providers' } }))}

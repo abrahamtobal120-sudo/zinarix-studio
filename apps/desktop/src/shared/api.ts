@@ -664,7 +664,45 @@ export type AppEvent =
    */
   | { type: 'update'; state: 'available' | 'ready'; version: string; url?: string }
   /** A message from the app's owner (app-config.json), shown once. */
-  | { type: 'notice'; id: string; text: string; url?: string };
+  | { type: 'notice'; id: string; text: string; url?: string }
+  /** The paired phone asked for something (see PhoneAction). */
+  | { type: 'phone'; action: PhoneAction }
+  /** The phone remote changed (started, stopped, a phone paired, new PIN). */
+  | { type: 'phone:status'; status: PhoneStatus };
+
+/** Remote control from a phone on the same network (a page served by the app). */
+export interface PhoneStatus {
+  running: boolean;
+  /** Address to open on the phone (http://<LAN IP>:<port>). */
+  url?: string;
+  /** Code the phone asks for once; changes after too many wrong tries. */
+  pin?: string;
+  /** Phones paired since it started. */
+  phones: number;
+  error?: string;
+}
+
+/** What the phone shows: the chats of the window and the one being controlled. */
+export interface PhoneSnapshot {
+  chats: { id: string; title: string; busy: boolean; waiting: boolean }[];
+  chatId: string;
+  agent: boolean;
+  busy: boolean;
+  turns: {
+    role: 'user' | 'assistant';
+    text: string;
+    error?: string;
+    tools: { id: string; title: string; status: 'running' | 'approval' | 'ok' | 'error' }[];
+  }[];
+}
+
+export type PhoneAction =
+  | { kind: 'send'; text: string }
+  | { kind: 'decide'; toolCallId: string; decision: 'approve' | 'deny' }
+  | { kind: 'stop' }
+  | { kind: 'select'; chatId: string }
+  | { kind: 'newChat' }
+  | { kind: 'agent'; on: boolean };
 
 export interface OmniApi {
   workspace: {
@@ -972,6 +1010,14 @@ export interface OmniApi {
     pathForFile(file: File): string;
     platform: string;
   };
+  phone: {
+    status(): Promise<PhoneStatus>;
+    /** Starts the phone remote for this window (the phone controls its chats). */
+    start(): Promise<PhoneStatus>;
+    stop(): Promise<PhoneStatus>;
+    /** What the phone should show now (sent while the remote runs). */
+    push(snapshot: PhoneSnapshot): Promise<void>;
+  };
   license: {
     status(): Promise<LicenseStatus>;
     /** A license key (ZX1.…) or the owner's word. Throws with a readable reason. */
@@ -1147,6 +1193,10 @@ export const CHANNELS = [
   'license:status',
   'license:activate',
   'license:remove',
+  'phone:status',
+  'phone:start',
+  'phone:stop',
+  'phone:push',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

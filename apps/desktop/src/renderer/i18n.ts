@@ -389,6 +389,9 @@ const es = {
   scanExplainPrompt:
     'Acabo de escanear {target} y encontré estos puertos abiertos:\n{ports}\nExplícame qué riesgo tiene cada uno y cómo lo aseguro.',
   termNew: 'Nueva terminal',
+  maximize: 'Maximizar',
+  maximizeSide: 'Maximizar panel lateral',
+  restoreSize: 'Restaurar tamaño',
   termPickShell: 'Elegir terminal (PowerShell, cmd, Git Bash, WSL…)',
   termAsAdmin: '{name} (administrador)',
   termAdmin: 'Terminal de administrador (sudo)',
@@ -1505,6 +1508,9 @@ const en: Record<Key, string> = {
   scanExplainPrompt:
     'I just scanned {target} and found these open ports:\n{ports}\nExplain the risk of each one and how to secure it.',
   termNew: 'New terminal',
+  maximize: 'Maximize',
+  maximizeSide: 'Maximize side panel',
+  restoreSize: 'Restore size',
   termPickShell: 'Pick a terminal (PowerShell, cmd, Git Bash, WSL…)',
   termAsAdmin: '{name} (administrator)',
   termAdmin: 'Administrator terminal (sudo)',
