@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Zinarix Studio Pro licenses (Ed25519), for the seller only.
-//   node scripts/license.mjs issue <email> [--name "Nombre"] [--days 365]  -> prints a key
+//   node scripts/license.mjs issue <email> [--name "Nombre"] [--days 365] [--plan pro|ai|proai]
+//                                                                          -> prints a key
 //   node scripts/license.mjs verify <key>                                  -> what a key grants
 //   node scripts/license.mjs pubkey                                        -> public key of the private key
 // The private key is NEVER in the repo: ~/.omni-signing/license.key by default
@@ -45,13 +46,20 @@ function loadPrivate() {
 
 if (cmd === 'issue') {
   if (!arg || !arg.includes('@')) {
-    console.error('usage: license.mjs issue <email> [--name "Nombre"] [--days 365]');
+    console.error(
+      'usage: license.mjs issue <email> [--name "Nombre"] [--days 365] [--plan pro|ai|proai]',
+    );
+    process.exit(2);
+  }
+  const plan = opt('plan') ?? 'pro';
+  if (!['pro', 'ai', 'proai'].includes(plan)) {
+    console.error('--plan must be pro, ai or proai');
     process.exit(2);
   }
   const key = loadPrivate();
   const iat = Date.now();
   const days = Number(opt('days') ?? 0);
-  const payload = { v: 1, id: `manual-${randomUUID()}`, plan: 'pro', email: arg };
+  const payload = { v: 1, id: `manual-${randomUUID()}`, plan, email: arg };
   if (opt('name')) payload.name = opt('name');
   payload.iat = iat;
   if (days > 0) payload.exp = iat + days * 86_400_000;

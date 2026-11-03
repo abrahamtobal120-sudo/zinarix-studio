@@ -4027,6 +4027,12 @@ button.link {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.acct-select {
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
 .git-track {
   font-size: 11px;
   color: var(--fg-dim);
@@ -5307,6 +5313,7 @@ button.big {
 }
 .status-item.plan-trial,
 .status-item.plan-pro,
+.status-item.plan-proai,
 .status-item.plan-owner {
   background: var(--brand-grad);
   color: #fff;
@@ -5316,7 +5323,7 @@ button.big {
 }
 .plan-panel {
   position: relative;
-  width: min(560px, 94vw);
+  width: min(620px, 94vw);
   max-height: 86vh;
   overflow: auto;
   background: var(--bg-2);
@@ -5344,6 +5351,7 @@ button.big {
   height: 44px;
 }
 .plan-hero.plan-pro,
+.plan-hero.plan-proai,
 .plan-hero.plan-owner,
 .plan-hero.plan-trial {
   background:
@@ -5426,6 +5434,29 @@ button.big {
 .plan-table .pro {
   color: var(--brand);
   font-weight: 600;
+}
+/* Zinarix AI: teal, like the AI plan on the website. */
+.plan-table .ai {
+  color: #0d9488;
+}
+.plan-table .pro.ai {
+  color: var(--brand);
+}
+.plan-table .current {
+  background: color-mix(in srgb, var(--brand) 9%, transparent);
+}
+.status-item.plan-ai {
+  background: #0d9488;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 9px;
+  margin: 2px 0;
+}
+.plan-hero.plan-ai {
+  background:
+    linear-gradient(var(--bg-3), var(--bg-3)) padding-box,
+    linear-gradient(135deg, #14b8a6, #0d9488) border-box;
+  border: 1px solid transparent;
 }
 .plan-buy {
   display: flex;

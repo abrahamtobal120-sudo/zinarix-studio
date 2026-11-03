@@ -14,7 +14,7 @@ import { BrowserController } from './browser.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
 import { Vercel, linkedProject } from './vercel.js';
-import { isOwnerCode, licenseStatus, normalizeKey, parseLicense } from './license.js';
+import { isOwnerCode, licenseStatus, normalizeKey, parseLicense, planCode } from './license.js';
 import type { StoredLicense } from './license.js';
 import { startUpdates } from './updates.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
@@ -118,13 +118,18 @@ function license() {
 
 function planName(): string {
   const l = license();
+  const who = l.email ? ` · ${l.email}` : '';
   return l.plan === 'owner'
-    ? 'Pro (dueño)'
+    ? 'Pro + AI (dueño)'
     : l.plan === 'pro'
-      ? `Pro · ${l.email ?? ''}`
-      : l.plan === 'trial'
-        ? `Prueba Pro: ${l.trialDaysLeft} días`
-        : 'Gratis';
+      ? `Pro${who}`
+      : l.plan === 'ai'
+        ? `AI${who}`
+        : l.plan === 'proai'
+          ? `Pro + AI${who}`
+          : l.plan === 'trial'
+            ? `Prueba Pro: ${l.trialDaysLeft} días`
+            : 'Gratis';
 }
 
 /** A Pro feature was asked for on a plan without it: the window explains and offers Pro. */
@@ -457,7 +462,9 @@ function registerIpc(): void {
   const team = z.string().max(128).nullable();
   handle('vercel:status', z.tuple([]), () => vercel.status());
   handle('vercel:setToken', z.tuple([z.string().min(1).max(500)]), (_w, t) => vercel.setToken(t));
-  handle('vercel:logout', z.tuple([]), () => vercel.logout());
+  const accountId = z.string().regex(/^[\w-]{1,40}$/);
+  handle('vercel:logout', z.tuple([accountId.optional()]), (_w, id) => vercel.logout(id));
+  handle('vercel:useAccount', z.tuple([accountId]), (_w, id) => vercel.useAccount(id));
   handle('vercel:linked', z.tuple([]), (w) =>
     w.workspace ? linkedProject(w.workspace.root) : null,
   );
@@ -543,20 +550,22 @@ function registerIpc(): void {
     ]),
     (_w, acc, pass) => mail.connect(acc, pass),
   );
-  handle('mail:logout', z.tuple([]), () => mail.logout());
-  handle('mail:folders', z.tuple([]), () => mail.folders());
+  const email = z.string().trim().email().max(320);
+  handle('mail:logout', z.tuple([email.optional()]), (_w, e) => mail.logout(e));
+  handle('mail:useAccount', z.tuple([email]), (_w, e) => mail.useAccount(e));
+  handle('mail:folders', z.tuple([]), () => mail.box().folders());
   handle(
     'mail:list',
     z.tuple([box, z.number().int().min(0).max(100_000), z.string().max(200)]),
-    (_w, f, p, q) => mail.list(f, p, q),
+    (_w, f, p, q) => mail.box().list(f, p, q),
   );
-  handle('mail:open', z.tuple([box, uid]), (_w, f, u) => mail.open(f, u));
+  handle('mail:open', z.tuple([box, uid]), (_w, f, u) => mail.box().open(f, u));
   handle(
     'mail:setFlag',
     z.tuple([box, uid, z.enum(['seen', 'flagged']), z.boolean()]),
-    (_w, f, u, flag, on) => mail.setFlag(f, u, flag, on),
+    (_w, f, u, flag, on) => mail.box().setFlag(f, u, flag, on),
   );
-  handle('mail:trash', z.tuple([box, uid]), (_w, f, u) => mail.trash(f, u));
+  handle('mail:trash', z.tuple([box, uid]), (_w, f, u) => mail.box().trash(f, u));
   const draft = z.object({
     to: z.string().max(5000),
     cc: z.string().max(5000).optional(),
@@ -569,20 +578,20 @@ function registerIpc(): void {
   handle(
     'mail:move',
     z.tuple([box, uid, z.enum(['inbox', 'junk', 'trash', 'archive'])]),
-    (_w, f, u, to) => mail.move(f, u, to),
+    (_w, f, u, to) => mail.box().move(f, u, to),
   );
   handle(
     'mail:send',
     z.tuple([draft.extend({ to: z.string().trim().min(3).max(5000) })]),
-    (_w, d) => mail.send(d),
+    (_w, d) => mail.box().send(d),
   );
-  handle('mail:saveDraft', z.tuple([draft]), (_w, d) => mail.saveDraft(d));
-  handle('mail:deleteDraft', z.tuple([uid]), (_w, u) => mail.deleteDraft(u));
+  handle('mail:saveDraft', z.tuple([draft]), (_w, d) => mail.box().saveDraft(d));
+  handle('mail:deleteDraft', z.tuple([uid]), (_w, u) => mail.box().deleteDraft(u));
   handle(
     'mail:saveAttachment',
     z.tuple([box, uid, z.number().int().min(0)]),
     async (w, f, u, i) => {
-      const a = mail.attachment(f, u, i);
+      const a = mail.box().attachment(f, u, i);
       const r = await dialog.showSaveDialog(w.win, {
         defaultPath: join(app.getPath('downloads'), basename(a.filename)),
       });
@@ -599,7 +608,8 @@ function registerIpc(): void {
   handle('supabase:setToken', z.tuple([z.string().min(1).max(500)]), (_w, t) =>
     supabase.setToken(t),
   );
-  handle('supabase:logout', z.tuple([]), () => supabase.logout());
+  handle('supabase:logout', z.tuple([accountId.optional()]), (_w, id) => supabase.logout(id));
+  handle('supabase:useAccount', z.tuple([accountId]), (_w, id) => supabase.useAccount(id));
   handle('supabase:linked', z.tuple([]), (w) =>
     w.workspace ? linkedSupabase(w.workspace.root) : null,
   );
@@ -1035,18 +1045,20 @@ function registerIpc(): void {
 
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {
-    if (isOwnerCode(input)) saveState({ owner: true, license: undefined });
+    const code = planCode(input);
+    if (isOwnerCode(input)) saveState({ owner: true, license: undefined, codePlan: undefined });
+    else if (code) saveState({ codePlan: code, owner: undefined, license: undefined });
     else {
       const key = normalizeKey(input);
       const p = parseLicense(key);
       if (p.exp && p.exp < Date.now()) throw new Error('Esta licencia ya venció.');
-      saveState({ license: key, owner: undefined });
+      saveState({ license: key, owner: undefined, codePlan: undefined });
     }
     broadcastSettings(w);
     return license();
   });
   handle('license:remove', z.tuple([]), (w) => {
-    saveState({ license: undefined, owner: undefined });
+    saveState({ license: undefined, owner: undefined, codePlan: undefined });
     broadcastSettings(w);
     return license();
   });

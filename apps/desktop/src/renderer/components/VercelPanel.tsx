@@ -1,3 +1,4 @@
+import { AccountSwitch } from './AccountSwitch';
 import { Icon } from './Icon';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
@@ -94,10 +95,17 @@ const SETTING_FIELDS: { key: keyof VercelSettings; label: string; ph: string }[]
 const NODE_VERSIONS = ['24.x', '22.x', '20.x'];
 
 export function VercelPanel() {
+  // A new body per account: switching leaves nothing of the previous one on screen.
+  const [gen, setGen] = useState(0);
+  return <VercelBody key={gen} reset={() => setGen((g) => g + 1)} />;
+}
+
+function VercelBody({ reset }: { reset: () => void }) {
   const workspace = useStore((s) => s.workspace);
   const root = workspace?.root;
   const [st, setSt] = useState<VercelStatus | null>(null);
   const [token, setToken] = useState('');
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [pick, setPick] = useState<Pick | null>(null);
   const [linked, setLinked] = useState(false);
@@ -279,10 +287,40 @@ export function VercelPanel() {
     );
   }
 
-  if (!st.connected && st.offline) {
+  const account = (
+    <AccountSwitch
+      icon="▲"
+      label={st.user ?? st.accounts.find((a) => a.id === st.active)?.label ?? 'Vercel'}
+      title={st.source === 'cli' ? t('vcFromCli') : t('vcFromApp')}
+      accounts={st.accounts}
+      active={st.active}
+      busy={busy !== null}
+      onUse={(id) =>
+        void act('use', async () => {
+          await api().vercel.useAccount(id);
+          reset();
+        })
+      }
+      onAdd={() => setAdding(true)}
+      onLogout={
+        st.source === 'app'
+          ? () => {
+              if (confirm(t('vcLogoutConfirm')))
+                void act('logout', async () => {
+                  await api().vercel.logout();
+                  reset();
+                });
+            }
+          : undefined
+      }
+    />
+  );
+
+  if (!adding && !st.connected && st.offline) {
     return (
       <div className="explorer">
         {title}
+        {st.accounts.length > 1 && account}
         <div className="sidebar-empty vc-connect">
           <p>{t('svcOffline', { name: 'Vercel' })}</p>
           <p className="vc-hint">{st.offline}</p>
@@ -298,66 +336,52 @@ export function VercelPanel() {
     );
   }
 
-  if (!st.connected) {
+  if (!st.connected || adding) {
+    const connect = () =>
+      void act('token', async () => {
+        await api().vercel.setToken(token);
+        setToken('');
+        reset();
+      });
     return (
       <div className="explorer">
         {title}
+        {!adding && st.accounts.length > 1 && account}
         <div className="sidebar-empty vc-connect">
-          <p>{st.source ? t('vcTokenRejected') : t('vcIntro')}</p>
+          <p>{adding ? t('acctAddIntro') : st.source ? t('vcTokenRejected') : t('vcIntro')}</p>
           <input
             type="password"
             value={token}
             placeholder={t('vcTokenPh')}
             onChange={(e) => setToken(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && token.trim())
-                void act('token', async () => setSt(await api().vercel.setToken(token)));
+              if (e.key === 'Enter' && token.trim()) connect();
             }}
           />
-          <button
-            className="primary"
-            disabled={!token.trim() || busy !== null}
-            onClick={() =>
-              void act('token', async () => {
-                setSt(await api().vercel.setToken(token));
-                setToken('');
-              })
-            }
-          >
+          <button className="primary" disabled={!token.trim() || busy !== null} onClick={connect}>
             {busy === 'token' ? '…' : t('vcConnect')}
           </button>
+          {adding && (
+            <button className="link" onClick={() => setAdding(false)}>
+              {t('acctCancel')}
+            </button>
+          )}
           <button className="link" onClick={() => open('https://vercel.com/account/tokens')}>
             {t('vcCreateToken')}
           </button>
-          <p className="vc-hint">{st.cli ? t('vcCliHint') : t('vcCliMissing')}</p>
-          <button onClick={() => inTerminal(st.cli, 'login')}>{t('vcCliLogin')}</button>
-          <button className="link" onClick={() => void api().vercel.status().then(setSt)}>
-            {t('vcRecheck')}
-          </button>
+          {!adding && (
+            <>
+              <p className="vc-hint">{st.cli ? t('vcCliHint') : t('vcCliMissing')}</p>
+              <button onClick={() => inTerminal(st.cli, 'login')}>{t('vcCliLogin')}</button>
+              <button className="link" onClick={() => void api().vercel.status().then(setSt)}>
+                {t('vcRecheck')}
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
   }
-
-  const account = (
-    <div className="git-branchbar">
-      <span className="git-branch" title={st.source === 'cli' ? t('vcFromCli') : t('vcFromApp')}>
-        ▲ {st.user}
-      </span>
-      <span className="spacer" />
-      {st.source === 'app' && (
-        <button
-          className="link"
-          onClick={() => {
-            if (confirm(t('vcLogoutConfirm')))
-              void act('logout', async () => setSt(await api().vercel.logout()));
-          }}
-        >
-          {t('vcLogout')}
-        </button>
-      )}
-    </div>
-  );
 
   // No project for this folder yet: pick one (or link it with the CLI).
   if (!pick) {

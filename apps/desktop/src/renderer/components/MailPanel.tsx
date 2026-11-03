@@ -1,3 +1,4 @@
+import { AccountSwitch } from './AccountSwitch';
 import { Icon } from './Icon';
 import { useCallback, useEffect, useState } from 'react';
 import type {
@@ -102,7 +103,14 @@ function srcDoc(html: string): string {
 }
 
 export function MailPanel() {
+  // A new body per mailbox: switching leaves nothing of the previous one on screen.
+  const [gen, setGen] = useState(0);
+  return <MailBody key={gen} reset={() => setGen((g) => g + 1)} />;
+}
+
+function MailBody({ reset }: { reset: () => void }) {
   const [st, setSt] = useState<MailStatus | null>(null);
+  const [adding, setAdding] = useState(false);
   const [form, setForm] = useState<MailAccount>(EMPTY_ACCOUNT);
   const [pass, setPass] = useState('');
   const [servers, setServers] = useState(false);
@@ -222,10 +230,10 @@ export function MailPanel() {
   const connect = () =>
     void act('connect', async () => {
       const acc = { ...form, user: form.user || form.email };
-      const s = await api().mail.connect(acc, pass);
+      await api().mail.connect(acc, pass);
       setPass('');
-      setSt(s);
       toast(t('mlConnected', { email: acc.email }));
+      reset();
     });
 
   const openMsg = (m: MailSummaryView) =>
@@ -384,7 +392,38 @@ export function MailPanel() {
     );
   }
 
-  if (!st.connected) {
+  const account = (
+    <AccountSwitch
+      icon="✉"
+      label={st.account?.email ?? ''}
+      title={st.account?.user}
+      accounts={st.accounts.map((a) => ({ id: a.email, label: a.email }))}
+      active={st.account?.email ?? null}
+      busy={busy !== null}
+      onUse={(email) =>
+        void act('use', async () => {
+          await api().mail.useAccount(email);
+          reset();
+        })
+      }
+      onAdd={() => {
+        setForm(EMPTY_ACCOUNT);
+        setPass('');
+        setGuessed('');
+        setServers(false);
+        setAdding(true);
+      }}
+      onLogout={() => {
+        if (confirm(t('mlLogoutConfirm', { email: st.account?.email ?? '' })))
+          void act('logout', async () => {
+            await api().mail.logout();
+            reset();
+          });
+      }}
+    />
+  );
+
+  if (!st.connected || adding) {
     const field = (key: keyof MailAccount, ph: string, type = 'text') => (
       <input
         type={type}
@@ -404,8 +443,9 @@ export function MailPanel() {
     return (
       <div className="explorer">
         {title}
+        {!adding && st.accounts.length > 1 && account}
         <div className="sidebar-empty vc-connect ml-connect">
-          <p>{st.account ? t('mlPassAgain') : t('mlIntro')}</p>
+          <p>{adding ? t('acctAddIntro') : st.account ? t('mlPassAgain') : t('mlIntro')}</p>
           <input
             type="email"
             value={form.email}
@@ -451,6 +491,11 @@ export function MailPanel() {
           <button className="primary" disabled={!ready || busy !== null} onClick={connect}>
             {busy === 'connect' ? '…' : t('mlConnect')}
           </button>
+          {adding && (
+            <button className="link" onClick={() => setAdding(false)}>
+              {t('acctCancel')}
+            </button>
+          )}
           <p className="vc-hint">{t('mlAppPassHint')}</p>
           <button
             className="link"
@@ -462,29 +507,6 @@ export function MailPanel() {
       </div>
     );
   }
-
-  const account = (
-    <div className="git-branchbar">
-      <span className="git-branch" title={st.account?.user}>
-        ✉ {st.account?.email}
-      </span>
-      <span className="spacer" />
-      <button
-        className="link"
-        onClick={() => {
-          if (confirm(t('mlLogoutConfirm')))
-            void act('logout', async () => {
-              setSt(await api().mail.logout());
-              setList(null);
-              setMsg(null);
-              setFolders([]);
-            });
-        }}
-      >
-        {t('mlLogout')}
-      </button>
-    </div>
-  );
 
   if (draft) {
     const set = (p: Partial<MailDraft>) => setDraft({ ...draft, ...p });

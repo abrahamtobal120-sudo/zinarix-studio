@@ -245,6 +245,7 @@ const TOOL_ICON: Record<string, IconName> = {
   file_hash: 'hash',
   list_ai_models: 'cpu',
   delegate_to_ai: 'users',
+  mail_accounts: 'users',
   mail_folders: 'folder',
   mail_list: 'mail',
   mail_read: 'mail',
@@ -260,6 +261,11 @@ const STATUS_ICON: Record<ToolStep['status'], IconName> = {
   ok: 'check',
   error: 'x',
 };
+
+/** Mailbox a mail tool works on, when the AI picked one ("" for the one open in the panel). */
+function mailFrom(a: Record<string, unknown>): string {
+  return typeof a.account === 'string' && a.account ? `${a.account} · ` : '';
+}
 
 function toolTitle(step: ToolStep): string {
   const a = step.args;
@@ -298,18 +304,20 @@ function toolTitle(step: ToolStep): string {
       return '';
     case 'delegate_to_ai':
       return `${String(a.model ?? '')} · ${String(a.task ?? '').slice(0, 120)}`;
-    case 'mail_folders':
+    case 'mail_accounts':
       return '';
+    case 'mail_folders':
+      return mailFrom(a).replace(/ · $/, '');
     case 'mail_list':
-      return `${String(a.folder ?? 'INBOX')}${a.query ? ` · "${String(a.query)}"` : ''}`;
+      return `${mailFrom(a)}${String(a.folder ?? 'INBOX')}${a.query ? ` · "${String(a.query)}"` : ''}`;
     case 'mail_read':
     case 'mail_mark':
-      return `${String(a.folder ?? 'INBOX')} #${String(a.uid ?? '')}`;
+      return `${mailFrom(a)}${String(a.folder ?? 'INBOX')} #${String(a.uid ?? '')}`;
     case 'mail_move':
-      return `${String(a.folder ?? 'INBOX')} #${String(a.uid ?? '')} → ${String(a.to ?? '')}`;
+      return `${mailFrom(a)}${String(a.folder ?? 'INBOX')} #${String(a.uid ?? '')} → ${String(a.to ?? '')}`;
     case 'mail_save_draft':
     case 'mail_send':
-      return `${String(a.to ?? '')} · ${String(a.subject ?? '')}`;
+      return `${mailFrom(a)}${String(a.to ?? '')} · ${String(a.subject ?? '')}`;
     default:
       return String(a.path ?? '.');
   }

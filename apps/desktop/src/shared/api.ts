@@ -263,6 +263,9 @@ export interface VercelStatus {
   cli: boolean;
   /** The token is kept but the service could not be reached (why); the panel retries. */
   offline?: string;
+  /** Accounts connected in the app (several at once); the panel and the AI use the active one. */
+  accounts: { id: string; label: string }[];
+  active: string | null;
 }
 export interface VercelProjectView {
   id: string;
@@ -320,8 +323,12 @@ export interface MailAccount {
   smtpPort: number;
 }
 export interface MailStatus {
+  /** The active mailbox has its password. */
   connected: boolean;
+  /** The active mailbox (the one the panel shows). */
   account: MailAccount | null;
+  /** Every mailbox connected in the app; the AI can use any of them. */
+  accounts: MailAccount[];
 }
 export interface MailFolderView {
   path: string;
@@ -382,6 +389,9 @@ export interface SupabaseStatus {
   cli: boolean;
   /** The token is kept but the service could not be reached (why); the panel retries. */
   offline?: string;
+  /** Accounts connected in the app (several at once); the panel and the AI use the active one. */
+  accounts: { id: string; label: string }[];
+  active: string | null;
 }
 export interface SupabaseProjectView {
   ref: string;
@@ -767,7 +777,10 @@ export interface OmniApi {
     status(): Promise<VercelStatus>;
     /** Saves an access token (encrypted with the OS keychain) and returns the new status. */
     setToken(token: string): Promise<VercelStatus>;
-    logout(): Promise<VercelStatus>;
+    /** Switches to another connected account. */
+    useAccount(id: string): Promise<VercelStatus>;
+    /** Forgets one account (the active one when no id is given). */
+    logout(id?: string): Promise<VercelStatus>;
     /** .vercel/project.json of the open folder (written by "vercel link"). */
     linked(): Promise<{ projectId: string; teamId: string | null } | null>;
     projects(teamId: string | null): Promise<VercelProjectView[]>;
@@ -808,7 +821,10 @@ export interface OmniApi {
     preset(email: string): Promise<MailAccount | null>;
     /** Checks both servers, then saves the account (password in the OS keychain). */
     connect(account: MailAccount, password: string): Promise<MailStatus>;
-    logout(): Promise<MailStatus>;
+    /** Switches the panel to another connected mailbox. */
+    useAccount(email: string): Promise<MailStatus>;
+    /** Forgets one mailbox (the active one when no address is given). */
+    logout(email?: string): Promise<MailStatus>;
     folders(): Promise<MailFolderView[]>;
     /** Page 0 = newest messages; `query` searches sender, recipient and subject. */
     list(folder: string, page: number, query: string): Promise<MailListView>;
@@ -830,7 +846,10 @@ export interface OmniApi {
     status(): Promise<SupabaseStatus>;
     /** Saves a personal access token (encrypted with the OS keychain). */
     setToken(token: string): Promise<SupabaseStatus>;
-    logout(): Promise<SupabaseStatus>;
+    /** Switches to another connected account. */
+    useAccount(id: string): Promise<SupabaseStatus>;
+    /** Forgets one account (the active one when no id is given). */
+    logout(id?: string): Promise<SupabaseStatus>;
     /** Project ref of the open folder (supabase/.temp/project-ref, written by "supabase link"). */
     linked(): Promise<string | null>;
     projects(): Promise<SupabaseProjectView[]>;
@@ -1032,6 +1051,7 @@ export const CHANNELS = [
   'vercel:status',
   'vercel:setToken',
   'vercel:logout',
+  'vercel:useAccount',
   'vercel:linked',
   'vercel:projects',
   'vercel:project',
@@ -1052,6 +1072,7 @@ export const CHANNELS = [
   'mail:preset',
   'mail:connect',
   'mail:logout',
+  'mail:useAccount',
   'mail:folders',
   'mail:list',
   'mail:open',
@@ -1065,6 +1086,7 @@ export const CHANNELS = [
   'supabase:status',
   'supabase:setToken',
   'supabase:logout',
+  'supabase:useAccount',
   'supabase:linked',
   'supabase:projects',
   'supabase:health',

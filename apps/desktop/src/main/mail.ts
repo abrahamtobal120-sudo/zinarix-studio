@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { resolveMx } from 'node:dns/promises';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -131,40 +132,181 @@ function htmlOf(mail: ParsedMail): string | null {
   return html;
 }
 
+/** A mailbox as kept on disk: its settings and which keychain entry holds its password. */
+type Saved = MailAccount & { key: string };
+
+/** Key of the mailbox migrated from older versions (one mailbox, `mail.json`). */
+const LEGACY = 'main';
+
+const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
 /**
- * The user's own mailbox, over IMAP (read, flags, move) and SMTP (send). Server settings live in
- * `mail.json`; the password in the OS keychain (TokenStore). One IMAP connection is kept open
- * and reopened when it drops.
+ * Every mailbox the user connected (several at once). The list lives in `mail-accounts.json`;
+ * each password in the OS keychain (TokenStore). The panel shows the active one; the AI can
+ * use any of them. Each mailbox keeps its own IMAP connection.
  */
 export class Mail {
-  private readonly cfgFile: string;
-  private readonly secret: TokenStore;
+  private readonly file: string;
+  private readonly boxes = new Map<string, MailBox>();
+
+  constructor(private readonly dir: string) {
+    this.file = join(dir, 'mail-accounts.json');
+  }
+
+  private secret(key: string): TokenStore {
+    return key === LEGACY
+      ? new TokenStore(join(this.dir, 'mail-password.bin'), 'mail-password')
+      : new TokenStore(join(this.dir, `mail-password-${key}.bin`), `mail-password:${key}`);
+  }
+
+  private read(): { active: string | null; accounts: Saved[] } {
+    if (existsSync(this.file)) {
+      try {
+        const s = JSON.parse(readFileSync(this.file, 'utf8')) as {
+          active: string | null;
+          accounts: Saved[];
+        };
+        if (Array.isArray(s.accounts)) return s;
+      } catch {
+        /* unreadable: start over */
+      }
+    }
+    // Older versions kept one mailbox in mail.json.
+    const legacy = join(this.dir, 'mail.json');
+    if (existsSync(legacy)) {
+      try {
+        const acc = JSON.parse(readFileSync(legacy, 'utf8')) as MailAccount;
+        return { active: acc.email, accounts: [{ ...acc, key: LEGACY }] };
+      } catch {
+        /* unreadable */
+      }
+    }
+    return { active: null, accounts: [] };
+  }
+
+  private write(s: { active: string | null; accounts: Saved[] }): void {
+    writeFileSync(this.file, JSON.stringify(s, null, 2), { mode: 0o600 });
+    rmSync(join(this.dir, 'mail.json'), { force: true });
+  }
+
+  private saved(email?: string): Saved | null {
+    const s = this.read();
+    const want = email ?? s.active;
+    return (
+      (want ? s.accounts.find((a) => sameEmail(a.email, want)) : undefined) ??
+      (email ? null : (s.accounts[0] ?? null))
+    );
+  }
+
+  status(): MailStatus {
+    const accounts = this.read().accounts.map(({ key: _k, ...acc }) => acc);
+    const active = this.saved();
+    return {
+      connected: !!active && !!this.secret(active.key).get(),
+      account: active && accounts.find((a) => sameEmail(a.email, active.email))!,
+      accounts,
+    };
+  }
+
+  preset(email: string): Promise<MailAccount | null> {
+    return mailPreset(email);
+  }
+
+  /**
+   * The mailbox with this address (the active one when none is given). Throws when it is not
+   * connected.
+   */
+  box(email?: string): MailBox {
+    const acc = this.saved(email);
+    if (!acc) {
+      if (email) {
+        const list = this.read().accounts.map((a) => a.email);
+        throw new Error(
+          `The mailbox ${email} is not connected${list.length ? ` (connected: ${list.join(', ')})` : ''}.`,
+        );
+      }
+      throw new Error('No hay una cuenta de correo conectada.');
+    }
+    const id = acc.email.toLowerCase();
+    let b = this.boxes.get(id);
+    if (!b || !b.same(acc)) {
+      void b?.close();
+      b = new MailBox(acc, this.secret(acc.key));
+      this.boxes.set(id, b);
+    }
+    return b;
+  }
+
+  /** Checks both servers with these settings and keeps the mailbox (password in the keychain). */
+  async connect(acc: MailAccount, pass: string): Promise<MailStatus> {
+    const s = this.read();
+    const old = s.accounts.find((a) => sameEmail(a.email, acc.email));
+    const key = old?.key ?? randomBytes(6).toString('hex');
+    const box = new MailBox(acc, this.secret(key));
+    await box.verify(pass);
+    const id = acc.email.toLowerCase();
+    await this.boxes.get(id)?.close();
+    this.boxes.set(id, box);
+    const next: Saved = { ...acc, key };
+    s.accounts = old ? s.accounts.map((a) => (a === old ? next : a)) : [...s.accounts, next];
+    s.active = acc.email;
+    this.write(s);
+    return this.status();
+  }
+
+  /** Makes another connected mailbox the one the panel shows. */
+  useAccount(email: string): MailStatus {
+    const s = this.read();
+    const acc = s.accounts.find((a) => sameEmail(a.email, email));
+    if (!acc) throw new Error('Esa cuenta ya no está conectada.');
+    s.active = acc.email;
+    this.write(s);
+    return this.status();
+  }
+
+  /** Forgets a mailbox (the active one by default); the next one left becomes active. */
+  async logout(email?: string): Promise<MailStatus> {
+    const s = this.read();
+    const acc = this.saved(email);
+    if (!acc) return this.status();
+    const id = acc.email.toLowerCase();
+    await this.boxes.get(id)?.close();
+    this.boxes.delete(id);
+    this.secret(acc.key).delete();
+    s.accounts = s.accounts.filter((a) => !sameEmail(a.email, acc.email));
+    if (!s.active || sameEmail(s.active, acc.email)) s.active = s.accounts[0]?.email ?? null;
+    this.write(s);
+    return this.status();
+  }
+}
+
+/**
+ * One mailbox, over IMAP (read, flags, move) and SMTP (send). One IMAP connection is kept open
+ * and reopened when it drops.
+ */
+export class MailBox {
   private client: ImapFlow | null = null;
   private connecting: Promise<ImapFlow> | null = null;
   /** Last opened message, parsed (attachments are saved from it without downloading again). */
   private last: { key: string; mail: ParsedMail } | null = null;
 
-  constructor(dir: string) {
-    this.cfgFile = join(dir, 'mail.json');
-    this.secret = new TokenStore(join(dir, 'mail-password.bin'), 'mail-password');
-  }
+  constructor(
+    readonly acc: MailAccount,
+    private readonly secret: TokenStore,
+  ) {}
 
-  private account(): MailAccount | null {
-    if (!existsSync(this.cfgFile)) return null;
-    try {
-      return JSON.parse(readFileSync(this.cfgFile, 'utf8')) as MailAccount;
-    } catch {
-      return null;
-    }
-  }
-
-  status(): MailStatus {
-    const account = this.account();
-    return { connected: !!account && !!this.secret.get(), account };
-  }
-
-  preset(email: string): Promise<MailAccount | null> {
-    return mailPreset(email);
+  /** Same address and servers (otherwise the connection has to be made again). */
+  same(acc: MailAccount): boolean {
+    const a = this.acc;
+    return (
+      a.email === acc.email &&
+      a.name === acc.name &&
+      a.user === acc.user &&
+      a.imapHost === acc.imapHost &&
+      a.imapPort === acc.imapPort &&
+      a.smtpHost === acc.smtpHost &&
+      a.smtpPort === acc.smtpPort
+    );
   }
 
   private imap(acc: MailAccount, pass: string): ImapFlow {
@@ -194,8 +336,9 @@ export class Mail {
     });
   }
 
-  /** Checks both servers with these settings and keeps them (password in the keychain). */
-  async connect(acc: MailAccount, pass: string): Promise<MailStatus> {
+  /** Checks both servers with this password and keeps it (in the keychain) and the connection. */
+  async verify(pass: string): Promise<void> {
+    const acc = this.acc;
     pass = cleanPass(acc, pass);
     const c = this.imap(acc, pass);
     try {
@@ -209,32 +352,22 @@ export class Mail {
       await c.logout().catch(() => {});
       throw new Error(`SMTP: ${errText(e)}`);
     }
-    await this.disconnect();
-    writeFileSync(this.cfgFile, JSON.stringify(acc, null, 2), { mode: 0o600 });
+    await this.close();
     this.secret.set(pass);
     this.client = c;
-    return this.status();
   }
 
-  private async disconnect(): Promise<void> {
+  async close(): Promise<void> {
     const c = this.client;
     this.client = null;
     this.last = null;
     if (c) await c.logout().catch(() => c.close());
   }
 
-  async logout(): Promise<MailStatus> {
-    await this.disconnect();
-    rmSync(this.cfgFile, { force: true });
-    this.secret.delete();
-    return this.status();
-  }
-
   private creds(): { acc: MailAccount; pass: string } {
-    const acc = this.account();
     const pass = this.secret.get();
-    if (!acc || !pass) throw new Error('No hay una cuenta de correo conectada.');
-    return { acc, pass };
+    if (!pass) throw new Error(`Falta la contraseña de ${this.acc.email}: vuelve a conectarla.`);
+    return { acc: this.acc, pass };
   }
 
   private async conn(): Promise<ImapFlow> {

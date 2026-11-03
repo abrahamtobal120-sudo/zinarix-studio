@@ -1,11 +1,13 @@
 // Vercel function: GET /api/license?session_id=cs_…
-// Checks a Stripe Checkout session (paid) and answers with a Zinarix Studio Pro license key.
+// Checks a Stripe Checkout session (paid) and answers with a Zinarix Studio license key (Pro, AI or Pro + AI).
 // No database: Ed25519 signatures are deterministic, so the same purchase always yields the
 // same key (the thank-you page can be reloaded). Environment variables (Vercel → Settings →
 // Environment Variables):
 //   STRIPE_SECRET_KEY    sk_live_… (or a restricted key that can read Checkout Sessions)
 //   LICENSE_PRIVATE_KEY  the private key (PEM) that matches the public key inside the app
-//   STRIPE_PAYMENT_LINK  optional plink_…: only purchases from that Payment Link get a key
+//   STRIPE_PAYMENT_LINK  optional plink_… of the Pro link (only purchases from a known link get a key)
+//   STRIPE_LINK_AI       optional plink_… of the AI link: its purchases get an 'ai' key
+//   STRIPE_LINK_PROAI    optional plink_… of the Pro + AI link: its purchases get a 'proai' key
 //   LICENSE_DAYS         optional: keys expire after this many days (empty: never)
 import { createPrivateKey, sign } from 'node:crypto';
 
@@ -45,9 +47,16 @@ export default async function handler(req, res) {
     return send(502, { error: 'Stripe no respondió. Recarga la página en un momento.' });
   }
 
-  const link = process.env.STRIPE_PAYMENT_LINK;
-  if (link && session.payment_link !== link)
-    return send(403, { error: 'Esa compra no es de Zinarix Studio Pro.' });
+  // The plan comes from the Payment Link used; with no links set, every purchase is Pro.
+  const links = {
+    pro: process.env.STRIPE_PAYMENT_LINK,
+    ai: process.env.STRIPE_LINK_AI,
+    proai: process.env.STRIPE_LINK_PROAI,
+  };
+  const known = Object.entries(links).filter(([, l]) => l);
+  const match = known.find(([, l]) => session.payment_link === l);
+  if (known.length && !match) return send(403, { error: 'Esa compra no es de Zinarix Studio.' });
+  const plan = match ? match[0] : 'pro';
   const paid =
     session.status === 'complete' &&
     (session.payment_status === 'paid' || session.payment_status === 'no_payment_required');
@@ -57,7 +66,7 @@ export default async function handler(req, res) {
   const name = (session.customer_details && session.customer_details.name) || undefined;
   const iat = Number(session.created) * 1000;
   const days = Number((session.metadata && session.metadata.days) || process.env.LICENSE_DAYS || 0);
-  const payload = { v: 1, id: session.id, plan: 'pro', email };
+  const payload = { v: 1, id: session.id, plan, email };
   if (name) payload.name = name;
   payload.iat = iat;
   if (days > 0) payload.exp = iat + days * 86400000;

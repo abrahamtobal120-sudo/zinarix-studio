@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { TokenStore } from './token-store.js';
+import { AccountList } from './accounts.js';
 import type {
   VercelDeploymentView,
   VercelEnvView,
@@ -154,14 +154,15 @@ const SETTING_KEYS = [
 export class Vercel {
   private cli: boolean | null = null;
 
-  constructor(private readonly dir: string) {}
+  private readonly accounts: AccountList;
 
-  private get store(): TokenStore {
-    return new TokenStore(join(this.dir, 'vercel-token.bin'), 'vercel');
+  constructor(dir: string) {
+    this.accounts = new AccountList(dir, 'vercel');
   }
 
   private async token(): Promise<{ token: string; source: 'app' | 'cli' } | null> {
-    const saved = this.store.get();
+    const acc = this.accounts.active();
+    const saved = acc && this.accounts.token(acc.id);
     if (saved) return { token: saved, source: 'app' };
     const t = await cliToken();
     return t ? { token: t, source: 'cli' } : null;
@@ -212,12 +213,15 @@ export class Vercel {
   async status(): Promise<VercelStatus> {
     this.cli ??= await cliInstalled();
     const tok = await this.token();
+    const active = tok?.source === 'app' ? this.accounts.active() : null;
     const base: VercelStatus = {
       connected: false,
       source: null,
       user: null,
       teams: [],
       cli: this.cli,
+      accounts: this.accounts.list(),
+      active: active?.id ?? null,
     };
     if (!tok) return base;
     try {
@@ -233,8 +237,10 @@ export class Vercel {
         '/v2/teams?limit=50',
         null,
       ).catch(() => ({ teams: [] }));
+      if (active) this.accounts.label(active.id, user.username);
       return {
         ...base,
+        accounts: this.accounts.list(),
         connected: true,
         source: tok.source,
         user: user.username,
@@ -255,13 +261,24 @@ export class Vercel {
       signal: AbortSignal.timeout(20_000),
     });
     if (!r.ok) throw new Error('Vercel rechazó ese token.');
-    this.store.set(t);
+    const j = (await r.json().catch(() => ({}))) as { user?: { username?: string } };
+    this.accounts.add(t, j.user?.username ?? '', true);
     return this.status();
   }
 
-  /** Forgets the app's token (the CLI login, if any, is the CLI's: `vercel logout`). */
-  async logout(): Promise<VercelStatus> {
-    this.store.delete();
+  /** Makes another connected account the one the panel and the AI use. */
+  async useAccount(id: string): Promise<VercelStatus> {
+    this.accounts.use(id);
+    return this.status();
+  }
+
+  /**
+   * Forgets one of the app's accounts (the active one by default). The CLI login, if any, is
+   * the CLI's: `vercel logout`.
+   */
+  async logout(id?: string): Promise<VercelStatus> {
+    const target = id ?? this.accounts.active()?.id;
+    if (target) this.accounts.remove(target);
     return this.status();
   }
 

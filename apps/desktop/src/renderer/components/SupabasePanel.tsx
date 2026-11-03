@@ -1,3 +1,4 @@
+import { AccountSwitch } from './AccountSwitch';
 import { Icon } from './Icon';
 import { useCallback, useEffect, useState } from 'react';
 import type {
@@ -182,10 +183,17 @@ function Grid({ r }: { r: SupabaseQueryResult }) {
 }
 
 export function SupabasePanel() {
+  // A new body per account: switching leaves nothing of the previous one on screen.
+  const [gen, setGen] = useState(0);
+  return <SupabaseBody key={gen} reset={() => setGen((g) => g + 1)} />;
+}
+
+function SupabaseBody({ reset }: { reset: () => void }) {
   const workspace = useStore((s) => s.workspace);
   const root = workspace?.root;
   const [st, setSt] = useState<SupabaseStatus | null>(null);
   const [token, setToken] = useState('');
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [ref, setRef] = useState<string | null>(null);
   const [linked, setLinked] = useState(false);
@@ -554,10 +562,44 @@ export function SupabasePanel() {
     );
   }
 
-  if (!st.connected && st.offline) {
+  const account = (
+    <AccountSwitch
+      icon={<Icon name="supabase" size={12} />}
+      label={
+        st.orgs.map((o) => o.name).join(', ') ||
+        st.accounts.find((a) => a.id === st.active)?.label ||
+        'Supabase'
+      }
+      title={st.source === 'cli' ? t('sbFromCli') : t('vcFromApp')}
+      accounts={st.accounts}
+      active={st.active}
+      busy={busy !== null}
+      onUse={(id) =>
+        void act('use', async () => {
+          await api().supabase.useAccount(id);
+          reset();
+        })
+      }
+      onAdd={() => setAdding(true)}
+      onLogout={
+        st.source === 'app'
+          ? () => {
+              if (confirm(t('sbLogoutConfirm')))
+                void act('logout', async () => {
+                  await api().supabase.logout();
+                  reset();
+                });
+            }
+          : undefined
+      }
+    />
+  );
+
+  if (!adding && !st.connected && st.offline) {
     return (
       <div className="explorer">
         {title}
+        {st.accounts.length > 1 && account}
         <div className="sidebar-empty vc-connect">
           <p>{t('svcOffline', { name: 'Supabase' })}</p>
           <p className="vc-hint">{st.offline}</p>
@@ -573,17 +615,19 @@ export function SupabasePanel() {
     );
   }
 
-  if (!st.connected) {
+  if (!st.connected || adding) {
     const connect = () =>
       void act('token', async () => {
-        setSt(await api().supabase.setToken(token));
+        await api().supabase.setToken(token);
         setToken('');
+        reset();
       });
     return (
       <div className="explorer">
         {title}
+        {!adding && st.accounts.length > 1 && account}
         <div className="sidebar-empty vc-connect">
-          <p>{st.source ? t('sbTokenRejected') : t('sbIntro')}</p>
+          <p>{adding ? t('acctAddIntro') : st.source ? t('sbTokenRejected') : t('sbIntro')}</p>
           <input
             type="password"
             value={token}
@@ -596,38 +640,27 @@ export function SupabasePanel() {
           <button className="primary" disabled={!token.trim() || busy !== null} onClick={connect}>
             {busy === 'token' ? '…' : t('vcConnect')}
           </button>
+          {adding && (
+            <button className="link" onClick={() => setAdding(false)}>
+              {t('acctCancel')}
+            </button>
+          )}
           <button className="link" onClick={() => open(`${DASH}/account/tokens`)}>
             {t('vcCreateToken')}
           </button>
-          <p className="vc-hint">{st.cli ? t('sbCliHint') : t('sbCliMissing')}</p>
-          <button onClick={() => inTerminal(st.cli, 'login')}>{t('sbCliLogin')}</button>
-          <button className="link" onClick={() => void api().supabase.status().then(setSt)}>
-            {t('vcRecheck')}
-          </button>
+          {!adding && (
+            <>
+              <p className="vc-hint">{st.cli ? t('sbCliHint') : t('sbCliMissing')}</p>
+              <button onClick={() => inTerminal(st.cli, 'login')}>{t('sbCliLogin')}</button>
+              <button className="link" onClick={() => void api().supabase.status().then(setSt)}>
+                {t('vcRecheck')}
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
   }
-
-  const account = (
-    <div className="git-branchbar">
-      <span className="git-branch" title={st.source === 'cli' ? t('sbFromCli') : t('vcFromApp')}>
-        <Icon name="supabase" size={12} /> {st.orgs.map((o) => o.name).join(', ') || 'Supabase'}
-      </span>
-      <span className="spacer" />
-      {st.source === 'app' && (
-        <button
-          className="link"
-          onClick={() => {
-            if (confirm(t('sbLogoutConfirm')))
-              void act('logout', async () => setSt(await api().supabase.logout()));
-          }}
-        >
-          {t('vcLogout')}
-        </button>
-      )}
-    </div>
-  );
 
   // No project for this folder yet: pick one (or link it with the CLI).
   if (!ref) {

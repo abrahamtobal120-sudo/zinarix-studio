@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { LicenseStatus, ProFeature } from '../../shared/plans';
-import { TRIAL_DAYS } from '../../shared/plans';
+import type { LicenseStatus, PlanId, ProFeature } from '../../shared/plans';
+import { hasAi, hasPro, isActivated, TRIAL_DAYS } from '../../shared/plans';
 import { runCommand } from '../commands';
 import { t } from '../i18n';
 import type { Key } from '../i18n';
@@ -22,6 +22,10 @@ export function planLabel(l: LicenseStatus): string {
       return t('planOwner');
     case 'pro':
       return 'Pro';
+    case 'ai':
+      return 'AI';
+    case 'proai':
+      return 'Pro + AI';
     case 'trial':
       return t('planTrialDays', { n: l.trialDaysLeft ?? TRIAL_DAYS });
     case 'open':
@@ -34,7 +38,7 @@ export function planLabel(l: LicenseStatus): string {
 /** Status bar: the plan, one click from the license panel. */
 export function PlanBadge() {
   const l = useStore((s) => s.license);
-  // While charging is off there is nothing to say (the owner still sees "Pro (dueño)").
+  // While charging is off there is nothing to say (the owner still sees "Pro + AI (dueño)").
   if (l.plan === 'open') return null;
   return (
     <span
@@ -42,7 +46,7 @@ export function PlanBadge() {
       title={t('planTitle')}
       onClick={() => setState({ modal: { kind: 'license' } })}
     >
-      <Icon name={l.plan === 'free' ? 'star' : 'sparkles'} size={12} /> {planLabel(l)}
+      <Icon name={l.plan === 'free' ? 'star' : l.plan === 'ai' ? 'cpu' : 'sparkles'} size={12} /> {planLabel(l)}
     </span>
   );
 }
@@ -54,16 +58,36 @@ const PRO_ROWS: { icon: IconName; key: Key; free: (l: LicenseStatus) => string }
   { icon: 'window', key: 'proWindows', free: (l) => (l.free.windows ? '✓' : '1') },
 ];
 
+/** The four plans, as columns. */
+const COLUMNS: { id: PlanId; label: () => string; pro: boolean; ai: boolean }[] = [
+  { id: 'free', label: () => t('planFree'), pro: false, ai: false },
+  { id: 'pro', label: () => 'Pro', pro: true, ai: false },
+  { id: 'ai', label: () => 'AI', pro: false, ai: true },
+  { id: 'proai', label: () => 'Pro + AI', pro: true, ai: true },
+];
+
+/** The column of the current plan (trial counts as Pro, the owner has everything). */
+const columnOf = (plan: PlanId): PlanId =>
+  plan === 'owner' ? 'proai' : plan === 'trial' ? 'pro' : plan;
+
 function ProTable() {
   const l = useStore((s) => s.license);
   if (l.plan === 'open') return null;
+  const current = columnOf(l.plan);
+  const cls = (c: (typeof COLUMNS)[number]) =>
+    [c.pro || c.ai ? 'pro' : '', c.ai ? 'ai' : '', c.id === current ? 'current' : '']
+      .filter(Boolean)
+      .join(' ');
   return (
     <table className="plan-table">
       <thead>
         <tr>
           <th />
-          <th>{t('planFree')}</th>
-          <th className="pro">Pro</th>
+          {COLUMNS.map((c) => (
+            <th key={c.id} className={cls(c)}>
+              {c.label()}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
@@ -71,18 +95,34 @@ function ProTable() {
           <td>
             <Icon name="sparkles" size={13} /> {t('proBase')}
           </td>
-          <td>✓</td>
-          <td className="pro">✓</td>
+          {COLUMNS.map((c) => (
+            <td key={c.id} className={cls(c)}>
+              ✓
+            </td>
+          ))}
         </tr>
         {PRO_ROWS.map((r) => (
           <tr key={r.key}>
             <td>
               <Icon name={r.icon} size={13} /> {t(r.key)}
             </td>
-            <td className="dim">{r.free(l)}</td>
-            <td className="pro">✓</td>
+            {COLUMNS.map((c) => (
+              <td key={c.id} className={`${cls(c)}${c.pro ? '' : ' dim'}`}>
+                {c.pro ? '✓' : r.free(l)}
+              </td>
+            ))}
           </tr>
         ))}
+        <tr>
+          <td>
+            <Icon name="cpu" size={13} /> {t('planAiRow')}
+          </td>
+          {COLUMNS.map((c) => (
+            <td key={c.id} className={`${cls(c)}${c.ai ? '' : ' dim'}`}>
+              {c.ai ? '✓' : '—'}
+            </td>
+          ))}
+        </tr>
       </tbody>
     </table>
   );
@@ -140,7 +180,7 @@ function ActivateForm({ onDone }: { onDone?: (l: LicenseStatus) => void }) {
           id="plan-key"
           value={key}
           spellCheck={false}
-          placeholder="ZX1.…"
+          placeholder="ZX1.… · zinarixpro at"
           onChange={(e) => setKey(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void activate()}
         />
@@ -163,10 +203,11 @@ export function LicensePanel() {
     if (!confirm(t('planRemoveConfirm'))) return;
     setState({ license: await api().license.remove() });
   };
-  const until =
-    l.plan === 'pro' && l.expires
+  const until = l.code
+    ? t('planCode')
+    : isActivated(l.plan) && l.expires
       ? t('planUntil', { date: new Date(l.expires).toLocaleDateString() })
-      : l.plan === 'pro' || l.plan === 'owner'
+      : isActivated(l.plan)
         ? t('planForever')
         : l.plan === 'trial' && l.trialEndsAt
           ? t('planTrialUntil', { date: new Date(l.trialEndsAt).toLocaleDateString() })
@@ -201,7 +242,7 @@ export function LicensePanel() {
           </>
         )}
         <ProTable />
-        {l.billing && l.plan !== 'owner' && l.plan !== 'pro' && (
+        {l.billing && !(hasPro(l.plan) && hasAi(l.plan)) && (
           <div className="plan-buy">
             <button className="primary big" onClick={buy}>
               <Icon name="sparkles" size={15} /> {t('planBuy')}
@@ -209,12 +250,12 @@ export function LicensePanel() {
             <span className="dim">{t('planBuyHint')}</span>
           </div>
         )}
-        {l.plan === 'pro' || l.plan === 'owner' ? (
+        {/* A plan code can always be swapped for another one. */}
+        {(!isActivated(l.plan) || l.code) && <ActivateForm />}
+        {(isActivated(l.plan) || l.code) && (
           <div className="plan-footer">
             <button onClick={() => void remove()}>{t('planRemove')}</button>
           </div>
-        ) : (
-          <ActivateForm />
         )}
       </div>
     </div>
@@ -379,7 +420,7 @@ export function Onboarding() {
             </h2>
             <p className="dim">{l.plan === 'open' ? t('planOpenBody') : t('onbTrialLead')}</p>
             {l.plan === 'open' ? <Included /> : <ProTable />}
-            {l.billing && l.plan !== 'pro' && l.plan !== 'owner' && <ActivateForm />}
+            {l.billing && !isActivated(l.plan) && <ActivateForm />}
           </div>
         )}
         {step === 3 && (

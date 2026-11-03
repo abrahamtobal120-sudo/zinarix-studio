@@ -1,6 +1,12 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
-import type { LicenseStatus, PlansConfig } from '../shared/plans.js';
-import { DEFAULT_PLANS, PRO_FEATURES } from '../shared/plans.js';
+import type { LicenseStatus, PaidPlan, PlanFeatures, PlansConfig } from '../shared/plans.js';
+import {
+  AI_FEATURES,
+  DEFAULT_PLANS,
+  FREE_FEATURES,
+  PRO_AI_FEATURES,
+  PRO_FEATURES,
+} from '../shared/plans.js';
 
 /**
  * License keys: `ZX1.<payload>.<signature>`, where payload is base64url JSON and the
@@ -15,11 +21,34 @@ MCowBQYDK2VwAyEA8L5XRiEBieWNmEXBKBQENGnNfXs3bcTX/WYhD0tuBiU=
 /** SHA-256 of the owner's word (the app's author uses it instead of buying a license). */
 const OWNER_HASH = '74eda8cdcd7947be8e6f67efe64ea6e8b37ed31f6b29a075406629cd091ebe56';
 
+/**
+ * Plan codes (SHA-256 of `zinarix-plan:<code without spaces>`): typed where a key goes, they
+ * put this copy on a plan, to try each one. zinarix at: free (even while charging is off),
+ * zinarixpro at: Pro, zinarixai at: AI, zinarixproai at: Pro + AI.
+ */
+const PLAN_CODES: Record<string, PaidPlan> = {
+  '242803bc4121ebb5b325318a6176ac7ac928527e56b243f4d28bf4482d3ebbee': 'free',
+  '43745c65a7ffdb389eaaccdfce85190ebb0e93b240d52b91c6507aa02e382578': 'pro',
+  '66de10d753ffcecb2c929329cdb17e26f02060d90e43e1aefb5546dd52f41cf8': 'ai',
+  '3629e4aa99e26c97b6fe1a0700baa36d614e820406c9a6b9c4bf5b72c4e46c2b': 'proai',
+};
+
+const PAID: PaidPlan[] = ['pro', 'ai', 'proai'];
+
+/** What each plan you can buy or set with a code includes. */
+export const PLAN_FEATURES: Record<PaidPlan, PlanFeatures> = {
+  free: FREE_FEATURES,
+  pro: PRO_FEATURES,
+  ai: AI_FEATURES,
+  proai: PRO_AI_FEATURES,
+};
+
 export interface LicensePayload {
   v: 1;
   /** Unique id (the payment it came from). */
   id: string;
-  plan: 'pro';
+  /** Keys made before AI existed are all 'pro'. */
+  plan: Exclude<PaidPlan, 'free'>;
   email: string;
   name?: string;
   /** Issued at (ms). */
@@ -41,6 +70,14 @@ export function isOwnerCode(input: string): boolean {
   return createHash('sha256').update(`zinarix-owner:${word}`).digest('hex') === OWNER_HASH;
 }
 
+/** The plan a code sets (any case, with or without spaces), or null. */
+export function planCode(input: string): PaidPlan | null {
+  const word = input.replace(/\s+/g, '').toLowerCase();
+  if (!word || word.length > 64) return null;
+  const hash = createHash('sha256').update(`zinarix-plan:${word}`).digest('hex');
+  return PLAN_CODES[hash] ?? null;
+}
+
 /** Checks a license key and returns what it grants; throws a readable error otherwise. */
 export function parseLicense(input: string, publicKeyPem = LICENSE_PUBLIC_KEY): LicensePayload {
   const key = normalizeKey(input);
@@ -55,7 +92,7 @@ export function parseLicense(input: string, publicKeyPem = LICENSE_PUBLIC_KEY): 
   } catch {
     throw new Error('La clave de licencia está dañada.');
   }
-  if (p.v !== 1 || p.plan !== 'pro' || typeof p.email !== 'string')
+  if (p.v !== 1 || !PAID.includes(p.plan) || typeof p.email !== 'string')
     throw new Error('Esta clave es de una versión más nueva de Zinarix Studio: actualiza la app.');
   return p;
 }
@@ -71,6 +108,8 @@ export interface StoredLicense {
   license?: string;
   /** Activated with the owner's word. */
   owner?: boolean;
+  /** Set with a plan code (zinarix at, zinarixpro at…). */
+  codePlan?: PaidPlan;
   /** First launch (ms). */
   firstRun?: number;
   /** When this copy first saw billing switched on (ms): the trial runs from here. */
@@ -89,17 +128,28 @@ export function licenseStatus(
 ): LicenseStatus {
   const cfg = s.plans ?? DEFAULT_PLANS;
   const base = { billing: cfg.billing, buyUrl: cfg.buyUrl, free: cfg.free };
-  if (s.owner) return { ...base, plan: 'owner', features: PRO_FEATURES, expires: null };
+  if (s.owner) return { ...base, plan: 'owner', features: PRO_AI_FEATURES, expires: null };
+  if (s.codePlan && s.codePlan in PLAN_FEATURES) {
+    // "zinarix at": the free plan as people will get it once charging is on.
+    if (s.codePlan === 'free') return { ...base, plan: 'free', features: cfg.free, code: true };
+    return {
+      ...base,
+      plan: s.codePlan,
+      features: PLAN_FEATURES[s.codePlan],
+      expires: null,
+      code: true,
+    };
+  }
   let problem: string | undefined;
   if (s.license) {
     try {
       const p = parseLicense(s.license, publicKeyPem);
-      if (p.exp && p.exp < now) problem = 'Tu licencia Pro venció. Renuévala para seguir con Pro.';
+      if (p.exp && p.exp < now) problem = 'Tu licencia venció. Renuévala para seguir con tu plan.';
       else
         return {
           ...base,
-          plan: 'pro',
-          features: PRO_FEATURES,
+          plan: p.plan,
+          features: PLAN_FEATURES[p.plan],
           email: p.email,
           name: p.name,
           expires: p.exp ?? null,

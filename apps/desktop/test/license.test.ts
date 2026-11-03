@@ -7,11 +7,18 @@ import {
   licenseStatus,
   normalizeKey,
   parseLicense,
+  planCode,
   signLicense,
   type LicensePayload,
 } from '../src/main/license.js';
 import { newer, parseRemote } from '../src/main/remote.js';
-import { DEFAULT_PLANS, FREE_FEATURES, PRO_FEATURES } from '../src/shared/plans.js';
+import {
+  AI_FEATURES,
+  DEFAULT_PLANS,
+  FREE_FEATURES,
+  PRO_AI_FEATURES,
+  PRO_FEATURES,
+} from '../src/shared/plans.js';
 
 /**
  * Plans and licenses: charging is off unless the owner turns it on from the website, the
@@ -62,6 +69,41 @@ describe('license keys', () => {
     expect(isOwnerCode('  TOBAL ')).toBe(true);
     for (const w of ['tobal1', 'toba', '', 'zinarix', 'x'.repeat(100)])
       expect(isOwnerCode(w)).toBe(false);
+  });
+});
+
+describe('plan codes', () => {
+  it('each code sets its plan, in any case and with or without spaces', () => {
+    expect(planCode('zinarix at')).toBe('free');
+    expect(planCode('ZinarixPro AT')).toBe('pro');
+    expect(planCode('zinarixproat')).toBe('pro');
+    expect(planCode(' zinarixai at ')).toBe('ai');
+    expect(planCode('zinarixproai at')).toBe('proai');
+    for (const w of ['zinarix', 'zinarixpro', 'tobal', 'zinarixpro at1', '', 'x'.repeat(100)])
+      expect(planCode(w)).toBeNull();
+  });
+
+  it('a code beats charging on or off; "zinarix at" is the free plan even when open', () => {
+    for (const plans of [DEFAULT_PLANS, billingOn]) {
+      expect(licenseStatus({ codePlan: 'free', plans }, NOW, PUB)).toMatchObject({
+        plan: 'free',
+        features: FREE_FEATURES,
+        code: true,
+      });
+      expect(licenseStatus({ codePlan: 'pro', plans }, NOW, PUB).features).toEqual(PRO_FEATURES);
+      expect(licenseStatus({ codePlan: 'ai', plans }, NOW, PUB).features).toEqual(AI_FEATURES);
+      expect(licenseStatus({ codePlan: 'proai', plans }, NOW, PUB).features).toEqual(
+        PRO_AI_FEATURES,
+      );
+    }
+  });
+
+  it('AI and Pro + AI keys grant their plan', () => {
+    for (const plan of ['ai', 'proai'] as const) {
+      const st = licenseStatus({ license: keyFor(payload({ plan })), plans: billingOn }, NOW, PUB);
+      expect(st.plan).toBe(plan);
+      expect(st.features.ai).toBe(true);
+    }
   });
 });
 
@@ -116,7 +158,7 @@ describe('plan of an installation', () => {
     for (const plans of [DEFAULT_PLANS, billingOn]) {
       const st = licenseStatus({ owner: true, plans, billingSince: NOW - 99 * DAY }, NOW, PUB);
       expect(st.plan).toBe('owner');
-      expect(st.features).toEqual(PRO_FEATURES);
+      expect(st.features).toEqual(PRO_AI_FEATURES);
     }
   });
 });
@@ -219,6 +261,15 @@ describe('website: /api/license (after a Stripe payment)', () => {
   it('keys can expire (per payment link metadata)', async () => {
     const r = await call({ ...paid, metadata: { days: '365' } });
     expect(parseLicense(r.body!.key!, PUB).exp).toBe(paid.created * 1000 + 365 * DAY);
+  });
+
+  it('the payment link decides the plan', async () => {
+    process.env.STRIPE_PAYMENT_LINK = 'plink_pro';
+    process.env.STRIPE_LINK_AI = 'plink_ai';
+    const r = await call({ ...paid, payment_link: 'plink_ai' });
+    expect(parseLicense(r.body!.key!, PUB).plan).toBe('ai');
+    delete process.env.STRIPE_PAYMENT_LINK;
+    delete process.env.STRIPE_LINK_AI;
   });
 
   it('no key for unpaid, unknown, foreign or malformed purchases', async () => {

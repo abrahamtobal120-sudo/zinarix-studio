@@ -65,8 +65,10 @@ En la app: **Ayuda → Plan y licencia…**, escribe `tobal` en el cuadro de la 
      con permiso solo de lectura de Checkout Sessions).
    - `LICENSE_PRIVATE_KEY`: el contenido completo de `license-private.pem` (la llave privada que
      se te entregó **fuera** del repo, en la carpeta `zinarix-licencias-PRIVADO`).
-   - `STRIPE_PAYMENT_LINK` (opcional): el id `plink_…` del enlace, para que solo esa compra dé
+   - `STRIPE_PAYMENT_LINK` (opcional): el id `plink_…` del enlace de Pro, para que solo esa compra dé
      licencias.
+   - `STRIPE_LINK_AI` y `STRIPE_LINK_PROAI` (opcionales): los `plink_…` de los enlaces de AI y
+     Pro + AI; esas compras dan una clave de ese plan.
 5. Pega el enlace de pago en `stripeLink` de `website/app-config.json` y publica.
 
 El cliente paga → Stripe lo manda a `/gracias` → la página pide la licencia a `/api/license`

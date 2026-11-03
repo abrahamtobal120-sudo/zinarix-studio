@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { TokenStore } from './token-store.js';
+import { AccountList } from './accounts.js';
 import type {
   SupabaseApiInfo,
   SupabaseAuthConfig,
@@ -97,6 +97,10 @@ function checkRef(ref: string): string {
   return ref;
 }
 
+function orgNames(orgs: { name: string }[]): string {
+  return Array.isArray(orgs) ? orgs.map((o) => o.name).join(', ') : '';
+}
+
 const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
 const lit = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
@@ -114,14 +118,15 @@ function cell(v: unknown): string | null {
 export class Supabase {
   private cli: boolean | null = null;
 
-  constructor(private readonly dir: string) {}
+  private readonly accounts: AccountList;
 
-  private get store(): TokenStore {
-    return new TokenStore(join(this.dir, 'supabase-token.bin'), 'supabase');
+  constructor(dir: string) {
+    this.accounts = new AccountList(dir, 'supabase');
   }
 
   private token(): { token: string; source: 'app' | 'cli' } | null {
-    const saved = this.store.get();
+    const acc = this.accounts.active();
+    const saved = acc && this.accounts.token(acc.id);
     if (saved) return { token: saved, source: 'app' };
     const t = cliToken();
     return t ? { token: t, source: 'cli' } : null;
@@ -158,7 +163,15 @@ export class Supabase {
   async status(): Promise<SupabaseStatus> {
     this.cli ??= await cliInstalled();
     const tok = this.token();
-    const base: SupabaseStatus = { connected: false, source: null, orgs: [], cli: this.cli };
+    const active = tok?.source === 'app' ? this.accounts.active() : null;
+    const base: SupabaseStatus = {
+      connected: false,
+      source: null,
+      orgs: [],
+      cli: this.cli,
+      accounts: this.accounts.list(),
+      active: active?.id ?? null,
+    };
     if (!tok) return base;
     try {
       // A network hiccup (e.g. right after startup) gets a second try before giving up.
@@ -169,8 +182,11 @@ export class Supabase {
           return this.req<{ id: string; name: string }[]>('/v1/organizations');
         },
       );
+      // A personal token has no user name: its organizations name the account.
+      if (active) this.accounts.label(active.id, orgNames(orgs));
       return {
         ...base,
+        accounts: this.accounts.list(),
         connected: true,
         source: tok.source,
         orgs: orgs.map((o) => ({ id: o.id, name: o.name })),
@@ -190,13 +206,24 @@ export class Supabase {
       signal: AbortSignal.timeout(20_000),
     });
     if (!r.ok) throw new Error('Supabase rechazó ese token.');
-    this.store.set(t);
+    const orgs = (await r.json().catch(() => [])) as { name: string }[];
+    this.accounts.add(t, orgNames(orgs));
     return this.status();
   }
 
-  /** Forgets the app's token (the CLI login, if any, is the CLI's: `supabase logout`). */
-  async logout(): Promise<SupabaseStatus> {
-    this.store.delete();
+  /** Makes another connected account the one the panel and the AI use. */
+  async useAccount(id: string): Promise<SupabaseStatus> {
+    this.accounts.use(id);
+    return this.status();
+  }
+
+  /**
+   * Forgets one of the app's accounts (the active one by default). The CLI login, if any, is
+   * the CLI's: `supabase logout`.
+   */
+  async logout(id?: string): Promise<SupabaseStatus> {
+    const target = id ?? this.accounts.active()?.id;
+    if (target) this.accounts.remove(target);
     return this.status();
   }
 

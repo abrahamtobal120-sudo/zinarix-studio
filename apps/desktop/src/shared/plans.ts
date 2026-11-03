@@ -5,8 +5,15 @@
  * (which enforces) and the renderer (which explains and offers the upgrade).
  */
 
-/** open: charging is off (set from the website), everyone has everything. */
-export type PlanId = 'open' | 'free' | 'trial' | 'pro' | 'owner';
+/**
+ * open: charging is off (set from the website), everyone has everything.
+ * ai: the free plan plus Zinarix AI (the best AIs without accounts or keys).
+ * proai: Pro plus Zinarix AI.
+ */
+export type PlanId = 'open' | 'free' | 'trial' | 'pro' | 'ai' | 'proai' | 'owner';
+
+/** What a license key or a plan code can grant. */
+export type PaidPlan = 'free' | 'pro' | 'ai' | 'proai';
 
 export interface PlanFeatures {
   /** Chats open at the same time (each one can be working). */
@@ -17,6 +24,8 @@ export interface PlanFeatures {
   windows: boolean;
   /** One AI handing work to another (delegate_to_ai): part of the agents, every plan. */
   delegation: boolean;
+  /** Zinarix AI: AIs included, without accounts or keys (plans AI and Pro + AI). */
+  ai?: boolean;
 }
 
 export const FREE_FEATURES: PlanFeatures = {
@@ -33,6 +42,20 @@ export const PRO_FEATURES: PlanFeatures = {
   delegation: true,
 };
 
+export const AI_FEATURES: PlanFeatures = { ...FREE_FEATURES, ai: true };
+
+export const PRO_AI_FEATURES: PlanFeatures = { ...PRO_FEATURES, ai: true };
+
+/** Plans that include Pro (more chats, side by side, windows). */
+export const hasPro = (plan: PlanId) => plan === 'pro' || plan === 'proai' || plan === 'owner';
+
+/** Plans that include Zinarix AI. */
+export const hasAi = (plan: PlanId) => plan === 'ai' || plan === 'proai' || plan === 'owner';
+
+/** Plans someone activated (a key or a code), which can be removed. */
+export const isActivated = (plan: PlanId) =>
+  plan === 'pro' || plan === 'ai' || plan === 'proai' || plan === 'owner';
+
 export type ProFeature = 'chats' | 'split' | 'windows';
 
 export interface LicenseStatus {
@@ -44,6 +67,8 @@ export interface LicenseStatus {
   buyUrl: string;
   /** What the free plan includes (set from the website). */
   free: PlanFeatures;
+  /** Set with a plan code (zinarix at, zinarixpro at…), not a bought key. */
+  code?: boolean;
   /** Who the license belongs to (Pro). */
   email?: string;
   name?: string;
