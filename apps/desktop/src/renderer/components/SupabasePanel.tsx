@@ -4,6 +4,9 @@ import type {
   SupabaseApiInfo,
   SupabaseAuthConfig,
   SupabaseBackupsView,
+  SupabaseEmailConfig,
+  SupabaseEmailKind,
+  SupabaseSmtpConfig,
   SupabaseBucketView,
   SupabaseColumnView,
   SupabaseFunctionView,
@@ -96,6 +99,15 @@ function copy(text: string, msg = t('vcCopied')) {
 /** Statements that only read (anything else asks first: it runs on the real database). */
 const READ_ONLY = /^\s*(select|with|explain|show|table|values)\b/i;
 
+const TEMPLATE_LABEL: Record<SupabaseEmailKind, () => string> = {
+  confirmation: () => t('sbTplConfirmation'),
+  invite: () => t('sbTplInvite'),
+  magic_link: () => t('sbTplMagic'),
+  recovery: () => t('sbTplRecovery'),
+  email_change: () => t('sbTplEmailChange'),
+  reauthentication: () => t('sbTplReauth'),
+};
+
 function inTerminal(cli: boolean, args: string) {
   setState({ panelOpen: true });
   setTimeout(() => void runInTerminal(`${cli ? 'supabase' : 'npx supabase'} ${args}`), 300);
@@ -182,7 +194,7 @@ export function SupabasePanel() {
   const [filter, setFilter] = useState('');
   const [health, setHealth] = useState<SupabaseHealthView[]>([]);
   const [view, setView] = useState<
-    'tables' | 'sql' | 'auth' | 'functions' | 'secrets' | 'storage' | 'migrations' | 'api'
+    'tables' | 'sql' | 'auth' | 'email' | 'functions' | 'secrets' | 'storage' | 'migrations' | 'api'
   >('tables');
   const [tables, setTables] = useState<SupabaseTableView[] | null>(null);
   const [tableFilter, setTableFilter] = useState('');
@@ -208,6 +220,13 @@ export function SupabasePanel() {
   const [authCfg, setAuthCfg] = useState<SupabaseAuthConfig | null>(null);
   const [authDraft, setAuthDraft] = useState<SupabaseAuthConfig | null>(null);
   const [backups, setBackups] = useState<SupabaseBackupsView | null>(null);
+  const [emailCfg, setEmailCfg] = useState<SupabaseEmailConfig | null>(null);
+  const [smtpDraft, setSmtpDraft] = useState<
+    (SupabaseSmtpConfig & { on: boolean; rate: string }) | null
+  >(null);
+  const [tplKind, setTplKind] = useState<SupabaseEmailKind>('confirmation');
+  const [tplDraft, setTplDraft] = useState<{ subject: string; content: string } | null>(null);
+  const [mailTo, setMailTo] = useState({ email: '', redirect: '' });
 
   const act = async (label: string, fn: () => Promise<unknown>) => {
     setBusy(label);
@@ -270,7 +289,8 @@ export function SupabasePanel() {
           api().supabase.users(ref),
         ]);
         setUsers({ n, list });
-      } else if (view === 'secrets') setSecrets(await api().supabase.secrets(ref));
+      } else if (view === 'email') setEmailCfg(await api().supabase.emailConfig(ref));
+      else if (view === 'secrets') setSecrets(await api().supabase.secrets(ref));
       else if (view === 'migrations') {
         setMigrations(await api().supabase.migrations(ref));
         setBackups(
@@ -294,6 +314,9 @@ export function SupabasePanel() {
     setSecrets(null);
     setAuthCfg(null);
     setAuthDraft(null);
+    setEmailCfg(null);
+    setSmtpDraft(null);
+    setTplDraft(null);
     setApiInfo(null);
     setFiles(null);
     setPreview(null);
@@ -397,6 +420,64 @@ export function SupabasePanel() {
       const fresh = await api().supabase.authConfig(ref);
       setAuthCfg(fresh);
       setAuthDraft(fresh);
+      toast(t('vcSettingsSaved'));
+    });
+  };
+
+  const sendEmail = (kind: 'invite' | 'magiclink' | 'recovery', email: string, redirect = '') => {
+    if (!ref || !email.trim()) return;
+    if (kind === 'invite' && !confirm(t('sbMailInviteConfirm', { email }))) return;
+    void act('mail', async () => {
+      await api().supabase.sendEmail(ref, kind, email.trim(), redirect);
+      toast(t('sbMailSent', { email: email.trim() }));
+    });
+  };
+
+  const editSmtp = () => {
+    if (!emailCfg) return;
+    if (smtpDraft) {
+      setSmtpDraft(null);
+      return;
+    }
+    const c = emailCfg.smtp;
+    setSmtpDraft({
+      on: !!c,
+      host: c?.host ?? '',
+      port: c?.port || '587',
+      user: c?.user ?? '',
+      pass: '',
+      senderEmail: c?.senderEmail ?? '',
+      senderName: c?.senderName ?? '',
+      rate: emailCfg.rateLimit ? String(emailCfg.rateLimit) : '',
+    });
+  };
+
+  const saveSmtp = () => {
+    if (!ref || !smtpDraft) return;
+    const { on, rate, ...d } = smtpDraft;
+    const smtp = {
+      ...d,
+      host: d.host.trim(),
+      user: d.user.trim(),
+      senderEmail: d.senderEmail.trim(),
+      senderName: d.senderName.trim(),
+    };
+    if (!on && emailCfg?.smtp && !confirm(t('sbSmtpOffConfirm'))) return;
+    void act('mail', async () => {
+      await api().supabase.setSmtp(ref, on ? smtp : null, on && rate ? Number(rate) : null);
+      setEmailCfg(await api().supabase.emailConfig(ref));
+      setSmtpDraft(null);
+      toast(t('vcSettingsSaved'));
+    });
+  };
+
+  const saveTemplate = () => {
+    if (!ref || !tplDraft) return;
+    const d = tplDraft;
+    void act('mail', async () => {
+      await api().supabase.setEmailTemplate(ref, tplKind, d.subject, d.content);
+      setEmailCfg(await api().supabase.emailConfig(ref));
+      setTplDraft(null);
       toast(t('vcSettingsSaved'));
     });
   };
@@ -722,6 +803,7 @@ export function SupabasePanel() {
               {tab('tables', `${t('sbTables')}${tables ? ` (${tables.length})` : ''}`)}
               {tab('sql', 'SQL')}
               {tab('auth', `Auth${users ? ` (${users.n})` : ''}`)}
+              {tab('email', 'Email')}
               {tab('functions', t('sbFunctions'))}
               {tab('secrets', `${t('sbSecrets')}${secrets ? ` (${secrets.length})` : ''}`)}
               {tab('storage', 'Storage')}
@@ -1032,6 +1114,265 @@ export function SupabasePanel() {
             </div>
           )}
 
+          {view === 'email' && (
+            <div className="tree git-list">
+              {emailCfg === null && (
+                <div className="git-clean">
+                  <Icon name="clock" size={13} className="spin-slow" /> {t('sbLoading')}
+                </div>
+              )}
+              {emailCfg && (
+                <>
+                  <div className="git-group">
+                    <span>{t('sbMailSend')}</span>
+                  </div>
+                  <div className="vc-form">
+                    <input
+                      type="email"
+                      value={mailTo.email}
+                      placeholder="persona@correo.com"
+                      spellCheck={false}
+                      onChange={(e) => setMailTo({ ...mailTo, email: e.target.value })}
+                    />
+                    <input
+                      value={mailTo.redirect}
+                      placeholder={t('sbMailRedirect')}
+                      spellCheck={false}
+                      onChange={(e) => setMailTo({ ...mailTo, redirect: e.target.value })}
+                    />
+                    <div className="git-connect-actions">
+                      {(
+                        [
+                          ['invite', t('sbMailInvite')],
+                          ['magiclink', t('sbMailMagic')],
+                          ['recovery', t('sbMailRecovery')],
+                        ] as const
+                      ).map(([kind, label]) => (
+                        <button
+                          key={kind}
+                          className={kind === 'invite' ? 'primary' : ''}
+                          disabled={
+                            busy !== null || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mailTo.email.trim())
+                          }
+                          onClick={() => sendEmail(kind, mailTo.email, mailTo.redirect)}
+                        >
+                          <Icon name="mail" size={14} /> {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="git-group">
+                    <span>SMTP</span>
+                    <span className="git-dir">
+                      {emailCfg.smtp
+                        ? `${emailCfg.smtp.host}:${emailCfg.smtp.port}`
+                        : t('sbSmtpBuiltIn')}
+                    </span>
+                  </div>
+                  {!emailCfg.smtp && <div className="git-gh-hint">{t('sbSmtpHint')}</div>}
+                  {emailCfg.smtp && (
+                    <div
+                      className="git-row"
+                      title={t('sbSmtpSender')}
+                      onClick={() => copy(emailCfg.smtp!.senderEmail)}
+                    >
+                      <span className="git-icon added">●</span>
+                      <span className="git-name">
+                        {emailCfg.smtp.senderName
+                          ? `${emailCfg.smtp.senderName} <${emailCfg.smtp.senderEmail}>`
+                          : emailCfg.smtp.senderEmail}
+                      </span>
+                      {emailCfg.rateLimit !== null && (
+                        <span className="git-dir vc-right">
+                          {t('sbSmtpRateShort', { n: emailCfg.rateLimit })}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="git-connect-actions vc-env-actions">
+                    <button className={smtpDraft ? 'primary' : ''} onClick={editSmtp}>
+                      <Icon name="settings" size={14} /> {t('sbSmtpEdit')}
+                    </button>
+                  </div>
+                  {smtpDraft && (
+                    <div className="vc-form vc-settings">
+                      <label className="vc-check">
+                        <input
+                          type="checkbox"
+                          checked={smtpDraft.on}
+                          onChange={(e) => setSmtpDraft({ ...smtpDraft, on: e.target.checked })}
+                        />
+                        {t('sbSmtpOn')}
+                      </label>
+                      {smtpDraft.on && (
+                        <>
+                          <label>
+                            <span>Host</span>
+                            <input
+                              value={smtpDraft.host}
+                              placeholder="smtp.resend.com"
+                              spellCheck={false}
+                              onChange={(e) => setSmtpDraft({ ...smtpDraft, host: e.target.value })}
+                            />
+                          </label>
+                          <label>
+                            <span>{t('sbSmtpPort')}</span>
+                            <input
+                              value={smtpDraft.port}
+                              placeholder="587"
+                              inputMode="numeric"
+                              onChange={(e) =>
+                                setSmtpDraft({
+                                  ...smtpDraft,
+                                  port: e.target.value.replace(/\D/g, ''),
+                                })
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>{t('sbSmtpUser')}</span>
+                            <input
+                              value={smtpDraft.user}
+                              placeholder="resend"
+                              spellCheck={false}
+                              onChange={(e) => setSmtpDraft({ ...smtpDraft, user: e.target.value })}
+                            />
+                          </label>
+                          <label>
+                            <span>{t('sbSmtpPass')}</span>
+                            <input
+                              type="password"
+                              value={smtpDraft.pass}
+                              placeholder={emailCfg.hasPass ? t('sbSmtpPassKeep') : ''}
+                              autoComplete="off"
+                              onChange={(e) => setSmtpDraft({ ...smtpDraft, pass: e.target.value })}
+                            />
+                          </label>
+                          <label>
+                            <span>{t('sbSmtpSender')}</span>
+                            <input
+                              type="email"
+                              value={smtpDraft.senderEmail}
+                              placeholder="no-reply@miapp.com"
+                              spellCheck={false}
+                              onChange={(e) =>
+                                setSmtpDraft({ ...smtpDraft, senderEmail: e.target.value })
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>{t('sbSmtpSenderName')}</span>
+                            <input
+                              value={smtpDraft.senderName}
+                              placeholder="Mi App"
+                              onChange={(e) =>
+                                setSmtpDraft({ ...smtpDraft, senderName: e.target.value })
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>{t('sbSmtpRate')}</span>
+                            <input
+                              value={smtpDraft.rate}
+                              placeholder="30"
+                              inputMode="numeric"
+                              onChange={(e) =>
+                                setSmtpDraft({
+                                  ...smtpDraft,
+                                  rate: e.target.value.replace(/\D/g, ''),
+                                })
+                              }
+                            />
+                          </label>
+                        </>
+                      )}
+                      <div className="git-connect-actions">
+                        <button
+                          className="primary"
+                          disabled={
+                            busy !== null ||
+                            (smtpDraft.on &&
+                              (!smtpDraft.host.trim() ||
+                                !smtpDraft.port ||
+                                !smtpDraft.senderEmail.includes('@') ||
+                                (!emailCfg.hasPass && !smtpDraft.pass)))
+                          }
+                          onClick={saveSmtp}
+                        >
+                          {t('vcEnvSave')}
+                        </button>
+                        <button onClick={() => setSmtpDraft(null)}>{t('vcEnvCancel')}</button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="git-group">
+                    <span>{t('sbMailTemplates')}</span>
+                  </div>
+                  {(Object.keys(emailCfg.templates) as SupabaseEmailKind[]).map((k) => (
+                    <div
+                      key={k}
+                      className={`git-row${tplDraft && tplKind === k ? ' on' : ''}`}
+                      title={t('vcEnvEdit')}
+                      onClick={() => {
+                        if (tplDraft && tplKind === k) {
+                          setTplDraft(null);
+                          return;
+                        }
+                        setTplKind(k);
+                        setTplDraft({ ...emailCfg.templates[k] });
+                      }}
+                    >
+                      <span className="git-icon">
+                        <Icon name="mail" size={13} />
+                      </span>
+                      <span className="git-name">{TEMPLATE_LABEL[k]()}</span>
+                      <span className="git-dir">{emailCfg.templates[k].subject}</span>
+                    </div>
+                  ))}
+                  {tplDraft && (
+                    <div className="vc-form vc-settings">
+                      <label>
+                        <span>{t('sbMailSubject')}</span>
+                        <input
+                          value={tplDraft.subject}
+                          onChange={(e) => setTplDraft({ ...tplDraft, subject: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        <span>HTML</span>
+                        <textarea
+                          value={tplDraft.content}
+                          spellCheck={false}
+                          rows={10}
+                          onChange={(e) => setTplDraft({ ...tplDraft, content: e.target.value })}
+                        />
+                      </label>
+                      <div className="git-gh-hint">{t('sbMailVars')}</div>
+                      <div className="git-connect-actions">
+                        <button
+                          className="primary"
+                          disabled={
+                            busy !== null ||
+                            JSON.stringify(tplDraft) === JSON.stringify(emailCfg.templates[tplKind])
+                          }
+                          onClick={saveTemplate}
+                        >
+                          {t('vcEnvSave')}
+                        </button>
+                        <button onClick={() => setTplDraft(null)}>{t('vcEnvCancel')}</button>
+                      </div>
+                    </div>
+                  )}
+                  <button className="link git-fetch" onClick={() => open(`${dash}/auth/templates`)}>
+                    {t('sbMailDash')}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {view === 'secrets' && (
             <div className="tree git-list">
               <div className="git-gh-hint">{t('sbSecretsHint')}</div>
@@ -1288,6 +1629,17 @@ export function SupabasePanel() {
                       {u.lastSignIn ? ago(u.lastSignIn) : t('sbNever')}
                     </span>
                     <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
+                      {u.email?.includes('@') && (
+                        <button
+                          title={t('sbMailRecoveryTitle')}
+                          onClick={() => {
+                            if (confirm(t('sbMailRecoveryConfirm', { email: u.email! })))
+                              sendEmail('recovery', u.email!);
+                          }}
+                        >
+                          <Icon name="mail" size={13} />
+                        </button>
+                      )}
                       <button
                         title={t('sbUserDelete')}
                         onClick={() => {
