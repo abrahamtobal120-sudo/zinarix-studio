@@ -339,6 +339,9 @@ function upgrade(w: Win | undefined, feature: string): void {
  * window then continues that task. Linux uses an XDG autostart entry; macOS and Windows the
  * system login items. Development runs are never registered.
  */
+/** Conversations whose agent run the last shutdown cut, until the first window asks. */
+let interruptedRuns: string[] = [];
+
 function resumeOnLogin(on: boolean): void {
   if (!app.isPackaged) return;
   try {
@@ -1299,6 +1302,7 @@ function registerIpc(): void {
     w.win.close();
   });
   handle('app:resumeOnLogin', z.tuple([z.boolean()]), (_w, on) => resumeOnLogin(on));
+  handle('app:interruptedRuns', z.tuple([]), () => interruptedRuns.splice(0));
   handle('app:newWindow', z.tuple([]), (w) => {
     if (!license().features.windows) return false;
     void createWindow({ near: w });
@@ -1783,6 +1787,10 @@ async function checkForUpdatesNow(w: Win | undefined): Promise<void> {
 app.whenReady().then(async () => {
   if (!isPrimary) return;
   ai = new AiService();
+  // Before any window opens: their chats reload these conversations with the progress saved.
+  interruptedRuns = ai.recoverInterrupted();
+  // Still pending if the window is closed before continuing them: open at the next login too.
+  if (interruptedRuns.length) resumeOnLogin(true);
   ai.useRules = prefs().projectRules;
   ai.onTitle = (conversationId, title) => {
     for (const w of wins.values()) send(w, { type: 'chat:title', conversationId, title });

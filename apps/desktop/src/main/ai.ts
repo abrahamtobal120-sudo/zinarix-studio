@@ -17,6 +17,7 @@ import { CatalogEntry, CliProfile, OmniError, t } from '@omni/shared';
 import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact, StreamRedactor } from '@omni/security';
 import { Agent } from './agent.js';
+import { RunJournal } from './runJournal.js';
 import { setCredentialEnvNames } from './env.js';
 import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
@@ -149,6 +150,8 @@ export class AiService {
   private readonly running = new Map<string, AbortController>();
   private readonly decisions = new Map<string, (d: ToolDecision) => void>();
   readonly agent: Agent;
+  /** Agent runs in progress, on disk (continued after a shutdown). */
+  private readonly journal: RunJournal;
   /** Settings toggle: include the project rules file in prompts. */
   useRules = true;
   /** Told when a new conversation gets its AI-written title (main sends it to the windows). */
@@ -167,6 +170,7 @@ export class AiService {
     this.scope = { workspace, browser };
     this.core = OmniCore.open({ home, askPassword: vaultPassword(home) });
     this.agent = new Agent(this.core, workspace, browser);
+    this.journal = new RunJournal(join(this.core.paths.home, 'runs-in-progress.json'));
     // Child shells never get the provider keys the app can read from the environment.
     setAppDataDirs([this.core.paths.home, dirname(this.core.paths.config)]);
     setCredentialEnvNames(this.core.providers().flatMap((p) => envVarNames(p)));
@@ -584,16 +588,25 @@ export class AiService {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
     const rec = new TurnRecorder(requestId);
+    const at = Date.now();
+    let convId: string | undefined;
     const send = (ev: ChatEventView) => {
       rec.add(ev);
+      // On disk at every step: a power cut leaves what was done for the next start.
+      if (convId)
+        this.journal.put(
+          requestId,
+          { conversationId: convId, prompt: req.prompt, ...rec.progress(), at },
+          ev.type === 'text' || ev.type === 'reasoning' || ev.type === 'tool_output',
+        );
       emit(requestId, ev);
     };
-    let convId: string | undefined;
     try {
       // Inside the try: a history failure (database locked, disk full) reaches the UI as an
       // error event instead of leaving the chat busy forever.
       convId = this.newConversation(req, requestId, emit, scope);
       const id = convId;
+      this.journal.put(requestId, { conversationId: id, prompt: req.prompt, ...rec.progress(), at });
       const userMessage = buildContextMessages(req.prompt, req.context).at(-1)!;
       await this.agent.run({
         conversationId: convId,
@@ -627,7 +640,36 @@ export class AiService {
     } finally {
       this.running.delete(requestId);
       if (convId) saveTurn(rec, this.core, convId);
+      this.journal.drop(requestId);
     }
+  }
+
+  /**
+   * Agent runs the last session left halfway (the app or the computer went off): what each
+   * one did is saved as its answer, so the chat that continues it knows which steps are done.
+   * Returns their conversations.
+   */
+  recoverInterrupted(): string[] {
+    const out: string[] = [];
+    for (const e of this.journal.takeLeftovers()) {
+      try {
+        if (!this.core.history.get(e.conversationId)) continue;
+        const display: TurnDisplay = {
+          ...e.display,
+          notices: [...(e.display.notices ?? []), t('run.interrupted')],
+        };
+        this.core.history.append(
+          e.conversationId,
+          { role: 'assistant', content: interruptedContent(e.text, display) },
+          display.model,
+          display,
+        );
+        out.push(e.conversationId);
+      } catch (err) {
+        console.error('could not recover a run', redact(String(err)));
+      }
+    }
+    return out;
   }
 
   /** The project rules file in use, if any. */
@@ -890,6 +932,28 @@ export function recentHistory(history: ChatMessage[]): ChatMessage[] {
   return first < 0 ? [] : h.slice(first);
 }
 
+/**
+ * The answer of a run a shutdown cut: its text plus the steps it took, written out because the
+ * model only gets the text of past turns (the tool cards are display only).
+ */
+function interruptedContent(text: string, d: TurnDisplay): string {
+  const steps = d.parts.flatMap((p) => {
+    if (p.kind !== 'tool') return [];
+    const a = p.args as { path?: unknown; command?: unknown };
+    const target = p.preview?.path ?? p.preview?.command ?? a.path ?? a.command;
+    const what = typeof target === 'string' && target ? ` ${target.slice(0, 200)}` : '';
+    const how = p.summary ? `: ${p.summary.slice(0, 300)}` : p.status === 'ok' ? '' : ' (no result)';
+    return [`- ${p.name}${what}${how}`];
+  });
+  return [
+    text.trim(),
+    steps.length ? `[Steps already taken before the cut]\n${steps.join('\n')}` : '',
+    '[The app or the computer went off here; the last step may be unfinished.]',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 /** Saving the turn must not throw past the request (the UI already got its events). */
 function saveTurn(rec: TurnRecorder, core: OmniCore, conversationId: string): void {
   try {
@@ -1033,6 +1097,11 @@ export class TurnRecorder {
         d.error = ev.message;
         break;
     }
+  }
+
+  /** The turn so far (for the run journal). */
+  progress(): { text: string; display: TurnDisplay } {
+    return { text: this.text, display: this.d };
   }
 
   private step(id: string) {

@@ -28,6 +28,7 @@ export function ActivityBar() {
   const active = useStore((s) => s.active);
   const gitChanges = useStore((s) => s.gitChanges);
   const sideMax = useStore((s) => s.maximized === 'side');
+  const watchNew = useStore((s) => s.watch?.reports.filter((r) => !r.seen).length ?? 0);
   const item = (
     active: boolean,
     title: string,
@@ -72,6 +73,13 @@ export function ActivityBar() {
       )}
       {item(sidebar === 'mail', t('mlTitle'), 'mail', () =>
         setState({ sidebar: sidebar === 'mail' ? null : 'mail' }),
+      )}
+      {item(
+        sidebar === 'watch',
+        t('wtTitle'),
+        'eye',
+        () => setState({ sidebar: sidebar === 'watch' ? null : 'watch' }),
+        watchNew,
       )}
       {item(chatOpen, t('chat'), 'agent', () => setState({ chatOpen: !chatOpen }))}
       {item(panelOpen, t('terminal'), 'terminal', () => setState({ panelOpen: !panelOpen }))}

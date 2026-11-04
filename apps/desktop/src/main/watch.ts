@@ -115,7 +115,8 @@ async function material(ws: Workspace, p: ProjectState | undefined): Promise<str
   if (isGit) {
     const since = p?.reviewedHead;
     const known =
-      since && (await git(ws, ['merge-base', '--is-ancestor', since, 'HEAD']).then(
+      since &&
+      (await git(ws, ['merge-base', '--is-ancestor', since, 'HEAD']).then(
         () => true,
         () => false,
       ));
@@ -130,7 +131,9 @@ async function material(ws: Workspace, p: ProjectState | undefined): Promise<str
     if (!diff.trim() && !known) diff = await git(ws, [...args, 'HEAD~3']).catch(() => '');
     if (diff.trim())
       parts.push(`<changes since="${known ? 'last review' : 'recent'}">\n${diff}\n</changes>`);
-    const untracked = (await git(ws, ['ls-files', '--others', '--exclude-standard']).catch(() => ''))
+    const untracked = (
+      await git(ws, ['ls-files', '--others', '--exclude-standard']).catch(() => '')
+    )
       .split('\n')
       .filter(Boolean)
       .slice(0, 50);
@@ -171,7 +174,9 @@ export function parseReview(text: string): { summary: string; items: WatchItem[]
         kind: it.kind === 'fix' ? ('fix' as const) : ('improve' as const),
         title: String(it.title ?? '').slice(0, 200),
         detail: String(it.detail ?? '').slice(0, 1500),
-        ...(typeof it.file === 'string' && it.file.trim() ? { file: it.file.trim().slice(0, 300) } : {}),
+        ...(typeof it.file === 'string' && it.file.trim()
+          ? { file: it.file.trim().slice(0, 300) }
+          : {}),
       }))
       .filter((it) => it.title)
       .slice(0, 5);

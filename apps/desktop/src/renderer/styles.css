@@ -7725,3 +7725,54 @@ button.wa-add {
   color: var(--fg-dim);
   font-style: italic;
 }
+
+/* ---------- watcher panel ---------- */
+.watch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0;
+}
+.watch-row select {
+  max-width: 55%;
+}
+.watch-error {
+  color: var(--danger, #e5534b);
+  margin: 4px 0;
+}
+.watch-report {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+  margin-top: 10px;
+}
+.watch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.watch-item {
+  border-left: 3px solid var(--fg-dim);
+  padding: 4px 8px;
+  margin: 6px 0;
+  border-radius: 2px;
+}
+.watch-fix {
+  border-left-color: var(--danger, #e5534b);
+}
+.watch-improve {
+  border-left-color: var(--accent, #4c8dff);
+}
+.watch-item-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.watch-item-title .run-badge {
+  margin: 0 6px 0 0;
+}
+.watch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 2px;
+}

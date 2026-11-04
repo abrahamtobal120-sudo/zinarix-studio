@@ -201,6 +201,7 @@ const api: OmniApi = {
     openExternal: call('app:openExternal') as OmniApi['app']['openExternal'],
     quit: call('app:quit') as OmniApi['app']['quit'],
     resumeOnLogin: call('app:resumeOnLogin') as OmniApi['app']['resumeOnLogin'],
+    interruptedRuns: call('app:interruptedRuns') as OmniApi['app']['interruptedRuns'],
     newWindow: call('app:newWindow') as OmniApi['app']['newWindow'],
     installUpdate: call('app:installUpdate') as OmniApi['app']['installUpdate'],
     pathForFile: (file: File) => webUtils.getPathForFile(file),

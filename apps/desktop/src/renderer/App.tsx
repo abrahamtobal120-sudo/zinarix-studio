@@ -10,6 +10,7 @@ import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
 import { MailPanel } from './components/MailPanel';
+import { WatchPanel } from './components/WatchPanel';
 import { RunPanel } from './components/RunPanel';
 import { SupabasePanel } from './components/SupabasePanel';
 import { VercelPanel } from './components/VercelPanel';
@@ -212,6 +213,9 @@ export function App() {
       applyTheme(getState().settings.theme);
       setState({ workspace: await api().workspace.current() });
       void api()
+        .watch.status()
+        .then((watch) => setState({ watch }));
+      void api()
         .whatsapp.status()
         .then(async (whatsapp) => {
           setState({ whatsapp });
@@ -249,6 +253,7 @@ export function App() {
         setState({ notice: { id: ev.id, text: ev.text, url: ev.url } });
       if (ev.type === 'browser:show') openBrowserTab();
       if (ev.type === 'whatsapp:status') setState({ whatsapp: ev.status });
+      if (ev.type === 'watch:status') setState({ watch: ev.status });
       if (ev.type === 'chat:title')
         for (const c of getState().chats)
           if (c.conversationId === ev.conversationId) updateChat(c.id, { title: ev.title });
@@ -284,6 +289,8 @@ export function App() {
                 <SupabasePanel />
               ) : sidebar === 'mail' ? (
                 <MailPanel />
+              ) : sidebar === 'watch' ? (
+                <WatchPanel />
               ) : (
                 <SearchView />
               )}

@@ -1165,6 +1165,11 @@ export interface OmniApi {
      */
     resumeOnLogin(on: boolean): Promise<void>;
     /**
+     * Conversations whose agent run the last shutdown cut (their progress is in the history
+     * already). Told once: later calls get an empty list.
+     */
+    interruptedRuns(): Promise<string[]>;
+    /**
      * Opens another Zinarix Studio window (its own folder, chats, browser and terminals).
      * false: the plan does not include more windows (Pro).
      */
@@ -1382,6 +1387,7 @@ export const CHANNELS = [
   'app:openExternal',
   'app:quit',
   'app:resumeOnLogin',
+  'app:interruptedRuns',
   'app:newWindow',
   'app:installUpdate',
   'license:status',
