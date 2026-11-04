@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { BotKind, BotsStatus, ThemeId } from '../../shared/api';
 import { THEME_IDS } from '../../shared/api';
 import { commands, defaultKeys, runCommand } from '../commands';
 import { t } from '../i18n';
 import { comboFromEvent } from '../keys';
+import { qrEncode } from '../qr';
 import { api, refreshSettings, setState, setTheme, toast, updatePrefs, useStore } from '../store';
 import { THEMES } from '../themes';
 import { Icon, type IconName } from './Icon';
@@ -45,14 +46,37 @@ function Toggle({
   );
 }
 
-/** Remote control from a phone on the same Wi-Fi: start/stop, address and PIN. */
+/** QR of a link, drawn as SVG on white so any phone camera reads it. */
+function QrCode({ text }: { text: string }) {
+  const grid = useMemo(() => qrEncode(text), [text]);
+  if (!grid) return null;
+  const n = grid.length;
+  let d = '';
+  grid.forEach((row, y) =>
+    row.forEach((dark, x) => {
+      if (dark) d += `M${x + 4} ${y + 4}h1v1h-1z`;
+    }),
+  );
+  return (
+    <svg className="phone-qr" viewBox={`0 0 ${n + 8} ${n + 8}`} shapeRendering="crispEdges">
+      <rect width={n + 8} height={n + 8} fill="#fff" />
+      <path d={d} fill="#000" />
+    </svg>
+  );
+}
+
+/** Remote control from a phone: start/stop, QR, address and PIN, on the Wi-Fi or from anywhere. */
 function PhoneSection() {
   const status = useStore((s) => s.phone);
   const [busy, setBusy] = useState(false);
+  const [where, setWhere] = useState<'lan' | 'remote'>('lan');
   useEffect(() => {
     void api()
       .phone.status()
-      .then((phone) => setState({ phone }))
+      .then((phone) => {
+        setState({ phone });
+        if (phone.remote?.url) setWhere('remote');
+      })
       .catch(() => undefined);
   }, []);
   const toggle = async (on: boolean) => {
@@ -80,64 +104,115 @@ function PhoneSection() {
     toast(t('copied'));
   };
   const remote = status.remote;
+  const remoteOn = !!remote && !remote.error;
+  const state = !status.running ? 'off' : status.phones > 0 ? 'ok' : 'wait';
+  const link = where === 'lan' ? status.url : remote?.url;
+
+  const pairing = (url: string, note: string) => (
+    <div className="phone-pair">
+      <QrCode text={url} />
+      <div className="phone-steps">
+        <div className="phone-step">
+          <span className="phone-num">1</span>
+          <span>{where === 'lan' ? t('phoneScanLan') : t('phoneScanRemote')}</span>
+        </div>
+        <div className="phone-url">
+          <code title={url}>{url}</code>
+          <button title={t('copy')} onClick={() => copy(url)}>
+            <Icon name="copy" size={14} />
+          </button>
+        </div>
+        <div className="phone-step">
+          <span className="phone-num">2</span>
+          <span>{t('phoneStep3')}</span>
+        </div>
+        <div className="phone-pin">
+          {(status.pin ?? '').split('').map((c, i) => (
+            <span key={i}>{c}</span>
+          ))}
+        </div>
+        <p className="settings-hint">{note}</p>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <h3>{t('phoneTitle')}</h3>
       <p className="dim small">{t('phoneHint')}</p>
-      <Toggle
-        label={t('phoneEnable')}
-        hint={t('phoneEnableHint')}
-        checked={status.running}
-        onChange={(v) => !busy && void toggle(v)}
-      />
-      {status.running && status.url && (
-        <div className="phone-pair">
-          <ol>
-            <li>{t('phoneStep1')}</li>
-            <li>
-              {t('phoneStep2')}
-              <div className="phone-url">
-                <code>{status.url}</code>
-                <button onClick={() => copy(status.url!)}>
-                  <Icon name="copy" size={14} />
-                </button>
-              </div>
-            </li>
-            <li>
-              {t('phoneStep3')}
-              <div className="phone-pin">{status.pin}</div>
-            </li>
-          </ol>
-          <p className="dim small">
-            {status.phones > 0 ? t('phoneConnected', { n: status.phones }) : t('phoneWaiting')}
-          </p>
-          <p className="dim small">{t('phoneFirewall')}</p>
+
+      <div className={`phone-hero ${state}`}>
+        <span className="phone-hero-icon">
+          <Icon name="smartphone" size={22} />
+        </span>
+        <span className="phone-hero-text">
+          <span className="settings-label">{t('phoneEnable')}</span>
+          <span className="phone-status">
+            <i />
+            {state === 'off'
+              ? t('phoneOff')
+              : state === 'ok'
+                ? t('phoneConnected', { n: status.phones })
+                : t('phoneWaiting')}
+          </span>
+          <span className="settings-hint">{t('phoneEnableHint')}</span>
+        </span>
+        <label className="phone-switch">
+          <input
+            type="checkbox"
+            checked={status.running}
+            disabled={busy}
+            onChange={(e) => void toggle(e.target.checked)}
+          />
+          <span />
+        </label>
+      </div>
+
+      {status.running && (
+        <div className="phone-card">
+          <div className="phone-tabs">
+            <button className={where === 'lan' ? 'on' : ''} onClick={() => setWhere('lan')}>
+              <Icon name="wifi" size={14} /> {t('phoneLan')}
+            </button>
+            <button className={where === 'remote' ? 'on' : ''} onClick={() => setWhere('remote')}>
+              <Icon name="globe" size={14} /> {t('phoneRemote')}
+              {remote?.url && <span className="phone-dot" />}
+            </button>
+          </div>
+
+          {where === 'lan' && link && pairing(link, t('phoneFirewall'))}
+
+          {where === 'remote' && (
+            <>
+              {remote?.url ? (
+                pairing(remote.url, t('phoneRemoteWarn'))
+              ) : (
+                <div className="phone-remote-off">
+                  <Icon name="globe" size={28} />
+                  <p className="small">{t('phoneRemoteHint')}</p>
+                  {remote?.progress && <p className="dim small">{remote.progress}</p>}
+                  {remote?.error && <p className="phone-error small">{remote.error}</p>}
+                  <button
+                    className="primary"
+                    disabled={busy || (remoteOn && !remote?.url)}
+                    onClick={() => void toggleRemote(true)}
+                  >
+                    {busy || (remoteOn && !remote?.url) ? t('phoneRemoteStarting') : t('phoneRemoteOn')}
+                  </button>
+                </div>
+              )}
+              {remote?.url && (
+                <div className="phone-card-foot">
+                  <button disabled={busy} onClick={() => void toggleRemote(false)}>
+                    {t('phoneRemoteOff')}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
-      {status.running && (
-        <>
-          <Toggle
-            label={t('phoneRemote')}
-            hint={t('phoneRemoteHint')}
-            checked={!!remote && !remote.error}
-            onChange={(v) => !busy && void toggleRemote(v)}
-          />
-          {remote?.progress && <p className="dim small">{remote.progress}</p>}
-          {remote?.error && <p className="dim small">{remote.error}</p>}
-          {remote?.url && (
-            <div className="phone-pair">
-              <p className="small">{t('phoneRemoteStep')}</p>
-              <div className="phone-url">
-                <code>{remote.url}</code>
-                <button onClick={() => copy(remote.url!)}>
-                  <Icon name="copy" size={14} />
-                </button>
-              </div>
-              <p className="dim small">{t('phoneRemoteWarn')}</p>
-            </div>
-          )}
-        </>
-      )}
+
       {status.running && <BotsSection pin={status.pin} />}
     </>
   );

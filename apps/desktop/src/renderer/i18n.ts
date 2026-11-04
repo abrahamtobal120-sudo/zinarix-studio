@@ -137,6 +137,14 @@ const es = {
   copy: 'Copiar',
   copied: 'Copiado',
   phoneTitle: 'Celular',
+  phoneOff: 'Apagado',
+  phoneLan: 'Misma red Wi-Fi',
+  phoneScanLan:
+    'Con el celular en la misma red Wi-Fi, escanea el código con la cámara o abre esta dirección:',
+  phoneScanRemote: 'Escanea el código con la cámara del celular o envíate este enlace:',
+  phoneRemoteOn: 'Activar acceso desde cualquier lugar',
+  phoneRemoteOff: 'Desactivar acceso desde cualquier lugar',
+  phoneRemoteStarting: 'Conectando…',
   phoneHint:
     'Controla Zinarix desde tu celular: ve los chats, escribe mensajes, aprueba o rechaza lo que pide el agente y detén respuestas. En la misma red Wi-Fi, o desde cualquier lugar si activas el acceso a distancia.',
   phoneEnable: 'Permitir control desde el celular',
@@ -1359,6 +1367,14 @@ const en: Record<Key, string> = {
   copy: 'Copy',
   copied: 'Copied',
   phoneTitle: 'Phone',
+  phoneOff: 'Off',
+  phoneLan: 'Same Wi-Fi',
+  phoneScanLan:
+    'With the phone on the same Wi-Fi network, scan the code with the camera or open this address:',
+  phoneScanRemote: "Scan the code with the phone's camera or send yourself this link:",
+  phoneRemoteOn: 'Turn on access from anywhere',
+  phoneRemoteOff: 'Turn off access from anywhere',
+  phoneRemoteStarting: 'Connecting…',
   phoneHint:
     'Control Zinarix from your phone: see the chats, write messages, approve or deny what the agent asks and stop answers. On the same Wi-Fi network, or from anywhere if you turn on remote access.',
   phoneEnable: 'Allow control from the phone',

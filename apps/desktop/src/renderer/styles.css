@@ -7099,24 +7099,255 @@ button.primary:hover,
 }
 
 /* Settings → Phone */
-.phone-pair ol {
-  padding-left: 18px;
+.phone-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-2);
+}
+.phone-hero-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg-dim);
+}
+.phone-hero.wait .phone-hero-icon,
+.phone-hero.ok .phone-hero-icon {
+  color: var(--accent);
+}
+.phone-hero-text {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 3px;
+}
+.phone-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.phone-status i {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  opacity: 0.6;
+}
+.phone-hero.wait .phone-status i {
+  background: var(--warn);
+  opacity: 1;
+  animation: phone-pulse 1.4s ease-in-out infinite;
+}
+.phone-hero.ok .phone-status {
+  color: var(--ok);
+}
+.phone-hero.ok .phone-status i {
+  background: var(--ok);
+  opacity: 1;
+}
+@keyframes phone-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.phone-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  cursor: pointer;
+}
+.phone-switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: inherit;
+}
+.phone-switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  background: var(--border);
+  transition: background 0.15s;
+  pointer-events: none;
+}
+.phone-switch span::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.phone-switch input:checked + span {
+  background: var(--accent);
+}
+.phone-switch input:checked + span::after {
+  transform: translateX(18px);
+}
+.phone-switch input:disabled + span {
+  opacity: 0.5;
+}
+.phone-switch input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.phone-card {
+  margin: 0 0 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.phone-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.phone-tabs button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-dim);
+}
+.phone-tabs button.on {
+  background: var(--bg);
+  color: var(--fg-strong);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.phone-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.phone-pair {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 18px;
+}
+.phone-qr {
+  flex-shrink: 0;
+  width: 168px;
+  height: 168px;
+  border-radius: 10px;
+}
+.phone-steps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.phone-step {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+}
+.phone-num {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.phone-steps > .phone-url,
+.phone-steps > .phone-pin {
+  margin-left: 28px;
+}
+.phone-steps > .phone-step:not(:first-child) {
+  margin-top: 6px;
 }
 .phone-url {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-top: 6px;
+  min-width: 0;
+}
+.phone-steps .phone-url {
+  margin-top: 0;
 }
 .phone-url code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   user-select: all;
-  font-size: 15px;
-  padding: 4px 8px;
-  border-radius: 6px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
   background: var(--bg-2);
+}
+.phone-pin {
+  display: flex;
+  gap: 6px;
+}
+.phone-pin span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 42px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  font: 600 22px var(--mono, monospace);
+  color: var(--accent);
+}
+.phone-steps .settings-hint {
+  margin: 6px 0 0 28px;
+}
+.phone-remote-off {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 32px;
+  text-align: center;
+  color: var(--fg-dim);
+}
+.phone-remote-off p {
+  margin: 0;
+  max-width: 440px;
+}
+.phone-error {
+  color: var(--danger);
+}
+.phone-card-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 18px 14px;
 }
 .bot-card {
   margin: 10px 0;
@@ -7129,12 +7360,6 @@ button.primary:hover,
 }
 .bot-card input {
   flex: 1;
-}
-.phone-pin {
-  margin-top: 6px;
-  font: 600 28px/1.2 var(--mono, monospace);
-  letter-spacing: 6px;
-  color: var(--accent);
 }
 
 /* ---------- WhatsApp Web tab ---------- */
