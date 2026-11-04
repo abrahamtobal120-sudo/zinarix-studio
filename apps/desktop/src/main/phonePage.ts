@@ -158,8 +158,9 @@ function render() {
 $('go').onclick = async () => {
   $('perr').textContent = '';
   try {
-    const r = await post('/api/pair', { pin: $('pin').value });
-    if (!r.ok) { $('perr').textContent = 'PIN incorrecto'; return; }
+    const key = new URLSearchParams(location.hash.slice(1)).get('k') || undefined;
+    const r = await post('/api/pair', { pin: $('pin').value, key });
+    if (!r.ok) { $('perr').textContent = (await r.json().catch(() => ({}))).error || 'PIN incorrecto'; return; }
     token = (await r.json()).token;
     localStorage.setItem('zx.token', token);
     paired();

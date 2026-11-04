@@ -5,6 +5,7 @@ import { networkInterfaces } from 'node:os';
 import { z } from 'zod';
 import type { PhoneAction, PhoneSnapshot, PhoneStatus } from '../shared/api.js';
 import { phonePage } from './phonePage.js';
+import { Tunnel } from './tunnel.js';
 
 /** Preferred port (the phone keeps working after a restart); another one if it is taken. */
 const PORT = 47390;
@@ -42,6 +43,10 @@ const same = (a: string, b: string) =>
  * Remote control from a phone on the same network: a small page served over HTTP. The phone
  * pairs once with a PIN shown on the computer and gets a token; with it, it sees the chats
  * and sends messages, approvals and stops, which go to the window that started it.
+ *
+ * Optionally also from anywhere: a Cloudflare tunnel gives a public https address. Pairing
+ * through it needs, besides the PIN, a long random key that only travels in the link the
+ * user copies (after the #, so it is not even sent to Cloudflare in the URL).
  */
 export class PhoneRemote {
   private server: Server | null = null;
@@ -52,6 +57,9 @@ export class PhoneRemote {
   private streams = new Set<ServerResponse>();
   private snapshot: PhoneSnapshot | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private port = 0;
+  private tunnel = new Tunnel();
+  private remote: { url?: string; key: string; progress?: string; error?: string } | null = null;
 
   constructor(
     private onAction: (a: PhoneAction) => void,
@@ -60,7 +68,20 @@ export class PhoneRemote {
 
   status(): PhoneStatus {
     if (!this.server) return { running: false, phones: 0 };
-    return { running: true, url: `http://${this.host}`, pin: this.pin, phones: this.tokens.size };
+    const r = this.remote;
+    return {
+      running: true,
+      url: `http://${this.host}`,
+      pin: this.pin,
+      phones: this.tokens.size,
+      remote: r
+        ? {
+            url: r.url ? `${r.url}/#k=${r.key}` : undefined,
+            progress: r.progress,
+            error: r.error,
+          }
+        : undefined,
+    };
   }
 
   async start(): Promise<PhoneStatus> {
@@ -86,6 +107,7 @@ export class PhoneRemote {
       listen(PORT);
     });
     this.server = server;
+    this.port = port;
     this.host = `${ip}:${port}`;
     this.newPin();
     this.heartbeat = setInterval(() => {
@@ -95,7 +117,47 @@ export class PhoneRemote {
     return this.status();
   }
 
+  /** Turns access from anywhere (the tunnel) on or off; progress arrives through onStatus. */
+  async setRemote(on: boolean): Promise<PhoneStatus> {
+    if (!on || !this.server) {
+      this.tunnel.stop();
+      this.remote = null;
+      return this.status();
+    }
+    if (this.remote?.url || this.remote?.progress) return this.status();
+    const remote: NonNullable<PhoneRemote['remote']> = { key: randomBytes(24).toString('hex') };
+    this.remote = remote;
+    const live = () => this.remote === remote;
+    try {
+      const url = await this.tunnel.start(
+        this.port,
+        (progress) => {
+          if (!live()) return;
+          remote.progress = progress;
+          this.onStatus(this.status());
+        },
+        (error) => {
+          if (!live()) return;
+          remote.url = undefined;
+          remote.error = error;
+          this.onStatus(this.status());
+        },
+      );
+      if (!live()) {
+        this.tunnel.stop();
+        return this.status();
+      }
+      remote.url = url;
+    } catch (e) {
+      if (live()) remote.error = e instanceof Error ? e.message : String(e);
+    }
+    remote.progress = undefined;
+    return this.status();
+  }
+
   stop(): PhoneStatus {
+    this.tunnel.stop();
+    this.remote = null;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
     for (const s of this.streams) s.end();
@@ -131,8 +193,13 @@ export class PhoneRemote {
 
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
-      // Only this address: a web page elsewhere cannot reach the remote through DNS tricks.
-      if (req.headers.host !== this.host) return end(res, 421, { error: 'host' });
+      // Only these addresses: a web page elsewhere cannot reach the remote through DNS tricks.
+      const host = req.headers.host ?? '';
+      const tunnelHost = this.remote?.url ? new URL(this.remote.url).host : null;
+      if (host !== this.host && host !== tunnelHost && host !== `127.0.0.1:${this.port}`)
+        return end(res, 421, { error: 'host' });
+      // The tunnel reaches the server from this same computer: everything local is "remote".
+      const viaTunnel = /^(127\.|::1$|::ffff:127\.)/.test(req.socket.remoteAddress ?? '');
       const url = new URL(req.url ?? '/', `http://${this.host}`);
       if (req.method === 'GET' && url.pathname === '/') {
         const nonce = randomBytes(16).toString('base64');
@@ -146,7 +213,12 @@ export class PhoneRemote {
         return void res.end(phonePage(nonce));
       }
       if (req.method === 'POST' && url.pathname === '/api/pair') {
-        const { pin } = z.object({ pin: z.string().max(20) }).parse(await body(req));
+        const { pin, key } = z
+          .object({ pin: z.string().max(20), key: z.string().max(200).optional() })
+          .parse(await body(req));
+        // Through the tunnel the address is public: the key of the link is required too.
+        if (viaTunnel && !(this.remote?.url && same(key ?? '', this.remote.key)))
+          return end(res, 403, { error: 'Enlace incompleto: copia otra vez el enlace de Zinarix' });
         if (!same(pin.replace(/\D/g, '').padEnd(6, ' '), this.pin)) {
           if (++this.tries >= MAX_TRIES) {
             this.newPin();

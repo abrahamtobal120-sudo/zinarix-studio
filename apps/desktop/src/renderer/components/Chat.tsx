@@ -347,6 +347,23 @@ const TOOL_ICON: Record<string, IconName> = {
   mail_move: 'archive',
   mail_save_draft: 'mail',
   mail_send: 'send',
+  supabase_accounts: 'users',
+  supabase_projects: 'supabase',
+  supabase_project_info: 'supabase',
+  supabase_tables: 'database',
+  supabase_columns: 'columns',
+  supabase_query: 'database',
+  supabase_pause: 'pause',
+  supabase_restore: 'play',
+  vercel_accounts: 'users',
+  vercel_projects: 'vercel',
+  vercel_project: 'vercel',
+  vercel_deployments: 'cloud',
+  vercel_logs: 'scroll',
+  vercel_redeploy: 'refresh',
+  vercel_promote: 'arrowDown',
+  vercel_cancel: 'stop',
+  vercel_set_env: 'key',
 };
 
 const STATUS_ICON: Record<ToolStep['status'], IconName> = {
@@ -356,7 +373,7 @@ const STATUS_ICON: Record<ToolStep['status'], IconName> = {
   error: 'x',
 };
 
-/** Mailbox a mail tool works on, when the AI picked one ("" for the one open in the panel). */
+/** Account a mail / Supabase / Vercel tool works on, when the AI picked one ("" for the one open in the panel). */
 function mailFrom(a: Record<string, unknown>): string {
   return typeof a.account === 'string' && a.account ? `${a.account} · ` : '';
 }
@@ -399,7 +416,33 @@ function toolTitle(step: ToolStep): string {
     case 'delegate_to_ai':
       return `${String(a.model ?? '')} · ${String(a.task ?? '').slice(0, 120)}`;
     case 'mail_accounts':
+    case 'supabase_accounts':
+    case 'vercel_accounts':
       return '';
+    case 'supabase_projects':
+    case 'vercel_projects':
+      return [a.account, a.team].filter(Boolean).map(String).join(' · ');
+    case 'supabase_project_info':
+    case 'supabase_tables':
+    case 'supabase_pause':
+    case 'supabase_restore':
+      return `${mailFrom(a)}${String(a.ref ?? '')}`;
+    case 'supabase_columns':
+      return `${mailFrom(a)}${String(a.ref ?? '')} · ${String(a.schema ?? 'public')}.${String(a.table ?? '')}`;
+    case 'supabase_query':
+      return `${mailFrom(a)}${String(a.ref ?? '')} · ${String(a.sql ?? '').slice(0, 160)}`;
+    case 'vercel_project':
+    case 'vercel_deployments':
+      return `${mailFrom(a)}${String(a.project ?? '')}`;
+    case 'vercel_logs':
+    case 'vercel_cancel':
+      return `${mailFrom(a)}${String(a.deployment ?? '')}`;
+    case 'vercel_redeploy':
+      return `${mailFrom(a)}${String(a.deployment ?? '')}${a.production === true ? ' → production' : ''}`;
+    case 'vercel_promote':
+      return `${mailFrom(a)}${String(a.project ?? '')} → ${String(a.deployment ?? '')}`;
+    case 'vercel_set_env':
+      return `${mailFrom(a)}${String(a.project ?? '')} · ${String(a.key ?? '')}`;
     case 'mail_folders':
       return mailFrom(a).replace(/ · $/, '');
     case 'mail_list':

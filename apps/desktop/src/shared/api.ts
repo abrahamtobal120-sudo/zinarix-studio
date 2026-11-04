@@ -679,6 +679,14 @@ export interface PhoneStatus {
   pin?: string;
   /** Phones paired since it started. */
   phones: number;
+  /** Access from anywhere (a Cloudflare tunnel), when it was turned on. */
+  remote?: {
+    /** Link to open on the phone from any network (carries the pairing key after #). */
+    url?: string;
+    /** What it is doing while it starts (downloading, connecting). */
+    progress?: string;
+    error?: string;
+  };
   error?: string;
 }
 
@@ -1015,6 +1023,8 @@ export interface OmniApi {
     /** Starts the phone remote for this window (the phone controls its chats). */
     start(): Promise<PhoneStatus>;
     stop(): Promise<PhoneStatus>;
+    /** Turns access from anywhere on or off (the remote must be running). */
+    remote(on: boolean): Promise<PhoneStatus>;
     /** What the phone should show now (sent while the remote runs). */
     push(snapshot: PhoneSnapshot): Promise<void>;
   };

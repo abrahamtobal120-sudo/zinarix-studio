@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { AccountList } from './accounts.js';
+import { AccountList, type SavedAccount } from './accounts.js';
 import type {
   VercelDeploymentView,
   VercelEnvView,
@@ -156,14 +156,36 @@ export class Vercel {
 
   private readonly accounts: AccountList;
 
-  constructor(dir: string) {
+  /** pinned: the account this instance uses instead of the active one (see forAccount). */
+  constructor(
+    private readonly dir: string,
+    private readonly pinned?: SavedAccount,
+  ) {
     this.accounts = new AccountList(dir, 'vercel');
   }
 
+  /** The connected accounts and which one the panel uses. */
+  accountList(): { accounts: SavedAccount[]; active: string | null } {
+    return { accounts: this.accounts.list(), active: this.accounts.active()?.id ?? null };
+  }
+
+  /**
+   * The same service on one connected account (by id or label), without changing the one the
+   * panel uses. No account: the active one.
+   */
+  forAccount(account?: string): Vercel {
+    if (!account) return this;
+    const list = this.accounts.list();
+    const acc = list.find((a) => a.id === account) ?? list.find((a) => a.label === account);
+    if (!acc) throw new Error(`No connected Vercel account "${account}".`);
+    return new Vercel(this.dir, acc);
+  }
+
   private async token(): Promise<{ token: string; source: 'app' | 'cli' } | null> {
-    const acc = this.accounts.active();
+    const acc = this.pinned ?? this.accounts.active();
     const saved = acc && this.accounts.token(acc.id);
     if (saved) return { token: saved, source: 'app' };
+    if (this.pinned) return null;
     const t = await cliToken();
     return t ? { token: t, source: 'cli' } : null;
   }
@@ -280,6 +302,15 @@ export class Vercel {
     const target = id ?? this.accounts.active()?.id;
     if (target) this.accounts.remove(target);
     return this.status();
+  }
+
+  /** Teams the account belongs to (projects outside them are the personal ones). */
+  async teams(): Promise<{ id: string; name: string; slug: string }[]> {
+    const { teams } = await this.req<{ teams: { id: string; name: string; slug: string }[] }>(
+      '/v2/teams?limit=50',
+      null,
+    );
+    return teams.map((t) => ({ id: t.id, name: t.name || t.slug, slug: t.slug }));
   }
 
   async projects(teamId: string | null): Promise<VercelProjectView[]> {

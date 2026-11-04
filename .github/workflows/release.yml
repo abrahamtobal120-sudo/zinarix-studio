@@ -79,8 +79,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # electron-builder's publish config uses releaseType "draft": it uploads to the
-        # draft created above and never publishes it.
-        run: pnpm exec electron-builder ${{ matrix.target }} --publish always
+        # draft created above and never publishes it. One app per plan: Zinarix Studio
+        # (free), Pro, AI and Pro + AI, each with its own installers and update channel.
+        run: node scripts/build-editions.mjs -- ${{ matrix.target }} --publish always
 
   # Runs only when every build succeeded: a failed platform leaves the release as a draft
   # (fix it and re-run the failed job, then this one).

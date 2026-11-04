@@ -1,4 +1,8 @@
 // Generates the website screenshots from the real app (demo data, scripted demo model).
+//   node scripts/marketing-shots.mjs <out>                      dark theme, the landing page
+//   SHOT_THEME=light SHOT_PLAN=pro node scripts/marketing-shots.mjs <out>
+// SHOT_THEME / SHOT_PLAN (a plan code: free, pro, ai, proai) also take the two-chat (split)
+// and plan-panel shots, for the sales page.
 import { _electron as electron } from 'playwright';
 import { createServer } from 'node:http';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -157,18 +161,30 @@ core.saveConfig({
   },
 });
 core.close();
+const theme = process.env.SHOT_THEME;
+const plan = process.env.SHOT_PLAN;
+const prefix = theme ? `app-${theme}-` : 'screenshot-';
+if (theme || plan)
+  writeFileSync(
+    join(home, 'desktop.json'),
+    JSON.stringify({ ...(theme ? { theme } : {}), ...(plan ? { codePlan: plan } : {}) }),
+  );
 
+// The script itself may run on Electron's Node (ELECTRON_RUN_AS_NODE, for node:sqlite).
+const { ELECTRON_RUN_AS_NODE: _asNode, ...env } = process.env;
 const app = await electron.launch({
   executablePath: 'node_modules/electron/dist/electron',
   args: ['.', proj],
-  env: { ...process.env, OMNI_HOME: home, OMNI_NO_KEYCHAIN: '1' },
+  env: { ...env, OMNI_HOME: home, OMNI_NO_KEYCHAIN: '1' },
 });
 const win = await app.firstWindow();
-await app.evaluate(({ BrowserWindow }) => {
-  const w = BrowserWindow.getAllWindows()[0];
-  w.setSize(1600, 960);
-  w.center();
-});
+// The sales-page shots keep the default size: resizing past a small screen stalls painting.
+if (!theme)
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    w.setSize(1600, 960);
+    w.center();
+  });
 await win.waitForSelector('.tree-row');
 await win.locator('.tree-row', { hasText: 'src' }).first().click();
 await win.locator('.tree-row', { hasText: 'server.js' }).first().click();
@@ -181,13 +197,13 @@ await ask('Agrega validación de email al usuario y corre las pruebas');
 for (let i = 0; i < 2; i++) {
   await win.waitForSelector('.tool-card.approval', { timeout: 20000 });
   await win.waitForTimeout(600);
-  if (i === 0) await win.screenshot({ path: join(out, 'screenshot-approval.png') });
+  if (i === 0) await win.screenshot({ path: join(out, `${prefix}approval.png`) });
   await win.locator('.tool-actions button.primary').click();
 }
 await win.waitForSelector('text=las 3 pruebas pasan', { timeout: 20000 });
 await win.locator('.tree-row', { hasText: 'validate.js' }).first().click();
 await win.waitForTimeout(900);
-await win.screenshot({ path: join(out, 'screenshot-agent.png') });
+await win.screenshot({ path: join(out, `${prefix}agent.png`) });
 await app.evaluate(({ BrowserWindow }) =>
   BrowserWindow.getAllWindows()[0].webContents.send('omni:event', {
     type: 'command',
@@ -196,13 +212,32 @@ await app.evaluate(({ BrowserWindow }) =>
 );
 await win.waitForSelector('.mp-card');
 await win.waitForTimeout(1500);
-await win.screenshot({ path: join(out, 'screenshot-models.png') });
+await win.screenshot({ path: join(out, `${prefix}models.png`) });
 await win.keyboard.press('Escape');
 await win.waitForTimeout(300);
-await win.locator('.status-item', { hasText: '📊' }).click();
+await win.locator('.status-item', { hasText: /📊|hoy|today/ }).click();
 await win.waitForSelector('.usage-table');
 await win.waitForTimeout(600);
-await win.screenshot({ path: join(out, 'screenshot-usage.png') });
+await win.screenshot({ path: join(out, `${prefix}usage.png`) });
+if (theme || plan) {
+  await win.keyboard.press('Escape');
+  await win.locator('.status-item', { hasText: /📊|hoy|today/ }).click();
+  await win.waitForTimeout(300);
+  await win.locator('.plan-badge, .status-item.plan').first().click();
+  await win.waitForTimeout(900);
+  await win.screenshot({ path: join(out, `${prefix}plan.png`) });
+  await win.keyboard.press('Escape');
+  await win.waitForTimeout(300);
+  // Two chats side by side (Pro): a second chat working while the first one is done.
+  await win.locator('button[title^="Nuevo chat en paralelo"]').first().click();
+  await win.waitForTimeout(400);
+  await win.locator('button[title^="Ver dos chats a la par"]').first().click();
+  await win.waitForTimeout(400);
+  await ask('Escribe una prueba para el servidor');
+  await win.waitForSelector('.tool-card.approval', { timeout: 20000 });
+  await win.waitForTimeout(800);
+  await win.screenshot({ path: join(out, `${prefix}split.png`) });
+}
 await app.close();
 server.close();
 console.log('ok');

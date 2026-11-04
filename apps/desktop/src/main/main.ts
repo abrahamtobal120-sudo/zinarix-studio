@@ -505,6 +505,7 @@ function registerIpc(): void {
   handle('github:pr', z.tuple([]), (w) => git(w).pr());
 
   const vercel = new Vercel(app.getPath('userData'));
+  ai.agent.vercel = vercel;
   const vid = z.string().min(1).max(128);
   const team = z.string().max(128).nullable();
   handle('vercel:status', z.tuple([]), () => vercel.status());
@@ -649,6 +650,7 @@ function registerIpc(): void {
   );
 
   const supabase = new Supabase(app.getPath('userData'));
+  ai.agent.supabase = supabase;
   const ref = z.string().min(1).max(40);
   const pgName = z.string().min(1).max(128);
   handle('supabase:status', z.tuple([]), () => supabase.status());
@@ -1112,6 +1114,9 @@ function registerIpc(): void {
     phoneOwner = undefined;
     return phone.stop();
   });
+  handle('phone:remote', z.tuple([z.boolean()]), (w, on) =>
+    phoneOwner === w ? phone.setRemote(on) : { running: false, phones: 0 },
+  );
   handle('phone:push', z.tuple([PhoneSnapshot]), (w, snapshot) => {
     if (phoneOwner === w) phone.push(snapshot);
   });

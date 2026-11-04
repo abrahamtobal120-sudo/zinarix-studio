@@ -25,6 +25,16 @@ import { isSecretFile, protectedWrite } from './guard.js';
 export { globToRegExp };
 import type { Workspace } from './workspace.js';
 import type { Mail } from './mail.js';
+import type { Supabase } from './supabase.js';
+import type { Vercel } from './vercel.js';
+import {
+  CLOUD_PROMPT_PART,
+  CLOUD_READ_ONLY,
+  CLOUD_TOOL_NAMES,
+  CLOUD_TOOLS,
+  cloudPreview,
+  runCloudTool,
+} from './cloudTools.js';
 import {
   MAIL_PROMPT_PART,
   MAIL_READ_ONLY,
@@ -89,6 +99,7 @@ You can inspect and change the project with tools:
 - run_command: runs a shell command in the workspace (tests, builds, git, package managers). The user approves every command; prefer non-interactive flags.
 - browser_open, browser_read, browser_click, browser_type, browser_scroll, browser_back: a real web browser the user can watch (this conversation has its own browser tab). Use it to read documentation, check a local dev server (e.g. http://localhost:3000) or follow web steps the user asks for. browser_read returns the page text and numbered interactive elements; use those numbers as "ref". Opening a site, clicking and typing need the user's approval per site. Never enter passwords, payment data or personal data; ask the user to do that.
 ${MAIL_PROMPT_PART}
+${CLOUD_PROMPT_PART}
 - list_ai_models and delegate_to_ai: other AI models connected in Zinarix Studio can work for you as helpers (e.g. a second opinion, a cheaper model for a long chore, a model with a skill you lack). The user approves every delegation and every action the helper takes. Give the helper a complete, self-contained task; it does not see this conversation.
 ${SYSTEM_PROMPT_PART}
 ${SECURITY_PROMPT_PART}
@@ -277,6 +288,7 @@ export const TOOLS: ToolDefinition[] = [
     parameters: { type: 'object', properties: {} },
   },
   ...MAIL_TOOLS,
+  ...CLOUD_TOOLS,
   ...SYSTEM_TOOLS,
   ...SECURITY_TOOLS,
 ];
@@ -319,6 +331,7 @@ const CLI_TOOL_NAMES = new Set([
   'browser_scroll',
   'browser_back',
   ...MAIL_TOOL_NAMES,
+  ...CLOUD_TOOL_NAMES,
   'list_ai_models',
   'delegate_to_ai',
 ]);
@@ -341,6 +354,7 @@ const READ_ONLY = new Set([
   'security_scan_project',
   'list_ai_models',
   ...MAIL_READ_ONLY,
+  ...CLOUD_READ_ONLY,
 ]);
 
 /**
@@ -357,6 +371,7 @@ export function approvalKey(name: string, a: Record<string, unknown>): string | 
 export function viewArgs(name: string, a: Record<string, unknown>): Record<string, unknown> {
   const out = redactDeep(a);
   if (name === 'set_env_var' && isSecretName(String(a.name))) out.value = '•••';
+  if (name === 'vercel_set_env') out.value = '•••';
   if (name === 'http_request' && a.headers && typeof a.headers === 'object')
     out.headers = Object.fromEntries(
       Object.entries(a.headers as Record<string, unknown>).map(([k, v]) => [
@@ -616,6 +631,9 @@ export class Agent {
 
   /** The user's mailbox (mail_* tools), set once the app has it. */
   mail?: Mail;
+  /** The user's Supabase and Vercel accounts (supabase_* / vercel_* tools). */
+  supabase?: Supabase;
+  vercel?: Vercel;
 
   constructor(
     private readonly core: OmniCore,
@@ -1068,6 +1086,7 @@ export class Agent {
         !call.name.startsWith('browser_') &&
         !NO_FOLDER.has(call.name) &&
         !MAIL_TOOL_NAMES.has(call.name) &&
+        !CLOUD_TOOL_NAMES.has(call.name) &&
         !SYSTEM_TOOL_NAMES.has(call.name) &&
         !SECURITY_NO_PROJECT.has(call.name)
       )
@@ -1084,9 +1103,11 @@ export class Agent {
           ? securityPreview(call.name, a)
           : MAIL_TOOL_NAMES.has(call.name)
             ? mailPreview(call.name, a)
-            : call.name === 'run_command'
-              ? commandWarning(a, ws?.root)
-              : null;
+            : CLOUD_TOOL_NAMES.has(call.name)
+              ? cloudPreview(call.name, a)
+              : call.name === 'run_command'
+                ? commandWarning(a, ws?.root)
+                : null;
       if (sys) {
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));
@@ -1192,6 +1213,13 @@ export class Agent {
       if (MAIL_TOOL_NAMES.has(call.name)) {
         if (!this.mail) return finish(false, 'Email is not available.', 'sin correo');
         const r = await runMailTool(this.mail, call.name, a);
+        return finish(true, r.content, r.summary);
+      }
+      if (CLOUD_TOOL_NAMES.has(call.name)) {
+        // The variable's value never shows up in what the UI gets back.
+        if (call.name === 'vercel_set_env' && typeof a.value === 'string' && a.value.length >= 8)
+          registerSecret(a.value);
+        const r = await runCloudTool(this, call.name, a);
         return finish(true, r.content, r.summary);
       }
 

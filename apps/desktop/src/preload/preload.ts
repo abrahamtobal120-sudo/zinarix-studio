@@ -199,6 +199,7 @@ const api: OmniApi = {
     status: call('phone:status') as OmniApi['phone']['status'],
     start: call('phone:start') as OmniApi['phone']['start'],
     stop: call('phone:stop') as OmniApi['phone']['stop'],
+    remote: call('phone:remote') as OmniApi['phone']['remote'],
     push: call('phone:push') as OmniApi['phone']['push'],
   },
   license: {
