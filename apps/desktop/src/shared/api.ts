@@ -684,8 +684,12 @@ export type AppEvent =
 export interface WhatsAppStatus {
   /** The page is loaded (it keeps running when its tab is closed). */
   open: boolean;
+  /** Logged in (the chat list shows); false while it asks for the QR; unknown before it loads. */
+  logged?: boolean;
   /** Control from WhatsApp is on. */
   control: boolean;
+  /** The other person of the chosen chat can give orders too (not only the user). */
+  others: boolean;
   /** The chat Zinarix listens to (picked by the user, meant to be "Message yourself"). */
   chat?: { id: string; title: string };
   /** The chat open in the page right now. */
@@ -696,6 +700,14 @@ export interface WhatsAppStatus {
   pending: number;
   /** Unread chats, as the page title says. */
   unread: number;
+  /** Last orders received and answers written, newest last. */
+  log: WhatsAppEvent[];
+}
+
+export interface WhatsAppEvent {
+  at: number;
+  dir: 'in' | 'out' | 'info';
+  text: string;
 }
 
 /** Remote control from a phone on the same network (a page served by the app). */
@@ -1104,6 +1116,10 @@ export interface OmniApi {
     control(on: boolean): Promise<WhatsAppStatus>;
     /** The chat open now becomes the one that controls Zinarix. */
     useCurrent(): Promise<WhatsAppStatus>;
+    /** Lets the other person of the chosen chat give orders too. */
+    others(on: boolean): Promise<WhatsAppStatus>;
+    /** Writes a test message in the chosen chat. */
+    test(): Promise<WhatsAppStatus>;
     forget(): Promise<WhatsAppStatus>;
   };
   license: {
@@ -1295,6 +1311,8 @@ export const CHANNELS = [
   'whatsapp:control',
   'whatsapp:useCurrent',
   'whatsapp:forget',
+  'whatsapp:others',
+  'whatsapp:test',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

@@ -214,6 +214,8 @@ const api: OmniApi = {
     control: call('whatsapp:control') as OmniApi['whatsapp']['control'],
     useCurrent: call('whatsapp:useCurrent') as OmniApi['whatsapp']['useCurrent'],
     forget: call('whatsapp:forget') as OmniApi['whatsapp']['forget'],
+    others: call('whatsapp:others') as OmniApi['whatsapp']['others'],
+    test: call('whatsapp:test') as OmniApi['whatsapp']['test'],
   },
   license: {
     status: call('license:status') as OmniApi['license']['status'],

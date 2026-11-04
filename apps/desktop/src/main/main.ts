@@ -1287,7 +1287,9 @@ function registerIpc(): void {
     if (phoneOwner !== w) return { running: false, phones: 0 };
     phoneOwner = undefined;
     bots.detach();
-    return phone.stop();
+    const status = phone.stop();
+    for (const o of wins.values()) send(o, { type: 'whatsapp:status', status: whatsapp.status() });
+    return status;
   });
   handle('phone:remote', z.tuple([z.boolean()]), (w, on) =>
     phoneOwner === w ? phone.setRemote(on) : { running: false, phones: 0 },
@@ -1322,6 +1324,8 @@ function registerIpc(): void {
   handle('whatsapp:control', z.tuple([z.boolean()]), (_w, on) => whatsapp.setControl(on));
   handle('whatsapp:useCurrent', z.tuple([]), () => whatsapp.useCurrent());
   handle('whatsapp:forget', z.tuple([]), () => whatsapp.forget());
+  handle('whatsapp:others', z.tuple([z.boolean()]), (_w, on) => whatsapp.setOthers(on));
+  handle('whatsapp:test', z.tuple([]), () => whatsapp.test());
 
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {
