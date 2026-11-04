@@ -756,6 +756,23 @@ export function newChat(patch: Partial<ChatTab> = {}, always = false): string {
 }
 
 /**
+ * Opens a new chat that runs at the same time as `from`: in the other pane when the plan has
+ * split view (both answers in sight), otherwise as one more tab. Null when the plan said no.
+ */
+export function newParallelChat(from: string, patch: Partial<ChatTab>): string | null {
+  if (!requirePro('chats')) return null;
+  const tab = blankChat(patch);
+  rememberProject(tab.folder);
+  setState((s) => ({ chats: [...s.chats, tab], chatHistoryFor: null }));
+  if (state.license.features.split) {
+    if (from === state.chatSplit) setState({ activeChat: tab.id });
+    else setState({ activeChat: from, chatSplit: tab.id });
+  }
+  selectChat(tab.id);
+  return tab.id;
+}
+
+/**
  * Opens a new chat just for questions: chat mode (no tools), without changing the saved mode,
  * and in no folder (it does not see the open project).
  */

@@ -202,6 +202,11 @@ const api: OmniApi = {
     remote: call('phone:remote') as OmniApi['phone']['remote'],
     push: call('phone:push') as OmniApi['phone']['push'],
   },
+  bots: {
+    status: call('bots:status') as OmniApi['bots']['status'],
+    connect: call('bots:connect') as OmniApi['bots']['connect'],
+    disconnect: call('bots:disconnect') as OmniApi['bots']['disconnect'],
+  },
   license: {
     status: call('license:status') as OmniApi['license']['status'],
     activate: call('license:activate') as OmniApi['license']['activate'],

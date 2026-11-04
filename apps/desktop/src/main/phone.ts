@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { z } from 'zod';
-import type { PhoneAction, PhoneSnapshot, PhoneStatus } from '../shared/api.js';
+import type { PhoneAction, PhoneRepo, PhoneSnapshot, PhoneStatus } from '../shared/api.js';
 import { phonePage } from './phonePage.js';
 import { Tunnel } from './tunnel.js';
 
@@ -24,6 +24,17 @@ const Action = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('newChat') }),
   z.object({ kind: z.literal('agent'), on: z.boolean() }),
 ]);
+
+/** The repositories of this computer, for the phone (see main.ts). */
+export interface PhoneRepos {
+  list(): Promise<PhoneRepo[]>;
+  /** git pull (fast-forward only); returns git's output. Only paths that list() returns. */
+  pull(path: string): Promise<string>;
+  /** Opens the repository in the window the phone controls (the chat then works on it). */
+  open(path: string): Promise<void>;
+}
+
+const RepoPath = z.object({ path: z.string().min(1).max(4096) });
 
 /** IPv4 of this computer on the local network (Wi-Fi / Ethernet), private ranges first. */
 export function lanAddress(): string | null {
@@ -67,6 +78,7 @@ export class PhoneRemote {
   constructor(
     private onAction: (a: PhoneAction) => void,
     private onStatus: (s: PhoneStatus) => void,
+    private repos: PhoneRepos,
   ) {}
 
   status(): PhoneStatus {
@@ -189,6 +201,23 @@ export class PhoneRemote {
     this.waiters.clear();
   }
 
+  /**
+   * The PIN shown on the computer (phones and chat bots pair with it). Too many wrong tries
+   * change it, so guessing is hopeless.
+   */
+  checkPin(pin: string): boolean {
+    if (!this.server) return false;
+    if (same(pin.replace(/\D/g, '').padEnd(6, ' '), this.pin)) {
+      this.tries = 0;
+      return true;
+    }
+    if (++this.tries >= MAX_TRIES) {
+      this.newPin();
+      this.onStatus(this.status());
+    }
+    return false;
+  }
+
   private newPin(): void {
     this.pin = String(randomInt(0, 1_000_000)).padStart(6, '0');
     this.tries = 0;
@@ -230,16 +259,9 @@ export class PhoneRemote {
         // Through the tunnel the address is public: the key of the link is required too.
         if (viaTunnel && !(this.remote?.url && same(key ?? '', this.remote.key)))
           return end(res, 403, { error: 'Enlace incompleto: copia otra vez el enlace de Zinarix' });
-        if (!same(pin.replace(/\D/g, '').padEnd(6, ' '), this.pin)) {
-          if (++this.tries >= MAX_TRIES) {
-            this.newPin();
-            this.onStatus(this.status());
-          }
-          return end(res, 403, { error: 'PIN incorrecto' });
-        }
+        if (!this.checkPin(pin)) return end(res, 403, { error: 'PIN incorrecto' });
         const token = randomBytes(32).toString('hex');
         this.tokens.add(token);
-        this.tries = 0;
         this.onStatus(this.status());
         return end(res, 200, { token });
       }
@@ -278,6 +300,22 @@ export class PhoneRemote {
       if (req.method === 'POST' && url.pathname === '/api/action') {
         this.onAction(Action.parse(await body(req)));
         return end(res, 200, { ok: true });
+      }
+      if (req.method === 'GET' && url.pathname === '/api/repos')
+        return end(res, 200, { repos: await this.repos.list() });
+      if (
+        req.method === 'POST' &&
+        (url.pathname === '/api/repos/pull' || url.pathname === '/api/repos/open')
+      ) {
+        const { path } = RepoPath.parse(await body(req));
+        try {
+          if (url.pathname.endsWith('/pull'))
+            return end(res, 200, { output: await this.repos.pull(path) });
+          await this.repos.open(path);
+          return end(res, 200, { ok: true });
+        } catch (e) {
+          return end(res, 409, { error: e instanceof Error ? e.message : String(e) });
+        }
       }
       end(res, 404, { error: 'not found' });
     } catch {

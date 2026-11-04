@@ -783,6 +783,9 @@ const es = {
     'Guarda los archivos abiertos para que la ventana pase a la carpeta de este chat',
   chatFolderRelease: 'Este chat trabaja en {path}. Clic: que use la carpeta abierta en la ventana',
   chatQueue: 'Poner en cola',
+  chatParallel: 'Enviar en paralelo',
+  chatParallelHint:
+    'Enviar en paralelo: abre un chat nuevo con el mismo modelo y lo ejecuta al mismo tiempo que este (Ctrl+Enter)',
   chatQueueHint: 'Poner en cola: se envía solo cuando termine la respuesta actual (Enter)',
   chatQueued: 'Mensajes en cola',
   chatQueuedNext: 'En cola ({n}): se envía solo al terminar',
@@ -1927,6 +1930,9 @@ const en: Record<Key, string> = {
   chatFolderUnsaved: "Save the open files so the window can move to this chat's folder",
   chatFolderRelease: 'This chat works in {path}. Click: use the folder open in the window',
   chatQueue: 'Queue',
+  chatParallel: 'Send in parallel',
+  chatParallelHint:
+    'Send in parallel: opens a new chat with the same model and runs it at the same time as this one (Ctrl+Enter)',
   chatQueueHint: 'Queue: sent by itself when the current answer ends (Enter)',
   chatQueued: 'Queued messages',
   chatQueuedNext: 'Queued ({n}): sent when this answer ends',

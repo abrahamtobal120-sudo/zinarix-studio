@@ -26,6 +26,7 @@ import {
   isChatVisible,
   newChat,
   newChatInFolder,
+  newParallelChat,
   newQuestionChat,
   newRequestId,
   rememberProject,
@@ -1276,6 +1277,19 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     void send(input);
   };
 
+  /** Runs what is in the box in a new chat (same model, mode and folder) alongside this one. */
+  const sendParallel = () => {
+    if (!input.trim()) return;
+    const opened = newParallelChat(id, {
+      model: meta?.model ?? null,
+      agent: agentMode,
+      folder: meta?.folder,
+      noFolder: meta?.noFolder,
+      initial: { prompt: input, send: true },
+    });
+    if (opened) setInput('');
+  };
+
   /** Stops the running answer; queued messages wait until the user sends them. */
   const stop = () => {
     if (!busy) return;
@@ -1330,6 +1344,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         sentIdx.current = i;
         setInput(sent.current[i]!);
       }
+      return;
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      e.preventDefault();
+      sendParallel();
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1816,6 +1835,16 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             <span className="model-chip-label">{shownModel ?? t('noModel')}</span>
             <Icon name="chevronDown" size={12} />
           </button>
+          {input.trim() && (
+            <button
+              className="send-btn"
+              title={t('chatParallelHint')}
+              aria-label={t('chatParallel')}
+              onClick={sendParallel}
+            >
+              <Icon name="columns" size={15} />
+            </button>
+          )}
           {busy && input.trim() && (
             <button
               className="primary send-btn"

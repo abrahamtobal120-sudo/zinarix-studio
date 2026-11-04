@@ -1,16 +1,17 @@
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BrowserWindow, Menu, app, dialog, ipcMain, protocol, shell } from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
 import { z } from 'zod';
-import type { AppEvent, Channel, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
+import type { AppEvent, Channel, PhoneRepo, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
 import { UI_ZOOM_STEPS } from '../shared/api.js';
 import { DEFAULT_PREFS, EVENT_CHANNEL, THEME_IDS } from '../shared/api.js';
 import { AiService } from './ai.js';
 import type { Scope } from './ai.js';
-import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName } from './git.js';
+import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName, run } from './git.js';
 import { BrowserController } from './browser.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
@@ -106,7 +107,112 @@ const phone = new PhoneRemote(
   (status) => {
     if (phoneOwner) send(phoneOwner, { type: 'phone:status', status });
   },
+  {
+    list: async () => {
+      const open = phoneOwner?.workspace?.root;
+      return mapLimit(findRepos(), 8, (p) => repoView(p, p === open));
+    },
+    pull: async (path) => run('git', ['pull', '--ff-only'], knownRepo(path), 300_000),
+    open: async (path) => {
+      if (!phoneOwner) throw new Error('No hay ninguna ventana conectada al celular.');
+      if (!(await openFolder(phoneOwner, knownRepo(path))))
+        throw new Error('No se pudo abrir la carpeta.');
+    },
+  },
 );
+
+// ---------------- repositories (for the phone) ----------------
+
+/** Folders where people usually clone: their direct subfolders with .git count as repos. */
+const CLONE_DIRS = [
+  '',
+  'Desktop',
+  'Escritorio',
+  'Documents',
+  'Documentos',
+  'projects',
+  'Projects',
+  'code',
+  'Code',
+  'dev',
+  'src',
+  'repos',
+  'git',
+  'GitHub',
+  'workspace',
+];
+const MAX_REPOS = 150;
+const isRepo = (p: string) => existsSync(join(p, '.git'));
+
+/**
+ * Repositories on this computer: the ones opened or cloned in Zinarix, their sibling folders
+ * and the subfolders of the usual places for code. No deep scan: it must answer quickly.
+ */
+function findRepos(): string[] {
+  const st = loadState();
+  const known = [...(st.repos ?? []), ...(st.recentFolders ?? [])].filter(isRepo);
+  const parents = new Set([
+    ...CLONE_DIRS.map((d) => join(homedir(), d)),
+    ...known.map((p) => dirname(p)),
+  ]);
+  const found = new Set(known);
+  for (const dir of parents) {
+    try {
+      for (const e of readdirSync(dir, { withFileTypes: true }))
+        if (e.isDirectory() && !e.name.startsWith('.') && isRepo(join(dir, e.name)))
+          found.add(join(dir, e.name));
+    } catch {
+      // The folder does not exist here (another language, another layout).
+    }
+  }
+  return [...found].slice(0, MAX_REPOS);
+}
+
+/** A path the phone sent, only if it is one of the repositories it was shown. */
+function knownRepo(path: string): string {
+  const abs = resolve(path);
+  if (!findRepos().includes(abs)) throw new Error('Ese repositorio no está en la lista.');
+  return abs;
+}
+
+async function repoView(path: string, open: boolean): Promise<PhoneRepo> {
+  const view: PhoneRepo = {
+    path,
+    name: basename(path),
+    branch: '',
+    changes: 0,
+    ahead: 0,
+    behind: 0,
+    open,
+  };
+  try {
+    const out = await run('git', ['status', '--porcelain=v2', '--branch'], path, 15_000);
+    for (const line of out.split('\n')) {
+      if (line.startsWith('# branch.head ')) view.branch = line.slice(14);
+      else if (line.startsWith('# branch.ab ')) {
+        const [, a, b] = /\+(\d+) -(\d+)/.exec(line) ?? [];
+        view.ahead = Number(a ?? 0);
+        view.behind = Number(b ?? 0);
+      } else if (line && !line.startsWith('#')) view.changes++;
+    }
+  } catch (e) {
+    view.error = e instanceof Error ? e.message : String(e);
+  }
+  return view;
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
 const toolState = z.enum(['running', 'approval', 'ok', 'error']);
 const id200 = z.string().max(200);
 const PhoneSnapshot = z.object({
@@ -142,6 +248,8 @@ const PhoneSnapshot = z.object({
 interface DesktopState extends StoredLicense {
   lastFolder?: string;
   recentFolders?: string[];
+  /** Git repositories opened or cloned here (the phone lists them to pull from anywhere). */
+  repos?: string[];
   theme?: ThemeId;
   prefs?: Partial<Prefs>;
 }
@@ -261,12 +369,13 @@ async function openFolder(w: Win, path: string): Promise<WorkspaceInfo | null> {
   const workspace = new Workspace(abs);
   w.workspace = workspace;
   workspace.watch(() => send(w, { type: 'fs:changed' }));
+  const st = loadState();
   saveState({
     lastFolder: abs,
-    recentFolders: [abs, ...(loadState().recentFolders ?? []).filter((f) => f !== abs)].slice(
-      0,
-      10,
-    ),
+    recentFolders: [abs, ...(st.recentFolders ?? []).filter((f) => f !== abs)].slice(0, 10),
+    ...(isRepo(abs) && {
+      repos: [abs, ...(st.repos ?? []).filter((f) => f !== abs)].slice(0, MAX_REPOS),
+    }),
   });
   app.addRecentDocument(abs);
   const info = await workspace.info();

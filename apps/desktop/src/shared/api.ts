@@ -674,7 +674,9 @@ export type AppEvent =
   /** The paired phone asked for something (see PhoneAction). */
   | { type: 'phone'; action: PhoneAction }
   /** The phone remote changed (started, stopped, a phone paired, new PIN). */
-  | { type: 'phone:status'; status: PhoneStatus };
+  | { type: 'phone:status'; status: PhoneStatus }
+  /** A Telegram or Discord bot connected, failed or got a new linked chat. */
+  | { type: 'bots:status'; status: BotsStatus };
 
 /** Remote control from a phone on the same network (a page served by the app). */
 export interface PhoneStatus {
@@ -709,6 +711,39 @@ export interface PhoneSnapshot {
     tools: { id: string; title: string; status: 'running' | 'approval' | 'ok' | 'error' }[];
   }[];
 }
+
+/** A git repository of this computer, as the phone lists it (to pull it from anywhere). */
+export interface PhoneRepo {
+  path: string;
+  name: string;
+  branch: string;
+  /** Files changed and not committed. */
+  changes: number;
+  /** Commits not pushed / not pulled yet (against the upstream, as of the last fetch). */
+  ahead: number;
+  behind: number;
+  /** It is the folder open in the window the phone controls. */
+  open: boolean;
+  error?: string;
+}
+
+/** Chat apps that can control Zinarix through an official bot (see Settings → Phone). */
+export type BotKind = 'telegram' | 'discord';
+
+export interface BotView {
+  /** A token is saved (it connects whenever the phone remote is on). */
+  saved: boolean;
+  connected: boolean;
+  /** The bot's user name (@name on Telegram). */
+  name?: string;
+  /** Discord: link to add the bot to a server (DMs need a server in common). */
+  invite?: string;
+  /** Chats linked with the PIN. */
+  paired: number;
+  error?: string;
+}
+
+export type BotsStatus = Record<BotKind, BotView>;
 
 export type PhoneAction =
   | { kind: 'send'; text: string }
@@ -1034,6 +1069,13 @@ export interface OmniApi {
     /** What the phone should show now (sent while the remote runs). */
     push(snapshot: PhoneSnapshot): Promise<void>;
   };
+  bots: {
+    status(): Promise<BotsStatus>;
+    /** Saves the bot token and connects it (only while the phone remote runs). */
+    connect(kind: BotKind, token: string): Promise<BotsStatus>;
+    /** Disconnects the bot and forgets its token and linked chats. */
+    disconnect(kind: BotKind): Promise<BotsStatus>;
+  };
   license: {
     status(): Promise<LicenseStatus>;
     /** A license key (ZX1.…) or the owner's word. Throws with a readable reason. */
@@ -1214,6 +1256,9 @@ export const CHANNELS = [
   'phone:stop',
   'phone:remote',
   'phone:push',
+  'bots:status',
+  'bots:connect',
+  'bots:disconnect',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

@@ -80,6 +80,7 @@ export class Tunnel {
     return await new Promise<string>((ok, fail) => {
       let found = false;
       let log = '';
+      let url = '';
       const timer = setTimeout(() => {
         this.stop();
         fail(new Error('Cloudflare no respondió a tiempo. Revisa la conexión a internet.'));
@@ -87,11 +88,13 @@ export class Tunnel {
       const read = (chunk: Buffer) => {
         if (found) return;
         log = (log + chunk.toString('utf8')).slice(-4000);
-        const m = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(log);
-        if (m) {
+        url ||= /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(log)?.[0] ?? '';
+        // The address is printed before Cloudflare can route it: opened that early, the phone
+        // gets an error (and may remember the name as missing). Wait for the first connection.
+        if (url && /Registered tunnel connection/.test(log)) {
           found = true;
           clearTimeout(timer);
-          ok(m[0]);
+          ok(url);
         }
       };
       proc.stdout?.on('data', read);
