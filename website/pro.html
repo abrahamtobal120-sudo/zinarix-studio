@@ -13,15 +13,9 @@
       property="og:description"
       content="Gratis, Pro, AI o el combo Pro + AI. Elige cómo quieres trabajar con IA."
     />
-    <meta property="og:image" content="assets/logo-512.png" />
+    <meta property="og:image" content="assets/app-light-split.png" />
     <meta name="theme-color" content="#ffffff" />
     <link rel="icon" type="image/png" href="assets/favicon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="pro.css" />
   </head>
   <body data-plan="pro">
@@ -32,6 +26,7 @@
       </a>
       <nav aria-label="Principal">
         <a href="#incluye">Qué incluye</a>
+        <a href="#capturas">Capturas</a>
         <a href="#planes">Planes</a>
         <a href="#comparar">Comparar</a>
         <a href="#faq">Preguntas</a>
@@ -62,71 +57,17 @@
           </p>
         </div>
 
-        <!-- app preview, light theme, reacts to the selected plan -->
-        <div class="app" aria-hidden="true">
-          <div class="app-title">
-            <i></i><i></i><i></i>
-            <span>mi-proyecto — Zinarix Studio</span>
-            <b class="app-plan" data-text="short"></b>
-          </div>
-          <div class="app-body">
-            <div class="app-activity">
-              <span class="on"></span><span></span><span></span><span></span>
-            </div>
-            <div class="app-side">
-              <p class="side-h">EXPLORADOR</p>
-              <p>▾ src</p>
-              <p class="in">app.ts</p>
-              <p class="in">api.ts</p>
-              <p class="in">styles.css</p>
-              <p>README.md</p>
-            </div>
-            <div class="app-main">
-              <div class="app-tabs">
-                <span class="tab on">Chat 1</span>
-                <span class="tab">Chat 2</span>
-                <span class="tab only-pro">Chat 3</span>
-                <span class="tab only-pro">Chat 4</span>
-                <span class="tab only-pro">+</span>
-                <span class="tab lock only-free">🔒 Chat 3 · Pro</span>
-              </div>
-              <div class="panes">
-                <div class="pane">
-                  <div class="model">
-                    <span class="m-dot"></span>
-                    <span class="m-ai">Zinarix AI · sin llave</span>
-                    <span class="m-key">Claude · tu llave</span>
-                  </div>
-                  <div class="msg user">Agrega pruebas a api.ts</div>
-                  <div class="msg bot">
-                    <span class="tool">✓ leyó 3 archivos</span>
-                    <span class="tool">⏵ npm test · esperando aprobación</span>
-                    Listo: 6 pruebas nuevas, todas pasan.
-                  </div>
-                </div>
-                <div class="pane only-split">
-                  <div class="model">
-                    <span class="m-dot b"></span>
-                    <span class="m-ai">GPT · Zinarix AI</span>
-                    <span class="m-key">GPT · tu llave</span>
-                  </div>
-                  <div class="msg user">Agrega pruebas a api.ts</div>
-                  <div class="msg bot">
-                    <span class="tool">✓ leyó 4 archivos</span>
-                    Propongo 8 pruebas; ¿las escribo?
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="app-status">
-            <span>⎇ main</span>
-            <span class="only-ai-s">✦ Créditos AI: 82%</span>
-            <span class="only-key-s">🔑 Llaves propias</span>
-            <span class="grow"></span>
-            <span data-text="statusPlan"></span>
-          </div>
-        </div>
+        <!-- real screenshot of the app (light theme), changes with the selected plan -->
+        <figure class="shot hero-shot">
+          <img
+            id="hero-img"
+            src="assets/app-light-split.png"
+            alt="Zinarix Studio con dos chats de IA trabajando a la par"
+            width="1512"
+            height="916"
+          />
+          <figcaption data-text="shotCaption"></figcaption>
+        </figure>
       </section>
 
       <ul class="trust reveal">
@@ -202,6 +143,35 @@
               <p>Modelo rápido para lo simple y potente para lo difícil, automático.</p>
             </div>
           </article>
+        </div>
+      </section>
+
+      <!-- REAL SCREENSHOTS -->
+      <section id="capturas" class="section">
+        <div class="head reveal">
+          <span class="eyebrow">La app real</span>
+          <h2>Así se ve Zinarix Studio</h2>
+          <p class="muted">Capturas tomadas de la app, sin retoques.</p>
+        </div>
+        <div class="gallery reveal">
+          <div class="gallery-tabs" role="tablist" aria-label="Capturas">
+            <button role="tab" aria-selected="true" data-shot="split">Dos chats a la par</button>
+            <button role="tab" aria-selected="false" data-shot="approval">Tú apruebas</button>
+            <button role="tab" aria-selected="false" data-shot="models">60+ modelos</button>
+            <button role="tab" aria-selected="false" data-shot="usage">Gasto por IA</button>
+            <button role="tab" aria-selected="false" data-shot="plan">Plan y licencia</button>
+          </div>
+          <figure class="shot">
+            <img
+              id="gallery-img"
+              src="assets/app-light-split.png"
+              alt="Captura de Zinarix Studio"
+              width="1512"
+              height="916"
+              loading="lazy"
+            />
+          </figure>
+          <p class="center muted small" id="gallery-caption"></p>
         </div>
       </section>
 

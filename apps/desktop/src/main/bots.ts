@@ -12,8 +12,10 @@ import type { PhoneRepos } from './phone.js';
 import { TokenStore } from './token-store.js';
 
 const KINDS: BotKind[] = ['telegram', 'discord'];
+/** WhatsApp Web (see whatsapp.ts) rides on the same commands, without a token or a PIN. */
+type LinkKind = BotKind | 'whatsapp';
 /** Longest message each app accepts. */
-const LIMIT: Record<BotKind, number> = { telegram: 4000, discord: 1900 };
+const LIMIT: Record<LinkKind, number> = { telegram: 4000, discord: 1900, whatsapp: 3000 };
 /** Longer answers are cut after this many messages (the rest stays in Zinarix). */
 const MAX_PARTS = 4;
 const RETRY_MS = 5000;
@@ -35,7 +37,7 @@ interface Incoming {
   button?: { data: string; done(note: string): Promise<void> };
 }
 
-interface Link {
+export interface Link {
   send(chat: string, text: string, buttons?: Button[]): Promise<void>;
   stop(): void;
 }
@@ -290,7 +292,9 @@ function discord(token: string, on: LinkEvents): Link {
       if (ev.code === 4004) return on.fail('Token de Discord inválido.');
       if (ev.code === 4013 || ev.code === 4014)
         return on.fail('Discord no permite los permisos del bot (revisa los "Privileged Gateway Intents").');
-      void sleep(RETRY_MS, ctl.signal).then(() => !ctl.signal.aborted && connect());
+      void sleep(RETRY_MS, ctl.signal).then(() => {
+        if (!ctl.signal.aborted) void connect();
+      });
     };
   };
   void connect();
@@ -356,7 +360,7 @@ Cuando la IA pida permiso para algo te llegan los botones Aprobar / Rechazar (o 
  * They run only while the phone remote is on, and only answer chats linked with its PIN.
  */
 export class ChatBots {
-  private links = new Map<BotKind, Link>();
+  private links = new Map<LinkKind, Link>();
   private views: Record<BotKind, BotView> = {
     telegram: { saved: false, connected: false, paired: 0 },
     discord: { saved: false, connected: false, paired: 0 },
@@ -364,7 +368,7 @@ export class ChatBots {
   private active = false;
   private snapshot: PhoneSnapshot | null = null;
   /** The conversation that gets the answers: the last linked chat that wrote. */
-  private target: { kind: BotKind; chat: string } | null = null;
+  private target: { kind: LinkKind; chat: string } | null = null;
   /** waiting: a message went out; running: the chat got busy with it. */
   private phase: 'idle' | 'waiting' | 'running' = 'idle';
   private turnsAtSend = 0;
@@ -427,6 +431,27 @@ export class ChatBots {
     this.phase = 'idle';
   }
 
+  /**
+   * WhatsApp Web plugs in its chat (null unplugs it). The chat was picked by the user inside
+   * Zinarix, so it needs no PIN. Its messages count only while the phone remote runs.
+   */
+  plug(link: Link | null): void {
+    if (link) this.links.set('whatsapp', link);
+    else this.links.delete('whatsapp');
+    if (!link && this.target?.kind === 'whatsapp') this.target = null;
+  }
+
+  /** A message from the WhatsApp chat; false when the remote is off (nobody listens). */
+  whatsapp(chat: string, text: string): boolean {
+    if (!this.active || !this.links.has('whatsapp')) return false;
+    void this.incoming('whatsapp', { chat, user: chat, text }).catch(() => undefined);
+    return true;
+  }
+
+  get running(): boolean {
+    return this.active;
+  }
+
   connect(kind: BotKind, token: string): BotsStatus {
     if (!this.active) throw new Error('Activa primero el control desde el celular.');
     this.store(kind).set(token.trim());
@@ -473,7 +498,7 @@ export class ChatBots {
   }
 
   /** Sends text in as many messages as needed (up to MAX_PARTS). */
-  private async say(kind: BotKind, chat: string, text: string, buttons?: Button[]): Promise<void> {
+  private async say(kind: LinkKind, chat: string, text: string, buttons?: Button[]): Promise<void> {
     const link = this.links.get(kind);
     if (!link) return;
     const max = LIMIT[kind];
@@ -490,10 +515,10 @@ export class ChatBots {
       await link.send(chat, parts[i]!, i === parts.length - 1 ? buttons : undefined);
   }
 
-  private async incoming(kind: BotKind, m: Incoming): Promise<void> {
+  private async incoming(kind: LinkKind, m: Incoming): Promise<void> {
     const key = `${kind}:${m.chat}`;
     const paired = this.paired();
-    if (!paired[kind].includes(m.user)) {
+    if (kind !== 'whatsapp' && !paired[kind].includes(m.user)) {
       const pin = /^\/?(?:start|pin)?\s*(\d[\d\s-]{4,10}\d)\s*$/i.exec(m.text ?? '')?.[1];
       if (pin && this.deps.checkPin(pin)) {
         paired[kind].push(m.user);

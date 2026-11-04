@@ -1,6 +1,6 @@
-// Zinarix Studio plans page: the Gratis / Pro / AI / Pro + AI switch (copy, app preview,
-// features, compare column), prices and buy links from app-config.json (the same switch the
-// installed apps read) and scroll reveal. No dependencies.
+// Zinarix Studio plans page: the Gratis / Pro / AI / Pro + AI switch (copy, app screenshot,
+// features, compare column), the screenshot gallery, prices and buy links from app-config.json
+// (the same switch the installed apps read) and scroll reveal. No dependencies.
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const PLAN_IDS = ['free', 'pro', 'ai', 'combo'];
 
@@ -13,6 +13,8 @@ const PLANS = {
     lead: 'El editor completo con el modo agente, más de 60 proveedores y modelos locales. Usas tus propias llaves y trabajas con <b><span class="free-chats">2</span> chats a la vez</b>.',
     statusPlan: 'Plan gratis',
     finalTitle: 'Empieza gratis hoy',
+    shot: 'agent',
+    shotCaption: 'El modo agente: edita, corre las pruebas y te muestra el resultado.',
     price: 'US$0',
     period: '',
     note: 'para siempre',
@@ -25,6 +27,8 @@ const PLANS = {
     lead: 'Sin esperar a que un modelo termine: <b>chats ilimitados en paralelo</b>, <b>dos IAs lado a lado</b> para comparar y <b>varias ventanas</b>, cada una con su proyecto.',
     statusPlan: 'Pro',
     finalTitle: 'Trabaja con todas tus IAs a la vez',
+    shot: 'split',
+    shotCaption: 'Pro: dos chats a la par, cada uno con su agente.',
   },
   ai: {
     name: 'AI',
@@ -34,6 +38,8 @@ const PLANS = {
     lead: 'Instala y empieza: <b>sin cuentas ni API keys</b>. Los créditos de IA vienen incluidos cada mes y Zinarix elige el modelo adecuado para cada tarea.',
     statusPlan: 'Modo AI',
     finalTitle: 'IA lista desde el primer minuto',
+    shot: 'models',
+    shotCaption: 'Elige entre los modelos de más de 60 proveedores.',
   },
   combo: {
     name: 'Pro + AI',
@@ -43,6 +49,8 @@ const PLANS = {
     lead: 'Todo Pro (chats ilimitados, IAs lado a lado, varias ventanas) <b>más el modo AI</b>: créditos incluidos y sin llaves. El paquete completo, a mejor precio.',
     statusPlan: 'Pro + AI',
     finalTitle: 'Todo Zinarix Studio, en un solo plan',
+    shot: 'split',
+    shotCaption: 'Varios agentes a la vez, con la IA incluida.',
   },
 };
 
@@ -60,6 +68,7 @@ const prices = {
 };
 
 let current = 'pro';
+const shotSrc = (name) => `assets/app-light-${name}.png`;
 
 function setAll(sel, fn) {
   document.querySelectorAll(sel).forEach(fn);
@@ -74,6 +83,8 @@ function render(id, animate) {
     setAll('[data-pick]', (b) => b.setAttribute('aria-selected', String(b.dataset.pick === id)));
     setAll('[data-text]', (e) => (e.textContent = p[e.dataset.text] ?? ''));
     setAll('[data-html]', (e) => (e.innerHTML = p[e.dataset.html] ?? ''));
+    const img = document.getElementById('hero-img');
+    if (!img.src.endsWith(shotSrc(p.shot))) img.src = shotSrc(p.shot);
     setAll('.cur-name', (e) => (e.textContent = p.name));
     setAll('.cur-price', (e) => (e.textContent = pr.price));
     setAll('.cur-period', (e) => (e.textContent = pr.period));
@@ -120,6 +131,27 @@ function setupSwitch() {
     pick(next);
     document.querySelector(`[data-pick="${next}"]`).focus();
   });
+}
+
+const GALLERY = {
+  split: 'Dos chats trabajando a la vez: uno espera tu aprobación y el otro ya terminó.',
+  approval: 'Cada cambio y cada comando pasa por ti antes de ejecutarse.',
+  models: 'Más de 60 proveedores y modelos locales en un solo selector.',
+  usage: 'Cuánto gastas por proveedor y por día, con presupuestos.',
+  plan: 'Tu plan y tu licencia, dentro de la app.',
+};
+
+function setupGallery() {
+  const img = document.getElementById('gallery-img');
+  const caption = document.getElementById('gallery-caption');
+  const tabs = document.querySelectorAll('[data-shot]');
+  const show = (name) => {
+    img.src = shotSrc(name);
+    caption.textContent = GALLERY[name];
+    tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.shot === name)));
+  };
+  tabs.forEach((t) => t.addEventListener('click', () => show(t.dataset.shot)));
+  caption.textContent = GALLERY.split;
 }
 
 function setupReveal() {
@@ -207,5 +239,6 @@ const fromUrl = new URLSearchParams(location.search).get('plan') ?? location.has
 render(PLAN_IDS.includes(fromUrl) ? fromUrl : 'pro', false);
 setupNav();
 setupSwitch();
+setupGallery();
 setupReveal();
 loadConfig();

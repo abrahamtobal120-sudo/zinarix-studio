@@ -6098,8 +6098,47 @@ button.big {
 .git-ref.vc-prod {
   color: var(--ok);
 }
-.vc-logs {
+.vc-logbox {
   margin: 0 8px 8px;
+}
+.vc-log-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0 4px;
+}
+.vc-log-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.vc-log-err {
+  color: var(--danger);
+}
+.vc-log-warn {
+  color: var(--warn);
+}
+.vc-alert {
+  margin: 0 10px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.vc-alert-sub {
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vc-logs {
+  margin: 0;
   padding: 8px;
   max-height: 320px;
   overflow: auto;
@@ -7078,6 +7117,18 @@ button.primary:hover,
   padding: 4px 8px;
   border-radius: 6px;
   background: var(--bg-2);
+}
+.bot-card {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+.bot-card h4 {
+  margin: 0 0 6px;
+}
+.bot-card input {
+  flex: 1;
 }
 .phone-pin {
   margin-top: 6px;

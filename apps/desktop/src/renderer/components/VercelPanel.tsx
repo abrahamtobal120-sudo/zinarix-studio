@@ -1,6 +1,6 @@
 import { AccountSwitch } from './AccountSwitch';
 import { Icon } from './Icon';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   VercelDeploymentView,
   VercelProjectInfo,
@@ -10,6 +10,7 @@ import type {
 } from '../../shared/api';
 import { t } from '../i18n';
 import { api, setState, toast, useStore } from '../store';
+import { askAgent } from './Chat';
 import { runInTerminal } from './Terminal';
 
 const errText = (e: unknown) =>
@@ -61,6 +62,110 @@ function inTerminal(cli: boolean, args: string) {
 function deploy(prod: boolean, cli: boolean) {
   if (prod && !confirm(t('vcProdConfirm'))) return;
   inTerminal(cli, `deploy${prod ? ' --prod' : ''}`);
+}
+
+/** Build log lines that point at the failure (shown in red) or at a warning (yellow). */
+const ERR_LINE = /\b(error|err!|failed|fatal|cannot find|not found|exited with)\b/i;
+const WARN_LINE = /\b(warn(ing)?|deprecated)\b/i;
+/** End of the log handed to the AI: the failure is almost always at the bottom. */
+const AI_LOG_TAIL = 8000;
+
+/** Hands a failed build to the agent: the end of its log and what to do with it. */
+async function fixWithAi(d: VercelDeploymentView, teamId: string | null, project: string) {
+  const log = (await api().vercel.logs(d.id, teamId)) || t('vcNoLogs');
+  askAgent(
+    t('vcFixPrompt', {
+      url: d.url,
+      project,
+      branch: [d.branch, d.sha?.slice(0, 7)].filter(Boolean).join(' · ') || d.target,
+      log: log.length > AI_LOG_TAIL ? `…\n${log.slice(-AI_LOG_TAIL)}` : log,
+    }),
+  );
+}
+
+/** Build log of one deployment; follows the build while it runs. */
+function DeployLog({
+  dep,
+  teamId,
+  onClose,
+  onFix,
+}: {
+  dep: VercelDeploymentView;
+  teamId: string | null;
+  onClose: () => void;
+  onFix: () => void;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const box = useRef<HTMLPreElement>(null);
+  const live = LIVE.has(dep.state);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api()
+        .vercel.logs(dep.id, teamId)
+        .then((x) => alive && setText(x || t('vcNoLogs')))
+        .catch((e: unknown) => alive && setText(errText(e)));
+    void load();
+    // One more read when the build ends, so the last lines show up.
+    if (!live) return () => void (alive = false);
+    const h = setInterval(() => void load(), 4000);
+    return () => {
+      alive = false;
+      clearInterval(h);
+    };
+  }, [dep.id, teamId, live]);
+
+  // Stay at the bottom while it grows (where the news and the errors are).
+  useEffect(() => {
+    const el = box.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [text]);
+
+  return (
+    <div className="vc-logbox">
+      <div className="vc-log-bar">
+        {live && (
+          <span className="git-track">
+            <Icon name="clock" size={11} className="spin-slow" /> {t('vcLiveLog')}
+          </span>
+        )}
+        <span className="spacer" />
+        {dep.state === 'ERROR' && (
+          <button className="primary" title={t('vcFixAiTitle')} onClick={onFix}>
+            <Icon name="wrench" size={12} /> {t('vcFixAi')}
+          </button>
+        )}
+        <button
+          title={t('vcCopyLog')}
+          disabled={!text}
+          onClick={() => {
+            void navigator.clipboard.writeText(text ?? '');
+            toast(t('vcLogCopied'));
+          }}
+        >
+          <Icon name="copy" size={12} />
+        </button>
+        <button title={t('vcCloseLog')} onClick={onClose}>
+          <Icon name="x" size={12} />
+        </button>
+      </div>
+      <pre className="vc-logs" ref={box}>
+        {text === null
+          ? '…'
+          : text.split('\n').map((line, i) => (
+              <div
+                key={i}
+                className={
+                  ERR_LINE.test(line) ? 'vc-log-err' : WARN_LINE.test(line) ? 'vc-log-warn' : ''
+                }
+              >
+                {line || ' '}
+              </div>
+            ))}
+      </pre>
+    </div>
+  );
 }
 
 const ENV_TARGETS = ['production', 'preview', 'development'] as const;
@@ -115,7 +220,7 @@ function VercelBody({ reset }: { reset: () => void }) {
   const [deps, setDeps] = useState<VercelDeploymentView[]>([]);
   const [info, setInfo] = useState<VercelProjectInfo | null>(null);
   const [view, setView] = useState<'deploys' | 'env' | 'domains' | 'settings'>('deploys');
-  const [logs, setLogs] = useState<{ id: string; text: string } | null>(null);
+  const [logsFor, setLogsFor] = useState<string | null>(null);
   const [target, setTarget] = useState<'' | 'production' | 'preview'>('');
   const [envForm, setEnvForm] = useState<{ key: string; value: string; targets: string[] } | null>(
     null,
@@ -449,6 +554,8 @@ function VercelBody({ reset }: { reset: () => void }) {
   }
 
   const prod = deps.find((d) => d.target === 'production' && d.state === 'READY');
+  const latest = deps[0];
+  const failed = latest?.state === 'ERROR' ? latest : null;
   const depQuery = depFilter.trim().toLowerCase();
   const shownDeps = deps.filter(
     (d) =>
@@ -553,6 +660,13 @@ function VercelBody({ reset }: { reset: () => void }) {
     ? `https://vercel.com/${st.teams.find((x) => x.id === project.teamId)?.slug ?? st.user}/${project.name}`
     : null;
 
+  const fix = (d: VercelDeploymentView) =>
+    void act('ai', () => fixWithAi(d, teamId, project?.name ?? projectId));
+  const showLog = (d: VercelDeploymentView) => {
+    setView('deploys');
+    setLogsFor(d.id);
+  };
+
   return (
     <div className="explorer git-panel">
       {title}
@@ -581,6 +695,12 @@ function VercelBody({ reset }: { reset: () => void }) {
                 {d.name}
               </button>
             ))}
+          </div>
+        )}
+        {prod && (
+          <div className="git-commit-meta" title={prod.url}>
+            <span className="added">●</span> {t('vcProdNow')} · {ago(prod.created)}
+            {prod.commit ? ` · ${prod.commit.split('\n')[0]}` : ''}
           </div>
         )}
         {project?.repo && (
@@ -612,6 +732,24 @@ function VercelBody({ reset }: { reset: () => void }) {
           )}
         </div>
       </div>
+
+      {failed && (
+        <div className="vc-alert">
+          <div>
+            <Icon name="warning" size={13} /> <strong>{t('vcLastFailed')}</strong> ·{' '}
+            {ago(failed.created)}
+          </div>
+          {failed.commit && <div className="vc-alert-sub">{failed.commit.split('\n')[0]}</div>}
+          <div className="git-connect-actions">
+            <button className="primary" disabled={busy !== null} onClick={() => fix(failed)}>
+              <Icon name="wrench" size={13} /> {busy === 'ai' ? '…' : t('vcFixAi')}
+            </button>
+            <button onClick={() => showLog(failed)}>
+              <Icon name="scroll" size={13} /> {t('vcLogs')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="git-branchbar">
         <div className="git-tabs">
@@ -694,16 +832,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                 >
                   <button
                     title={t('vcLogs')}
-                    onClick={() =>
-                      logs?.id === d.id
-                        ? setLogs(null)
-                        : void act('logs', async () =>
-                            setLogs({
-                              id: d.id,
-                              text: (await api().vercel.logs(d.id, pick.teamId)) || t('vcNoLogs'),
-                            }),
-                          )
-                    }
+                    onClick={() => setLogsFor(logsFor === d.id ? null : d.id)}
                   >
                     <Icon name="scroll" size={14} />
                   </button>
@@ -786,7 +915,14 @@ function VercelBody({ reset }: { reset: () => void }) {
                   )}
                 </span>
               </div>
-              {logs?.id === d.id && <pre className="vc-logs">{logs.text}</pre>}
+              {logsFor === d.id && (
+                <DeployLog
+                  dep={d}
+                  teamId={teamId}
+                  onClose={() => setLogsFor(null)}
+                  onFix={() => fix(d)}
+                />
+              )}
             </div>
           ))}
           {busy && (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ThemeId } from '../../shared/api';
+import type { BotKind, BotsStatus, ThemeId } from '../../shared/api';
 import { THEME_IDS } from '../../shared/api';
 import { commands, defaultKeys, runCommand } from '../commands';
 import { t } from '../i18n';
@@ -138,6 +138,103 @@ function PhoneSection() {
           )}
         </>
       )}
+      {status.running && <BotsSection pin={status.pin} />}
+    </>
+  );
+}
+
+/** Telegram and Discord bots (official APIs): paste the token, then link the chat with the PIN. */
+function BotsSection({ pin }: { pin?: string }) {
+  const [bots, setBots] = useState<BotsStatus | null>(null);
+  const [tokens, setTokens] = useState<Record<BotKind, string>>({ telegram: '', discord: '' });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void api()
+      .bots.status()
+      .then(setBots)
+      .catch(() => undefined);
+    return api().on((ev) => {
+      if (ev.type === 'bots:status') setBots(ev.status);
+    });
+  }, []);
+  const run = async (fn: () => Promise<BotsStatus>) => {
+    setBusy(true);
+    try {
+      setBots(await fn());
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!bots) return null;
+  const bot = (kind: BotKind, title: string, steps: string) => {
+    const b = bots[kind];
+    return (
+      <div className="bot-card">
+        <h4>{title}</h4>
+        {b.saved ? (
+          <>
+            <p className="small">
+              {b.error
+                ? b.error
+                : b.connected
+                  ? t('botConnected', { name: b.name ?? '' })
+                  : t('botConnecting')}
+            </p>
+            {b.connected && (
+              <p className="dim small">
+                {b.paired > 0
+                  ? t('botPaired', { n: b.paired })
+                  : t('botPairHint', { name: b.name ?? '', pin: pin ?? '' })}
+              </p>
+            )}
+            {kind === 'discord' && b.invite && (
+              <div className="phone-url">
+                <span className="small">{t('botInvite')}</span>
+                <button onClick={() => void api().app.openExternal(b.invite!)}>
+                  <Icon name="external" size={14} />
+                </button>
+              </div>
+            )}
+            <button disabled={busy} onClick={() => void run(() => api().bots.disconnect(kind))}>
+              {t('botDisconnect')}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="dim small">{steps}</p>
+            <div className="phone-url">
+              <input
+                type="password"
+                placeholder={t('botToken')}
+                value={tokens[kind]}
+                onChange={(e) => setTokens({ ...tokens, [kind]: e.target.value })}
+              />
+              <button
+                disabled={busy || tokens[kind].trim().length < 20}
+                onClick={() =>
+                  void run(async () => {
+                    const r = await api().bots.connect(kind, tokens[kind]);
+                    setTokens({ ...tokens, [kind]: '' });
+                    return r;
+                  })
+                }
+              >
+                {t('botConnect')}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+  return (
+    <>
+      <h3>{t('botsTitle')}</h3>
+      <p className="dim small">{t('botsHint')}</p>
+      {bot('telegram', 'Telegram', t('botTelegramSteps'))}
+      {bot('discord', 'Discord', t('botDiscordSteps'))}
     </>
   );
 }

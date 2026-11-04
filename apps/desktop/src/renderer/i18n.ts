@@ -158,6 +158,22 @@ const es = {
     'Envía este enlace a tu celular (por ejemplo, por WhatsApp a ti mismo), ábrelo y escribe el PIN de arriba:',
   phoneRemoteWarn:
     'El enlace incluye una clave secreta: no lo compartas. Cambia cada vez que lo activas y deja de funcionar al apagarlo.',
+  botsTitle: 'Telegram y Discord',
+  botsHint:
+    'Controla Zinarix escribiéndole a un bot: la IA te responde en el chat, apruebas lo que pide y haces /repos, /pull o /abrir desde cualquier lugar. Usan las APIs oficiales (no hay riesgo de bloqueo) y no necesitan el acceso desde cualquier lugar. Funcionan mientras el control desde el celular esté activo.',
+  botTelegramSteps:
+    'En Telegram abre @BotFather, escribe /newbot, ponle nombre y copia el token que te da. Pégalo aquí:',
+  botDiscordSteps:
+    'En discord.com/developers/applications crea una aplicación, entra a Bot, pulsa "Reset Token" y copia el token. Pégalo aquí:',
+  botToken: 'Token del bot',
+  botConnect: 'Conectar',
+  botDisconnect: 'Desconectar y olvidar',
+  botConnecting: 'Conectando…',
+  botConnected: 'Conectado como {name}.',
+  botPairHint: 'Escríbele a {name} por mensaje privado el PIN {pin} para vincular tu chat.',
+  botPaired: '{n} chat(s) vinculado(s). Escribe /ayuda en el chat para ver los comandos.',
+  botInvite:
+    'Agrega el bot a un servidor tuyo (Discord solo deja escribirle por privado si comparten un servidor):',
   insert: 'Insertar',
   replaceSel: 'Reemplazar selección',
   runInTerminal: 'Ejecutar en terminal',
@@ -688,6 +704,16 @@ const es = {
   vcLogs: 'Ver log de compilación',
   vcNoLogs: '(sin log)',
   vcInspect: 'Abrir en vercel.com',
+  vcFixAi: 'Arreglar con IA',
+  vcFixAiTitle: 'Manda el log al agente para que encuentre el error y lo corrija',
+  vcFixPrompt:
+    'El despliegue de Vercel {url} del proyecto "{project}" falló ({branch}). Este es el final del log de compilación:\n\n```\n{log}\n```\n\nExplícame en palabras sencillas qué falló y corrígelo en el código (con mi aprobación). Al terminar dime cómo volver a desplegar.',
+  vcLastFailed: 'El último despliegue falló',
+  vcCopyLog: 'Copiar log',
+  vcLogCopied: 'Log copiado',
+  vcCloseLog: 'Cerrar log',
+  vcLiveLog: 'En vivo',
+  vcProdNow: 'Producción',
   vcCopyUrl: 'Copiar URL',
   vcCopied: 'URL copiada',
   vcCancel: 'Cancelar despliegue',
@@ -1309,6 +1335,22 @@ const en: Record<Key, string> = {
     'Send this link to your phone (for example, to yourself on WhatsApp), open it and enter the PIN above:',
   phoneRemoteWarn:
     "The link contains a secret key: don't share it. It changes each time you turn this on and stops working when you turn it off.",
+  botsTitle: 'Telegram and Discord',
+  botsHint:
+    'Control Zinarix by writing to a bot: the AI answers in the chat, you approve what it asks and run /repos, /pull or /abrir from anywhere. They use the official APIs (no risk of being blocked) and do not need access from anywhere. They work while phone control is on.',
+  botTelegramSteps:
+    'In Telegram open @BotFather, send /newbot, give it a name and copy the token it gives you. Paste it here:',
+  botDiscordSteps:
+    'At discord.com/developers/applications create an application, open Bot, press "Reset Token" and copy the token. Paste it here:',
+  botToken: 'Bot token',
+  botConnect: 'Connect',
+  botDisconnect: 'Disconnect and forget',
+  botConnecting: 'Connecting…',
+  botConnected: 'Connected as {name}.',
+  botPairHint: 'Send {name} a private message with the PIN {pin} to link your chat.',
+  botPaired: '{n} chat(s) linked. Send /ayuda in the chat to see the commands.',
+  botInvite:
+    'Add the bot to a server of yours (Discord only allows private messages when you share a server):',
   insert: 'Insert',
   replaceSel: 'Replace selection',
   runInTerminal: 'Run in terminal',
@@ -1836,6 +1878,16 @@ const en: Record<Key, string> = {
   vcLogs: 'Show build log',
   vcNoLogs: '(no log)',
   vcInspect: 'Open on vercel.com',
+  vcFixAi: 'Fix with AI',
+  vcFixAiTitle: 'Send the log to the agent so it finds the error and fixes it',
+  vcFixPrompt:
+    'The Vercel deployment {url} of project "{project}" failed ({branch}). This is the end of the build log:\n\n```\n{log}\n```\n\nExplain in plain words what failed and fix it in the code (with my approval). When done, tell me how to deploy again.',
+  vcLastFailed: 'The last deployment failed',
+  vcCopyLog: 'Copy log',
+  vcLogCopied: 'Log copied',
+  vcCloseLog: 'Close log',
+  vcLiveLog: 'Live',
+  vcProdNow: 'Production',
   vcCopyUrl: 'Copy URL',
   vcCopied: 'URL copied',
   vcCancel: 'Cancel deployment',

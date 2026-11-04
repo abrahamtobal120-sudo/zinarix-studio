@@ -13,3 +13,5 @@ apps/desktop/release/
 .vercel/
 *private*.pem
 license-private*
+.vercel
+.env*
