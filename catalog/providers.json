@@ -4862,7 +4862,7 @@
       },
       "status": "unverified",
       "verifiedAt": null,
-      "notes": "Runs the local `cursor-agent -p --output-format stream-json` with the user's Cursor plan. The prompt goes as an argument (not usable through .cmd shims on Windows)."
+      "notes": "Runs the local `cursor-agent -p --output-format stream-json` with the user's Cursor plan. The prompt goes over stdin; on Windows the bundled node.exe behind cursor-agent.cmd is run directly."
     },
     {
       "id": "copilot-cli",

@@ -100,7 +100,26 @@ function paired() {
   for (const id of ['chats', 'new', 'bar', 'log', 'foot']) $(id).classList.remove('hide');
   connect();
 }
+// Through the internet (the https tunnel) live events are held back on the way: long polling.
+let polling = 0;
+async function poll(gen) {
+  let v = -1;
+  while (gen === polling && token) {
+    try {
+      const r = await fetch('/api/poll?v=' + v, { headers: { Authorization: 'Bearer ' + token } });
+      if (gen !== polling) return;
+      if (r.status === 401) return unpair();
+      if (!r.ok) throw new Error();
+      $('dot').classList.add('on');
+      if (r.status === 200) { const d = await r.json(); v = d.v; snap = d.snapshot; render(); }
+    } catch {
+      $('dot').classList.remove('on');
+      await new Promise((ok) => setTimeout(ok, 3000));
+    }
+  }
+}
 function connect() {
+  if (location.protocol === 'https:') return void poll(++polling);
   if (es) es.close();
   es = new EventSource('/api/events?token=' + encodeURIComponent(token));
   es.onopen = () => $('dot').classList.add('on');

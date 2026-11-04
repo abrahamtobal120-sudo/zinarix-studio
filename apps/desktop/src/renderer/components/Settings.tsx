@@ -65,6 +65,21 @@ function PhoneSection() {
       setBusy(false);
     }
   };
+  const toggleRemote = async (on: boolean) => {
+    setBusy(true);
+    try {
+      const phone = await api().phone.remote(on);
+      setState({ phone });
+      if (phone.remote?.error) toast(phone.remote.error);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = (text: string) => {
+    void navigator.clipboard.writeText(text);
+    toast(t('copied'));
+  };
+  const remote = status.remote;
   return (
     <>
       <h3>{t('phoneTitle')}</h3>
@@ -83,12 +98,7 @@ function PhoneSection() {
               {t('phoneStep2')}
               <div className="phone-url">
                 <code>{status.url}</code>
-                <button
-                  onClick={() => {
-                    void navigator.clipboard.writeText(status.url!);
-                    toast(t('copied'));
-                  }}
-                >
+                <button onClick={() => copy(status.url!)}>
                   <Icon name="copy" size={14} />
                 </button>
               </div>
@@ -103,6 +113,30 @@ function PhoneSection() {
           </p>
           <p className="dim small">{t('phoneFirewall')}</p>
         </div>
+      )}
+      {status.running && (
+        <>
+          <Toggle
+            label={t('phoneRemote')}
+            hint={t('phoneRemoteHint')}
+            checked={!!remote && !remote.error}
+            onChange={(v) => !busy && void toggleRemote(v)}
+          />
+          {remote?.progress && <p className="dim small">{remote.progress}</p>}
+          {remote?.error && <p className="dim small">{remote.error}</p>}
+          {remote?.url && (
+            <div className="phone-pair">
+              <p className="small">{t('phoneRemoteStep')}</p>
+              <div className="phone-url">
+                <code>{remote.url}</code>
+                <button onClick={() => copy(remote.url!)}>
+                  <Icon name="copy" size={14} />
+                </button>
+              </div>
+              <p className="dim small">{t('phoneRemoteWarn')}</p>
+            </div>
+          )}
+        </>
       )}
     </>
   );

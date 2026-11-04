@@ -56,6 +56,9 @@ export class PhoneRemote {
   private tokens = new Set<string>();
   private streams = new Set<ServerResponse>();
   private snapshot: PhoneSnapshot | null = null;
+  /** Grows with each snapshot; long polls wait until it changes. */
+  private version = 0;
+  private waiters = new Set<() => void>();
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private port = 0;
   private tunnel = new Tunnel();
@@ -164,6 +167,7 @@ export class PhoneRemote {
     this.streams.clear();
     this.tokens.clear();
     this.snapshot = null;
+    this.wake();
     this.server?.close();
     this.server?.closeAllConnections();
     this.server = null;
@@ -174,8 +178,15 @@ export class PhoneRemote {
   push(snapshot: PhoneSnapshot): void {
     if (!this.server) return;
     this.snapshot = snapshot;
+    this.version++;
+    this.wake();
     const data = `data: ${JSON.stringify(snapshot)}\n\n`;
     for (const s of this.streams) s.write(data);
+  }
+
+  private wake(): void {
+    for (const w of this.waiters) w();
+    this.waiters.clear();
   }
 
   private newPin(): void {
@@ -244,6 +255,25 @@ export class PhoneRemote {
         req.on('close', () => this.streams.delete(res));
         if (this.snapshot) res.write(`data: ${JSON.stringify(this.snapshot)}\n\n`);
         return;
+      }
+      // Long polling, for the tunnel: Cloudflare holds an event stream back, not a response.
+      if (req.method === 'GET' && url.pathname === '/api/poll') {
+        const seen = Number(url.searchParams.get('v'));
+        const changed = () => this.snapshot !== null && this.version !== seen;
+        if (!changed()) {
+          await new Promise<void>((ok) => {
+            const done = () => {
+              clearTimeout(timer);
+              this.waiters.delete(done);
+              ok();
+            };
+            const timer = setTimeout(done, 25_000);
+            this.waiters.add(done);
+            req.on('close', done);
+          });
+        }
+        if (!changed()) return void res.writeHead(204, { 'Cache-Control': 'no-store' }).end();
+        return end(res, 200, { v: this.version, snapshot: this.snapshot });
       }
       if (req.method === 'POST' && url.pathname === '/api/action') {
         this.onAction(Action.parse(await body(req)));

@@ -1206,6 +1206,7 @@ export const CHANNELS = [
   'phone:status',
   'phone:start',
   'phone:stop',
+  'phone:remote',
   'phone:push',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];

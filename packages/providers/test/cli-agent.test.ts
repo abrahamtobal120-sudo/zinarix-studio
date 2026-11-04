@@ -1,9 +1,16 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { CatalogEntry, ChatChunk, ChatRequest, CliProfile } from '@omni/shared';
-import { CliStreamParser, cliDeniedHint, cliMode, cliPrompt, getAdapter } from '@omni/providers';
+import {
+  CliStreamParser,
+  bundledNode,
+  cliDeniedHint,
+  cliMode,
+  cliPrompt,
+  getAdapter,
+} from '@omni/providers';
 import type { ProviderConfig } from '@omni/providers';
 
 const dir = mkdtempSync(join(tmpdir(), 'omni-cli-'));
@@ -385,6 +392,26 @@ describe('cli-agent adapter (fake CLI processes)', () => {
     expect(t.ok).toBe(false);
   });
 
+  it('runs Cursor Agent with the prompt on stdin and the workspace trusted', async () => {
+    const bin = fakeCli('cursor-agent', [
+      JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'hola desde cursor' }] },
+      }),
+      JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'x' }),
+    ]);
+    const out = await collect(cfg('cursor', bin), {
+      model: 'default',
+      messages: [{ role: 'user', content: 'di hola' }],
+    });
+    expect(text(out)).toBe('hola desde cursor');
+    const call = JSON.parse(
+      await import('node:fs').then((fs) => fs.readFileSync(bin + '.call.json', 'utf8')),
+    );
+    expect(call.input).toBe('di hola');
+    expect(call.argv).toEqual(['-p', '--output-format', 'stream-json', '--trust', '--mode', 'ask']);
+  });
+
   it('rejects model names that are not plain identifiers', async () => {
     const bin = fakeCli('claude3', []);
     await expect(
@@ -393,5 +420,29 @@ describe('cli-agent adapter (fake CLI processes)', () => {
         messages: [{ role: 'user', content: 'x' }],
       }),
     ).rejects.toMatchObject({ code: 'bad_request' });
+  });
+});
+
+describe('bundledNode (Cursor install on Windows)', () => {
+  const root = join(dir, 'cursor-install');
+  const version = (name: string) => {
+    const d = join(root, 'versions', name);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'node.exe'), '');
+    writeFileSync(join(d, 'index.js'), '');
+    return d;
+  };
+
+  it('picks the newest complete version folder behind the launcher', () => {
+    mkdirSync(root, { recursive: true });
+    expect(bundledNode(root)).toBeUndefined();
+    version('2026.09.01-abc123');
+    const newest = version('2026.10.22-27dcf5f');
+    mkdirSync(join(root, 'versions', '2026.11.01-dead00'), { recursive: true }); // interrupted update
+    mkdirSync(join(root, 'versions', 'not-a-version'), { recursive: true });
+    expect(bundledNode(root)).toEqual({
+      file: join(newest, 'node.exe'),
+      args: [join(newest, 'index.js')],
+    });
   });
 });

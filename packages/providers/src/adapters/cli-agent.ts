@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
-import { accessSync, constants, statSync } from 'node:fs';
+import { accessSync, constants, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, extname, isAbsolute, join } from 'node:path';
+import { delimiter, dirname, extname, isAbsolute, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest, CliProfile } from '@omni/shared';
@@ -91,15 +91,22 @@ const PROFILES: Record<CliProfile, Profile> = {
   },
   cursor: {
     output: 'json',
-    prompt: 'arg',
+    // `-p` with no prompt argument reads it from stdin: no command-line length limit, and it
+    // also works through the Windows launcher.
+    prompt: 'stdin',
     args: ({ model, mode }) => [
       '-p',
       '--output-format',
       'stream-json',
+      // Headless runs otherwise stop at the "trust this workspace?" question nobody can answer.
+      '--trust',
       ...(mode === 'read' ? ['--mode', 'ask'] : mode === 'full' ? ['--force'] : []),
       ...(model ? ['--model', model] : []),
     ],
-    install: 'curl https://cursor.com/install -fsS | bash',
+    install:
+      process.platform === 'win32'
+        ? `irm 'https://cursor.com/install?win32=true' | iex (en PowerShell)`
+        : 'curl https://cursor.com/install -fsS | bash',
     login: 'ejecuta `cursor-agent login` en una terminal',
   },
   copilot: {
@@ -229,6 +236,14 @@ export function cliDeniedHint(cfg: ProviderConfig, req: ChatRequest): string {
   return CLI_HINT_FULL;
 }
 
+function isFile(file: string): boolean {
+  try {
+    return statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function isExecutable(file: string): boolean {
   try {
     if (!statSync(file).isFile()) return false;
@@ -261,6 +276,10 @@ export function findExecutable(
     '/usr/local/bin',
     '/opt/homebrew/bin',
     ...(process.platform === 'win32' && env.APPDATA ? [join(env.APPDATA, 'npm')] : []),
+    // Cursor's Windows installer; its PATH change only reaches programs started afterwards.
+    ...(process.platform === 'win32' && env.LOCALAPPDATA
+      ? [join(env.LOCALAPPDATA, 'cursor-agent')]
+      : []),
   ].filter(Boolean);
   const exts =
     process.platform === 'win32'
@@ -290,9 +309,43 @@ function cliEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
+const VERSION_DIR = /^(\d{4})\.(\d{1,2})\.(\d{1,2})(?:-(\d{2})-(\d{2})-(\d{2}))?-[a-f0-9]+$/;
+
+/**
+ * Cursor's Windows launcher (cursor-agent.cmd → cursor-agent.ps1) only runs a bundled
+ * `node.exe index.js`, next to it or in the newest `versions\<version>\`. Running that
+ * directly skips cmd.exe and PowerShell, so stopping the run really stops the agent.
+ */
+export function bundledNode(root: string): { file: string; args: string[] } | undefined {
+  const dirs = [root];
+  try {
+    const versions = readdirSync(join(root, 'versions'), { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => ({ name: e.name, m: VERSION_DIR.exec(e.name) }))
+      .filter((v): v is { name: string; m: RegExpExecArray } => !!v.m)
+      .map((v) => ({ name: v.name, key: v.m.slice(1, 7).map((n) => Number(n ?? 0)) }))
+      .sort((a, b) => {
+        for (let i = 0; i < a.key.length; i++)
+          if (a.key[i] !== b.key[i]) return b.key[i]! - a.key[i]!;
+        return 0;
+      });
+    for (const v of versions) dirs.push(join(root, 'versions', v.name));
+  } catch {
+    // No versions folder: only a node.exe beside the launcher can work.
+  }
+  for (const dir of dirs) {
+    const node = join(dir, 'node.exe');
+    const entry = join(dir, 'index.js');
+    if (isFile(node) && isFile(entry)) return { file: node, args: [entry] };
+  }
+  return undefined;
+}
+
 /** npm installs CLIs on Windows as .cmd shims, which only run through cmd.exe. */
 function launch(file: string, args: string[]): { file: string; args: string[]; verbatim: boolean } {
   if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(extname(file))) {
+    const bundled = bundledNode(dirname(file));
+    if (bundled) return { file: bundled.file, args: [...bundled.args, ...args], verbatim: false };
     // Every argument is checked against SAFE_ARG first, so nothing here is interpreted by cmd.
     const line = [file, ...args].map((a) => `"${a}"`).join(' ');
     return {

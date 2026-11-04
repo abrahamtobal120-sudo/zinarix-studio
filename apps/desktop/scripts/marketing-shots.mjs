@@ -220,21 +220,24 @@ await win.waitForSelector('.usage-table');
 await win.waitForTimeout(600);
 await win.screenshot({ path: join(out, `${prefix}usage.png`) });
 if (theme || plan) {
-  await win.keyboard.press('Escape');
-  await win.locator('.status-item', { hasText: /📊|hoy|today/ }).click();
-  await win.waitForTimeout(300);
-  await win.locator('.plan-badge, .status-item.plan').first().click();
+  const closeModal = async () => {
+    await win.locator('.modal-x').first().click();
+    await win.waitForTimeout(300);
+  };
+  await closeModal();
+  await win.locator('.plan-badge').first().click();
   await win.waitForTimeout(900);
   await win.screenshot({ path: join(out, `${prefix}plan.png`) });
-  await win.keyboard.press('Escape');
-  await win.waitForTimeout(300);
+  await closeModal();
   // Two chats side by side (Pro): a second chat working while the first one is done.
   await win.locator('button[title^="Nuevo chat en paralelo"]').first().click();
   await win.waitForTimeout(400);
   await win.locator('button[title^="Ver dos chats a la par"]').first().click();
   await win.waitForTimeout(400);
-  await ask('Escribe una prueba para el servidor');
-  await win.waitForSelector('.tool-card.approval', { timeout: 20000 });
+  // The new chat's input comes after the first chat's.
+  await win.locator('.chat-input textarea').last().fill('Agrega validación de email al usuario');
+  await win.keyboard.press('Enter');
+  await win.locator('.tool-card.approval').first().waitFor({ timeout: 20000 });
   await win.waitForTimeout(800);
   await win.screenshot({ path: join(out, `${prefix}split.png`) });
 }

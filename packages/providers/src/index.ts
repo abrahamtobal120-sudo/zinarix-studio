@@ -29,6 +29,7 @@ export {
   cliMode,
   cliDeniedHint,
   findExecutable,
+  bundledNode,
   CliStreamParser,
 } from './adapters/cli-agent.js';
 export type { CliMode } from './adapters/cli-agent.js';

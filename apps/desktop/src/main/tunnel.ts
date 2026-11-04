@@ -11,7 +11,8 @@ function asset(): string | null {
   const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'amd64' : null;
   if (!arch) return null;
   if (process.platform === 'linux') return `cloudflared-linux-${arch}`;
-  if (process.platform === 'win32') return arch === 'amd64' ? 'cloudflared-windows-amd64.exe' : null;
+  if (process.platform === 'win32')
+    return arch === 'amd64' ? 'cloudflared-windows-amd64.exe' : null;
   if (process.platform === 'darwin') return `cloudflared-darwin-${arch}.tgz`;
   return null;
 }
@@ -24,7 +25,13 @@ async function binary(onProgress: (msg: string) => void): Promise<string> {
 
   const dir = join(app.getPath('userData'), 'bin');
   const file = join(dir, exe);
-  if (await stat(file).then((s) => s.size > 1_000_000, () => false)) return file;
+  if (
+    await stat(file).then(
+      (s) => s.size > 1_000_000,
+      () => false,
+    )
+  )
+    return file;
 
   const name = asset();
   if (!name) throw new Error('El acceso a distancia no está disponible en este sistema.');
@@ -65,11 +72,10 @@ export class Tunnel {
     this.stop();
     const bin = await binary(onProgress);
     onProgress('Abriendo la conexión segura…');
-    const proc = spawn(
-      bin,
-      ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`],
-      { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
-    );
+    const proc = spawn(bin, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
     this.proc = proc;
     return await new Promise<string>((ok, fail) => {
       let found = false;

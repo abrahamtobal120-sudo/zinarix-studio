@@ -138,7 +138,7 @@ const es = {
   copied: 'Copiado',
   phoneTitle: 'Celular',
   phoneHint:
-    'Controla Zinarix desde tu celular: ve los chats, escribe mensajes, aprueba o rechaza lo que pide el agente y detén respuestas. El celular debe estar en la misma red Wi-Fi que esta computadora.',
+    'Controla Zinarix desde tu celular: ve los chats, escribe mensajes, aprueba o rechaza lo que pide el agente y detén respuestas. En la misma red Wi-Fi, o desde cualquier lugar si activas el acceso a distancia.',
   phoneEnable: 'Permitir control desde el celular',
   phoneEnableHint:
     'Se apaga al cerrar la ventana. Cada vez que lo activas hay que volver a conectar.',
@@ -151,6 +151,13 @@ const es = {
   phoneFirewall:
     'Si el celular no abre la página, permite el puerto en el firewall de esta computadora.',
   phonePaired: 'Celular conectado a Zinarix',
+  phoneRemote: 'Acceso desde cualquier lugar',
+  phoneRemoteHint:
+    'Para usarlo fuera de casa, con datos móviles u otra red. Crea una conexión segura (https) con Cloudflare, sin abrir puertos ni crear cuentas.',
+  phoneRemoteStep:
+    'Envía este enlace a tu celular (por ejemplo, por WhatsApp a ti mismo), ábrelo y escribe el PIN de arriba:',
+  phoneRemoteWarn:
+    'El enlace incluye una clave secreta: no lo compartas. Cambia cada vez que lo activas y deja de funcionar al apagarlo.',
   insert: 'Insertar',
   replaceSel: 'Reemplazar selección',
   runInTerminal: 'Ejecutar en terminal',
@@ -1276,7 +1283,7 @@ const en: Record<Key, string> = {
   copied: 'Copied',
   phoneTitle: 'Phone',
   phoneHint:
-    'Control Zinarix from your phone: see the chats, write messages, approve or deny what the agent asks and stop answers. The phone must be on the same Wi-Fi network as this computer.',
+    'Control Zinarix from your phone: see the chats, write messages, approve or deny what the agent asks and stop answers. On the same Wi-Fi network, or from anywhere if you turn on remote access.',
   phoneEnable: 'Allow control from the phone',
   phoneEnableHint:
     'Turns off when the window closes. Each time you turn it on, the phone pairs again.',
@@ -1287,6 +1294,13 @@ const en: Record<Key, string> = {
   phoneConnected: '{n} phone(s) connected. Add the page to the home screen to use it as an app.',
   phoneFirewall: "If the phone can't open the page, allow the port in this computer's firewall.",
   phonePaired: 'Phone connected to Zinarix',
+  phoneRemote: 'Access from anywhere',
+  phoneRemoteHint:
+    'To use it away from home, on mobile data or another network. Creates a secure (https) connection through Cloudflare, without opening ports or creating accounts.',
+  phoneRemoteStep:
+    'Send this link to your phone (for example, to yourself on WhatsApp), open it and enter the PIN above:',
+  phoneRemoteWarn:
+    "The link contains a secret key: don't share it. It changes each time you turn this on and stops working when you turn it off.",
   insert: 'Insert',
   replaceSel: 'Replace selection',
   runInTerminal: 'Run in terminal',
