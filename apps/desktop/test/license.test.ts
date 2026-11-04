@@ -12,6 +12,7 @@ import {
   type LicensePayload,
 } from '../src/main/license.js';
 import { newer, parseRemote } from '../src/main/remote.js';
+import { EDITIONS, editionOf } from '../src/shared/edition.js';
 import {
   AI_FEATURES,
   DEFAULT_PLANS,
@@ -281,5 +282,41 @@ describe('website: /api/license (after a Stripe payment)', () => {
     const bad = await call(paid, '../../v1/charges');
     expect(bad.status).toBe(400);
     expect(bad.fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('editions (one app per plan)', () => {
+  it('the standard app is unchanged', () => {
+    const st = licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.standard);
+    expect(st.features).toEqual(PRO_AI_FEATURES);
+    expect(st.edition).toBeUndefined();
+  });
+
+  it('an edition never grants more than its plan', () => {
+    expect(licenseStatus({}, NOW, PUB, EDITIONS.ai).features).toEqual(FREE_FEATURES);
+    expect(licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.pro).features).toEqual(
+      PRO_FEATURES,
+    );
+    expect(licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.ai).features).toEqual(
+      AI_FEATURES,
+    );
+  });
+
+  it('a key of another plan says which app to download', () => {
+    const st = licenseStatus(
+      { license: keyFor(payload({ plan: 'ai' })), plans: billingOn },
+      NOW,
+      PUB,
+      EDITIONS.pro,
+    );
+    expect(st.edition).toBe('pro');
+    expect(st.features).toEqual(FREE_FEATURES);
+    expect(st.problem).toMatch(/Zinarix Studio AI/);
+  });
+
+  it('editionOf falls back to the standard app', () => {
+    expect(editionOf(undefined)).toBe(EDITIONS.standard);
+    expect(editionOf('nope')).toBe(EDITIONS.standard);
+    expect(editionOf('proai').productName).toBe('Zinarix Studio Pro + AI');
   });
 });

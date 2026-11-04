@@ -136,6 +136,21 @@ const es = {
   send: 'Enviar',
   copy: 'Copiar',
   copied: 'Copiado',
+  phoneTitle: 'Celular',
+  phoneHint:
+    'Controla Zinarix desde tu celular: ve los chats, escribe mensajes, aprueba o rechaza lo que pide el agente y detén respuestas. El celular debe estar en la misma red Wi-Fi que esta computadora.',
+  phoneEnable: 'Permitir control desde el celular',
+  phoneEnableHint:
+    'Se apaga al cerrar la ventana. Cada vez que lo activas hay que volver a conectar.',
+  phoneStep1: 'Conecta el celular a la misma red Wi-Fi.',
+  phoneStep2: 'Abre esta dirección en el navegador del celular:',
+  phoneStep3: 'Escribe este PIN:',
+  phoneWaiting: 'Esperando a que se conecte un celular…',
+  phoneConnected:
+    '{n} celular(es) conectado(s). Puedes agregar la página a la pantalla de inicio para usarla como app.',
+  phoneFirewall:
+    'Si el celular no abre la página, permite el puerto en el firewall de esta computadora.',
+  phonePaired: 'Celular conectado a Zinarix',
   insert: 'Insertar',
   replaceSel: 'Reemplazar selección',
   runInTerminal: 'Ejecutar en terminal',
@@ -619,7 +634,8 @@ const es = {
   vcCliMissing: 'O inicia sesión con la CLI de Vercel (se usa con npx si no está instalada).',
   vcCliLogin: 'Iniciar sesión (vercel login)',
   vcRecheck: 'Ya inicié sesión, comprobar',
-  svcOffline: 'Tu sesión de {name} sigue guardada, pero ahora no responde. Se reintenta solo cada 20 s.',
+  svcOffline:
+    'Tu sesión de {name} sigue guardada, pero ahora no responde. Se reintenta solo cada 20 s.',
   svcRetry: 'Reintentar ahora',
   vcFromCli: 'Sesión de la CLI de Vercel',
   vcFromApp: 'Token guardado en la app (cifrado)',
@@ -627,7 +643,8 @@ const es = {
   vcLogoutConfirm: '¿Olvidar el token de Vercel guardado en la app?',
   acctAdd: '+ Otra cuenta',
   acctAddTitle: 'Conectar otra cuenta (las que ya tienes siguen conectadas)',
-  acctAddIntro: 'Conecta otra cuenta. Las que ya tienes siguen conectadas y puedes cambiar entre ellas.',
+  acctAddIntro:
+    'Conecta otra cuenta. Las que ya tienes siguen conectadas y puedes cambiar entre ellas.',
   acctCancel: 'Cancelar',
   acctSwitch: 'Cambiar de cuenta',
   vcNotLinked:
@@ -954,7 +971,8 @@ const es = {
   sbMailDash: 'Ver las plantillas en supabase.com',
   mlTitle: 'Correo',
   mlInbox: 'Recibidos',
-  mlPassAgain: 'Tu cuenta sigue guardada, pero falta la contraseña. Escríbela otra vez para reconectar.',
+  mlPassAgain:
+    'Tu cuenta sigue guardada, pero falta la contraseña. Escríbela otra vez para reconectar.',
   mlSaveDraft: 'Guardar borrador',
   mlDraftSaved: 'Borrador guardado.',
   mlDraftDelete: 'Eliminar borrador',
@@ -1256,6 +1274,19 @@ const en: Record<Key, string> = {
   send: 'Send',
   copy: 'Copy',
   copied: 'Copied',
+  phoneTitle: 'Phone',
+  phoneHint:
+    'Control Zinarix from your phone: see the chats, write messages, approve or deny what the agent asks and stop answers. The phone must be on the same Wi-Fi network as this computer.',
+  phoneEnable: 'Allow control from the phone',
+  phoneEnableHint:
+    'Turns off when the window closes. Each time you turn it on, the phone pairs again.',
+  phoneStep1: 'Connect the phone to the same Wi-Fi network.',
+  phoneStep2: "Open this address in the phone's browser:",
+  phoneStep3: 'Enter this PIN:',
+  phoneWaiting: 'Waiting for a phone to connect…',
+  phoneConnected: '{n} phone(s) connected. Add the page to the home screen to use it as an app.',
+  phoneFirewall: "If the phone can't open the page, allow the port in this computer's firewall.",
+  phonePaired: 'Phone connected to Zinarix',
   insert: 'Insert',
   replaceSel: 'Replace selection',
   runInTerminal: 'Run in terminal',
@@ -1736,7 +1767,8 @@ const en: Record<Key, string> = {
   vcCliMissing: 'Or sign in with the Vercel CLI (runs through npx if not installed).',
   vcCliLogin: 'Sign in (vercel login)',
   vcRecheck: 'I signed in, check again',
-  svcOffline: 'Your {name} login is still saved, but it is not answering right now. Retrying every 20 s.',
+  svcOffline:
+    'Your {name} login is still saved, but it is not answering right now. Retrying every 20 s.',
   svcRetry: 'Retry now',
   vcFromCli: 'Vercel CLI session',
   vcFromApp: 'Token saved in the app (encrypted)',
@@ -1744,7 +1776,8 @@ const en: Record<Key, string> = {
   vcLogoutConfirm: 'Forget the Vercel token saved in the app?',
   acctAdd: '+ Add account',
   acctAddTitle: 'Connect another account (the ones you have stay connected)',
-  acctAddIntro: 'Connect another account. The ones you have stay connected and you can switch between them.',
+  acctAddIntro:
+    'Connect another account. The ones you have stay connected and you can switch between them.',
   acctCancel: 'Cancel',
   acctSwitch: 'Switch account',
   vcNotLinked:
@@ -2067,7 +2100,8 @@ const en: Record<Key, string> = {
   sbMailDash: 'See the templates on supabase.com',
   mlTitle: 'Mail',
   mlInbox: 'Inbox',
-  mlPassAgain: 'Your account is still saved, but its password is missing. Type it again to reconnect.',
+  mlPassAgain:
+    'Your account is still saved, but its password is missing. Type it again to reconnect.',
   mlSaveDraft: 'Save draft',
   mlDraftSaved: 'Draft saved.',
   mlDraftDelete: 'Delete draft',

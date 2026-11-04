@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ThemeId } from '../../shared/api';
 import { THEME_IDS } from '../../shared/api';
 import { commands, defaultKeys, runCommand } from '../commands';
 import { t } from '../i18n';
 import { comboFromEvent } from '../keys';
-import { api, refreshSettings, setState, setTheme, updatePrefs, useStore } from '../store';
+import { api, refreshSettings, setState, setTheme, toast, updatePrefs, useStore } from '../store';
 import { THEMES } from '../themes';
 import { Icon, type IconName } from './Icon';
 
@@ -21,7 +21,7 @@ const FONTS = [
   'monospace',
 ];
 
-type Section = 'appearance' | 'editor' | 'ai' | 'keys';
+type Section = 'appearance' | 'editor' | 'ai' | 'phone' | 'keys';
 
 function Toggle({
   label,
@@ -42,6 +42,69 @@ function Toggle({
       </span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     </label>
+  );
+}
+
+/** Remote control from a phone on the same Wi-Fi: start/stop, address and PIN. */
+function PhoneSection() {
+  const status = useStore((s) => s.phone);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void api()
+      .phone.status()
+      .then((phone) => setState({ phone }))
+      .catch(() => undefined);
+  }, []);
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    try {
+      const phone = on ? await api().phone.start() : await api().phone.stop();
+      setState({ phone });
+      if (phone.error) toast(phone.error);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <h3>{t('phoneTitle')}</h3>
+      <p className="dim small">{t('phoneHint')}</p>
+      <Toggle
+        label={t('phoneEnable')}
+        hint={t('phoneEnableHint')}
+        checked={status.running}
+        onChange={(v) => !busy && void toggle(v)}
+      />
+      {status.running && status.url && (
+        <div className="phone-pair">
+          <ol>
+            <li>{t('phoneStep1')}</li>
+            <li>
+              {t('phoneStep2')}
+              <div className="phone-url">
+                <code>{status.url}</code>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(status.url!);
+                    toast(t('copied'));
+                  }}
+                >
+                  <Icon name="copy" size={14} />
+                </button>
+              </div>
+            </li>
+            <li>
+              {t('phoneStep3')}
+              <div className="phone-pin">{status.pin}</div>
+            </li>
+          </ol>
+          <p className="dim small">
+            {status.phones > 0 ? t('phoneConnected', { n: status.phones }) : t('phoneWaiting')}
+          </p>
+          <p className="dim small">{t('phoneFirewall')}</p>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -97,6 +160,7 @@ export function SettingsPanel() {
           {nav('appearance', t('setAppearance'), 'palette')}
           {nav('editor', t('setEditor'), 'edit')}
           {nav('ai', t('setAi'), 'sparkles')}
+          {nav('phone', t('phoneTitle'), 'smartphone')}
           {nav('keys', t('shortcuts'), 'keyboard')}
         </nav>
         <div className="settings-body">
@@ -233,6 +297,8 @@ export function SettingsPanel() {
               />
             </>
           )}
+
+          {section === 'phone' && <PhoneSection />}
 
           {section === 'keys' && (
             <>

@@ -7,6 +7,8 @@ import {
   PRO_AI_FEATURES,
   PRO_FEATURES,
 } from '../shared/plans.js';
+import type { Edition } from '../shared/edition.js';
+import { clampFeatures, EDITIONS } from '../shared/edition.js';
 
 /**
  * License keys: `ZX1.<payload>.<signature>`, where payload is base64url JSON and the
@@ -120,12 +122,34 @@ export interface StoredLicense {
 
 const DAY = 86_400_000;
 
-/** What this installation may use right now. */
+const PLAN_LABEL: Record<PaidPlan, string> = {
+  free: 'Gratis',
+  pro: 'Pro',
+  ai: 'AI',
+  proai: 'Pro + AI',
+};
+
+/** What this installation may use right now (inside what its edition can grant). */
 export function licenseStatus(
   s: StoredLicense,
   now = Date.now(),
   publicKeyPem = LICENSE_PUBLIC_KEY,
+  edition: Edition = EDITIONS.standard,
 ): LicenseStatus {
+  const st = planStatus(s, now, publicKeyPem);
+  if (edition.id === 'standard') return st;
+  const out: LicenseStatus = {
+    ...st,
+    edition: edition.id,
+    features: clampFeatures(st.features, edition.ceiling),
+  };
+  const plan = st.plan;
+  if ((plan === 'pro' || plan === 'ai' || plan === 'proai') && !edition.plans.includes(plan))
+    out.problem = `Tu clave es del plan ${PLAN_LABEL[plan]}: esta app es ${edition.productName}. Descarga Zinarix Studio ${PLAN_LABEL[plan]} para usarla completa.`;
+  return out;
+}
+
+function planStatus(s: StoredLicense, now: number, publicKeyPem: string): LicenseStatus {
   const cfg = s.plans ?? DEFAULT_PLANS;
   const base = { billing: cfg.billing, buyUrl: cfg.buyUrl, free: cfg.free };
   if (s.owner) return { ...base, plan: 'owner', features: PRO_AI_FEATURES, expires: null };

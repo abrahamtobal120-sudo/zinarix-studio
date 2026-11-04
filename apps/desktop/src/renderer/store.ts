@@ -4,6 +4,7 @@ import type {
   AiRole,
   ChatContext,
   OmniApi,
+  PhoneStatus,
   Prefs,
   Settings,
   ThemeId,
@@ -102,6 +103,8 @@ export interface State {
   update: { state: 'available' | 'ready'; version: string; url?: string } | null;
   /** A message from the app's owner (shown once). */
   notice: RemoteNotice | null;
+  /** Remote control from a phone (Settings → Phone). */
+  phone: PhoneStatus;
 }
 
 /** One chat of the panel. Its turns live in its own component; this is what the tabs show. */
@@ -172,6 +175,7 @@ let state: State = {
   },
   update: null,
   notice: null,
+  phone: { running: false, phones: 0 },
 };
 
 const listeners = new Set<() => void>();

@@ -17,6 +17,7 @@ import { Vercel, linkedProject } from './vercel.js';
 import { isOwnerCode, licenseStatus, normalizeKey, parseLicense, planCode } from './license.js';
 import type { StoredLicense } from './license.js';
 import { startUpdates } from './updates.js';
+import { editionOf } from '../shared/edition.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
 import { PhoneRemote } from './phone.js';
 import type { RemoteNotice } from '../shared/plans.js';
@@ -38,7 +39,10 @@ const appRoot = resolve(here, '..', '..');
 const rendererDir = join(appRoot, 'dist', 'renderer');
 process.env.OMNI_CATALOG_DIR ??= join(appRoot, 'dist', 'catalog');
 
-app.setName('Zinarix Studio');
+/** Which app this is (Zinarix Studio, Zinarix Studio Pro…): set at build time. */
+const edition = editionOf(process.env.ZINARIX_EDITION);
+const APP_NAME = edition.productName;
+app.setName(APP_NAME);
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'app',
@@ -156,7 +160,7 @@ function saveState(patch: Partial<DesktopState>): void {
 
 /** The plan of this installation (trial, Pro, owner or free). */
 function license() {
-  return licenseStatus(loadState());
+  return licenseStatus(loadState(), undefined, undefined, edition);
 }
 
 function planName(): string {
@@ -244,7 +248,7 @@ async function openFolder(w: Win, path: string): Promise<WorkspaceInfo | null> {
   });
   app.addRecentDocument(abs);
   const info = await workspace.info();
-  if (!w.win.isDestroyed()) w.win.setTitle(`${info.name} — Zinarix Studio`);
+  if (!w.win.isDestroyed()) w.win.setTitle(`${info.name} — ${APP_NAME}`);
   send(w, { type: 'workspace', workspace: info });
   return info;
 }
@@ -319,7 +323,7 @@ function registerIpc(): void {
   handle('workspace:close', z.tuple([]), (w) => {
     w.workspace?.dispose();
     w.workspace = undefined;
-    w.win.setTitle('Zinarix Studio');
+    w.win.setTitle(APP_NAME);
     send(w, { type: 'workspace', workspace: null });
   });
   // A folder for one chat only: the window keeps its open folder.
@@ -1298,11 +1302,11 @@ function buildMenu(): void {
           click: (_item, bw) => void checkForUpdatesNow(winOf(bw) ?? focused()),
         },
         {
-          label: 'Acerca de Zinarix Studio',
+          label: `Acerca de ${APP_NAME}`,
           click: (_item, bw) =>
             void dialog.showMessageBox((winOf(bw) ?? focused())!.win, {
-              title: 'Zinarix Studio',
-              message: `Zinarix Studio ${app.getVersion()} · ${planName()}`,
+              title: APP_NAME,
+              message: `${APP_NAME} ${app.getVersion()} · ${planName()}`,
               detail: `Electron ${process.versions.electron} · Node ${process.versions.node}\nEditor multi-IA · MIT`,
             }),
         },
@@ -1335,7 +1339,7 @@ async function createWindow(
     ...(pos ? { x: pos[0]! + 32, y: pos[1]! + 32 } : {}),
     minWidth: 800,
     minHeight: 500,
-    title: 'Zinarix Studio',
+    title: APP_NAME,
     icon: iconPath(),
     show: false,
     backgroundColor: light ? '#ffffff' : '#1e1e1e',
@@ -1478,7 +1482,7 @@ async function checkForUpdatesNow(w: Win | undefined): Promise<void> {
   const found = (await refreshRemote()) || Boolean(await updates?.check());
   if (!found && w)
     void dialog.showMessageBox(w.win, {
-      title: 'Zinarix Studio',
+      title: APP_NAME,
       message: `Tienes la versión más reciente (${app.getVersion()}).`,
     });
 }
@@ -1500,7 +1504,7 @@ app.whenReady().then(async () => {
   const initial = folderFromArgv(process.argv) ?? process.env.OMNI_OPEN_FOLDER;
   await createWindow({ folder: initial, restore: true });
   // Installed copies update themselves from the GitHub releases (silently when offline).
-  updates = startUpdates((ev) => {
+  updates = startUpdates(edition.channel, (ev) => {
     for (const w of wins.values()) send(w, ev);
   });
   // The owner's switches and announcements, now and every few hours.

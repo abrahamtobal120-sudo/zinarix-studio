@@ -12,6 +12,8 @@ const EVERY_MS = 6 * 60 * 60 * 1000;
  * it; failures (offline, an unsigned macOS build) are logged and never shown as errors.
  */
 export function startUpdates(
+  /** The edition's update feed (`latest`, `pro`, `ai`, `proai`): each app updates itself. */
+  channel: string,
   emit: (ev: AppEvent) => void,
 ): { install(): void; check(): Promise<boolean> } | undefined {
   if (!app.isPackaged || process.env.ZINARIX_NO_UPDATES) return undefined;
@@ -19,6 +21,11 @@ export function startUpdates(
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.logger = null;
+  if (channel !== 'latest') {
+    autoUpdater.channel = channel;
+    // Setting a channel turns downgrades on; an edition only ever moves forward.
+    autoUpdater.allowDowngrade = false;
+  }
   autoUpdater.on('update-available', (info) =>
     emit({ type: 'update', state: 'available', version: info.version }),
   );

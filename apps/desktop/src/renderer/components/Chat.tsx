@@ -5,6 +5,8 @@ import type {
   ChatEventView,
   ConversationView,
   OmniApi,
+  PhoneAction,
+  PhoneSnapshot,
   ToolDecision,
   ToolPreview,
 } from '../../shared/api';
@@ -134,8 +136,100 @@ interface ChatHandle {
   setAgent: (on: boolean) => void;
   load: (conversationId: string) => void;
   reset: () => void;
+  /** Stops like the Stop button (queued messages wait). */
+  stop: () => void;
+  decide: (toolCallId: string, d: ToolDecision) => void;
+  /** The last turns, for the phone remote. */
+  view: () => PhoneSnapshot['turns'];
 }
 const handles = new Map<string, ChatHandle>();
+
+/** Turns the phone shows (the newest ones; long texts keep their end). */
+const PHONE_TURNS = 40;
+const PHONE_TEXT = 8000;
+function phoneTurns(turns: Turn[]): PhoneSnapshot['turns'] {
+  return turns.slice(-PHONE_TURNS).map((x) => {
+    const text =
+      x.parts
+        ?.filter((p) => p.kind === 'text')
+        .map((p) => p.text)
+        .join('\n') || x.content;
+    return {
+      role: x.role,
+      text: text.length > PHONE_TEXT ? '…' + text.slice(-PHONE_TEXT) : text,
+      ...(x.error ? { error: x.error.slice(0, 2000) } : {}),
+      tools: (x.parts ?? [])
+        .filter((p): p is ToolStep => p.kind === 'tool')
+        .slice(-60)
+        .map((p) => ({
+          id: p.id,
+          title: `${p.name} ${toolTitle(p)}`.trim().slice(0, 300),
+          status: p.status,
+        })),
+    };
+  });
+}
+
+let phoneTimer: ReturnType<typeof setTimeout> | undefined;
+/** Sends the phone what the controlled chat looks like now (a few times a second at most). */
+export function pushToPhone(): void {
+  if (!getState().phone.running || phoneTimer) return;
+  phoneTimer = setTimeout(() => {
+    phoneTimer = undefined;
+    const s = getState();
+    if (!s.phone.running) return;
+    const id = focusedChat();
+    const h = handles.get(id);
+    void api()
+      .phone.push({
+        chats: s.chats.map((c, i) => ({
+          id: c.id,
+          title: (c.title || t('chatTabN', { n: i + 1 })).slice(0, 200),
+          busy: c.busy,
+          waiting: c.waiting,
+        })),
+        chatId: id,
+        agent: chatTab(id)?.agent ?? true,
+        busy: h?.busy() ?? false,
+        turns: h?.view() ?? [],
+      })
+      .catch(() => undefined);
+  }, 250);
+}
+
+/** Does what the paired phone asked, in the chat the user is looking at. */
+export function runPhoneAction(a: PhoneAction): void {
+  const id = focusedChat();
+  const h = handles.get(id);
+  switch (a.kind) {
+    case 'send':
+      setState({ chatOpen: true });
+      if (!h) newChat({ initial: { prompt: a.text, send: true } }, true);
+      // Busy: it goes out when the current answer ends, like messages written meanwhile.
+      else if (h.busy()) updateChat(id, { queued: [...(chatTab(id)?.queued ?? []), a.text] });
+      else h.send(a.text);
+      break;
+    case 'decide':
+      h?.decide(a.toolCallId, a.decision);
+      break;
+    case 'stop':
+      h?.stop();
+      break;
+    case 'select':
+      selectChat(a.chatId);
+      break;
+    case 'newChat':
+      newChat({}, true);
+      break;
+    case 'agent':
+      if (chatTab(id)) {
+        updateChat(id, { agent: a.on });
+        saveAgentMode(a.on);
+      }
+      break;
+  }
+  pushToPhone();
+}
 
 /**
  * Sends a prompt from elsewhere (Ctrl+L, palette, security center…) to the chat the user is
@@ -865,6 +959,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     setAgent: setAgentMode,
     load: (cid) => void loadConversation(cid),
     reset: resetChat,
+    stop: () => stop(),
+    decide: (toolCallId, d) => decide(toolCallId, d),
+    view: () => phoneTurns(turnsNow.current),
   };
   useEffect(() => {
     const proxy: ChatHandle = {
@@ -875,6 +972,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       setAgent: (on) => handle.current!.setAgent(on),
       load: (cid) => handle.current!.load(cid),
       reset: () => handle.current!.reset(),
+      stop: () => handle.current!.stop(),
+      decide: (...a) => handle.current!.decide(...a),
+      view: () => handle.current!.view(),
     };
     handles.set(id, proxy);
     return () => {
@@ -912,6 +1012,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     });
     if (finished) onFinished();
   }, [id, busy, waiting]);
+  // The phone remote follows the chat being looked at.
+  useEffect(() => {
+    if (id === focusedChat()) pushToPhone();
+  }, [id, turns, busy]);
 
   /** Sends one answer of this chat to another AI, in a new chat (the user reviews and sends). */
   const handoff = (turn: Turn) => {
@@ -2034,6 +2138,10 @@ export function ChatPanel() {
   const list = useStore((s) => s.chatList);
   const focusedId = focus === 1 && split ? split : activeChat;
   const strip = useRef<HTMLDivElement>(null);
+  const phoneOn = useStore((s) => s.phone.running);
+  useEffect(() => {
+    if (phoneOn) pushToPhone();
+  }, [phoneOn, chats, focusedId]);
 
   // Keep the focused tab in view when there are many.
   useEffect(() => {

@@ -22,6 +22,8 @@ await build({
   target: 'node24',
   sourcemap: true,
   external,
+  // The edition (scripts/build-editions.mjs): standard, pro, ai or proai.
+  define: { 'process.env.ZINARIX_EDITION': JSON.stringify(process.env.ZINARIX_EDITION ?? '') },
   banner: {
     js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
   },

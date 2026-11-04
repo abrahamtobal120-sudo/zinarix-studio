@@ -6961,3 +6961,30 @@ button.primary:hover,
   font-family: inherit;
   font-size: 13px;
 }
+
+/* Settings → Phone */
+.phone-pair ol {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.phone-url {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.phone-url code {
+  user-select: all;
+  font-size: 15px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--bg-2);
+}
+.phone-pin {
+  margin-top: 6px;
+  font: 600 28px/1.2 var(--mono, monospace);
+  letter-spacing: 6px;
+  color: var(--accent);
+}

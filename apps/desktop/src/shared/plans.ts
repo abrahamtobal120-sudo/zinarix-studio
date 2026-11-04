@@ -5,6 +5,8 @@
  * (which enforces) and the renderer (which explains and offers the upgrade).
  */
 
+import type { EditionId } from './edition.js';
+
 /**
  * open: charging is off (set from the website), everyone has everything.
  * ai: the free plan plus Zinarix AI (the best AIs without accounts or keys).
@@ -60,6 +62,8 @@ export type ProFeature = 'chats' | 'split' | 'windows';
 
 export interface LicenseStatus {
   plan: PlanId;
+  /** The app's edition (Zinarix Studio Pro, AI…); absent: the standard app. */
+  edition?: EditionId;
   features: PlanFeatures;
   /** Charging is on (plans.json on the website). */
   billing: boolean;
