@@ -346,7 +346,7 @@ describe('one AI delegates to another, with the user’s approval', () => {
 });
 
 describe('review fixes', () => {
-  it('one conversation never runs twice at the same time (two tabs or windows)', async () => {
+  it('a message sent while the conversation works runs alongside, in its own transcript', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     const seen: Record<string, unknown[]> = {};
@@ -356,7 +356,10 @@ describe('review fixes', () => {
         join(root, 'omni'),
         {
           'p1/boss': {
-            turns: [() => ({ calls: [{ name: 'write_file', args: { path: 'x', content: '1' } }] })],
+            turns: [
+              () => ({ calls: [{ name: 'write_file', args: { path: 'x', content: '1' } }] }),
+              () => ({ text: 'b listo' }),
+            ],
           },
         },
         seen,
@@ -375,15 +378,27 @@ describe('review fixes', () => {
       ask: async () => (await gate, 'deny' as ToolDecision),
     });
     await new Promise((r) => setTimeout(r, 20));
-    await expect(
-      agent.run({
-        ...base,
-        userMessage: { role: 'user', content: 'b' },
-        ask: async () => 'approve',
-      }),
-    ).rejects.toThrow(/ya está trabajando/);
+    const second = await agent.run({
+      ...base,
+      userMessage: { role: 'user', content: 'b' },
+      ask: async () => 'approve',
+    });
+    expect(second).toBe('b listo');
+    type Req = { messages: ChatMessage[] };
+    const contents = (r: unknown) => (r as Req).messages.map((m) => m.content);
+    // The second message starts from the transcript before the first one (no half-done turn).
+    expect(contents(seen['p1/boss']![1])).toEqual([expect.any(String), 'b']);
     release();
     await first;
+    // On the next turn the conversation knows the exchange that ran alongside.
+    await agent.run({
+      ...base,
+      userMessage: { role: 'user', content: 'c' },
+      ask: async () => 'approve',
+    });
+    const last = contents(seen['p1/boss']!.at(-1));
+    expect(last.slice(-3)).toEqual(['b', 'b listo', 'c']);
+    expect(last).toContain('a');
   });
 
   it('a CLI agent as helper is high risk, approved one at a time, and asked never again "always"', async () => {

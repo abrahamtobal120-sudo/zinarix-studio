@@ -130,6 +130,11 @@ export interface ChatTab {
   unread: boolean;
   /** Messages waiting for the current answer to end; each one is sent by itself in turn. */
   queued: string[];
+  /**
+   * The message the chat is working on, kept until its answer ends: still set on the next start
+   * means the app (or the computer) went off mid-task, and the chat continues it by itself.
+   */
+  resume?: string;
   /** Sent (or put in the box) once the chat opens: a handoff or a task from elsewhere. */
   initial?: { prompt: string; context?: ChatContext[]; send: boolean };
 }
@@ -647,6 +652,7 @@ function restoreChats(): Pick<State, 'chats' | 'activeChat' | 'chatSplit' | 'cha
             agent: typeof x.agent === 'boolean' ? x.agent : savedAgentMode(),
             folder: typeof x.folder === 'string' && x.folder ? x.folder : undefined,
             noFolder: x.noFolder === true || undefined,
+            resume: typeof x.resume === 'string' && x.resume ? x.resume : undefined,
           }),
         );
       if (chats.length) {
@@ -683,6 +689,7 @@ function persistChats(): void {
           agent: c.agent,
           folder: c.folder,
           noFolder: c.noFolder,
+          resume: c.resume,
         })),
         active: state.activeChat,
         split: state.chatSplit,
@@ -691,6 +698,27 @@ function persistChats(): void {
   } catch {
     // storage unavailable: chats are still saved in the history
   }
+  syncResumeOnLogin();
+}
+
+let resumeOnLogin: boolean | null = null;
+/** The app opens at login only while some chat has a task left halfway. */
+function syncResumeOnLogin(): void {
+  const on = state.chats.some((c) => c.resume);
+  if (on === resumeOnLogin) return;
+  resumeOnLogin = on;
+  void api()
+    .app.resumeOnLogin(on)
+    .catch(() => {
+      resumeOnLogin = null;
+    });
+}
+
+/** The user closes the window on purpose: the chats it stops are not continued later. */
+export function forgetResume(): void {
+  if (!state.chats.some((c) => c.resume)) return;
+  setState((s) => ({ chats: s.chats.map((c) => (c.resume ? { ...c, resume: undefined } : c)) }));
+  persistChats();
 }
 
 export function chatTab(id: string): ChatTab | undefined {
@@ -709,7 +737,8 @@ export function updateChat(id: string, patch: Partial<ChatTab>): void {
     'model' in patch ||
     'agent' in patch ||
     'folder' in patch ||
-    'noFolder' in patch
+    'noFolder' in patch ||
+    'resume' in patch
   )
     persistChats();
 }
@@ -738,9 +767,17 @@ export function selectChat(id: string): void {
 
 // ---------------- plan (Pro features) ----------------
 
+/**
+ * A new plan: what it no longer includes closes (two chats side by side after the trial, a
+ * removed key), so the free plan looks the same whether it was just set or restored.
+ */
+export function setLicense(license: LicenseStatus): void {
+  setState(license.features.split ? { license } : { license, chatSplit: null, chatFocus: 0 });
+}
+
 export async function refreshLicense(): Promise<void> {
   try {
-    setState({ license: await api().license.status() });
+    setLicense(await api().license.status());
   } catch {
     // main not ready: keep the last known plan
   }

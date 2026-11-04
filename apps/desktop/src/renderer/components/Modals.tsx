@@ -23,6 +23,7 @@ import { SecurityCenter } from './SecurityCenter';
 import { Scanner } from './Scanner';
 import { CloneRepo, CommitView, GitDiff, PublishRepo } from './GitModals';
 import { SettingsPanel } from './Settings';
+import { Icon } from './Icon';
 import { fileIcon } from './icons';
 import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
@@ -583,11 +584,13 @@ function Providers({ focus }: { focus?: string }) {
                 </button>
                 {p.keyUrl && (
                   <button onClick={() => void api().app.openExternal(p.keyUrl!)}>
-                    🔑 {t('getKey')}
+                    <Icon name="key" size={13} /> {t('getKey')}
                   </button>
                 )}
                 {p.docsUrl && (
-                  <button onClick={() => void api().app.openExternal(p.docsUrl!)}>📖 Docs</button>
+                  <button onClick={() => void api().app.openExternal(p.docsUrl!)}>
+                    <Icon name="books" size={13} /> Docs
+                  </button>
                 )}
                 {p.connected && p.store !== 'env' && (
                   <button
@@ -613,7 +616,7 @@ function Providers({ focus }: { focus?: string }) {
                       await refreshSettings();
                     }}
                   >
-                    🗑 {t('provDelete')}
+                    <Icon name="trash" size={13} /> {t('provDelete')}
                   </button>
                 )}
               </div>
@@ -742,7 +745,7 @@ function AiEdit() {
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="ai-edit-head">
-          ✨ {t('aiEdit')}{' '}
+          <Icon name="sparkle" size={14} /> {t('aiEdit')}{' '}
           <span className="dim">
             · {getState().settings.roles.inline ?? getState().settings.defaultModel ?? t('noModel')}{' '}
             · {sel.startLineNumber}–{sel.endLineNumber}

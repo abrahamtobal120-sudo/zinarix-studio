@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import { api, openFile, setState, toast, useStore } from '../store';
 import { monacoTheme } from '../themes';
+import { Icon } from './Icon';
 
 const close = () => setState({ modal: null });
 const errText = (e: unknown) =>
@@ -57,7 +58,7 @@ export function GitDiff({ path, staged }: { path: string; staged: boolean }) {
               void openFile(path);
             }}
           >
-            📄 {t('gitOpenFile')}
+            <Icon name="file" size={13} /> {t('gitOpenFile')}
           </button>
           <button onClick={close}>×</button>
         </div>
@@ -206,7 +207,7 @@ export function CloneRepo() {
                 {shown.map((r) => (
                   <div key={r.name} className="gh-repo" onClick={() => !busy && void clone(r.name)}>
                     <div className="gh-repo-name">
-                      {r.private ? '🔒' : '📖'} {r.name}
+                      <Icon name={r.private ? 'lock' : 'globe'} size={13} /> {r.name}
                     </div>
                     {r.description && <div className="dim gh-repo-desc">{r.description}</div>}
                   </div>
@@ -262,7 +263,9 @@ export function PublishRepo() {
         <button className="modal-x" onClick={close} disabled={busy} aria-label={t('close')}>
           ×
         </button>
-        <h2>☁ {t('ghPublish')}</h2>
+        <h2>
+          <Icon name="cloud" size={16} /> {t('ghPublish')}
+        </h2>
         {gh && !gh.loggedIn ? (
           <p>
             {gh.installed ? t('ghNotLogged') : t('ghNotInstalled')}{' '}
@@ -293,11 +296,11 @@ export function PublishRepo() {
                   checked={vis === 'private'}
                   onChange={() => setVis('private')}
                 />
-                🔒 {t('ghPrivate')}
+                <Icon name="lock" size={13} /> {t('ghPrivate')}
               </label>
               <label className="check">
                 <input type="radio" checked={vis === 'public'} onChange={() => setVis('public')} />
-                📖 {t('ghPublic')}
+                <Icon name="globe" size={13} /> {t('ghPublic')}
               </label>
             </div>
             <div className="gh-row end">
@@ -309,7 +312,13 @@ export function PublishRepo() {
                 disabled={busy || !gh?.loggedIn || !name.trim()}
                 onClick={() => void publish()}
               >
-                {busy ? '⏳' : `☁ ${t('ghPublishBtn')}`}
+                {busy ? (
+                  '…'
+                ) : (
+                  <>
+                    <Icon name="cloud" size={13} /> {t('ghPublishBtn')}
+                  </>
+                )}
               </button>
             </div>
           </>

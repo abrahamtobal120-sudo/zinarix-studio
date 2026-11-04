@@ -197,7 +197,9 @@ function PhoneSection() {
                     disabled={busy || (remoteOn && !remote?.url)}
                     onClick={() => void toggleRemote(true)}
                   >
-                    {busy || (remoteOn && !remote?.url) ? t('phoneRemoteStarting') : t('phoneRemoteOn')}
+                    {busy || (remoteOn && !remote?.url)
+                      ? t('phoneRemoteStarting')
+                      : t('phoneRemoteOn')}
                   </button>
                 </div>
               )}
@@ -504,7 +506,7 @@ export function SettingsPanel() {
               />
               <div className="settings-sub">
                 <button onClick={() => (close(), void runCommand('ai.rules'))}>
-                  📜 {t('rulesEdit')}
+                  <Icon name="scroll" size={13} /> {t('rulesEdit')}
                 </button>
               </div>
               <Toggle

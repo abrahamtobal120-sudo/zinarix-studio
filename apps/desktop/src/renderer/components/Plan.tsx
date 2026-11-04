@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react';
 import type { LicenseStatus, PlanId, ProFeature } from '../../shared/plans';
-import { hasAi, hasPro, isActivated, TRIAL_DAYS } from '../../shared/plans';
+import { hasPro, isActivated, TRIAL_DAYS } from '../../shared/plans';
 import { runCommand } from '../commands';
 import { t } from '../i18n';
 import type { Key } from '../i18n';
-import { api, getState, refreshLicense, refreshModels, setState, toast, useStore } from '../store';
+import {
+  api,
+  getState,
+  refreshLicense,
+  refreshModels,
+  setLicense,
+  setState,
+  toast,
+  useStore,
+} from '../store';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 
@@ -162,7 +171,7 @@ function ActivateForm({ onDone }: { onDone?: (l: LicenseStatus) => void }) {
     setError(null);
     try {
       const l = await api().license.activate(key);
-      setState({ license: l });
+      setLicense(l);
       setKey('');
       toast(t('planActivated', { plan: planLabel(l) }));
       onDone?.(l);
@@ -201,7 +210,7 @@ export function LicensePanel() {
   }, []);
   const remove = async () => {
     if (!confirm(t('planRemoveConfirm'))) return;
-    setState({ license: await api().license.remove() });
+    setLicense(await api().license.remove());
   };
   const until = l.code
     ? t('planCode')
@@ -242,7 +251,8 @@ export function LicensePanel() {
           </>
         )}
         <ProTable />
-        {l.billing && !(hasPro(l.plan) && hasAi(l.plan)) && (
+        {/* The button sells Pro: not shown to someone who already has it. */}
+        {l.billing && !hasPro(l.plan) && (
           <div className="plan-buy">
             <button className="primary big" onClick={buy}>
               <Icon name="agent" size={15} /> {t('planBuy')}

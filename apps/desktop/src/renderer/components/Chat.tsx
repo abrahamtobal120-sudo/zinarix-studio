@@ -80,6 +80,8 @@ interface Turn {
   notices?: string[];
   reasoning?: string;
   context?: string[];
+  /** Request of the exchange (question and answer share it): several can run at once. */
+  rid?: string;
 }
 
 /** "/" commands of the message box: a ready-made prompt (or an action). */
@@ -286,6 +288,30 @@ interface SavedDisplay {
   meta?: { usd: number | null; inputTokens: number; outputTokens: number; latencyMs: number };
   error?: string;
   context?: string[];
+  request?: string;
+}
+
+/**
+ * Puts every answer right after its question: answers sent alongside are saved in the order
+ * they ended (q1, q2, a2, a1), and are shown as q1, a1, q2, a2.
+ */
+function pairTurns(turns: Turn[]): Turn[] {
+  const answers = new Map<string, Turn>();
+  const asked = new Set<string>();
+  for (const x of turns) {
+    if (!x.rid) continue;
+    if (x.role === 'assistant') answers.set(x.rid, x);
+    else asked.add(x.rid);
+  }
+  const out: Turn[] = [];
+  for (const x of turns) {
+    // An answer goes under its question (placed there below).
+    if (x.role === 'assistant' && x.rid && asked.has(x.rid)) continue;
+    out.push(x);
+    const a = x.role === 'user' && x.rid ? answers.get(x.rid) : undefined;
+    if (a) out.push(a);
+  }
+  return out;
 }
 
 function metaLine(m: {
@@ -627,9 +653,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
   /** Model of this chat; undefined = the app default for the mode. */
   const chatModel = meta?.model ?? undefined;
-  const [busy, setBusy] = useState<string | null>(null);
+  /** Requests answering right now (a message sent while others work runs alongside them). */
+  const [running, setRunning] = useState<string[]>([]);
+  /** The most recent of them (null = idle). */
+  const busy = running.at(-1) ?? null;
   const [conversationId, setConversationIdState] = useState<string | undefined>();
+  /** Latest conversation id (a message sent alongside must not wait for a render to see it). */
+  const conversationNow = useRef<string | undefined>(undefined);
   const setConversationId = (c: string | undefined) => {
+    conversationNow.current = c;
     setConversationIdState(c);
     updateChat(id, { conversationId: c });
     remember(c);
@@ -642,8 +674,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
   const attachments = useStore((s) => s.chatAttachments);
   const [termMenu, setTermMenu] = useState<TerminalSession[] | null>(null);
-  /** The request currently streaming into the last turn, and its event unsubscribe. */
-  const current = useRef<{ id: string; off: () => void } | null>(null);
+  /** The requests streaming into their turns, with their event unsubscribe. */
+  const runs = useRef(new Map<string, () => void>());
   const [suggest, setSuggest] = useState<Suggest | null>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [rulesFile, setRulesFile] = useState<string | null>(null);
@@ -682,34 +714,40 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       .catch(() => setRulesFile(null));
   }, [root, ownFolder, fsVersion, projectRules]);
 
-  /** Aborts the in-flight request (if any) and stops listening to its events. */
+  /** Aborts the in-flight requests (if any) and stops listening to their events. */
   const cancelCurrent = () => {
-    const req = current.current;
-    if (!req) return;
-    current.current = null;
-    req.off();
-    void api().ai.abort(req.id);
-    setBusy(null);
+    if (!runs.current.size) return;
+    for (const [rid, off] of runs.current) {
+      off();
+      void api().ai.abort(rid);
+    }
+    runs.current.clear();
+    setRunning([]);
+    updateChat(id, { resume: undefined });
   };
 
-  const loadConversation = async (cid: string) => {
+  /** Shows a saved conversation; resolves with its turns (null when it could not be read). */
+  const loadConversation = async (cid: string): Promise<Turn[] | null> => {
     let data: Awaited<ReturnType<OmniApi['ai']['conversation']>>;
     try {
       data = await api().ai.conversation(cid);
     } catch (err) {
       toast(String(err instanceof Error ? err.message : err));
-      return;
+      return null;
     }
     if (!data) {
       remember(undefined);
-      return;
+      return null;
     }
     cancelCurrent();
-    setTurns(
+    const loaded = pairTurns(
       data.messages.map((m): Turn => {
         const d = (m.display ?? {}) as SavedDisplay;
-        if (m.role === 'user') return { role: 'user', content: m.content, context: d.context };
+        const rid = d.request ? { rid: d.request } : {};
+        if (m.role === 'user')
+          return { role: 'user', content: m.content, context: d.context, ...rid };
         return {
+          ...rid,
           role: 'assistant',
           content: m.content,
           parts: d.parts?.length ? d.parts : m.content ? [{ kind: 'text', text: m.content }] : [],
@@ -721,11 +759,30 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         };
       }),
     );
+    setTurns(loaded);
     setConversationId(data.conversation.id);
     updateChat(id, { title: data.conversation.title.slice(0, 60) });
     setChanged([]);
     setShowHistory(false);
     stick.current = true;
+    return loaded;
+  };
+
+  /**
+   * The app (or the computer) went off while this chat was working on `task`: reopens its
+   * conversation and asks the model to go on from where the work stopped.
+   */
+  const resumeTask = async (task: string, cid: string | undefined, agent: boolean) => {
+    let base: Turn[] = [];
+    if (cid) {
+      const loaded = await loadConversation(cid);
+      if (loaded) base = loaded;
+    }
+    // The cut message was saved without its answer: it travels inside the new prompt instead.
+    while (base.at(-1)?.role === 'user') base = base.slice(0, -1);
+    updateChat(id, { resume: task });
+    toast(t('chatResumed'));
+    void send(t('chatResumePrompt', { task }), [], agent, base);
   };
 
   /**
@@ -757,6 +814,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (opened.current) return;
     opened.current = true;
     const m = chatTab(id);
+    if (m?.resume) {
+      void resumeTask(m.resume, m.conversationId, m.agent);
+      return;
+    }
     if (m?.conversationId) void loadConversation(m.conversationId);
     const init = m?.initial;
     if (init) {
@@ -829,7 +890,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     /** A queued message: what the user is typing meanwhile stays in the box. */
     fromQueue = false,
   ) => {
-    if (!prompt.trim() || busy) return;
+    if (!prompt.trim()) return;
     setShowHistory(false);
     setSuggest(null);
     if (sent.current[sent.current.length - 1] !== prompt) sent.current.push(prompt);
@@ -847,25 +908,36 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (!chatTab(id)?.title) updateChat(id, { title: prompt.trim().split('\n')[0]!.slice(0, 60) });
     const turns = base ?? turnsNow.current;
     if (base) setTurns(base);
+    // Exchanges still running are left out: their question has no answer yet.
     const history = turns
-      .filter((x) => !x.error)
+      .filter((x) => !x.error && !(x.rid && runs.current.has(x.rid)))
       .map((x) => ({ role: x.role, content: x.content }))
       .slice(-MAX_HISTORY);
     if (history[0]?.role === 'assistant') history.shift();
+    // Sent alongside a first message whose conversation is not known yet: wait for it, so both
+    // land in the same conversation.
+    for (let i = 0; i < 60 && runs.current.size && !conversationNow.current; i++)
+      await new Promise((ok) => setTimeout(ok, 50));
     const requestId = newRequestId();
     // Agent mode also works without a folder (system, network, browser and security tools).
     const useAgent = forceAgent || agentMode;
     stick.current = true;
     setTurns((x) => [
       ...x,
-      { role: 'user', content: prompt, context: context.map((c) => c.source) },
-      { role: 'assistant', content: '', parts: [] },
+      { role: 'user', content: prompt, context: context.map((c) => c.source), rid: requestId },
+      { role: 'assistant', content: '', parts: [], rid: requestId },
     ]);
     if (!fromQueue) setInput('');
-    setBusy(requestId);
+    setRunning((r) => [...r, requestId]);
+    // Kept until the answer ends, so a shutdown in between is continued on the next start (a
+    // resumed task keeps its original message, not the "go on" prompt).
+    updateChat(id, { resume: chatTab(id)?.resume ?? prompt });
 
+    // Each request writes into its own answer (others may be streaming below it).
     const update = (fn: (turn: Turn) => Turn) =>
-      setTurns((x) => [...x.slice(0, -1), fn(x[x.length - 1]!)]);
+      setTurns((x) =>
+        x.map((turn) => (turn.role === 'assistant' && turn.rid === requestId ? fn(turn) : turn)),
+      );
     const updateStep = (id: string, fn: (s: ToolStep) => ToolStep) =>
       update((turn) => ({
         ...turn,
@@ -883,10 +955,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
     const finish = () => {
       off();
-      // A newer request (new chat, another conversation) already took over: leave it alone.
-      if (current.current?.id !== requestId) return;
-      current.current = null;
-      setBusy(null);
+      // Cancelled (new chat, another conversation): leave the chat alone.
+      if (!runs.current.delete(requestId)) return;
+      setRunning((r) => r.filter((x) => x !== requestId));
+      if (!runs.current.size) updateChat(id, { resume: undefined });
       void refreshSettings();
       // Only the chat the user is in takes the cursor back (not one finishing in the background).
       const el = document.activeElement;
@@ -895,7 +967,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     const off = api().on((ev) => {
       if (ev.type !== 'chat' || ev.requestId !== requestId) return;
       // Events of a request that was cancelled or replaced must not touch the current turns.
-      if (current.current?.id !== requestId) return;
+      if (!runs.current.has(requestId)) return;
       const e: ChatEventView = ev.event;
       switch (e.type) {
         case 'conversation':
@@ -958,7 +1030,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           break;
       }
     });
-    current.current = { id: requestId, off };
+    runs.current.set(requestId, off);
     try {
       await api().ai.chat(requestId, {
         agent: useAgent,
@@ -967,13 +1039,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         history,
         prompt,
         context,
-        conversationId,
+        conversationId: conversationNow.current,
         folder: ownFolder,
         noFolder: noFolder || undefined,
       });
     } catch (err) {
       // The request never reached the model (validation, IPC failure): show it and unlock the input.
-      if (current.current?.id !== requestId) return;
+      if (!runs.current.has(requestId)) return;
       update((turn) => ({
         ...turn,
         error: err instanceof Error ? err.message : String(err),
@@ -1041,8 +1113,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   });
 
   // The tab strip shows what each chat is doing.
-  const waiting = Boolean(
-    busy && turns.at(-1)?.parts?.some((p) => p.kind === 'tool' && p.status === 'approval'),
+  const waiting = turns.some(
+    (x) =>
+      x.rid &&
+      running.includes(x.rid) &&
+      x.parts?.some((p) => p.kind === 'tool' && p.status === 'approval'),
   );
   const wasBusy = useRef(false);
   useEffect(() => {
@@ -1266,14 +1341,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   const submit = async () => {
     if (await runSlash(input)) return;
-    // Still working: the message waits its turn and goes out by itself when this one ends.
-    if (busy) {
-      if (!input.trim()) return;
-      updateChat(id, { queued: [...queued, input] });
-      setInput('');
-      return;
-    }
+    // Still working: the message runs alongside (the answers stream at the same time).
     void send(input);
+  };
+
+  /** Puts what is in the box in the queue: it goes out by itself when the answers end. */
+  const enqueue = () => {
+    if (!input.trim()) return;
+    updateChat(id, { queued: [...queued, input] });
+    setInput('');
   };
 
   /** Runs what is in the box in a new chat (same model, mode and folder) alongside this one. */
@@ -1289,11 +1365,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (opened) setInput('');
   };
 
-  /** Stops the running answer; queued messages wait until the user sends them. */
+  /** Stops the running answers; queued messages wait until the user sends them. */
   const stop = () => {
     if (!busy) return;
     stopped.current = true;
-    void api().ai.abort(busy);
+    for (const rid of running) void api().ai.abort(rid);
   };
 
   const onInputKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -1356,14 +1432,20 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     }
   };
 
-  const decide = (toolCallId: string, d: ToolDecision) => {
-    if (!busy) return;
-    void api().ai.toolDecision(busy, toolCallId, d);
+  /** Answers an approval; `rid` is the answer it belongs to (several may be running). */
+  const decide = (toolCallId: string, d: ToolDecision, rid?: string) => {
+    const asks = (turn: Turn) =>
+      turn.role === 'assistant' &&
+      turn.parts?.some((p) => p.kind === 'tool' && p.id === toolCallId && p.status === 'approval');
+    const owner =
+      rid ?? turnsNow.current.find((x) => x.rid && running.includes(x.rid) && asks(x))?.rid;
+    if (!owner || !running.includes(owner)) return;
+    void api().ai.toolDecision(owner, toolCallId, d);
     // The card leaves the approval state right away (a long command or a helper AI may
     // run for minutes); its result updates it again when it arrives.
     setTurns((x) =>
-      x.map((turn, i) =>
-        i === x.length - 1
+      x.map((turn) =>
+        turn.role === 'assistant' && turn.rid === owner
           ? {
               ...turn,
               parts: (turn.parts ?? []).map((p) =>
@@ -1493,7 +1575,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           </div>
         )}
         {turns.map((turn, i) => {
-          const last = i === turns.length - 1;
+          /** This answer is still streaming. */
+          const live = turn.role === 'assistant' && Boolean(turn.rid && running.includes(turn.rid));
+          /** Last exchange with nothing running: regenerate / continue apply to it. */
+          const last = i === turns.length - 1 && !busy;
           return (
             <div key={i} className={`turn ${turn.role}`}>
               {turn.role === 'user' ? (
@@ -1549,13 +1634,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                       <Markdown
                         key={j}
                         text={p.text}
-                        streaming={busy !== null && last && j === (turn.parts?.length ?? 0) - 1}
+                        streaming={live && j === (turn.parts?.length ?? 0) - 1}
                       />
                     ) : (
-                      <ToolCard key={p.id} step={p} onDecide={(d) => decide(p.id, d)} />
+                      <ToolCard key={p.id} step={p} onDecide={(d) => decide(p.id, d, turn.rid)} />
                     ),
                   )}
-                  {busy !== null && last && !turn.content && !turn.parts?.length && !turn.error && (
+                  {live && !turn.content && !turn.parts?.length && !turn.error && (
                     <div className="typing">
                       <span />
                       <span />
@@ -1576,7 +1661,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                     </div>
                   )}
                   {turn.meta && <div className="turn-meta">{turn.meta}</div>}
-                  {!(busy !== null && last) && (turn.content || turn.error) && (
+                  {!live && (turn.content || turn.error) && (
                     <div className="turn-actions">
                       {turn.content && (
                         <button title={t('copy')} onClick={() => copyTurn(turn)}>
@@ -1846,12 +1931,22 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           )}
           {busy && input.trim() && (
             <button
-              className="primary send-btn"
+              className="send-btn"
               title={t('chatQueueHint')}
               aria-label={t('chatQueue')}
-              onClick={() => void submit()}
+              onClick={enqueue}
             >
               <Icon name="clock" size={15} />
+            </button>
+          )}
+          {busy && input.trim() && (
+            <button
+              className="primary send-btn"
+              title={t('chatAlongsideHint')}
+              aria-label={t('chatAlongside')}
+              onClick={() => void submit()}
+            >
+              <Icon name="send" size={16} />
             </button>
           )}
           {busy ? (

@@ -25,8 +25,8 @@ function rsDivisor(degree: number): number[] {
   let root = 1;
   for (let i = 0; i < degree; i++) {
     for (let j = 0; j < d.length; j++) {
-      d[j] = gfMul(d[j], root);
-      if (j + 1 < d.length) d[j] ^= d[j + 1];
+      d[j] = gfMul(d[j]!, root);
+      if (j + 1 < d.length) d[j] = d[j]! ^ d[j + 1]!;
     }
     root = gfMul(root, 0x02);
   }
@@ -38,7 +38,7 @@ function rsRemainder(data: number[], divisor: number[]): number[] {
   for (const b of data) {
     const factor = b ^ (out.shift() as number);
     out.push(0);
-    divisor.forEach((c, i) => (out[i] ^= gfMul(c, factor)));
+    divisor.forEach((c, i) => (out[i] = out[i]! ^ gfMul(c, factor)));
   }
   return out;
 }
@@ -54,7 +54,7 @@ const rawModules = (ver: number): number => {
 };
 
 const dataCodewords = (ver: number): number =>
-  Math.floor(rawModules(ver) / 8) - ECC_PER_BLOCK[ver] * NUM_BLOCKS[ver];
+  Math.floor(rawModules(ver) / 8) - ECC_PER_BLOCK[ver]! * NUM_BLOCKS[ver]!;
 
 function alignPositions(ver: number, size: number): number[] {
   if (ver === 1) return [];
@@ -94,8 +94,8 @@ export function qrEncode(text: string): boolean[][] | null {
   }
 
   // Split into blocks, add error correction and interleave.
-  const numBlocks = NUM_BLOCKS[ver];
-  const eccLen = ECC_PER_BLOCK[ver];
+  const numBlocks = NUM_BLOCKS[ver]!;
+  const eccLen = ECC_PER_BLOCK[ver]!;
   const raw = Math.floor(rawModules(ver) / 8);
   const numShort = numBlocks - (raw % numBlocks);
   const shortLen = Math.floor(raw / numBlocks);
@@ -109,9 +109,9 @@ export function qrEncode(text: string): boolean[][] | null {
     blocks.push(dat.concat(ecc));
   }
   const codewords: number[] = [];
-  for (let i = 0; i < blocks[0].length; i++) {
+  for (let i = 0; i < blocks[0]!.length; i++) {
     blocks.forEach((b, j) => {
-      if (i !== shortLen - eccLen || j >= numShort) codewords.push(b[i]);
+      if (i !== shortLen - eccLen || j >= numShort) codewords.push(b[i]!);
     });
   }
 
@@ -120,8 +120,8 @@ export function qrEncode(text: string): boolean[][] | null {
   const mod = Array.from({ length: size }, () => new Array<boolean>(size).fill(false));
   const fn = Array.from({ length: size }, () => new Array<boolean>(size).fill(false));
   const set = (x: number, y: number, dark: boolean) => {
-    mod[y][x] = dark;
-    fn[y][x] = true;
+    mod[y]![x] = dark;
+    fn[y]![x] = true;
   };
   for (let i = 0; i < size; i++) {
     set(6, i, i % 2 === 0);
@@ -131,7 +131,7 @@ export function qrEncode(text: string): boolean[][] | null {
     [3, 3],
     [size - 4, 3],
     [3, size - 4],
-  ]) {
+  ] as const) {
     for (let dy = -4; dy <= 4; dy++) {
       for (let dx = -4; dx <= 4; dx++) {
         const x = cx + dx;
@@ -190,13 +190,13 @@ export function qrEncode(text: string): boolean[][] | null {
       for (let j = 0; j < 2; j++) {
         const x = right - j;
         const y = ((right + 1) & 2) === 0 ? size - 1 - vert : vert;
-        if (fn[y][x]) continue;
+        if (fn[y]![x]) continue;
         let dark = false;
         if (i < codewords.length * 8) {
-          dark = bit(codewords[i >>> 3], 7 - (i & 7));
+          dark = bit(codewords[i >>> 3]!, 7 - (i & 7));
           i++;
         }
-        mod[y][x] = dark !== ((x + y) % 2 === 0);
+        mod[y]![x] = dark !== ((x + y) % 2 === 0);
       }
     }
   }

@@ -45,6 +45,16 @@ export const PLAN_FEATURES: Record<PaidPlan, PlanFeatures> = {
   proai: PRO_AI_FEATURES,
 };
 
+/**
+ * What a plan grants with the website's settings: AI is the free plan plus Zinarix AI, so it
+ * follows the free plan the website sets (the plan table shows the same numbers for both).
+ */
+function planFeatures(plan: PaidPlan, cfg: PlansConfig): PlanFeatures {
+  if (plan === 'free') return cfg.free;
+  if (plan === 'ai') return { ...cfg.free, ai: true };
+  return PLAN_FEATURES[plan];
+}
+
 export interface LicensePayload {
   v: 1;
   /** Unique id (the payment it came from). */
@@ -159,7 +169,7 @@ function planStatus(s: StoredLicense, now: number, publicKeyPem: string): Licens
     return {
       ...base,
       plan: s.codePlan,
-      features: PLAN_FEATURES[s.codePlan],
+      features: planFeatures(s.codePlan, cfg),
       expires: null,
       code: true,
     };
@@ -173,7 +183,7 @@ function planStatus(s: StoredLicense, now: number, publicKeyPem: string): Licens
         return {
           ...base,
           plan: p.plan,
-          features: PLAN_FEATURES[p.plan],
+          features: planFeatures(p.plan, cfg),
           email: p.email,
           name: p.name,
           expires: p.exp ?? null,

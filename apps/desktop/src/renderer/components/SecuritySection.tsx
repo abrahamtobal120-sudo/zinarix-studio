@@ -62,21 +62,19 @@ const scoreOf = (f: FindingView[]) =>
 
 const CATS: {
   id: SecKind | 'dashboard' | 'network' | 'history';
-  icon: string;
   svg: IconName;
   label: string;
 }[] = [
-  { id: 'dashboard', icon: '🛡️', svg: 'shield', label: 'Panel' },
-  { id: 'project', icon: '🔑', svg: 'key', label: 'Proyecto' },
-  { id: 'deps', icon: '📦', svg: 'package', label: 'Dependencias' },
-  { id: 'system', icon: '💻', svg: 'monitor', label: 'Mi equipo' },
-  { id: 'network', icon: '📡', svg: 'wifi', label: 'Red (nmap)' },
-  { id: 'site', icon: '🌐', svg: 'globe', label: 'Sitios web' },
-  { id: 'hash', icon: '🧾', svg: 'hash', label: 'Archivos' },
-  { id: 'history', icon: '🕘', svg: 'history', label: 'Historial' },
+  { id: 'dashboard', svg: 'shield', label: 'Panel' },
+  { id: 'project', svg: 'key', label: 'Proyecto' },
+  { id: 'deps', svg: 'package', label: 'Dependencias' },
+  { id: 'system', svg: 'monitor', label: 'Mi equipo' },
+  { id: 'network', svg: 'wifi', label: 'Red (nmap)' },
+  { id: 'site', svg: 'globe', label: 'Sitios web' },
+  { id: 'hash', svg: 'hash', label: 'Archivos' },
+  { id: 'history', svg: 'history', label: 'Historial' },
 ];
 const labelOf = (k: string) => CATS.find((c) => c.id === k)?.label ?? k;
-const iconOf = (k: string) => CATS.find((c) => c.id === k)?.icon ?? '•';
 const SvgOf = ({ k, size = 15 }: { k: string; size?: number }) => (
   <Icon name={CATS.find((c) => c.id === k)?.svg ?? 'shield'} size={size} />
 );
@@ -164,7 +162,7 @@ function Findings({ report, kind }: { report: SecReportView; kind: SecKind }) {
                   {f.where && <span className="sv-where">{f.where}</span>}
                   <span className="sv-finding-actions">
                     <button title={t('secAskAI')} onClick={() => fixOne(kind, f)}>
-                      ✨
+                      <Icon name="sparkle" size={13} />
                     </button>
                     <button
                       title={t('secCopy')}
@@ -176,7 +174,7 @@ function Findings({ report, kind }: { report: SecReportView; kind: SecKind }) {
                           .then(() => toast(t('secCopied')));
                       }}
                     >
-                      📋
+                      <Icon name="copy" size={13} />
                     </button>
                   </span>
                 </div>
@@ -272,10 +270,14 @@ function ScanTab() {
             checked={authorized}
             onChange={(e) => setAuthorized(e.target.checked)}
           />
-          <span>⚠️ {t('scannerAuthorize')}</span>
+          <span>
+            <Icon name="warning" size={13} /> {t('scannerAuthorize')}
+          </span>
         </label>
       )}
-      {error && <div className="scan-error">⛔ {error}</div>}
+      {error && <div className="scan-error">
+          <Icon name="warning" size={13} /> {error}
+        </div>}
       {result && (
         <div className="scan-results">
           <div className="scan-summary">
@@ -284,7 +286,7 @@ function ScanTab() {
           {result.hosts.map((h) => (
             <div key={h.host} className="scan-host">
               <div className="scan-host-name">
-                🖥️ {h.host}
+                <Icon name="monitor" size={13} /> {h.host}
                 {h.reverse && <span className="dim"> · {h.reverse}</span>}
               </div>
               <table className="scan-table">
@@ -299,7 +301,7 @@ function ScanTab() {
                   {h.openPorts.map((p) => (
                     <tr key={p.port} className={p.risky ? 'risky' : ''}>
                       <td>
-                        {p.port} {p.risky && '⚠️'}
+                        {p.port} {p.risky && <Icon name="warning" size={12} />}
                       </td>
                       <td>{p.service}</td>
                       <td className="scan-banner">{p.banner ?? '—'}</td>
@@ -418,7 +420,7 @@ export function SecuritySection() {
     for (const k of SCAN_KINDS) {
       const r = store[k]?.report;
       if (!r) continue;
-      lines.push(`## ${iconOf(k)} ${labelOf(k)}`, '');
+      lines.push(`## ${labelOf(k)}`, '');
       for (const n of r.notes) lines.push(`_${n}_`);
       if (!r.findings.length) lines.push('', '✓ Sin hallazgos.', '');
       for (const f of r.findings)
@@ -627,7 +629,7 @@ export function SecuritySection() {
                 </button>
                 {store[cat]?.report?.findings.length ? (
                   <button onClick={() => explain(cat, store[cat]!.report!)}>
-                    ✨ {t('secAskAI')}
+                    <Icon name="sparkle" size={13} /> {t('secAskAI')}
                   </button>
                 ) : null}
               </div>
@@ -672,7 +674,7 @@ export function SecuritySection() {
               </button>
               {store.site?.report?.findings.length ? (
                 <button onClick={() => explain('site', store.site!.report!)}>
-                  ✨ {t('secAskAI')}
+                  <Icon name="sparkle" size={13} /> {t('secAskAI')}
                 </button>
               ) : null}
             </div>

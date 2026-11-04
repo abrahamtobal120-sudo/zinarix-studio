@@ -211,7 +211,17 @@ export function App() {
       await Promise.all([refreshSettings(), loadPrefs(), refreshLicense()]);
       applyTheme(getState().settings.theme);
       setState({ workspace: await api().workspace.current() });
-      void api().whatsapp.status().then((whatsapp) => setState({ whatsapp }));
+      void api()
+        .whatsapp.status()
+        .then(async (whatsapp) => {
+          setState({ whatsapp });
+          // WhatsApp control left on: Zinarix connects by itself so the chats get answers.
+          if (whatsapp.control && whatsapp.chats.length && !whatsapp.linked) {
+            const phone = await api().phone.start();
+            setState({ phone });
+          }
+        })
+        .catch(() => undefined);
       await refreshModels().catch(() => undefined);
       // The guided setup (no AI connected yet) or what's new in this version, once.
       const s = getState();

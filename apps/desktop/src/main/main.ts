@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
@@ -329,6 +329,36 @@ function planName(): string {
 /** A Pro feature was asked for on a plan without it: the window explains and offers Pro. */
 function upgrade(w: Win | undefined, feature: string): void {
   if (w) send(w, { type: 'command', command: `license.upgrade:${feature}` });
+}
+
+/**
+ * Starts the app at login only while a chat was left working (a shutdown cut it): the restored
+ * window then continues that task. Linux uses an XDG autostart entry; macOS and Windows the
+ * system login items. Development runs are never registered.
+ */
+function resumeOnLogin(on: boolean): void {
+  if (!app.isPackaged) return;
+  try {
+    if (process.platform === 'linux') {
+      const file = join(homedir(), '.config', 'autostart', 'zinarix-studio-resume.desktop');
+      if (!on) {
+        if (existsSync(file)) rmSync(file);
+        return;
+      }
+      const exec = process.env.APPIMAGE ?? process.execPath;
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(
+        file,
+        '[Desktop Entry]\nType=Application\n' +
+          `Name=${APP_NAME}\nExec="${exec.replace(/"/g, '\\"')}"\n` +
+          'X-GNOME-Autostart-enabled=true\nNoDisplay=true\n',
+      );
+    } else {
+      app.setLoginItemSettings({ openAtLogin: on });
+    }
+  } catch {
+    // not allowed here: the task still goes on the next time the app is opened by hand
+  }
 }
 
 function prefs(): Prefs {
@@ -766,6 +796,15 @@ function registerIpc(): void {
       z.string().min(1).max(1000),
     ]),
     (_w, acc, pass) => mail.connect(acc, pass),
+  );
+  handle('mail:googleReady', z.tuple([]), () => !!mail.google.client());
+  handle(
+    'mail:setGoogleClient',
+    z.tuple([z.string().trim().min(10).max(300), z.string().trim().max(300)]),
+    (_w, clientId, clientSecret) => mail.google.setClient({ clientId, clientSecret }),
+  );
+  handle('mail:googleLogin', z.tuple([z.string().trim().max(200).optional()]), (_w, name) =>
+    mail.googleLogin((url) => void shell.openExternal(url), name),
   );
   const email = z.string().trim().email().max(320);
   handle('mail:logout', z.tuple([email.optional()]), (_w, e) => mail.logout(e));
@@ -1256,6 +1295,7 @@ function registerIpc(): void {
     w.allowClose = true;
     w.win.close();
   });
+  handle('app:resumeOnLogin', z.tuple([z.boolean()]), (_w, on) => resumeOnLogin(on));
   handle('app:newWindow', z.tuple([]), (w) => {
     if (!license().features.windows) return false;
     void createWindow({ near: w });
@@ -1324,8 +1364,11 @@ function registerIpc(): void {
   handle('whatsapp:control', z.tuple([z.boolean()]), (_w, on) => whatsapp.setControl(on));
   handle('whatsapp:useCurrent', z.tuple([]), () => whatsapp.useCurrent());
   handle('whatsapp:forget', z.tuple([]), () => whatsapp.forget());
-  handle('whatsapp:others', z.tuple([z.boolean()]), (_w, on) => whatsapp.setOthers(on));
-  handle('whatsapp:test', z.tuple([]), () => whatsapp.test());
+  handle('whatsapp:who', z.tuple([z.string().max(200), z.enum(['me', 'them', 'all'])]), (_w, id, who) =>
+    whatsapp.setWho(id, who),
+  );
+  handle('whatsapp:remove', z.tuple([z.string().max(200)]), (_w, id) => whatsapp.remove(id));
+  handle('whatsapp:test', z.tuple([z.string().max(200).optional()]), (_w, id) => whatsapp.test(id));
 
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {

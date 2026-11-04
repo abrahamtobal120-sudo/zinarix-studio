@@ -11,6 +11,7 @@ import {
   newQuestionChat,
   requirePro,
   runningChats,
+  forgetResume,
   toggleChatList,
   toggleChatSplit,
   getEditor,
@@ -380,6 +381,7 @@ function baseCommands(): Command[] {
         // Closing the window stops its chats: say so when some are still working.
         const busy = runningChats();
         if (busy && !confirm(t('chatsBusyQuit', { n: busy }))) return;
+        forgetResume();
         void api().app.quit();
       },
     },

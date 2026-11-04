@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ScanResultView } from '../../shared/api';
 import { t } from '../i18n';
 import { api, newRequestId, setState } from '../store';
+import { Icon } from './Icon';
 
 const presets = (): { id: string; label: string; ports?: string }[] => [
   { id: 'top', label: 'Top 100', ports: undefined },
@@ -96,7 +97,9 @@ export function Scanner() {
         <button className="modal-x" onClick={close} aria-label={t('close')}>
           ×
         </button>
-        <h2>📡 {t('scannerTitle')}</h2>
+        <h2>
+          <Icon name="wifi" size={16} /> {t('scannerTitle')}
+        </h2>
         <p className="dim">{t('scannerIntro')}</p>
 
         <div className="scan-form">
@@ -147,7 +150,9 @@ export function Scanner() {
               checked={authorized}
               onChange={(e) => setAuthorized(e.target.checked)}
             />
-            <span>⚠️ {t('scannerAuthorize')}</span>
+            <span>
+              <Icon name="warning" size={13} /> {t('scannerAuthorize')}
+            </span>
           </label>
         )}
 
@@ -178,7 +183,9 @@ export function Scanner() {
           )}
         </div>
 
-        {error && <div className="scan-error">⛔ {error}</div>}
+        {error && <div className="scan-error">
+            <Icon name="warning" size={13} /> {error}
+          </div>}
 
         {result && (
           <div className="scan-results">
@@ -193,7 +200,7 @@ export function Scanner() {
             {result.hosts.map((h) => (
               <div key={h.host} className="scan-host">
                 <div className="scan-host-name">
-                  🖥️ {h.host}
+                  <Icon name="monitor" size={13} /> {h.host}
                   {h.reverse && <span className="dim"> · {h.reverse}</span>}
                 </div>
                 <table className="scan-table">
@@ -208,7 +215,11 @@ export function Scanner() {
                     {h.openPorts.map((p) => (
                       <tr key={p.port} className={p.risky ? 'risky' : ''}>
                         <td>
-                          {p.port} {p.risky && <span title={t('scannerRisky')}>⚠️</span>}
+                          {p.port} {p.risky && (
+                            <span title={t('scannerRisky')}>
+                              <Icon name="warning" size={12} />
+                            </span>
+                          )}
                         </td>
                         <td>{p.service}</td>
                         <td className="scan-banner">{p.banner ?? '—'}</td>
@@ -238,12 +249,12 @@ export function Scanner() {
                   );
                 }}
               >
-                ✨ {t('scannerExplain')}
+                <Icon name="sparkle" size={13} /> {t('scannerExplain')}
               </button>
             )}
           </div>
         )}
-        <p className="sec-legal">⚖️ {t('scannerLegal')}</p>
+        <p className="sec-legal">{t('scannerLegal')}</p>
       </div>
     </div>
   );

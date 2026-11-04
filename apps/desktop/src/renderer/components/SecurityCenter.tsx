@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { t } from '../i18n';
 import { setState, useStore } from '../store';
 import { askAgent } from './Chat';
+import { Icon, type IconName } from './Icon';
 
 interface Check {
   id: string;
-  icon: string;
+  icon: IconName;
   title: string;
   desc: string;
   prompt: string;
@@ -17,7 +18,7 @@ interface Check {
 const checks = (): Check[] => [
   {
     id: 'secrets',
-    icon: '🔑',
+    icon: 'key',
     title: t('chkSecretsTitle'),
     desc: t('chkSecretsDesc'),
     prompt: t('chkSecretsPrompt'),
@@ -25,7 +26,7 @@ const checks = (): Check[] => [
   },
   {
     id: 'deps',
-    icon: '📦',
+    icon: 'package',
     title: t('chkDepsTitle'),
     desc: t('chkDepsDesc'),
     prompt: t('chkDepsPrompt'),
@@ -33,14 +34,14 @@ const checks = (): Check[] => [
   },
   {
     id: 'system',
-    icon: '💻',
+    icon: 'monitor',
     title: t('chkSystemTitle'),
     desc: t('chkSystemDesc'),
     prompt: t('chkSystemPrompt'),
   },
   {
     id: 'ports',
-    icon: '📡',
+    icon: 'wifi',
     title: t('chkPortsTitle'),
     desc: t('chkPortsDesc'),
     prompt: '',
@@ -48,7 +49,7 @@ const checks = (): Check[] => [
   },
   {
     id: 'site',
-    icon: '🌐',
+    icon: 'globe',
     title: t('chkSiteTitle'),
     desc: t('chkSiteDesc'),
     prompt: '',
@@ -56,7 +57,7 @@ const checks = (): Check[] => [
   },
   {
     id: 'hash',
-    icon: '🧾',
+    icon: 'hash',
     title: t('chkHashTitle'),
     desc: t('chkHashDesc'),
     prompt: '',
@@ -78,7 +79,9 @@ export function SecurityCenter() {
         <button className="modal-x" onClick={close} aria-label={t('close')}>
           ×
         </button>
-        <h2>🛡️ {t('securityTitle')}</h2>
+        <h2>
+          <Icon name="shield" size={16} /> {t('securityTitle')}
+        </h2>
         <p className="dim">{t('securityIntro')}</p>
         <div className="sec-grid">
           {checks().map((c) => {
@@ -87,7 +90,9 @@ export function SecurityCenter() {
             return (
               <div key={c.id} className={`sec-card ${blocked ? 'disabled' : ''}`}>
                 <div className="sec-head">
-                  <span className="sec-icon">{c.icon}</span>
+                  <span className="sec-icon">
+                    <Icon name={c.icon} size={16} />
+                  </span>
                   <strong>{c.title}</strong>
                 </div>
                 <p>{c.desc}</p>
@@ -125,7 +130,7 @@ export function SecurityCenter() {
             );
           })}
         </div>
-        <p className="sec-legal">⚖️ {t('securityLegal')}</p>
+        <p className="sec-legal">{t('securityLegal')}</p>
       </div>
     </div>
   );

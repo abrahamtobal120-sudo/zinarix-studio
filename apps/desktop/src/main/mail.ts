@@ -8,6 +8,7 @@ import { simpleParser } from 'mailparser';
 import type { AddressObject, ParsedMail } from 'mailparser';
 import { createTransport } from 'nodemailer';
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
+import { GoogleAuth } from './googleMail.js';
 import { TokenStore } from './token-store.js';
 import type {
   MailAccount,
@@ -140,6 +141,12 @@ const LEGACY = 'main';
 
 const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
+/** Gmail's servers, for accounts signed in with Google. */
+const GMAIL = PRESETS[0]![1];
+
+/** How a mailbox logs in: a password, or an OAuth access token (XOAUTH2). */
+type Auth = { user: string; pass: string } | { user: string; accessToken: string };
+
 /**
  * Every mailbox the user connected (several at once). The list lives in `mail-accounts.json`;
  * each password in the OS keychain (TokenStore). The panel shows the active one; the AI can
@@ -148,9 +155,11 @@ const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().
 export class Mail {
   private readonly file: string;
   private readonly boxes = new Map<string, MailBox>();
+  readonly google: GoogleAuth;
 
   constructor(private readonly dir: string) {
     this.file = join(dir, 'mail-accounts.json');
+    this.google = new GoogleAuth(dir);
   }
 
   private secret(key: string): TokenStore {
@@ -231,7 +240,7 @@ export class Mail {
     let b = this.boxes.get(id);
     if (!b || !b.same(acc)) {
       void b?.close();
-      b = new MailBox(acc, this.secret(acc.key));
+      b = new MailBox(acc, this.secret(acc.key), this.google);
       this.boxes.set(id, b);
     }
     return b;
@@ -242,7 +251,7 @@ export class Mail {
     const s = this.read();
     const old = s.accounts.find((a) => sameEmail(a.email, acc.email));
     const key = old?.key ?? randomBytes(6).toString('hex');
-    const box = new MailBox(acc, this.secret(key));
+    const box = new MailBox(acc, this.secret(key), this.google);
     await box.verify(pass);
     const id = acc.email.toLowerCase();
     await this.boxes.get(id)?.close();
@@ -252,6 +261,18 @@ export class Mail {
     s.active = acc.email;
     this.write(s);
     return this.status();
+  }
+
+  /**
+   * Signs in with Google in the browser (no app password) and keeps the Gmail mailbox; the
+   * refresh token goes to the keychain in place of a password.
+   */
+  async googleLogin(openUrl: (url: string) => void, name?: string): Promise<MailStatus> {
+    const g = await this.google.login(openUrl);
+    return this.connect(
+      { email: g.email, user: g.email, name: name || g.name, auth: 'google', ...GMAIL },
+      g.refresh,
+    );
   }
 
   /** Makes another connected mailbox the one the panel shows. */
@@ -293,6 +314,7 @@ export class MailBox {
   constructor(
     readonly acc: MailAccount,
     private readonly secret: TokenStore,
+    private readonly google: GoogleAuth,
   ) {}
 
   /** Same address and servers (otherwise the connection has to be made again). */
@@ -302,6 +324,7 @@ export class MailBox {
       a.email === acc.email &&
       a.name === acc.name &&
       a.user === acc.user &&
+      a.auth === acc.auth &&
       a.imapHost === acc.imapHost &&
       a.imapPort === acc.imapPort &&
       a.smtpHost === acc.smtpHost &&
@@ -309,12 +332,20 @@ export class MailBox {
     );
   }
 
-  private imap(acc: MailAccount, pass: string): ImapFlow {
+  /** Login for the servers: the password, or a fresh access token from the refresh token kept. */
+  private async login(secret: string): Promise<Auth> {
+    const acc = this.acc;
+    if (acc.auth === 'google')
+      return { user: acc.user, accessToken: await this.google.accessToken(secret) };
+    return { user: acc.user, pass: cleanPass(acc, secret) };
+  }
+
+  private imap(acc: MailAccount, auth: Auth): ImapFlow {
     const c = new ImapFlow({
       host: acc.imapHost,
       port: acc.imapPort,
       secure: acc.imapPort === 993,
-      auth: { user: acc.user, pass },
+      auth,
       logger: false,
       emitLogs: false,
     });
@@ -326,34 +357,40 @@ export class MailBox {
     return c;
   }
 
-  private smtp(acc: MailAccount, pass: string) {
+  private smtp(acc: MailAccount, auth: Auth) {
     return createTransport({
       host: acc.smtpHost,
       port: acc.smtpPort,
       secure: acc.smtpPort === 465,
       requireTLS: acc.smtpPort !== 465,
-      auth: { user: acc.user, pass },
+      auth:
+        'accessToken' in auth
+          ? { type: 'OAuth2', user: auth.user, accessToken: auth.accessToken }
+          : auth,
     });
   }
 
-  /** Checks both servers with this password and keeps it (in the keychain) and the connection. */
-  async verify(pass: string): Promise<void> {
+  /**
+   * Checks both servers with this password (or Google refresh token) and keeps it (in the
+   * keychain) and the connection.
+   */
+  async verify(secret: string): Promise<void> {
     const acc = this.acc;
-    pass = cleanPass(acc, pass);
-    const c = this.imap(acc, pass);
+    const auth = await this.login(secret);
+    const c = this.imap(acc, auth);
     try {
       await c.connect();
     } catch (e) {
       throw new Error(`IMAP: ${errText(e)}`);
     }
     try {
-      await this.smtp(acc, pass).verify();
+      await this.smtp(acc, auth).verify();
     } catch (e) {
       await c.logout().catch(() => {});
       throw new Error(`SMTP: ${errText(e)}`);
     }
     await this.close();
-    this.secret.set(pass);
+    this.secret.set('pass' in auth ? auth.pass : secret);
     this.client = c;
   }
 
@@ -364,17 +401,22 @@ export class MailBox {
     if (c) await c.logout().catch(() => c.close());
   }
 
-  private creds(): { acc: MailAccount; pass: string } {
-    const pass = this.secret.get();
-    if (!pass) throw new Error(`Falta la contraseña de ${this.acc.email}: vuelve a conectarla.`);
-    return { acc: this.acc, pass };
+  private async creds(): Promise<{ acc: MailAccount; auth: Auth }> {
+    const secret = this.secret.get();
+    if (!secret)
+      throw new Error(
+        this.acc.auth === 'google'
+          ? `Falta la sesión de Google de ${this.acc.email}: vuelve a iniciar sesión.`
+          : `Falta la contraseña de ${this.acc.email}: vuelve a conectarla.`,
+      );
+    return { acc: this.acc, auth: await this.login(secret) };
   }
 
   private async conn(): Promise<ImapFlow> {
     if (this.client?.usable) return this.client;
     this.connecting ??= (async () => {
-      const { acc, pass } = this.creds();
-      const c = this.imap(acc, pass);
+      const { acc, auth } = await this.creds();
+      const c = this.imap(acc, auth);
       try {
         await c.connect();
       } catch (e) {
@@ -553,7 +595,7 @@ export class MailBox {
 
   /** Saves the draft in the Drafts folder, replacing the copy it was opened from. */
   async saveDraft(d: MailDraft): Promise<number | null> {
-    const { acc } = this.creds();
+    const acc = this.acc;
     const drafts = await this.roleFolder('\\Drafts');
     if (!drafts) throw new Error('Tu servidor de correo no tiene carpeta de borradores.');
     const { raw } = await this.compose(acc, d);
@@ -569,10 +611,10 @@ export class MailBox {
   }
 
   async send(d: MailDraft): Promise<void> {
-    const { acc, pass } = this.creds();
+    const { acc, auth } = await this.creds();
     const { raw, envelope } = await this.compose(acc, d);
     try {
-      await this.smtp(acc, pass).sendMail({ envelope, raw });
+      await this.smtp(acc, auth).sendMail({ envelope, raw });
     } catch (e) {
       throw new Error(errText(e));
     }

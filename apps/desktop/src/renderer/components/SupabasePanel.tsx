@@ -994,7 +994,11 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                                       {preview.cols.map((c) => (
                                         <tr key={c.name}>
                                           <td title={c.name}>
-                                            {c.pk ? '🔑 ' : ''}
+                                            {c.pk && (
+                                              <>
+                                                <Icon name="key" size={11} />{' '}
+                                              </>
+                                            )}
                                             {c.name}
                                           </td>
                                           <td>{c.type}</td>

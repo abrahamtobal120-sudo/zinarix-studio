@@ -394,7 +394,7 @@ function VercelBody({ reset }: { reset: () => void }) {
 
   const account = (
     <AccountSwitch
-      icon="▲"
+      icon={<Icon name="vercel" size={12} />}
       label={st.user ?? st.accounts.find((a) => a.id === st.active)?.label ?? 'Vercel'}
       title={st.source === 'cli' ? t('vcFromCli') : t('vcFromApp')}
       accounts={st.accounts}
@@ -691,7 +691,11 @@ function VercelBody({ reset }: { reset: () => void }) {
                 title={d.verified ? d.name : t('vcUnverified')}
                 onClick={() => open(`https://${d.name}`)}
               >
-                {d.verified ? '' : '⚠ '}
+                {!d.verified && (
+                  <>
+                    <Icon name="warning" size={12} />{' '}
+                  </>
+                )}
                 {d.name}
               </button>
             ))}

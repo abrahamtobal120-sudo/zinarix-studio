@@ -517,6 +517,7 @@ export class AiService {
     this.core.history.append(id, { role: 'user', content: req.prompt }, undefined, {
       context: req.context.map((c) => c.source),
       agent: Boolean(req.agent),
+      request: requestId,
     });
     return id;
   }
@@ -557,7 +558,7 @@ export class AiService {
       emit(requestId, { type: 'error', code: d.code, message: d.message });
       return;
     }
-    const rec = new TurnRecorder();
+    const rec = new TurnRecorder(requestId);
     const send: Emit = (rid, ev) => {
       rec.add(ev);
       emit(rid, ev);
@@ -582,7 +583,7 @@ export class AiService {
   ): Promise<void> {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
-    const rec = new TurnRecorder();
+    const rec = new TurnRecorder(requestId);
     const send = (ev: ChatEventView) => {
       rec.add(ev);
       emit(requestId, ev);
@@ -953,14 +954,20 @@ export interface TurnDisplay {
   notices?: string[];
   meta?: { usd: number | null; inputTokens: number; outputTokens: number; latencyMs: number };
   error?: string;
+  /** Request that produced it (the same one is on its question): pairs answers sent alongside. */
+  request?: string;
 }
 
 const MAX_SAVED_OUTPUT = 8000;
 
 /** Mirrors the chat events of one turn so the whole turn can be restored later. */
 export class TurnRecorder {
-  private readonly d: TurnDisplay = { parts: [] };
+  private readonly d: TurnDisplay;
   private text = '';
+
+  constructor(request?: string) {
+    this.d = { parts: [], ...(request ? { request } : {}) };
+  }
 
   add(ev: ChatEventView): void {
     const d = this.d;

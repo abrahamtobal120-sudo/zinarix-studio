@@ -323,6 +323,8 @@ export interface MailAccount {
   name?: string;
   /** Login user (usually the email itself). */
   user: string;
+  /** 'google': signed in with Google (OAuth, no app password). Absent: password login. */
+  auth?: 'google';
   imapHost: string;
   imapPort: number;
   smtpHost: string;
@@ -680,7 +682,19 @@ export type AppEvent =
   /** WhatsApp Web changed (unread count, chat open, control, answers waiting). */
   | { type: 'whatsapp:status'; status: WhatsAppStatus };
 
-/** WhatsApp Web inside Zinarix, and the chat of it that controls Zinarix (optional). */
+/** Whose messages of an allowed WhatsApp chat are orders: yours, the other person's, or both. */
+export type WhatsAppWho = 'me' | 'them' | 'all';
+
+/** A WhatsApp chat allowed to control Zinarix. */
+export interface WhatsAppChat {
+  id: string;
+  title: string;
+  who: WhatsAppWho;
+  /** Answers waiting for this chat to be open (in status only). */
+  pending?: number;
+}
+
+/** WhatsApp Web inside Zinarix, and the chats of it that control Zinarix (optional). */
 export interface WhatsAppStatus {
   /** The page is loaded (it keeps running when its tab is closed). */
   open: boolean;
@@ -688,15 +702,13 @@ export interface WhatsAppStatus {
   logged?: boolean;
   /** Control from WhatsApp is on. */
   control: boolean;
-  /** The other person of the chosen chat can give orders too (not only the user). */
-  others: boolean;
-  /** The chat Zinarix listens to (picked by the user, meant to be "Message yourself"). */
-  chat?: { id: string; title: string };
+  /** The chats Zinarix listens to ("Message yourself", or people the user trusts). */
+  chats: WhatsAppChat[];
   /** The chat open in the page right now. */
   current?: { id: string; title: string };
   /** The phone remote runs (the control needs it, like the Telegram and Discord bots). */
   linked: boolean;
-  /** Answers waiting for the chosen chat to be open. */
+  /** Answers waiting for their chat to be open. */
   pending: number;
   /** Unread chats, as the page title says. */
   unread: number;
@@ -708,6 +720,8 @@ export interface WhatsAppEvent {
   at: number;
   dir: 'in' | 'out' | 'info';
   text: string;
+  /** Name of the chat it came from or went to. */
+  chat?: string;
 }
 
 /** Remote control from a phone on the same network (a page served by the app). */
@@ -942,6 +956,12 @@ export interface OmniApi {
     preset(email: string): Promise<MailAccount | null>;
     /** Checks both servers, then saves the account (password in the OS keychain). */
     connect(account: MailAccount, password: string): Promise<MailStatus>;
+    /** An OAuth client is set up for "Sign in with Google" (saved, or from the environment). */
+    googleReady(): Promise<boolean>;
+    /** Saves the user's Google OAuth client (Google Cloud → Credentials → Desktop app). */
+    setGoogleClient(clientId: string, clientSecret: string): Promise<void>;
+    /** Signs in with Google in the browser and connects that Gmail mailbox (no app password). */
+    googleLogin(name?: string): Promise<MailStatus>;
     /** Switches the panel to another connected mailbox. */
     useAccount(email: string): Promise<MailStatus>;
     /** Forgets one mailbox (the active one when no address is given). */
@@ -1081,6 +1101,11 @@ export interface OmniApi {
     /** Closes this window (after the unsaved-changes check); the app quits with the last one. */
     quit(): Promise<void>;
     /**
+     * Opens the app when the user logs in (on) while a chat was left working, so a task cut by
+     * a shutdown goes on by itself; off when nothing is pending.
+     */
+    resumeOnLogin(on: boolean): Promise<void>;
+    /**
      * Opens another Zinarix Studio window (its own folder, chats, browser and terminals).
      * false: the plan does not include more windows (Pro).
      */
@@ -1114,12 +1139,14 @@ export interface OmniApi {
     setBounds(rect: { x: number; y: number; width: number; height: number } | null): Promise<void>;
     reload(): Promise<void>;
     control(on: boolean): Promise<WhatsAppStatus>;
-    /** The chat open now becomes the one that controls Zinarix. */
+    /** The chat open now is allowed to control Zinarix. */
     useCurrent(): Promise<WhatsAppStatus>;
-    /** Lets the other person of the chosen chat give orders too. */
-    others(on: boolean): Promise<WhatsAppStatus>;
-    /** Writes a test message in the chosen chat. */
-    test(): Promise<WhatsAppStatus>;
+    /** Whose messages of an allowed chat are orders. */
+    who(id: string, who: WhatsAppWho): Promise<WhatsAppStatus>;
+    /** The chat stops controlling Zinarix. */
+    remove(id: string): Promise<WhatsAppStatus>;
+    /** Writes a test message in an allowed chat (the first one when not given). */
+    test(id?: string): Promise<WhatsAppStatus>;
     forget(): Promise<WhatsAppStatus>;
   };
   license: {
@@ -1223,6 +1250,9 @@ export const CHANNELS = [
   'mail:status',
   'mail:preset',
   'mail:connect',
+  'mail:googleReady',
+  'mail:setGoogleClient',
+  'mail:googleLogin',
   'mail:logout',
   'mail:useAccount',
   'mail:folders',
@@ -1292,6 +1322,7 @@ export const CHANNELS = [
   'terminal:kill',
   'app:openExternal',
   'app:quit',
+  'app:resumeOnLogin',
   'app:newWindow',
   'app:installUpdate',
   'license:status',
@@ -1311,7 +1342,8 @@ export const CHANNELS = [
   'whatsapp:control',
   'whatsapp:useCurrent',
   'whatsapp:forget',
-  'whatsapp:others',
+  'whatsapp:who',
+  'whatsapp:remove',
   'whatsapp:test',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];

@@ -564,6 +564,10 @@ interface Session {
   env: Record<string, string>;
   /** Models that refused native tools in this conversation (they use the text protocol). */
   textModels: Set<string>;
+  /** Transcript before the run in progress: where a message sent alongside it starts from. */
+  idle?: ChatMessage[];
+  /** Exchanges that ran alongside (question and final answer), joined on the next turn. */
+  merge?: ChatMessage[];
 }
 
 type Emit = (ev: ChatEventView) => void;
@@ -689,17 +693,19 @@ export class Agent {
     delegation?: boolean;
     addCost?: (c: Totals) => void;
   }): Promise<string> {
-    // One run per conversation: the same chat opened in two tabs or windows would interleave
-    // its messages (and its approvals) in one transcript.
-    if (this.active.has(opts.conversationId))
-      throw new Error(
-        'Esta conversación ya está trabajando en otro chat o ventana. Espera a que termine, o empieza un chat nuevo.',
-      );
+    // A message sent while the conversation works runs alongside, in a transcript of its own
+    // (two runs in one transcript would interleave their tool calls and approvals).
+    if (this.active.has(opts.conversationId)) return this.runAlongside(opts);
     const s = this.session(opts.conversationId);
     const system = AGENT_SYSTEM + (opts.rules ?? '');
     if (!s.messages.length)
       s.messages.push({ role: 'system', content: system }, ...opts.fallbackHistory);
-    else if (s.messages[0]?.role === 'system') s.messages[0] = { role: 'system', content: system };
+    else {
+      if (s.messages[0]?.role === 'system') s.messages[0] = { role: 'system', content: system };
+      if (s.merge?.length) s.messages.push(...s.merge);
+    }
+    s.merge = undefined;
+    s.idle = s.messages.slice();
     s.messages.push(opts.userMessage);
     this.active.add(opts.conversationId);
     try {
@@ -711,6 +717,36 @@ export class Agent {
       throw e;
     } finally {
       this.active.delete(opts.conversationId);
+      s.idle = undefined;
+    }
+  }
+
+  /**
+   * Runs a message next to the one in progress (like a second question while the first is
+   * answered). It starts from the transcript before that run, keeps its file changes as a
+   * helper of the conversation (so "revert" covers them) and shares its approvals; the
+   * question and its final answer join the conversation's transcript on its next turn.
+   */
+  private async runAlongside(opts: Parameters<Agent['run']>[0]): Promise<string> {
+    const main = this.session(opts.conversationId);
+    const id = `${opts.conversationId}${HELPER_SEP}p${Math.random().toString(36).slice(2, 8)}`;
+    const s = this.session(id);
+    s.alwaysAllow = main.alwaysAllow;
+    s.env = main.env;
+    s.textModels = main.textModels;
+    const system = AGENT_SYSTEM + (opts.rules ?? '');
+    const base = main.idle?.slice(1) ?? opts.fallbackHistory;
+    s.messages.push({ role: 'system', content: system }, ...base, opts.userMessage);
+    this.active.add(id);
+    try {
+      const answer = await this.loop(s, { ...opts, conversationId: id, depth: opts.depth ?? 0 });
+      if (answer.trim())
+        (main.merge ??= []).push(opts.userMessage, { role: 'assistant', content: answer });
+      return answer;
+    } finally {
+      this.active.delete(id);
+      // Only its checkpoints are kept (for "revert"); the transcript is not needed any more.
+      s.messages = [];
     }
   }
 

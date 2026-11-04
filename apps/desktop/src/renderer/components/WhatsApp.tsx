@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WhatsAppStatus } from '../../shared/api';
-import { api, setState, toast, useStore } from '../store';
+import type { WhatsAppStatus, WhatsAppWho } from '../../shared/api';
+import { api, getState, setState, toast, useStore } from '../store';
 import { t } from '../i18n';
 import { Icon } from './Icon';
 
@@ -23,38 +23,13 @@ const COMMANDS: [string, 'waCmdRepos' | 'waCmdPull' | 'waCmdOpen' | 'waCmdStop' 
   ['/chats', 'waCmdChats'],
 ];
 
-function Step({
-  ok,
-  n,
-  title,
-  hint,
-  children,
-}: {
-  ok: boolean;
-  n: number;
-  title: string;
-  hint?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className={`wa-step${ok ? ' ok' : ''}`}>
-      <span className="wa-step-n">{ok ? <Icon name="check" size={12} /> : n}</span>
-      <div className="wa-step-body">
-        <div className="wa-step-title">{title}</div>
-        {hint && <div className="wa-step-hint">{hint}</div>}
-        {children && <div className="wa-step-actions">{children}</div>}
-      </div>
-    </div>
-  );
-}
-
 /**
  * The WhatsApp Web tab. The page is a native view drawn by the main process over the host
- * (like the browser); the side panel sets up and shows the control of Zinarix from one chat.
+ * (like the browser); the side panel sets up and shows the control of Zinarix from the
+ * allowed chats.
  */
 export function WhatsAppPane({ visible }: { visible: boolean }) {
   const st = useStore((s) => s.whatsapp);
-  const phone = useStore((s) => s.phone);
   const covered = useStore((s) => Boolean(s.modal || s.inputBox));
   const [busy, setBusy] = useState(false);
   const [side, setSide] = useState(true);
@@ -106,33 +81,43 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
   };
 
   /** Zinarix answers only while the phone remote runs: started from here too. */
+  const ensureRemote = async () => {
+    if (getState().phone.running) return;
+    const p = await api().phone.start();
+    setState({ phone: p });
+    if (p.error) throw new Error(p.error);
+  };
+
   const connect = () =>
     act(async () => {
-      const p = await api().phone.start();
-      setState({ phone: p });
-      if (p.error) throw new Error(p.error);
+      await ensureRemote();
       return api().whatsapp.status();
     });
 
-  const listen = () =>
+  /** The main switch: allows the open chat when none is allowed yet, and connects Zinarix. */
+  const toggle = (on: boolean) =>
     act(async () => {
-      const r = st?.chat ? await api().whatsapp.control(true) : await api().whatsapp.useCurrent();
-      if (!phone.running) {
-        const p = await api().phone.start();
-        setState({ phone: p });
-        if (p.error) toast(p.error);
-        return api().whatsapp.status();
-      }
-      return r;
+      if (!on) return api().whatsapp.control(false);
+      if (!st?.chats.length) await api().whatsapp.useCurrent();
+      else await api().whatsapp.control(true);
+      await ensureRemote();
+      return api().whatsapp.status();
     });
 
+  const allow = () =>
+    act(async () => {
+      await api().whatsapp.useCurrent();
+      await ensureRemote();
+      return api().whatsapp.status();
+    });
+
+  const chats = st?.chats ?? [];
   const logged = st?.logged === true;
-  const hasChat = Boolean(st?.chat);
-  const listening = Boolean(st?.control && st.chat);
+  const listening = Boolean(st?.control && chats.length);
   const linked = Boolean(st?.linked);
   const ready = logged && listening && linked;
-  const name = st?.chat?.title || t('waChosenChat');
-  const onOther = Boolean(st?.chat && st.current && st.current.id !== st.chat.id);
+  const cur = st?.current;
+  const curAllowed = Boolean(cur && chats.some((c) => c.id === cur.id));
 
   let line: string;
   let tone: 'on' | 'warn' | 'off' = 'off';
@@ -143,11 +128,11 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
   else if (!linked) {
     line = t('waNeedsRemote');
     tone = 'warn';
-  } else if (onOther) {
-    line = t('waAway', { name });
-    tone = 'warn';
   } else {
-    line = t('waListening', { name });
+    line = t(chats.length === 1 ? 'waListening' : 'waListeningMany', {
+      name: chats[0]?.title ?? '',
+      n: chats.length,
+    });
     tone = 'on';
   }
 
@@ -163,16 +148,7 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
           {st?.pending ? ` · ${t('waPending', { n: st.pending })}` : ''}
         </span>
         <div className="spacer" />
-        {listening && linked && (
-          <button className="wa-btn" disabled={busy} onClick={() => void act(() => api().whatsapp.test())}>
-            {t('waTest')}
-          </button>
-        )}
-        <button
-          className="bicon"
-          title={t('navReload')}
-          onClick={() => void api().whatsapp.reload()}
-        >
+        <button className="bicon" title={t('navReload')} onClick={() => void api().whatsapp.reload()}>
           <Icon name="refresh" size={15} />
         </button>
         <button
@@ -191,89 +167,109 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
         </div>
         {side && (
           <aside className="wa-side">
-            <div className="wa-card">
-              <div className="wa-card-head">
-                <span>{t('waTitle')}</span>
-                {ready && <span className="wa-pill on">{t('waOn')}</span>}
-              </div>
-              <Step ok={logged} n={1} title={t('waStep1')} hint={logged ? undefined : t('waStep1Hint')} />
-              <Step
-                ok={hasChat}
-                n={2}
-                title={hasChat ? t('waStep2Done', { name }) : t('waStep2')}
-                hint={hasChat ? undefined : t('waStep2Hint')}
-              >
-                {logged && (!hasChat || onOther) && (
-                  <button
-                    className={hasChat ? 'wa-btn' : 'primary'}
-                    disabled={busy || !st?.current}
-                    title={st?.current ? st.current.title : t('waOpenFirst')}
-                    onClick={() => void act(() => api().whatsapp.useCurrent())}
-                  >
-                    {st?.current
-                      ? t('waUseNamed', { name: st.current.title || t('waThisChat') })
-                      : t('waOpenFirst')}
-                  </button>
-                )}
-              </Step>
-              <Step
-                ok={linked}
-                n={3}
-                title={t('waStep3')}
-                hint={linked ? undefined : t('waStep3Hint')}
-              >
-                {!linked && (
-                  <button className="primary" disabled={busy} onClick={() => void connect()}>
-                    {t('waConnect')}
-                  </button>
-                )}
-              </Step>
-              <Step ok={listening} n={4} title={listening ? t('waStep4Done') : t('waStep4')}>
-                {hasChat &&
-                  (listening ? (
-                    <button
-                      className="wa-btn"
-                      disabled={busy}
-                      onClick={() => void act(() => api().whatsapp.control(false))}
-                    >
-                      {t('waStop')}
-                    </button>
-                  ) : (
-                    <button className="primary" disabled={busy} onClick={() => void listen()}>
-                      {t('waStart')}
-                    </button>
-                  ))}
-              </Step>
-            </div>
-
-            {hasChat && (
-              <div className="wa-card">
-                <label className="wa-check">
+            <div className={`wa-card wa-main${ready ? ' on' : ''}`}>
+              <div className="wa-main-head">
+                <div>
+                  <div className="wa-main-title">{t('waTitle')}</div>
+                  <div className="wa-main-sub">{ready ? t('waReadyHint') : t('waIntro')}</div>
+                </div>
+                <label className="wa-switch" title={listening ? t('waStop') : t('waTitle')}>
                   <input
                     type="checkbox"
-                    checked={Boolean(st?.others)}
-                    disabled={busy}
-                    onChange={(e) => {
-                      const on = e.target.checked;
-                      void act(() => api().whatsapp.others(on));
-                    }}
+                    checked={listening}
+                    disabled={busy || !logged || (!chats.length && !cur)}
+                    onChange={(e) => void toggle(e.target.checked)}
                   />
-                  <span>
-                    <span className="wa-check-title">{t('waOthers')}</span>
-                    <span className="wa-check-hint">{t('waOthersHint')}</span>
-                  </span>
+                  <span />
                 </label>
-                <div className="wa-row">
-                  <button
-                    className="wa-btn"
-                    disabled={busy}
-                    onClick={() => void act(() => api().whatsapp.forget())}
-                  >
-                    {t('waForget')}
-                  </button>
+              </div>
+              <div className="wa-checks">
+                <div className={`wa-chk${logged ? ' ok' : ''}`}>
+                  <Icon name={logged ? 'check' : 'x'} size={12} />
+                  {logged ? t('waStep1') : t('waStep1Hint')}
+                </div>
+                <div className={`wa-chk${chats.length ? ' ok' : ''}`}>
+                  <Icon name={chats.length ? 'check' : 'x'} size={12} />
+                  {chats.length ? t('waChatsCount', { n: chats.length }) : t('waStep2Hint')}
+                </div>
+                <div className={`wa-chk${linked ? ' ok' : ''}`}>
+                  <Icon name={linked ? 'check' : 'x'} size={12} />
+                  {linked ? t('waStep3') : t('waStep3Hint')}
+                  {!linked && (
+                    <button className="wa-btn" disabled={busy} onClick={() => void connect()}>
+                      {t('waConnect')}
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+
+            <div className="wa-card">
+              <div className="wa-card-head">
+                <span>{t('waChatsTitle')}</span>
+              </div>
+              {!chats.length && <div className="wa-note">{t('waNoChats')}</div>}
+              {chats.map((c) => {
+                const self = /\((t[uú]|you)\)\s*$/i.test(c.title);
+                const open = cur?.id === c.id;
+                return (
+                  <div key={c.id} className={`wa-chat${open ? ' open' : ''}`}>
+                    <div className="wa-chat-row">
+                      <span className="wa-chat-name" title={c.id}>
+                        {c.title || c.id}
+                      </span>
+                      {open && <span className="wa-pill">{t('waOpenNow')}</span>}
+                      {c.pending ? <span className="wa-pill warn">{c.pending}</span> : null}
+                    </div>
+                    {!self && (
+                      <select
+                        className="wa-who"
+                        value={c.who}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const who = e.target.value as WhatsAppWho;
+                          void act(() => api().whatsapp.who(c.id, who));
+                        }}
+                      >
+                        <option value="them">{t('waWhoThem')}</option>
+                        <option value="me">{t('waWhoMe')}</option>
+                        <option value="all">{t('waWhoAll')}</option>
+                      </select>
+                    )}
+                    <div className="wa-row">
+                      <button
+                        className="wa-btn"
+                        disabled={busy || !listening || !linked}
+                        onClick={() => void act(() => api().whatsapp.test(c.id))}
+                      >
+                        {t('waTest')}
+                      </button>
+                      <button
+                        className="wa-btn"
+                        disabled={busy}
+                        onClick={() => void act(() => api().whatsapp.remove(c.id))}
+                      >
+                        {t('waRemove')}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {logged && (
+                <button
+                  className={chats.length ? 'wa-btn wa-add' : 'primary wa-add'}
+                  disabled={busy || !cur || curAllowed}
+                  onClick={() => void allow()}
+                >
+                  {!cur
+                    ? t('waOpenFirst')
+                    : curAllowed
+                      ? t('waAlready', { name: cur.title || t('waThisChat') })
+                      : t('waUseNamed', { name: cur.title || t('waThisChat') })}
+                </button>
+              )}
+              <div className="wa-note">{t('waOthersHint')}</div>
+            </div>
 
             <div className="wa-card">
               <div className="wa-card-head">
@@ -301,6 +297,7 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
                     <span className="wa-ev-time">{clock(e.at)}</span>
                     <span className="wa-ev-text">
                       {e.dir === 'in' ? '← ' : e.dir === 'out' ? '→ ' : ''}
+                      {e.chat && e.dir !== 'info' && <b>{e.chat}: </b>}
                       {e.text}
                     </span>
                   </div>

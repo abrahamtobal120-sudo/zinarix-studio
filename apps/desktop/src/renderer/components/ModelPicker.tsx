@@ -520,7 +520,7 @@ export function ModelPicker({
                         setState({ modal: { kind: 'providers', focus: openProvider.id } })
                       }
                     >
-                      🔑 {t('connect')} {openProvider.name}
+                      <Icon name="key" size={13} /> {t('connect')} {openProvider.name}
                     </button>
                   )}
                 </div>
@@ -579,7 +579,13 @@ export function ModelPicker({
                     className={r.connected ? 'primary mp-use' : 'mp-use'}
                     onClick={() => void choose(r)}
                   >
-                    {r.connected ? t('use') : `🔑 ${t('connect')}`}
+                    {r.connected ? (
+                      t('use')
+                    ) : (
+                      <>
+                        <Icon name="key" size={12} /> {t('connect')}
+                      </>
+                    )}
                   </button>
                 </div>
               ))}
@@ -597,7 +603,7 @@ export function ModelPicker({
           </span>
           {errors.map((e) => (
             <span key={e.provider} className="err" title={e.error}>
-              ⚠ {e.provider}
+              <Icon name="warning" size={12} /> {e.provider}
             </span>
           ))}
           <span className="spacer" />

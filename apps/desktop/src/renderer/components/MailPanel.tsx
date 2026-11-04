@@ -1,5 +1,5 @@
 import { AccountSwitch } from './AccountSwitch';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { useCallback, useEffect, useState } from 'react';
 import type {
   MailAccount,
@@ -24,15 +24,15 @@ const open = (url: string) => void api().app.openExternal(url);
 /** Folder shown first: the inbox. */
 const FOLDER_KEY = 'zinarix.mailFolder';
 
-const FOLDER_ICON: Record<string, string> = {
-  '\\Inbox': '📥',
-  '\\Sent': '📤',
-  '\\Drafts': '📝',
-  '\\Trash': '🗑',
-  '\\Junk': '⚠',
-  '\\Archive': '🗄',
-  '\\Flagged': '★',
-  '\\All': '📚',
+const FOLDER_ICON: Record<string, IconName> = {
+  '\\Inbox': 'inbox',
+  '\\Sent': 'send',
+  '\\Drafts': 'edit',
+  '\\Trash': 'trash',
+  '\\Junk': 'warning',
+  '\\Archive': 'archive',
+  '\\Flagged': 'star',
+  '\\All': 'mail',
 };
 
 /** Folders in the order mail apps show them; the rest follow, by name. */
@@ -116,6 +116,10 @@ function MailBody({ reset }: { reset: () => void }) {
   const [servers, setServers] = useState(false);
   const [guessed, setGuessed] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  /** An OAuth client is set up for "Sign in with Google" (null: not known yet). */
+  const [gReady, setGReady] = useState<boolean | null>(null);
+  const [gSetup, setGSetup] = useState(false);
+  const [gClient, setGClient] = useState({ id: '', secret: '' });
   const [folders, setFolders] = useState<MailFolderView[]>([]);
   const [folder, setFolder] = useState(() => localStorage.getItem(FOLDER_KEY) ?? 'INBOX');
   const [query, setQuery] = useState('');
@@ -137,6 +141,7 @@ function MailBody({ reset }: { reset: () => void }) {
   };
 
   useEffect(() => {
+    void api().mail.googleReady().then(setGReady);
     void api()
       .mail.status()
       .then((s) => {
@@ -234,6 +239,20 @@ function MailBody({ reset }: { reset: () => void }) {
       setPass('');
       toast(t('mlConnected', { email: acc.email }));
       reset();
+    });
+
+  const googleLogin = () =>
+    void act('google', async () => {
+      const s = await api().mail.googleLogin(form.name || undefined);
+      toast(t('mlConnected', { email: s.account?.email ?? '' }));
+      reset();
+    });
+
+  const saveGoogleClient = () =>
+    void act('gclient', async () => {
+      await api().mail.setGoogleClient(gClient.id.trim(), gClient.secret.trim());
+      setGReady(true);
+      setGSetup(false);
     });
 
   const openMsg = (m: MailSummaryView) =>
@@ -394,7 +413,7 @@ function MailBody({ reset }: { reset: () => void }) {
 
   const account = (
     <AccountSwitch
-      icon="✉"
+      icon={<Icon name="mail" size={12} />}
       label={st.account?.email ?? ''}
       title={st.account?.user}
       accounts={st.accounts.map((a) => ({ id: a.email, label: a.email }))}
@@ -445,7 +464,62 @@ function MailBody({ reset }: { reset: () => void }) {
         {title}
         {!adding && st.accounts.length > 1 && account}
         <div className="sidebar-empty vc-connect ml-connect">
-          <p>{adding ? t('acctAddIntro') : st.account ? t('mlPassAgain') : t('mlIntro')}</p>
+          <p>
+            {adding
+              ? t('acctAddIntro')
+              : st.account?.auth === 'google'
+                ? t('mlGoogleAgain')
+                : st.account
+                  ? t('mlPassAgain')
+                  : t('mlIntro')}
+          </p>
+          {gReady && !gSetup && (
+            <button className="primary" disabled={busy !== null} onClick={googleLogin}>
+              {busy === 'google' ? t('mlGoogleWaiting') : t('mlGoogle')}
+            </button>
+          )}
+          {gReady === false && !gSetup && (
+            <button onClick={() => setGSetup(true)}>{t('mlGoogleSetup')}</button>
+          )}
+          {gSetup && (
+            <div className="ml-servers">
+              <p className="vc-hint">{t('mlGoogleSetupHint')}</p>
+              <button
+                className="link"
+                onClick={() => open('https://console.cloud.google.com/apis/credentials')}
+              >
+                {t('mlGoogleConsole')}
+              </button>
+              <input
+                value={gClient.id}
+                placeholder="Client ID (…apps.googleusercontent.com)"
+                spellCheck={false}
+                onChange={(e) => setGClient({ ...gClient, id: e.target.value })}
+              />
+              <input
+                type="password"
+                value={gClient.secret}
+                placeholder="Client secret"
+                onChange={(e) => setGClient({ ...gClient, secret: e.target.value })}
+              />
+              <div className="git-connect-actions">
+                <button
+                  className="primary"
+                  disabled={gClient.id.trim().length < 10 || busy !== null}
+                  onClick={saveGoogleClient}
+                >
+                  {busy === 'gclient' ? '…' : t('mlGoogleSave')}
+                </button>
+                <button onClick={() => setGSetup(false)}>{t('mlCancel')}</button>
+              </div>
+            </div>
+          )}
+          {gReady && !gSetup && (
+            <button className="link" onClick={() => setGSetup(true)}>
+              {t('mlGoogleChange')}
+            </button>
+          )}
+          <p className="vc-hint">{t('mlOrPassword')}</p>
           <input
             type="email"
             value={form.email}
@@ -638,7 +712,7 @@ function MailBody({ reset }: { reset: () => void }) {
                   title={t('mlSpam')}
                   onClick={() => moveMsg(msg.uid, 'junk', t('mlSpammed'))}
                 >
-                  ⚠
+                  <Icon name="warning" size={14} />
                 </button>
               )}
             </>
@@ -735,7 +809,9 @@ function MailBody({ reset }: { reset: () => void }) {
                 localStorage.setItem(FOLDER_KEY, f.path);
               }}
             >
-              <span className="ml-folder-icon">{FOLDER_ICON[f.specialUse ?? ''] ?? '🏷'}</span>
+              <span className="ml-folder-icon">
+                <Icon name={FOLDER_ICON[f.specialUse ?? ''] ?? 'tag'} size={12} />
+              </span>
               <span className="ml-folder-name">{folderName(f)}</span>
               {count > 0 && <span className="ml-folder-count">{count}</span>}
             </button>

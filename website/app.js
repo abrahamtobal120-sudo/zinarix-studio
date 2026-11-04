@@ -20,7 +20,6 @@ const OS_LABEL = {
   mac: 'Descargar para macOS',
   linux: 'Descargar para Linux',
 };
-const OS_GLYPH = { windows: '⊞', mac: '🍎', linux: '🐧' };
 const OS_BEST = { windows: 'win-exe', mac: 'mac-arm64', linux: 'deb' };
 
 function detectOs() {
@@ -67,7 +66,8 @@ async function setupDownloads() {
     const primary = document.getElementById('primary-download');
     primary.href = best.href === RELEASES ? '#descargar' : best.href;
     document.getElementById('primary-label').textContent = OS_LABEL[os];
-    document.getElementById('primary-glyph').textContent = OS_GLYPH[os];
+    document.getElementById('primary-glyph').outerHTML =
+      `<span class="os-logo ${os}" id="primary-glyph" aria-hidden="true"></span>`;
   }
 }
 
@@ -254,7 +254,7 @@ function setupMotion() {
     nav.classList.toggle('scrolled', window.scrollY > 10);
     if (!reduceMotion && win) {
       const p = Math.min(1, window.scrollY / 500);
-      win.style.transform = `rotateX(${14 * (1 - p)}deg) scale(${0.96 + 0.04 * p})`;
+      win.style.transform = `rotateX(${10 * (1 - p)}deg) scale(${0.97 + 0.03 * p})`;
     }
   };
   window.addEventListener('scroll', onScroll, { passive: true });
