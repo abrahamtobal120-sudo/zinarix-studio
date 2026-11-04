@@ -676,7 +676,27 @@ export type AppEvent =
   /** The phone remote changed (started, stopped, a phone paired, new PIN). */
   | { type: 'phone:status'; status: PhoneStatus }
   /** A Telegram or Discord bot connected, failed or got a new linked chat. */
-  | { type: 'bots:status'; status: BotsStatus };
+  | { type: 'bots:status'; status: BotsStatus }
+  /** WhatsApp Web changed (unread count, chat open, control, answers waiting). */
+  | { type: 'whatsapp:status'; status: WhatsAppStatus };
+
+/** WhatsApp Web inside Zinarix, and the chat of it that controls Zinarix (optional). */
+export interface WhatsAppStatus {
+  /** The page is loaded (it keeps running when its tab is closed). */
+  open: boolean;
+  /** Control from WhatsApp is on. */
+  control: boolean;
+  /** The chat Zinarix listens to (picked by the user, meant to be "Message yourself"). */
+  chat?: { id: string; title: string };
+  /** The chat open in the page right now. */
+  current?: { id: string; title: string };
+  /** The phone remote runs (the control needs it, like the Telegram and Discord bots). */
+  linked: boolean;
+  /** Answers waiting for the chosen chat to be open. */
+  pending: number;
+  /** Unread chats, as the page title says. */
+  unread: number;
+}
 
 /** Remote control from a phone on the same network (a page served by the app). */
 export interface PhoneStatus {
@@ -1076,6 +1096,16 @@ export interface OmniApi {
     /** Disconnects the bot and forgets its token and linked chats. */
     disconnect(kind: BotKind): Promise<BotsStatus>;
   };
+  whatsapp: {
+    status(): Promise<WhatsAppStatus>;
+    /** Where the page goes (CSS px of the window); null hides it. */
+    setBounds(rect: { x: number; y: number; width: number; height: number } | null): Promise<void>;
+    reload(): Promise<void>;
+    control(on: boolean): Promise<WhatsAppStatus>;
+    /** The chat open now becomes the one that controls Zinarix. */
+    useCurrent(): Promise<WhatsAppStatus>;
+    forget(): Promise<WhatsAppStatus>;
+  };
   license: {
     status(): Promise<LicenseStatus>;
     /** A license key (ZX1.…) or the owner's word. Throws with a readable reason. */
@@ -1259,6 +1289,12 @@ export const CHANNELS = [
   'bots:status',
   'bots:connect',
   'bots:disconnect',
+  'whatsapp:status',
+  'whatsapp:setBounds',
+  'whatsapp:reload',
+  'whatsapp:control',
+  'whatsapp:useCurrent',
+  'whatsapp:forget',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

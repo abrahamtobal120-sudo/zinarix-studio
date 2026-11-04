@@ -110,10 +110,17 @@ export class WhatsApp {
   /** Answers waiting for the chosen chat to be open. */
   private outbox: string[] = [];
   private sending = false;
-  private saved: Saved;
+  private stored: Saved | null = null;
 
-  constructor(private deps: WhatsAppDeps) {
-    this.saved = this.load();
+  constructor(private deps: WhatsAppDeps) {}
+
+  /** Read on first use (the app's folder is known only once the app is ready). */
+  private get saved(): Saved {
+    return (this.stored ??= this.load());
+  }
+
+  private set saved(v: Saved) {
+    this.stored = v;
   }
 
   private file(): string {

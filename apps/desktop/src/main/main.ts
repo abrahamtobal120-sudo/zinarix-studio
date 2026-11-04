@@ -24,6 +24,7 @@ import { fetchRemote, latestRelease, newer } from './remote.js';
 import { PhoneRemote } from './phone.js';
 import type { PhoneRepos } from './phone.js';
 import { ChatBots } from './bots.js';
+import { WhatsApp } from './whatsapp.js';
 import type { RemoteNotice } from '../shared/plans.js';
 import { DOWNLOAD_URL } from '../shared/plans.js';
 import {
@@ -134,10 +135,28 @@ const bots = new ChatBots({
     if (phoneOwner) send(phoneOwner, { type: 'bots:status', status });
   },
 });
+/** WhatsApp Web in a tab; its chosen chat controls Zinarix like the bots (see whatsapp.ts). */
+const whatsapp = new WhatsApp({
+  dir: () => ai.core.paths.home,
+  incoming: (chat, text) => bots.whatsapp(chat, text),
+  linked: () => bots.running,
+  onStatus: (status) => {
+    for (const w of wins.values()) send(w, { type: 'whatsapp:status', status });
+  },
+});
+bots.plug({
+  send: (chat, text, buttons) =>
+    whatsapp.send(
+      chat,
+      buttons?.length ? `${text}\n\nResponde "si" para aprobar o "no" para rechazar.` : text,
+    ),
+  stop: () => undefined,
+});
 /** Stops the phone remote and the bots that ride on it. */
 function stopPhone(): void {
   bots.detach();
   phone.stop();
+  for (const w of wins.values()) send(w, { type: 'whatsapp:status', status: whatsapp.status() });
 }
 
 // ---------------- repositories (for the phone) ----------------
@@ -1257,6 +1276,7 @@ function registerIpc(): void {
     try {
       const status = await phone.start();
       if (status.running) bots.attach();
+      for (const o of wins.values()) send(o, { type: 'whatsapp:status', status: whatsapp.status() });
       return status;
     } catch (e) {
       phoneOwner = undefined;
@@ -1284,6 +1304,24 @@ function registerIpc(): void {
     return bots.connect(kind, token);
   });
   handle('bots:disconnect', z.tuple([botKind]), (_w, kind) => bots.disconnect(kind));
+
+  handle('whatsapp:status', z.tuple([]), () => whatsapp.status());
+  handle('whatsapp:setBounds', z.tuple([rect]), (w, r) => {
+    const f = w.win.webContents.getZoomFactor();
+    whatsapp.setBounds(
+      w.win,
+      r && {
+        x: Math.round(r.x * f),
+        y: Math.round(r.y * f),
+        width: Math.round(r.width * f),
+        height: Math.round(r.height * f),
+      },
+    );
+  });
+  handle('whatsapp:reload', z.tuple([]), () => whatsapp.reload());
+  handle('whatsapp:control', z.tuple([z.boolean()]), (_w, on) => whatsapp.setControl(on));
+  handle('whatsapp:useCurrent', z.tuple([]), () => whatsapp.useCurrent());
+  handle('whatsapp:forget', z.tuple([]), () => whatsapp.forget());
 
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {
@@ -1575,6 +1613,7 @@ async function createWindow(
   });
   win.on('closed', () => {
     w.browser.destroy();
+    whatsapp.release(win);
     for (const r of w.requests) ai?.abort(r);
     for (const t of w.terminals) {
       terminals.kill(t);

@@ -207,6 +207,14 @@ const api: OmniApi = {
     connect: call('bots:connect') as OmniApi['bots']['connect'],
     disconnect: call('bots:disconnect') as OmniApi['bots']['disconnect'],
   },
+  whatsapp: {
+    status: call('whatsapp:status') as OmniApi['whatsapp']['status'],
+    setBounds: call('whatsapp:setBounds') as OmniApi['whatsapp']['setBounds'],
+    reload: call('whatsapp:reload') as OmniApi['whatsapp']['reload'],
+    control: call('whatsapp:control') as OmniApi['whatsapp']['control'],
+    useCurrent: call('whatsapp:useCurrent') as OmniApi['whatsapp']['useCurrent'],
+    forget: call('whatsapp:forget') as OmniApi['whatsapp']['forget'],
+  },
   license: {
     status: call('license:status') as OmniApi['license']['status'],
     activate: call('license:activate') as OmniApi['license']['activate'],
