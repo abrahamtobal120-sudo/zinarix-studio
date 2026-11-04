@@ -8,6 +8,7 @@ import type { Prefs } from '../../shared/api';
 import {
   BROWSER_TAB,
   SECURITY_TAB,
+  WHATSAPP_TAB,
   activate,
   attachEditor,
   closeTab,
@@ -18,6 +19,7 @@ import {
   useStore,
 } from '../store';
 import { BrowserPane } from './Browser';
+import { WhatsAppPane } from './WhatsApp';
 import { SecuritySection } from './SecuritySection';
 import { Welcome } from './Chrome';
 
@@ -90,7 +92,11 @@ export function EditorArea() {
   const isBrowser = active === BROWSER_TAB;
   const isSecurity = active === SECURITY_TAB;
   const hasBrowserTab = tabs.some((x) => x.path === BROWSER_TAB);
-  const showEditor = Boolean(activeTab && !activeTab.notice && !isBrowser && !isSecurity);
+  const isWhatsApp = active === WHATSAPP_TAB;
+  const hasWhatsAppTab = tabs.some((x) => x.path === WHATSAPP_TAB);
+  const showEditor = Boolean(
+    activeTab && !activeTab.notice && !isBrowser && !isSecurity && !isWhatsApp,
+  );
   return (
     <div className="editor-area">
       {tabs.length > 0 && (
@@ -112,6 +118,7 @@ export function EditorArea() {
             >
               <span className="tab-name">
                 {tab.path === SECURITY_TAB && <Icon name="shield" size={13} />}
+                {tab.path === WHATSAPP_TAB && <Icon name="whatsapp" size={13} />}
                 {tab.path === BROWSER_TAB && (
                   <svg
                     className="tab-globe"
@@ -153,12 +160,13 @@ export function EditorArea() {
           </button>
         </div>
       )}
-      {activeTab && !isBrowser && !isSecurity && (
+      {activeTab && !isBrowser && !isSecurity && !isWhatsApp && (
         <div className="breadcrumbs">{activeTab.path.split('/').join(' › ')}</div>
       )}
       <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />
       {activeTab?.notice && <div className="notice-pane">{activeTab.notice}</div>}
       {hasBrowserTab && <BrowserPane visible={isBrowser} />}
+      {hasWhatsAppTab && <WhatsAppPane visible={isWhatsApp} />}
       {isSecurity && <SecuritySection />}
       {!activeTab && <Welcome />}
     </div>

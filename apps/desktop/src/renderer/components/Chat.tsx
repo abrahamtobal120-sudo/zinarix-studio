@@ -14,7 +14,6 @@ import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import { monacoTheme } from '../themes';
 import {
-  BROWSER_TAB,
   api,
   chatFolder,
   chatTab,
@@ -1798,7 +1797,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             />
             <Icon name="file" size={14} />
             <span className="pill-label">
-              {active && active !== BROWSER_TAB ? active.split('/').pop() : t('includeFile')}
+              {active && !active.startsWith('::') ? active.split('/').pop() : t('includeFile')}
             </span>
           </label>
           <button

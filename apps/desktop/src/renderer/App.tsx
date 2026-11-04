@@ -211,6 +211,7 @@ export function App() {
       await Promise.all([refreshSettings(), loadPrefs(), refreshLicense()]);
       applyTheme(getState().settings.theme);
       setState({ workspace: await api().workspace.current() });
+      void api().whatsapp.status().then((whatsapp) => setState({ whatsapp }));
       await refreshModels().catch(() => undefined);
       // The guided setup (no AI connected yet) or what's new in this version, once.
       const s = getState();
@@ -237,6 +238,7 @@ export function App() {
       if (ev.type === 'notice' && !noticeSeen(ev.id))
         setState({ notice: { id: ev.id, text: ev.text, url: ev.url } });
       if (ev.type === 'browser:show') openBrowserTab();
+      if (ev.type === 'whatsapp:status') setState({ whatsapp: ev.status });
       if (ev.type === 'chat:title')
         for (const c of getState().chats)
           if (c.conversationId === ev.conversationId) updateChat(c.id, { title: ev.title });

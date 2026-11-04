@@ -5,6 +5,7 @@ import type {
   ChatContext,
   OmniApi,
   PhoneStatus,
+  WhatsAppStatus,
   Prefs,
   Settings,
   ThemeId,
@@ -105,6 +106,8 @@ export interface State {
   notice: RemoteNotice | null;
   /** Remote control from a phone (Settings → Phone). */
   phone: PhoneStatus;
+  /** WhatsApp Web in its tab (unread count, control from a chat). */
+  whatsapp: WhatsAppStatus | null;
 }
 
 /** One chat of the panel. Its turns live in its own component; this is what the tabs show. */
@@ -176,6 +179,7 @@ let state: State = {
   update: null,
   notice: null,
   phone: { running: false, phones: 0 },
+  whatsapp: null,
 };
 
 const listeners = new Set<() => void>();
@@ -295,6 +299,17 @@ export function openSecurityTab(): void {
   activate(SECURITY_TAB);
 }
 
+/** Pseudo-path of the WhatsApp Web tab. */
+export const WHATSAPP_TAB = '::whatsapp';
+
+export function openWhatsAppTab(): void {
+  if (!state.tabs.some((x) => x.path === WHATSAPP_TAB))
+    setState((s) => ({
+      tabs: [...s.tabs, { path: WHATSAPP_TAB, name: 'WhatsApp', dirty: false }],
+    }));
+  activate(WHATSAPP_TAB);
+}
+
 export function openBrowserTab(): void {
   if (!state.tabs.some((x) => x.path === BROWSER_TAB))
     setState((s) => ({
@@ -387,7 +402,9 @@ export function resetDocs(): void {
   for (const d of docs.values()) d.model.dispose();
   docs.clear();
   setState((s) => {
-    const tabs = s.tabs.filter((x) => x.path === BROWSER_TAB || x.path === SECURITY_TAB);
+    const tabs = s.tabs.filter(
+      (x) => x.path === BROWSER_TAB || x.path === SECURITY_TAB || x.path === WHATSAPP_TAB,
+    );
     return { tabs, active: tabs[0]?.path ?? null };
   });
 }

@@ -7136,3 +7136,89 @@ button.primary:hover,
   letter-spacing: 6px;
   color: var(--accent);
 }
+
+/* ---------- WhatsApp Web tab ---------- */
+.wa-pane {
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--bg-2);
+}
+.wa-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  flex-shrink: 0;
+}
+.wa-logo {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #25d366;
+  color: #fff;
+}
+.wa-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-state .dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+}
+.wa-state.on .dot {
+  background: #25d366;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #25d366 25%, transparent);
+}
+.wa-state.warn .dot {
+  background: var(--warn);
+}
+.wa-pane button.wa-btn {
+  font-size: 12.5px;
+}
+.wa-help {
+  margin: 0 10px 4px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+  background: var(--bg-3);
+}
+.wa-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin: 4px 10px 10px;
+  padding: 1px;
+  border-radius: 12px;
+  background: var(--border);
+}
+.wa-host {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.wa-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #8696a0;
+  font-size: 13px;
+}

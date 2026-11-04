@@ -158,6 +158,20 @@ const es = {
     'Envía este enlace a tu celular (por ejemplo, por WhatsApp a ti mismo), ábrelo y escribe el PIN de arriba:',
   phoneRemoteWarn:
     'El enlace incluye una clave secreta: no lo compartas. Cambia cada vez que lo activas y deja de funcionar al apagarlo.',
+  waControlOff: 'Control desde WhatsApp apagado',
+  waControlHint:
+    'Para controlar Zinarix desde WhatsApp: abre aquí el chat "Mensaje para ti" (tu propio número), escribe algo en él y pulsa "Usar este chat". Desde ese momento, lo que te escribas ahí (también desde el celular) le llega a la IA de Zinarix y la respuesta aparece en el mismo chat.',
+  waCommands:
+    'Comandos: /repos, /pull 2, /abrir 2, /parar, /nuevo, /chats, /ayuda. Necesita el control desde el celular encendido y que este chat siga abierto en esta pestaña.',
+  waUseThis: 'Usar este chat',
+  waResume: 'Volver a escuchar "{name}"',
+  waStop: 'Dejar de escuchar',
+  waNeedsRemote: 'Enciende el control desde el celular (Configuración → Celular) para que Zinarix responda',
+  waOpenChat: 'Abre el chat "{name}" para que Zinarix lo lea y responda',
+  waListening: 'Zinarix escucha "{name}"',
+  waChosenChat: 'elegido',
+  waPending: '{n} respuesta(s) por enviar',
+  waLoading: 'Cargando WhatsApp Web…',
   botsTitle: 'Telegram y Discord',
   botsHint:
     'Controla Zinarix escribiéndole a un bot: la IA te responde en el chat, apruebas lo que pide y haces /repos, /pull o /abrir desde cualquier lugar. Usan las APIs oficiales (no hay riesgo de bloqueo) y no necesitan el acceso desde cualquier lugar. Funcionan mientras el control desde el celular esté activo.',
@@ -1335,6 +1349,20 @@ const en: Record<Key, string> = {
     'Send this link to your phone (for example, to yourself on WhatsApp), open it and enter the PIN above:',
   phoneRemoteWarn:
     "The link contains a secret key: don't share it. It changes each time you turn this on and stops working when you turn it off.",
+  waControlOff: 'Control from WhatsApp is off',
+  waControlHint:
+    'To control Zinarix from WhatsApp: open the "Message yourself" chat here (your own number), write something in it and press "Use this chat". From then on, what you write there (also from your phone) goes to the Zinarix AI and the answer shows up in the same chat.',
+  waCommands:
+    'Commands: /repos, /pull 2, /abrir 2, /parar, /nuevo, /chats, /ayuda. Needs phone control on and this chat to stay open in this tab.',
+  waUseThis: 'Use this chat',
+  waResume: 'Listen to "{name}" again',
+  waStop: 'Stop listening',
+  waNeedsRemote: 'Turn on phone control (Settings → Phone) so Zinarix can answer',
+  waOpenChat: 'Open the chat "{name}" so Zinarix can read it and answer',
+  waListening: 'Zinarix is listening to "{name}"',
+  waChosenChat: 'chosen',
+  waPending: '{n} answer(s) waiting to be sent',
+  waLoading: 'Loading WhatsApp Web…',
   botsTitle: 'Telegram and Discord',
   botsHint:
     'Control Zinarix by writing to a bot: the AI answers in the chat, you approve what it asks and run /repos, /pull or /abrir from anywhere. They use the official APIs (no risk of being blocked) and do not need access from anywhere. They work while phone control is on.',

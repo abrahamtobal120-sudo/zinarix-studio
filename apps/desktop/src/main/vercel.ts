@@ -284,7 +284,7 @@ export class Vercel {
     });
     if (!r.ok) throw new Error('Vercel rechazó ese token.');
     const j = (await r.json().catch(() => ({}))) as { user?: { username?: string } };
-    this.accounts.add(t, j.user?.username ?? '', true);
+    this.accounts.add(t, j.user?.username ?? '');
     return this.status();
   }
 

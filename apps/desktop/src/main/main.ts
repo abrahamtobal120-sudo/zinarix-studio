@@ -1732,6 +1732,8 @@ app.whenReady().then(async () => {
   // Start empty unless a folder is passed explicitly: the user drops or picks one.
   const initial = folderFromArgv(process.argv) ?? process.env.OMNI_OPEN_FOLDER;
   await createWindow({ folder: initial, restore: true });
+  // WhatsApp control left on: its page opens out of sight and keeps listening.
+  whatsapp.resume();
   // Installed copies update themselves from the GitHub releases (silently when offline).
   updates = startUpdates(edition.channel, (ev) => {
     for (const w of wins.values()) send(w, ev);
@@ -1743,6 +1745,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   stopPhone();
+  whatsapp.destroy();
   terminals.killAll();
   ai?.close();
   app.quit();

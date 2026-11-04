@@ -70,14 +70,12 @@ export class AccountList {
   }
 
   /**
-   * Keeps a new account and makes it the active one. The same token again, or the same label
-   * when labels name one user (`byLabel`), replaces that account's token instead.
+   * Keeps a new account and makes it the active one. The same token again only makes that
+   * account active; another token of the same user is kept as one more account.
    */
-  add(token: string, label: string, byLabel = false): void {
+  add(token: string, label: string): void {
     const s = this.read();
-    const same = s.accounts.find(
-      (a) => (byLabel && !!label && a.label === label) || this.token(a.id) === token,
-    );
+    const same = s.accounts.find((a) => this.token(a.id) === token);
     const id = same?.id ?? randomBytes(6).toString('hex');
     this.store(id).set(token);
     if (same) same.label = label;

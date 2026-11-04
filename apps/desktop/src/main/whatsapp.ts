@@ -177,7 +177,7 @@ export class WhatsApp {
         backgroundThrottling: false,
       },
     });
-    view.setBackgroundColor('#111b21');
+    view.setBackgroundColor('#ffffff');
     view.setBorderRadius(10);
     const wc = view.webContents;
     wc.setUserAgent(chromeAgent());
@@ -370,6 +370,7 @@ export class WhatsApp {
           if (i) {
             // Shift+Enter: a new line inside the same message.
             wc.sendInputEvent({ type: 'keyDown', keyCode: 'Return', modifiers: ['shift'] });
+            wc.sendInputEvent({ type: 'char', keyCode: '\r', modifiers: ['shift'] });
             wc.sendInputEvent({ type: 'keyUp', keyCode: 'Return', modifiers: ['shift'] });
           }
           if (lines[i]) await wc.insertText(lines[i]!);

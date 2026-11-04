@@ -5,13 +5,14 @@ import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
 import {
   BROWSER_TAB,
-  SECURITY_TAB,
   activate,
   api,
   getState,
   openBrowserTab,
   openDropped,
   openSecurityTab,
+  openWhatsAppTab,
+  WHATSAPP_TAB,
   setState,
   toggleMaximized,
   useStore,
@@ -22,6 +23,8 @@ export function ActivityBar() {
   const panelOpen = useStore((s) => s.panelOpen);
   const chatOpen = useStore((s) => s.chatOpen);
   const browserActive = useStore((s) => s.active === BROWSER_TAB);
+  const whatsappActive = useStore((s) => s.active === WHATSAPP_TAB);
+  const whatsappUnread = useStore((s) => s.whatsapp?.unread ?? 0);
   const active = useStore((s) => s.active);
   const gitChanges = useStore((s) => s.gitChanges);
   const sideMax = useStore((s) => s.maximized === 'side');
@@ -78,6 +81,18 @@ export function ActivityBar() {
           activate(other?.path ?? null);
         } else openBrowserTab();
       })}
+      {item(
+        whatsappActive,
+        'WhatsApp',
+        'whatsapp',
+        () => {
+          if (whatsappActive) {
+            const other = getState().tabs.find((x) => x.path !== WHATSAPP_TAB);
+            activate(other?.path ?? null);
+          } else openWhatsAppTab();
+        },
+        whatsappUnread,
+      )}
       <div className="spacer" />
       {sidebar &&
         item(
@@ -104,7 +119,7 @@ export function StatusBar() {
   const settings = useStore((s) => s.settings);
   const cursor = useStore((s) => s.cursor);
   const active = useStore((s) =>
-    s.active === BROWSER_TAB || s.active === SECURITY_TAB ? null : s.active,
+    s.active?.startsWith('::') ? null : s.active,
   );
   const tabs = useStore((s) => s.tabs);
   const prefs = useStore((s) => s.prefs);
