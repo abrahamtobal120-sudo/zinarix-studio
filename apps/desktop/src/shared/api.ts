@@ -157,6 +157,8 @@ export interface Settings {
 
 /** Editor and app preferences (Settings screen), kept in desktop.json. */
 export interface Prefs {
+  /** Size of the whole interface, in percent (100 = real size). */
+  uiZoom: number;
   fontSize: number;
   fontFamily: string;
   tabSize: number;
@@ -173,7 +175,11 @@ export interface Prefs {
   keybindings: Record<string, string>;
 }
 
+/** Steps of the interface size (Ver > Acercar / Alejar and Settings). */
+export const UI_ZOOM_STEPS = [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300];
+
 export const DEFAULT_PREFS: Prefs = {
+  uiZoom: 100,
   fontSize: 14,
   fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace",
   tabSize: 2,

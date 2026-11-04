@@ -6,6 +6,7 @@ import { BrowserWindow, Menu, app, dialog, ipcMain, protocol, shell } from 'elec
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
 import { z } from 'zod';
 import type { AppEvent, Channel, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
+import { UI_ZOOM_STEPS } from '../shared/api.js';
 import { DEFAULT_PREFS, EVENT_CHANNEL, THEME_IDS } from '../shared/api.js';
 import { AiService } from './ai.js';
 import type { Scope } from './ai.js';
@@ -187,6 +188,27 @@ function upgrade(w: Win | undefined, feature: string): void {
 function prefs(): Prefs {
   const p = loadState().prefs ?? {};
   return { ...DEFAULT_PREFS, ...p, keybindings: { ...p.keybindings } };
+}
+
+/** Sizes every window's interface to the saved zoom (a percentage). */
+function applyZoom(): void {
+  const f = prefs().uiZoom / 100;
+  for (const w of wins.values()) if (!w.win.isDestroyed()) w.win.webContents.setZoomFactor(f);
+}
+
+/** Ver > Acercar / Alejar / Tamaño real: saved, so it lasts and reaches every window. */
+function stepZoom(dir: -1 | 0 | 1): void {
+  const cur = prefs().uiZoom;
+  const next =
+    dir === 0
+      ? 100
+      : dir > 0
+        ? (UI_ZOOM_STEPS.find((z) => z > cur) ?? UI_ZOOM_STEPS.at(-1)!)
+        : (UI_ZOOM_STEPS.findLast((z) => z < cur) ?? UI_ZOOM_STEPS[0]!);
+  if (next === cur) return;
+  saveState({ prefs: { ...prefs(), uiZoom: next } });
+  applyZoom();
+  for (const w of wins.values()) send(w, { type: 'settings:changed' });
 }
 
 function send(w: Win, ev: AppEvent): void {
@@ -790,6 +812,7 @@ function registerIpc(): void {
 
   const prefsPatch = z
     .object({
+      uiZoom: z.number().int().min(50).max(300),
       fontSize: z.number().int().min(8).max(40),
       fontFamily: z.string().max(300),
       tabSize: z.number().int().min(1).max(16),
@@ -808,6 +831,7 @@ function registerIpc(): void {
     const next = { ...prefs(), ...patch };
     saveState({ prefs: next });
     ai.useRules = next.projectRules;
+    applyZoom();
     broadcastSettings(w);
     return next;
   });
@@ -1256,9 +1280,28 @@ function buildMenu(): void {
         { label: 'Chat de IA', accelerator: 'CmdOrCtrl+Alt+I', click: cmd('view.chat') },
         { label: 'Alternar tema claro/oscuro', click: cmd('view.toggleTheme') },
         { type: 'separator' },
-        { role: 'zoomIn', label: 'Acercar' },
-        { role: 'zoomOut', label: 'Alejar' },
-        { role: 'resetZoom', label: 'Tamaño real' },
+        { label: 'Agrandar todo', accelerator: 'CmdOrCtrl+=', click: () => stepZoom(1) },
+        // Hidden twins: Ctrl + on keyboards where "+" is its own key (numpad, Spanish layout).
+        {
+          label: 'Agrandar todo',
+          accelerator: 'CmdOrCtrl+Plus',
+          visible: false,
+          click: () => stepZoom(1),
+        },
+        {
+          label: 'Agrandar todo',
+          accelerator: 'CmdOrCtrl+numadd',
+          visible: false,
+          click: () => stepZoom(1),
+        },
+        { label: 'Achicar todo', accelerator: 'CmdOrCtrl+-', click: () => stepZoom(-1) },
+        {
+          label: 'Achicar todo',
+          accelerator: 'CmdOrCtrl+numsub',
+          visible: false,
+          click: () => stepZoom(-1),
+        },
+        { label: 'Tamaño real', accelerator: 'CmdOrCtrl+0', click: () => stepZoom(0) },
         { role: 'togglefullscreen', label: 'Pantalla completa' },
         ...(app.isPackaged
           ? []
@@ -1375,6 +1418,8 @@ async function createWindow(
   );
   wins.set(w.id, w);
   win.once('ready-to-show', () => win.show());
+  // Electron forgets the zoom on each load; the saved interface size is set again.
+  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(prefs().uiZoom / 100));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) void shell.openExternal(url);
     return { action: 'deny' };

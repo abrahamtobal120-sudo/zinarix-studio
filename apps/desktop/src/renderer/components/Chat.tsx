@@ -45,7 +45,7 @@ import { runCommand } from '../commands';
 import { fileIcon } from './icons';
 import { Icon, TONE, type IconName } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
-import { ChatHistory } from './ChatHistory';
+import { ChatHistory, when } from './ChatHistory';
 import { Markdown } from './Markdown';
 import { listTerminals, sendTerminalToChat, type TerminalSession } from './Terminal';
 
@@ -2027,6 +2027,9 @@ function ChatProject({
       </div>
       {open && (
         <>
+          {items.length > 0 && past.length > 0 && (
+            <div className="chat-list-sub">{t('chatOpenNow')}</div>
+          )}
           {items.map(({ c, n }) => {
             const label = c.title || t('chatTabN', { n });
             const status = chatStatusText(c);
@@ -2043,8 +2046,24 @@ function ChatProject({
                   if (e.button === 1) requestCloseChat(c.id);
                 }}
               >
-                <ChatStatus c={c} />
-                <span className="chat-tab-label">{label}</span>
+                <span className="chat-list-avatar">
+                  {c.model ? (
+                    <ProviderLogo id={c.model.split('/')[0]!} size={18} />
+                  ) : (
+                    <Icon name={c.agent ? 'agent' : 'message'} size={13} />
+                  )}
+                  {(c.busy || c.waiting || c.unread) && (
+                    <span className="chat-list-badge">
+                      <ChatStatus c={c} />
+                    </span>
+                  )}
+                </span>
+                <span className="chat-list-main">
+                  <span className="chat-tab-label">{label}</span>
+                  <span className="chat-list-meta">
+                    {status || (c.model ? c.model.split('/').pop() : t('chatNoModel'))}
+                  </span>
+                </span>
                 {c.queued.length > 0 && (
                   <em className="chat-list-count" title={t('chatQueued')}>
                     +{c.queued.length}
@@ -2066,6 +2085,7 @@ function ChatProject({
               </div>
             );
           })}
+          {past.length > 0 && <div className="chat-list-sub">{t('chatRecent')}</div>}
           {past.slice(0, 8).map((v) => (
             <div
               key={v.id}
@@ -2077,10 +2097,19 @@ function ChatProject({
                 newChat({ conversationId: v.id, title: v.title.slice(0, 60), folder: own })
               }
             >
-              <span className="chat-tab-status">
-                <Icon name="history" size={11} />
+              <span className="chat-list-avatar">
+                {v.model ? (
+                  <ProviderLogo id={v.model.split('/')[0]!} size={18} />
+                ) : (
+                  <Icon name="history" size={13} />
+                )}
               </span>
-              <span className="chat-tab-label">{v.title}</span>
+              <span className="chat-list-main">
+                <span className="chat-tab-label">{v.title}</span>
+                <span className="chat-list-meta">
+                  {when(v.updatedAt)} · {t('histMessages', { n: v.messageCount })}
+                </span>
+              </span>
             </div>
           ))}
           {!items.length && saved !== null && !past.length && (

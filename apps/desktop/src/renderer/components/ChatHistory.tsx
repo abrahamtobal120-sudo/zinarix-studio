@@ -17,7 +17,8 @@ function bucket(ts: number): string {
   return t('histOlder');
 }
 
-function when(ts: number): string {
+/** Time today, otherwise the day ("3 nov"). */
+export function when(ts: number): string {
   const d = new Date(ts);
   const sameDay = new Date().toDateString() === d.toDateString();
   return sameDay

@@ -209,6 +209,21 @@ export function SettingsPanel() {
                   <ThemeCard key={id} id={id} active={settings.theme === id} />
                 ))}
               </div>
+              <h3>{t('setUiZoom')}</h3>
+              <label className="settings-field">
+                <span>{t('setUiZoomHint')}</span>
+                <span className="settings-range">
+                  <input
+                    type="range"
+                    min={50}
+                    max={300}
+                    step={5}
+                    value={prefs.uiZoom}
+                    onChange={(e) => void updatePrefs({ uiZoom: Number(e.target.value) })}
+                  />
+                  <b>{prefs.uiZoom}%</b>
+                </span>
+              </label>
               <h3>{t('setFont')}</h3>
               <label className="settings-field">
                 <span>{t('setFontSize')}</span>
