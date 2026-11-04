@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { BrowserWindow, Menu, app, dialog, ipcMain, protocol, shell } from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
 import { z } from 'zod';
-import type { AppEvent, Channel, PhoneRepo, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
+import type { AppEvent, BotKind, Channel, PhoneAction, PhoneRepo, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
 import { UI_ZOOM_STEPS } from '../shared/api.js';
 import { DEFAULT_PREFS, EVENT_CHANNEL, THEME_IDS } from '../shared/api.js';
 import { AiService } from './ai.js';
@@ -22,6 +22,8 @@ import { startUpdates } from './updates.js';
 import { editionOf } from '../shared/edition.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
 import { PhoneRemote } from './phone.js';
+import type { PhoneRepos } from './phone.js';
+import { ChatBots } from './bots.js';
 import type { RemoteNotice } from '../shared/plans.js';
 import { DOWNLOAD_URL } from '../shared/plans.js';
 import {
@@ -100,14 +102,7 @@ const terminals = new Terminals(
 
 /** The window the phone controls (the one that started the remote). */
 let phoneOwner: Win | undefined;
-const phone = new PhoneRemote(
-  (action) => {
-    if (phoneOwner) send(phoneOwner, { type: 'phone', action });
-  },
-  (status) => {
-    if (phoneOwner) send(phoneOwner, { type: 'phone:status', status });
-  },
-  {
+const phoneRepos: PhoneRepos = {
     list: async () => {
       const open = phoneOwner?.workspace?.root;
       return mapLimit(findRepos(), 8, (p) => repoView(p, p === open));
@@ -118,8 +113,32 @@ const phone = new PhoneRemote(
       if (!(await openFolder(phoneOwner, knownRepo(path))))
         throw new Error('No se pudo abrir la carpeta.');
     },
+};
+const phoneAction = (action: PhoneAction) => {
+  if (phoneOwner) send(phoneOwner, { type: 'phone', action });
+};
+const phone = new PhoneRemote(
+  phoneAction,
+  (status) => {
+    if (phoneOwner) send(phoneOwner, { type: 'phone:status', status });
   },
+  phoneRepos,
 );
+/** Telegram / Discord bots: the same remote control, from those apps (see bots.ts). */
+const bots = new ChatBots({
+  dir: () => ai.core.paths.home,
+  action: phoneAction,
+  repos: phoneRepos,
+  checkPin: (pin) => phone.checkPin(pin),
+  onStatus: (status) => {
+    if (phoneOwner) send(phoneOwner, { type: 'bots:status', status });
+  },
+});
+/** Stops the phone remote and the bots that ride on it. */
+function stopPhone(): void {
+  bots.detach();
+  phone.stop();
+}
 
 // ---------------- repositories (for the phone) ----------------
 
@@ -1232,11 +1251,13 @@ function registerIpc(): void {
     // One window at a time: starting it here takes it from the other one.
     if (phoneOwner && phoneOwner !== w) {
       send(phoneOwner, { type: 'phone:status', status: { running: false, phones: 0 } });
-      phone.stop();
+      stopPhone();
     }
     phoneOwner = w;
     try {
-      return await phone.start();
+      const status = await phone.start();
+      if (status.running) bots.attach();
+      return status;
     } catch (e) {
       phoneOwner = undefined;
       return { running: false, phones: 0, error: e instanceof Error ? e.message : String(e) };
@@ -1245,14 +1266,24 @@ function registerIpc(): void {
   handle('phone:stop', z.tuple([]), (w) => {
     if (phoneOwner !== w) return { running: false, phones: 0 };
     phoneOwner = undefined;
+    bots.detach();
     return phone.stop();
   });
   handle('phone:remote', z.tuple([z.boolean()]), (w, on) =>
     phoneOwner === w ? phone.setRemote(on) : { running: false, phones: 0 },
   );
   handle('phone:push', z.tuple([PhoneSnapshot]), (w, snapshot) => {
-    if (phoneOwner === w) phone.push(snapshot);
+    if (phoneOwner !== w) return;
+    phone.push(snapshot);
+    bots.push(snapshot);
   });
+  const botKind = z.enum(['telegram', 'discord']) satisfies z.ZodType<BotKind>;
+  handle('bots:status', z.tuple([]), () => bots.status());
+  handle('bots:connect', z.tuple([botKind, z.string().trim().min(20).max(300)]), (w, kind, token) => {
+    if (phoneOwner !== w) throw new Error('Activa primero el control desde el celular.');
+    return bots.connect(kind, token);
+  });
+  handle('bots:disconnect', z.tuple([botKind]), (_w, kind) => bots.disconnect(kind));
 
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {
@@ -1553,7 +1584,7 @@ async function createWindow(
     for (const f of w.chatFolders.values()) f.dispose();
     if (phoneOwner === w) {
       phoneOwner = undefined;
-      phone.stop();
+      stopPhone();
     }
     wins.delete(w.id);
   });
@@ -1672,7 +1703,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  phone.stop();
+  stopPhone();
   terminals.killAll();
   ai?.close();
   app.quit();
