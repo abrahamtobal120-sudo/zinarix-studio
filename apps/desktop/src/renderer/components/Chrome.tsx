@@ -70,7 +70,7 @@ export function ActivityBar() {
       {item(sidebar === 'mail', t('mlTitle'), 'mail', () =>
         setState({ sidebar: sidebar === 'mail' ? null : 'mail' }),
       )}
-      {item(chatOpen, t('chat'), 'sparkles', () => setState({ chatOpen: !chatOpen }))}
+      {item(chatOpen, t('chat'), 'agent', () => setState({ chatOpen: !chatOpen }))}
       {item(panelOpen, t('terminal'), 'terminal', () => setState({ panelOpen: !panelOpen }))}
       {item(browserActive, t('browser'), 'globe', () => {
         if (browserActive) {
@@ -142,7 +142,7 @@ export function StatusBar() {
           title={t('setInlineHint')}
           onClick={() => void runCommand('ai.toggleInline')}
         >
-          <Icon name="sparkles" size={13} /> {t('inlineShort')}
+          <Icon name="agent" size={13} /> {t('inlineShort')}
         </span>
       )}
       {settings.localOnly && (
@@ -237,7 +237,7 @@ export function Welcome() {
               <Icon name="key" size={16} /> {t('connectProvider')}
             </button>
             <button className="big" onClick={() => setState({ chatOpen: true })}>
-              <Icon name="sparkles" size={16} /> {t('chat')}
+              <Icon name="agent" size={16} /> {t('chat')}
             </button>
           </div>
           <div className="welcome-keys">
@@ -245,7 +245,7 @@ export function Welcome() {
             {row(t('cmdPalette'), 'Ctrl+Shift+P', 'palette', 'menu')}
             {row(t('aiEdit'), 'Ctrl+K', 'ai.edit', 'edit')}
             {row(t('welcomeAsk'), 'Ctrl+L', 'ai.askSelection', 'message')}
-            {row(t('pickModel'), 'Ctrl+Alt+M', 'ai.pickModel', 'brain')}
+            {row(t('pickModel'), 'Ctrl+Alt+M', 'ai.pickModel', 'thinking')}
             {row(t('terminal'), 'Ctrl+`', 'view.terminal', 'terminal')}
           </div>
         </>

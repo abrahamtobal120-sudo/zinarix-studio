@@ -138,7 +138,7 @@ export function ChatHistory({
                   <ProviderLogo id={c.model.split('/')[0]!} size={22} />
                 ) : (
                   <span className="ch-dot">
-                    <Icon name="sparkles" size={13} />
+                    <Icon name="agent" size={13} />
                   </span>
                 )}
                 <span className="ch-main">

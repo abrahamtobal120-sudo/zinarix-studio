@@ -334,7 +334,7 @@ export function TerminalPanel() {
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => sendTerminalToChat(active)}
           >
-            <Icon name="sparkles" size={13} /> {t('termToChat')}
+            <Icon name="agent" size={13} /> {t('termToChat')}
           </button>
           <span className="term-split">
             <button title={t('termNew')} aria-label={t('termNew')} onClick={() => void create()}>

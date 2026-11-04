@@ -333,7 +333,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
               </div>
               <div className="browser-ask">
                 <span className="browser-ask-title">
-                  <UiIcon name="sparkles" size={14} /> {t('browserAskAgent')}
+                  <UiIcon name="agent" size={14} /> {t('browserAskAgent')}
                 </span>
                 {[t('browserIdea1'), t('browserIdea2'), t('browserIdea3')].map((idea) => (
                   <button key={idea} className="browser-chip" onClick={() => askInChat(idea)}>

@@ -46,7 +46,7 @@ export function PlanBadge() {
       title={t('planTitle')}
       onClick={() => setState({ modal: { kind: 'license' } })}
     >
-      <Icon name={l.plan === 'free' ? 'star' : l.plan === 'ai' ? 'cpu' : 'sparkles'} size={12} /> {planLabel(l)}
+      <Icon name={l.plan === 'free' ? 'star' : l.plan === 'ai' ? 'cpu' : 'agent'} size={12} /> {planLabel(l)}
     </span>
   );
 }
@@ -93,7 +93,7 @@ function ProTable() {
       <tbody>
         <tr>
           <td>
-            <Icon name="sparkles" size={13} /> {t('proBase')}
+            <Icon name="agent" size={13} /> {t('proBase')}
           </td>
           {COLUMNS.map((c) => (
             <td key={c.id} className={cls(c)}>
@@ -130,7 +130,7 @@ function ProTable() {
 
 /** While everything is free: what "everything" means. */
 const INCLUDED: { icon: IconName; key: Key }[] = [
-  { icon: 'sparkles', key: 'proBase' },
+  { icon: 'agent', key: 'proBase' },
   { icon: 'message', key: 'newChats' },
   { icon: 'columns', key: 'proSplit' },
   { icon: 'window', key: 'newWindows' },
@@ -236,7 +236,7 @@ export function LicensePanel() {
         {l.plan === 'open' && (
           <>
             <div className="plan-open">
-              <Icon name="sparkles" size={14} /> {t('planOpenBody')}
+              <Icon name="agent" size={14} /> {t('planOpenBody')}
             </div>
             <Included />
           </>
@@ -245,7 +245,7 @@ export function LicensePanel() {
         {l.billing && !(hasPro(l.plan) && hasAi(l.plan)) && (
           <div className="plan-buy">
             <button className="primary big" onClick={buy}>
-              <Icon name="sparkles" size={15} /> {t('planBuy')}
+              <Icon name="agent" size={15} /> {t('planBuy')}
             </button>
             <span className="dim">{t('planBuyHint')}</span>
           </div>
@@ -279,7 +279,7 @@ export function UpgradeModal({ feature }: { feature: ProFeature }) {
           ×
         </button>
         <div className="upgrade-icon">
-          <Icon name="sparkles" size={26} />
+          <Icon name="agent" size={26} />
         </div>
         <h2>{t(FEATURE_TITLE[feature], { n: free.maxChats })}</h2>
         <p className="dim">{t('upBody')}</p>
@@ -463,7 +463,7 @@ export function Onboarding() {
                 <Icon name="folder" size={14} /> {t('openFolder')}
               </button>
               <button className="primary" onClick={() => (close(), setState({ chatOpen: true }))}>
-                <Icon name="sparkles" size={14} /> {t('onbGo')}
+                <Icon name="agent" size={14} /> {t('onbGo')}
               </button>
             </span>
           )}
@@ -497,7 +497,7 @@ export function WhatsNew() {
           ×
         </button>
         <h2>
-          <Icon name="sparkles" size={18} /> {t('newsTitle', { v: version })}
+          <Icon name="agent" size={18} /> {t('newsTitle', { v: version })}
         </h2>
         <div className="news-grid">
           {NEWS.map((n) => (

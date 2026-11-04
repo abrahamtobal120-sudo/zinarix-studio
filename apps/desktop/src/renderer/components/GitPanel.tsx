@@ -436,7 +436,7 @@ export function GitPanel() {
                 onClick={() => void generate()}
                 title={t('gitAiMessageTitle')}
               >
-                {busy === 'ai' ? '…' : <Icon name="sparkles" size={14} />} {t('gitAiMessage')}
+                {busy === 'ai' ? '…' : <Icon name="agent" size={14} />} {t('gitAiMessage')}
               </button>
               <label className="check" title={t('gitAmendTitle')}>
                 <input

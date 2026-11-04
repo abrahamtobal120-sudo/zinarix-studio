@@ -193,7 +193,7 @@ export function SettingsPanel() {
           </div>
           {nav('appearance', t('setAppearance'), 'palette')}
           {nav('editor', t('setEditor'), 'edit')}
-          {nav('ai', t('setAi'), 'sparkles')}
+          {nav('ai', t('setAi'), 'agent')}
           {nav('phone', t('phoneTitle'), 'smartphone')}
           {nav('keys', t('shortcuts'), 'keyboard')}
         </nav>

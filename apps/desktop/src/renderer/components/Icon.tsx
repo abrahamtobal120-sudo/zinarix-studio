@@ -3,7 +3,8 @@ import { createElement } from 'react';
 /**
  * Stroke icon set (24×24 grid, currentColor) so the chrome looks the same on every OS.
  * Shapes come from Lucide (https://lucide.dev), ISC license, Copyright (c) 2026 Lucide Icons and Contributors.
- * github/vercel/supabase are our own.
+ * agent/prompt/thinking and github/vercel/supabase are our own.
+ * Square caps and miter joins keep it closer to a classic IDE than to rounded "AI app" icons.
  */
 type IconNode = readonly (readonly [string, Record<string, string>])[];
 
@@ -51,16 +52,10 @@ const ICONS = {
       { d: 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z' },
     ],
   ],
-  sparkles: [
-    [
-      'path',
-      {
-        d: 'M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z',
-      },
-    ],
-    ['path', { d: 'M20 2v4' }],
-    ['path', { d: 'M22 4h-4' }],
-    ['circle', { cx: '4', cy: '20', r: '2' }],
+  agent: [
+    ['path', { d: 'M3 4h18v13H10l-5 4v-4H3z' }],
+    ['path', { d: 'm8 8.5 2.5 2-2.5 2' }],
+    ['path', { d: 'M13 12.5h3' }],
   ],
   terminal: [
     ['path', { d: 'm7 11 2-2-2-2' }],
@@ -170,13 +165,9 @@ const ICONS = {
     ['circle', { cx: '18', cy: '6', r: '3' }],
     ['circle', { cx: '6', cy: '18', r: '3' }],
   ],
-  bot: [
-    ['path', { d: 'M12 8V4H8' }],
-    ['rect', { width: '16', height: '12', x: '4', y: '8', rx: '2' }],
-    ['path', { d: 'M2 14h2' }],
-    ['path', { d: 'M20 14h2' }],
-    ['path', { d: 'M15 13v2' }],
-    ['path', { d: 'M9 13v2' }],
+  prompt: [
+    ['path', { d: 'm4 17 6-6-6-6' }],
+    ['path', { d: 'M12 19h8' }],
   ],
   file: [
     [
@@ -564,15 +555,10 @@ const ICONS = {
       },
     ],
   ],
-  brain: [
-    ['path', { d: 'M12 18V5' }],
-    ['path', { d: 'M15 13a4.17 4.17 0 01-3-4 4.17 4.17 0 01-3 4' }],
-    ['path', { d: 'M17.707 6.294A3 3 0 1012 5a3 3 0 10-5.707 1.294' }],
-    ['path', { d: 'M17.996 5.125a4 4 0 012.526 5.77' }],
-    ['path', { d: 'M18 18a4 4 0 002-7.465' }],
-    ['path', { d: 'M19.967 17.482a4 4 0 11-7.967.517 4 4 0 11-7.967-.517' }],
-    ['path', { d: 'M6 18a4 4 0 01-2-7.465' }],
-    ['path', { d: 'M6.004 5.125a4 4 0 00-2.526 5.77' }],
+  thinking: [
+    ['circle', { cx: '6', cy: '12', r: '1' }],
+    ['circle', { cx: '12', cy: '12', r: '1' }],
+    ['circle', { cx: '18', cy: '12', r: '1' }],
   ],
   github: [
     [
@@ -589,30 +575,8 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS;
 
-/** Per-icon accent so the chrome reads at a glance, like Claude desktop. */
-export const TONE: Partial<Record<IconName, string>> = {
-  files: '#4c8dff',
-  search: '#38bdf8',
-  git: '#f97316',
-  run: '#22c55e',
-  vercel: 'var(--fg-strong)',
-  supabase: '#3ecf8e',
-  mail: '#ea4335',
-  sparkles: '#a78bfa',
-  terminal: '#f5a524',
-  globe: '#14b8a6',
-  shield: '#22c55e',
-  chart: '#ec4899',
-  key: '#f5a524',
-  menu: '#38bdf8',
-  settings: '#94a3b8',
-  edit: '#a78bfa',
-  books: '#f5a524',
-  message: '#4c8dff',
-  brain: '#ec4899',
-  check: '#22c55e',
-  play: '#22c55e',
-};
+/** Icons stay monochrome (they inherit the text colour); kept so callers can opt into an accent. */
+export const TONE: Partial<Record<IconName, string>> = {};
 
 export function Icon({
   name,
@@ -631,9 +595,9 @@ export function Icon({
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      strokeWidth={1.5}
+      strokeLinecap="square"
+      strokeLinejoin="miter"
       aria-hidden="true"
     >
       {(ICONS[name] as IconNode).map(([tag, attrs], i) => createElement(tag, { key: i, ...attrs }))}

@@ -1521,7 +1521,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                   {turn.reasoning && (
                     <details className="turn-reasoning">
                       <summary>
-                        <Icon name="brain" size={13} /> {t('thinking')}
+                        <Icon name="thinking" size={13} /> {t('thinking')}
                       </summary>
                       {turn.reasoning}
                     </details>
@@ -1769,7 +1769,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               checked={agentMode}
               onChange={(e) => setAgentMode(e.target.checked)}
             />
-            <Icon name="bot" size={14} /> {t('agent')}
+            <Icon name="prompt" size={14} /> {t('agent')}
           </label>
           <label className={`check pill ${includeFile ? 'on' : ''}`} title={t('includeFile')}>
             <input

@@ -407,7 +407,7 @@ export function ModelPicker({
           {chip('fav', 'star', t('fFavorites'))}
           {chip('tools', 'wrench', t('fTools'))}
           {chip('vision', 'eye', t('fVision'))}
-          {chip('reasoning', 'brain', t('fReasoning'))}
+          {chip('reasoning', 'thinking', t('fReasoning'))}
           {chip('long', 'books', '≥200k')}
           {chip('cheap', 'dollar', t('fCheap'))}
           {chip('local', 'home', t('fLocal'))}
@@ -572,7 +572,7 @@ export function ModelPicker({
                       <Icon name="eye" size={14} />
                     </span>
                     <span className={r.reasoning ? '' : 'off'} title={t('fReasoning')}>
-                      <Icon name="brain" size={14} />
+                      <Icon name="thinking" size={14} />
                     </span>
                   </span>
                   <button
