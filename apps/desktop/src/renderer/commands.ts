@@ -184,6 +184,11 @@ function baseCommands(): Command[] {
       run: () => setState((s) => ({ sidebar: s.sidebar === 'supabase' ? null : 'supabase' })),
     },
     {
+      id: 'view.watch',
+      label: t('wtTitle'),
+      run: () => setState((s) => ({ sidebar: s.sidebar === 'watch' ? null : 'watch' })),
+    },
+    {
       id: 'view.mail',
       label: t('mlTitle'),
       run: () => setState((s) => ({ sidebar: s.sidebar === 'mail' ? null : 'mail' })),

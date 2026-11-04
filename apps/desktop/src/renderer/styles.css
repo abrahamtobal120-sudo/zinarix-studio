@@ -1949,6 +1949,18 @@ button.big {
   color: var(--fg-dim);
   font-size: 11px;
 }
+.tool-chevron {
+  display: inline-grid;
+  place-items: center;
+  color: var(--fg-dim);
+  transition: transform 0.15s ease;
+}
+.tool-head:hover .tool-chevron {
+  color: var(--fg);
+}
+.tool-chevron.open {
+  transform: rotate(90deg);
+}
 .tool-card.ok .tool-status .icon {
   color: var(--ok);
 }

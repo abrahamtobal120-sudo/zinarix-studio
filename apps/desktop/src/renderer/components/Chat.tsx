@@ -545,6 +545,9 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
             className={step.status === 'running' ? 'spin-slow' : undefined}
           />
         </span>
+        <span className={`tool-chevron ${open ? 'open' : ''}`}>
+          <Icon name="chevron" size={12} />
+        </span>
       </div>
       {open && (
         <div className="tool-body">

@@ -6,6 +6,7 @@ import type {
   OmniApi,
   PhoneStatus,
   WhatsAppStatus,
+  WatchStatus,
   Prefs,
   Settings,
   ThemeId,
@@ -66,7 +67,7 @@ export interface State {
   workspace: WorkspaceInfo | null;
   tabs: Tab[];
   active: string | null;
-  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | 'mail' | null;
+  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | 'mail' | 'watch' | null;
   panelOpen: boolean;
   /** One area takes the whole window: the side panel, the terminal or the editor/browser. */
   maximized: 'side' | 'panel' | 'editor' | null;
@@ -108,6 +109,8 @@ export interface State {
   phone: PhoneStatus;
   /** WhatsApp Web in its tab (unread count, control from a chat). */
   whatsapp: WhatsAppStatus | null;
+  /** The Watcher (always-on project reviewer). */
+  watch: WatchStatus | null;
 }
 
 /** One chat of the panel. Its turns live in its own component; this is what the tabs show. */
@@ -185,6 +188,7 @@ let state: State = {
   notice: null,
   phone: { running: false, phones: 0 },
   whatsapp: null,
+  watch: null,
 };
 
 const listeners = new Set<() => void>();
