@@ -680,7 +680,56 @@ export type AppEvent =
   /** A Telegram or Discord bot connected, failed or got a new linked chat. */
   | { type: 'bots:status'; status: BotsStatus }
   /** WhatsApp Web changed (unread count, chat open, control, answers waiting). */
-  | { type: 'whatsapp:status'; status: WhatsAppStatus };
+  | { type: 'whatsapp:status'; status: WhatsAppStatus }
+  /** The Watcher (Vigía) reviewed a project, started or stopped, or its settings changed. */
+  | { type: 'watch:status'; status: WatchStatus };
+
+/** Something the Watcher thinks should be fixed (a bug, a risk) or improved. */
+export interface WatchItem {
+  kind: 'fix' | 'improve';
+  title: string;
+  detail: string;
+  /** Workspace-relative file (maybe with ":line"), when the advice is about one place. */
+  file?: string;
+}
+
+/** One review of a project by the Watcher. */
+export interface WatchReport {
+  id: string;
+  ts: number;
+  /** Absolute folder of the project, and its name. */
+  project: string;
+  name: string;
+  summary: string;
+  items: WatchItem[];
+  model: string;
+  usd: number | null;
+  seen: boolean;
+}
+
+export interface WatchSettings {
+  /** Keeps watching the open projects (checks are free; only reviews use tokens). */
+  enabled: boolean;
+  /** Least minutes between two AI reviews. */
+  everyMin: number;
+  /** Most AI reviews in a day. */
+  maxPerDay: number;
+  /** "provider/model" for the reviews; null = the chat model. */
+  model: string | null;
+}
+
+export interface WatchStatus {
+  settings: WatchSettings;
+  /** Project being reviewed right now. */
+  busy: string | null;
+  lastReview: number | null;
+  /** When the next review may happen (if something changes by then). */
+  nextAt: number | null;
+  reviewsToday: number;
+  lastError: string | null;
+  /** Newest first. */
+  reports: WatchReport[];
+}
 
 /** Whose messages of an allowed WhatsApp chat are orders: yours, the other person's, or both. */
 export type WhatsAppWho = 'me' | 'them' | 'all';
@@ -1094,6 +1143,16 @@ export interface OmniApi {
     resize(id: number, cols: number, rows: number): Promise<void>;
     kill(id: number): Promise<void>;
   };
+  /** The Watcher: an always-on reviewer that spends tokens only now and then. */
+  watch: {
+    status(): Promise<WatchStatus>;
+    configure(patch: Partial<WatchSettings>): Promise<WatchStatus>;
+    /** Reviews this window's project now (even when nothing changed). */
+    runNow(): Promise<WatchStatus>;
+    /** Marks every report as seen (the badge goes away). */
+    seen(): Promise<WatchStatus>;
+    dismiss(id: string): Promise<WatchStatus>;
+  };
   app: {
     prefs(): Promise<Prefs>;
     setPrefs(patch: Partial<Prefs>): Promise<Prefs>;
@@ -1345,6 +1404,11 @@ export const CHANNELS = [
   'whatsapp:who',
   'whatsapp:remove',
   'whatsapp:test',
+  'watch:status',
+  'watch:configure',
+  'watch:runNow',
+  'watch:seen',
+  'watch:dismiss',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

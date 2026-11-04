@@ -1,5 +1,5 @@
-// Zinarix Studio landing page: latest-release download links, OS detection, provider
-// marquee, scroll reveal, gallery/install tabs, hero tilt and card glow. No dependencies.
+// Zinarix Studio landing page: latest-release download links, OS detection, provider grid,
+// scroll reveal, install tabs and copy buttons. No dependencies.
 const REPO = 'abrahamtobal120-sudo/zinarix-studio';
 const RELEASES = `https://github.com/${REPO}/releases`;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -71,134 +71,67 @@ async function setupDownloads() {
   }
 }
 
-// ---------- provider marquee ----------
+// ---------- providers ----------
 // [catalog id, display name]; logos live in assets/providers/<id>.svg (Lobe Icons, MIT).
 const PROVIDERS = [
-  ['openai', 'OpenAI'],
   ['anthropic', 'Anthropic'],
-  ['google-gemini', 'Google Gemini'],
+  ['openai', 'OpenAI'],
+  ['google-gemini', 'Gemini'],
   ['deepseek', 'DeepSeek'],
   ['xai', 'xAI Grok'],
   ['mistral', 'Mistral'],
-  ['meta-llama', 'Meta'],
-  ['cohere', 'Cohere'],
   ['openrouter', 'OpenRouter'],
   ['groq', 'Groq'],
-  ['cerebras', 'Cerebras'],
-  ['together', 'Together AI'],
-  ['fireworks', 'Fireworks'],
-  ['deepinfra', 'DeepInfra'],
-  ['huggingface-inference-providers', 'Hugging Face'],
-  ['nvidia-nim', 'NVIDIA NIM'],
+  ['meta-llama', 'Meta Llama'],
   ['alibaba-qwen', 'Qwen'],
   ['moonshot', 'Kimi'],
   ['zhipu-zai', 'GLM'],
-  ['minimax', 'MiniMax'],
-  ['siliconflow', 'SiliconFlow'],
-  ['chutes', 'Chutes'],
-  ['featherless', 'Featherless'],
-  ['stepfun', 'StepFun'],
-  ['venice', 'Venice'],
-  ['byteplus-modelark', 'Doubao'],
-  ['azure-openai', 'Azure OpenAI'],
-  ['amazon-bedrock', 'Bedrock'],
-  ['google-vertex', 'Vertex AI'],
   ['ollama', 'Ollama'],
   ['lm-studio', 'LM Studio'],
   ['vllm', 'vLLM'],
-  ['nebius-token-factory', 'Nebius'],
-  ['sambanova', 'SambaNova'],
-  ['cloudflare-workers-ai', 'Cloudflare'],
-  ['upstage', 'Upstage'],
+  ['cerebras', 'Cerebras'],
+  ['together', 'Together AI'],
+  ['fireworks', 'Fireworks'],
+  ['amazon-bedrock', 'Bedrock'],
+  ['google-vertex', 'Vertex AI'],
+  ['azure-openai', 'Azure OpenAI'],
   ['claude-code', 'Claude Code'],
-  ['codex-cli', 'Codex'],
+  ['codex-cli', 'Codex CLI'],
   ['gemini-cli', 'Gemini CLI'],
-  ['hyperbolic', 'Hyperbolic'],
-  ['novita', 'Novita'],
 ];
-const COLORS = [
-  '#2563eb',
-  '#7c3aed',
-  '#db2777',
-  '#ea580c',
-  '#059669',
-  '#0891b2',
-  '#4f46e5',
-  '#b45309',
-  '#be123c',
-  '#0d9488',
-];
-function color(name) {
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return COLORS[h % COLORS.length];
-}
-async function setupMarquee() {
-  const track = document.getElementById('marquee');
-  let withLogo = new Set();
-  try {
-    withLogo = new Set(await (await fetch('assets/providers/index.json')).json());
-  } catch {
-    // no index: initials only
-  }
-  const chip = ([id, name]) =>
-    withLogo.has(id)
-      ? `<span class="chip"><i class="logo"><img src="assets/providers/${id}.svg" alt="" /></i>${name}</span>`
-      : `<span class="chip"><i style="background:${color(id)}">${name
-          .replace(/[^A-Za-z0-9]/g, '')
-          .slice(0, 2)
-          .toUpperCase()}</i>${name}</span>`;
-  const html = PROVIDERS.map(chip).join('');
-  track.innerHTML = html + html; // doubled for a seamless loop
+const PROVIDER_TOTAL = 62;
+function setupProviders() {
+  const list = document.getElementById('providers');
+  list.innerHTML = PROVIDERS.map(
+    ([id, name]) =>
+      `<li><img src="assets/providers/${id}.svg" alt="" loading="lazy" /><span>${name}</span></li>`,
+  ).join('');
+  document.getElementById('providers-more').textContent =
+    `+ ${PROVIDER_TOTAL - PROVIDERS.length} más: Cohere, Hugging Face, NVIDIA NIM, SambaNova, Cloudflare, MiniMax…`;
 }
 
-// ---------- reveal on scroll + counters ----------
+// ---------- reveal on scroll (added from JS so the page never hides content without it) ----------
 function setupReveal() {
-  const els = document.querySelectorAll('.reveal');
-  if (reduceMotion || !('IntersectionObserver' in window)) {
-    els.forEach((e) => e.classList.add('in'));
-    return;
-  }
+  if (reduceMotion || !('IntersectionObserver' in window)) return;
+  const els = document.querySelectorAll('.sec-head, .feature, .more, .plans, .os-grid, .term, .qa');
   const io = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue;
         e.target.classList.add('in');
-        e.target.querySelectorAll('[data-count]').forEach(countUp);
         io.unobserve(e.target);
       }
     },
-    { threshold: 0.12 },
+    { threshold: 0.08, rootMargin: '0px 0px -40px 0px' },
   );
-  els.forEach((e) => io.observe(e));
-}
-function countUp(el) {
-  const end = Number(el.dataset.count);
-  const suffix = el.dataset.suffix ?? '';
-  const start = performance.now();
-  const tick = (now) => {
-    const t = Math.min(1, (now - start) / 1200);
-    el.textContent = Math.round(end * (1 - Math.pow(1 - t, 3))) + suffix;
-    if (t < 1) requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+  els.forEach((e) => {
+    e.classList.add('reveal');
+    io.observe(e);
+  });
 }
 
 // ---------- tabs ----------
 function setupTabs() {
-  const img = document.getElementById('gallery-img');
-  const caption = document.getElementById('gallery-caption');
-  document.querySelectorAll('.gallery .tabs button').forEach((b, _i, all) => {
-    b.addEventListener('click', () => {
-      all.forEach((x) => x.setAttribute('aria-selected', String(x === b)));
-      img.style.opacity = '0';
-      setTimeout(() => {
-        img.src = b.dataset.shot;
-        caption.textContent = b.dataset.caption;
-        img.onload = () => (img.style.opacity = '1');
-      }, 180);
-    });
-  });
   document.querySelectorAll('#install-tabs button').forEach((b, _i, all) => {
     b.addEventListener('click', () => {
       all.forEach((x) => {
@@ -225,18 +158,21 @@ function setupTerminalInstall() {
   const preferred = { windows: 'c-win', mac: 'c-mac', linux: 'c-linux' }[os];
   const tab = preferred && tabs.find((b) => b.dataset.panel === preferred);
   if (tab) show(tab);
+  if (os === 'windows')
+    document.getElementById('hero-cmd').textContent =
+      'irm https://zinarix-studio.vercel.app/install.ps1 | iex';
   document.querySelectorAll('.cmd .copy').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const text = btn.parentElement.querySelector('code').textContent;
+      const code = btn.parentElement.querySelector('code');
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(code.textContent.replace(/\s+/g, ' ').trim());
       } catch {
         const r = document.createRange();
-        r.selectNodeContents(btn.parentElement.querySelector('code'));
+        r.selectNodeContents(code);
         getSelection().removeAllRanges();
         getSelection().addRange(r);
       }
-      btn.textContent = '¡Copiado!';
+      btn.textContent = 'Copiado';
       btn.classList.add('done');
       setTimeout(() => {
         btn.textContent = 'Copiar';
@@ -246,33 +182,19 @@ function setupTerminalInstall() {
   });
 }
 
-// ---------- hero tilt, sticky nav, card glow ----------
-function setupMotion() {
+// ---------- sticky nav border ----------
+function setupNav() {
   const nav = document.getElementById('nav');
-  const win = document.getElementById('hero-window');
-  const onScroll = () => {
-    nav.classList.toggle('scrolled', window.scrollY > 10);
-    if (!reduceMotion && win) {
-      const p = Math.min(1, window.scrollY / 500);
-      win.style.transform = `rotateX(${10 * (1 - p)}deg) scale(${0.97 + 0.03 * p})`;
-    }
-  };
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
-  document.querySelectorAll('.glow-card').forEach((card) => {
-    card.addEventListener('pointermove', (e) => {
-      const r = card.getBoundingClientRect();
-      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
-      card.style.setProperty('--my', `${e.clientY - r.top}px`);
-    });
-  });
 }
 
-setupMarquee();
+setupProviders();
 setupReveal();
 setupTabs();
 setupTerminalInstall();
-setupMotion();
+setupNav();
 setupDownloads();
 
 // ---------- pricing (app-config.json: the same switch the installed apps read) ----------

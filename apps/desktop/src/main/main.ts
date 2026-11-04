@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BrowserWindow, Menu, app, dialog, ipcMain, protocol, shell } from 'electron';
+import { BrowserWindow, Menu, Notification, app, dialog, ipcMain, protocol, shell } from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
 import { z } from 'zod';
 import type { AppEvent, BotKind, Channel, PhoneAction, PhoneRepo, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
@@ -25,6 +25,7 @@ import { PhoneRemote } from './phone.js';
 import type { PhoneRepos } from './phone.js';
 import { ChatBots } from './bots.js';
 import { WhatsApp } from './whatsapp.js';
+import { Watcher } from './watch.js';
 import type { RemoteNotice } from '../shared/plans.js';
 import { DOWNLOAD_URL } from '../shared/plans.js';
 import {
@@ -84,6 +85,8 @@ interface Win {
 
 const wins = new Map<number, Win>();
 let ai: AiService;
+/** The always-on project reviewer (created with the AI service). */
+let watcher: Watcher;
 /** Which window each terminal belongs to. */
 const termOwner = new Map<number, Win>();
 const terminals = new Terminals(
@@ -1370,6 +1373,20 @@ function registerIpc(): void {
   handle('whatsapp:remove', z.tuple([z.string().max(200)]), (_w, id) => whatsapp.remove(id));
   handle('whatsapp:test', z.tuple([z.string().max(200).optional()]), (_w, id) => whatsapp.test(id));
 
+  const watchPatch = z
+    .object({
+      enabled: z.boolean(),
+      everyMin: z.number().int().min(15).max(7 * 24 * 60),
+      maxPerDay: z.number().int().min(1).max(48),
+      model: z.string().min(3).max(200).nullable(),
+    })
+    .partial();
+  handle('watch:status', z.tuple([]), () => watcher.status());
+  handle('watch:configure', z.tuple([watchPatch]), (_w, patch) => watcher.configure(patch));
+  handle('watch:runNow', z.tuple([]), (w) => watcher.runNow(w.workspace));
+  handle('watch:seen', z.tuple([]), () => watcher.seen());
+  handle('watch:dismiss', z.tuple([z.string().uuid()]), (_w, id) => watcher.dismiss(id));
+
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {
     const code = planCode(input);
@@ -1773,6 +1790,31 @@ app.whenReady().then(async () => {
   // The trial counts from the first launch.
   if (!loadState().firstRun) saveState({ firstRun: Date.now() });
   ai.features = () => license().features;
+  watcher = new Watcher({
+    home: ai.core.paths.home,
+    core: ai.core,
+    projects: () => [...wins.values()].flatMap((w) => (w.workspace ? [w.workspace] : [])),
+    changed: (status) => {
+      for (const w of wins.values()) send(w, { type: 'watch:status', status });
+    },
+    found: (report) => {
+      if (BrowserWindow.getFocusedWindow() || !Notification.isSupported()) return;
+      const n = new Notification({
+        title: `Vigía · ${report.name}`,
+        body: `${report.items.length} sugerencia(s): ${report.items[0]!.title}`,
+      });
+      n.on('click', () => {
+        const w =
+          [...wins.values()].find((x) => x.workspace?.root === report.project) ?? focused();
+        if (!w) return;
+        if (w.win.isMinimized()) w.win.restore();
+        w.win.focus();
+        send(w, { type: 'command', command: 'view.watch' });
+      });
+      n.show();
+    },
+  });
+  watcher.start();
   registerProtocol();
   registerIpc();
   buildMenu();
@@ -1791,6 +1833,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  watcher?.stop();
   stopPhone();
   whatsapp.destroy();
   terminals.killAll();

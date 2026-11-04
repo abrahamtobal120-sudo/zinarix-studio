@@ -188,6 +188,13 @@ const api: OmniApi = {
     resize: call('terminal:resize') as OmniApi['terminal']['resize'],
     kill: call('terminal:kill') as OmniApi['terminal']['kill'],
   },
+  watch: {
+    status: call('watch:status') as OmniApi['watch']['status'],
+    configure: call('watch:configure') as OmniApi['watch']['configure'],
+    runNow: call('watch:runNow') as OmniApi['watch']['runNow'],
+    seen: call('watch:seen') as OmniApi['watch']['seen'],
+    dismiss: call('watch:dismiss') as OmniApi['watch']['dismiss'],
+  },
   app: {
     prefs: call('app:prefs') as OmniApi['app']['prefs'],
     setPrefs: call('app:setPrefs') as OmniApi['app']['setPrefs'],
