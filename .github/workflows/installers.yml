@@ -22,7 +22,7 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install (PowerShell)
         shell: pwsh
         run: Get-Content website/install.ps1 -Raw | Invoke-Expression
@@ -44,7 +44,7 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash website/install.sh
       - run: test -d "/Applications/Zinarix Studio.app" && test -x "$HOME/.local/bin/zinarix-studio"
       - run: bash website/install.sh --uninstall && test ! -d "/Applications/Zinarix Studio.app"
@@ -52,7 +52,7 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash website/install.sh
       - run: dpkg -s zinarix-studio && test -e "/opt/Zinarix Studio/zinarix-studio"
       - name: Fallback without the GitHub API
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: pacman -Sy --noconfirm curl
       - run: bash website/install.sh
       - run: pacman -Qo '/opt/Zinarix Studio/zinarix-studio'
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash website/install.sh
       - run: test -x "$HOME/.local/share/zinarix-studio/Zinarix-Studio.AppImage" && test -x "$HOME/.local/bin/zinarix-studio"
       - run: bash website/install.sh --uninstall && test ! -e "$HOME/.local/share/zinarix-studio"
