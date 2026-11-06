@@ -127,7 +127,7 @@ OMNI_LIVE_TESTS=1 ANTHROPIC_API_KEY=… OPENAI_API_KEY=… GROQ_API_KEY=… pnpm
 
 ```
 apps/cli            CLI `omni` (commander + Ink)
-apps/desktop        App de escritorio Electron (v0.4.0): editor, agente, navegador IA, Git y GitHub, centro de seguridad
+apps/desktop        App de escritorio Electron (v0.6.1): editor, agente, navegador IA, Git y GitHub, centro de seguridad
 apps/web            Fase 6 — PWA (pendiente)
 packages/shared     Esquemas Zod, tipos, errores, i18n es/en
 packages/security   Secret opaco, redactor de secretos, logger que redacta
