@@ -1,0 +1,29 @@
+name: Especial
+
+# Builds the portable, no-UAC Windows .exe "Zinarix Studio Especial" and uploads it as an artifact.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/desktop/scripts/build-especial.mjs', '.github/workflows/especial.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @omni/desktop exec node scripts/build-especial.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zinarix-Studio-Especial
+          path: apps/desktop/release/Zinarix-Studio-Especial-*.exe

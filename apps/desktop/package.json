@@ -20,7 +20,8 @@
     "install:linux": "bash scripts/install-linux.sh",
     "install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows.ps1",
     "install:local": "node scripts/install-local.mjs",
-    "smoke": "node scripts/smoke.mjs /tmp"
+    "smoke": "node scripts/smoke.mjs /tmp",
+    "dist:especial": "pnpm build && node scripts/build-especial.mjs"
   },
   "dependencies": {
     "@lydell/node-pty": "1.2.0-beta.15",
