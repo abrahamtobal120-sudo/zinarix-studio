@@ -6,7 +6,11 @@ import { fileURLToPath } from 'node:url';
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const require = createRequire(import.meta.url);
+const repoRoot = dirname(dirname(appDir));
 const buildSteps = [
+  // The shared packages (@omni/core, providers…) first: the app bundles their dist/.
+  // Incremental, so it only recompiles what changed.
+  [join(dirname(require.resolve('typescript/package.json')), 'bin/tsc'), '-b', repoRoot],
   [join(appDir, 'build.mjs')],
   [join(dirname(require.resolve('vite/package.json')), 'bin/vite.js'), 'build'],
 ];

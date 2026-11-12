@@ -177,6 +177,26 @@ describe('vault', () => {
     await c.wipe();
     expect(existsSync(join(home, 'vault.enc'))).toBe(false);
   });
+
+  it('falls back to the file vault when the keychain refuses a key (Windows 1280-char limit)', async () => {
+    const c = open();
+    const kept = new Map<string, string>();
+    Object.assign(c.vault.keychain, {
+      available: () => true,
+      get: async (id: string) => (kept.has(id) ? { reveal: () => kept.get(id) } : undefined),
+      set: async (id: string, v: string) => {
+        if (v.length > 1280) throw new Error('longer than the platform limit');
+        kept.set(id, v);
+      },
+      delete: async (id: string) => kept.delete(id),
+    });
+    expect(await c.vault.set('groq', 'gsk_short1234567890')).toBe('keychain');
+    const long = `gsk_${'x'.repeat(2000)}`;
+    expect(await c.vault.set('groq', long)).toBe('file');
+    expect(kept.has('groq')).toBe(false);
+    const got = await c.vault.get('groq');
+    expect(got?.store).toBe('file');
+  });
 });
 
 describe('stream', () => {

@@ -112,8 +112,15 @@ export class KeychainStore implements KeyStore {
     }
   }
 
+  /**
+   * Writes and reads back: Windows Credential Manager rejects values over 1280 UTF-16 chars
+   * (long OAuth/JWT tokens) and a locked keychain may accept a value and drop it.
+   */
   async set(id: string, value: string) {
-    new Entry(this.service, id).setPassword(value);
+    const entry = new Entry(this.service, id);
+    entry.setPassword(value);
+    if (entry.getPassword() !== value)
+      throw new OmniError('config', 'the OS keychain did not keep the key');
   }
 
   async delete(id: string) {
@@ -323,15 +330,25 @@ export class Vault {
     return undefined;
   }
 
-  /** Stores in the keychain when available, otherwise in the encrypted file. */
+  /**
+   * Stores in the keychain when available, otherwise in the encrypted file. A value the
+   * keychain refuses (e.g. longer than Windows Credential Manager's limit) goes to the file;
+   * any old keychain copy is removed first, since reads prefer the keychain.
+   */
   async set(id: string, value: string, prefer?: 'keychain' | 'file'): Promise<StoreName> {
     const trimmed = value.trim();
     if (!trimmed) throw new OmniError('config', 'empty key');
     new Secret(trimmed); // register for redaction before anything else can echo it
     if (prefer !== 'file' && this.keychain.available()) {
-      await this.keychain.set(id, trimmed);
-      return 'keychain';
+      try {
+        await this.keychain.set(id, trimmed);
+        if (this.file.exists() && this.file.unlocked()) await this.file.delete(id);
+        return 'keychain';
+      } catch {
+        /* refused by the keychain: fall back to the encrypted file */
+      }
     }
+    await this.keychain.delete(id);
     await this.file.set(id, trimmed);
     return 'file';
   }
