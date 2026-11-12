@@ -487,6 +487,8 @@ const es = {
   maximizeSide: 'Maximizar panel lateral',
   restoreSize: 'Restaurar tamaño',
   termPickShell: 'Elegir terminal (PowerShell, cmd, Git Bash, WSL…)',
+  termProfiles: 'Terminales',
+  termProfilesError: 'No se pudieron detectar las terminales instaladas.',
   termAsAdmin: '{name} (administrador)',
   termAdmin: 'Terminal de administrador (sudo)',
   termAdminWin:
@@ -1755,6 +1757,8 @@ const en: Record<Key, string> = {
   maximizeSide: 'Maximize side panel',
   restoreSize: 'Restore size',
   termPickShell: 'Pick a terminal (PowerShell, cmd, Git Bash, WSL…)',
+  termProfiles: 'Shells',
+  termProfilesError: 'Could not detect installed shells.',
   termAsAdmin: '{name} (administrator)',
   termAdmin: 'Administrator terminal (sudo)',
   termAdminWin:

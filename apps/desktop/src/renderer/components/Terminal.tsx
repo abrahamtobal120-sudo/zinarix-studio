@@ -284,6 +284,7 @@ export function TerminalPanel() {
 
   const openMenu = (e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
+    void api().terminal.profiles().then(setProfiles, () => toast(t('termProfilesError')));
     const r = e.currentTarget.getBoundingClientRect();
     setMenu((m) => (m ? null : { x: r.right, y: r.top }));
   };
@@ -348,17 +349,16 @@ export function TerminalPanel() {
             >
               <Icon name={maximized ? 'minimize' : 'maximize'} size={14} />
             </button>
-            {profiles.length > 1 && (
               <button
-                className={menu ? 'on' : ''}
+                className={`term-profile-picker ${menu ? 'on' : ''}`}
                 title={t('termPickShell')}
                 aria-label={t('termPickShell')}
                 aria-expanded={Boolean(menu)}
                 onClick={openMenu}
               >
+                {t('termProfiles')}
                 <Icon name="chevronDown" size={11} />
               </button>
-            )}
           </span>
           <button
             className="term-admin"

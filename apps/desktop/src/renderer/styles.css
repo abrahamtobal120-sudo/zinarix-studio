@@ -1162,6 +1162,14 @@ button.big {
   color: var(--fg);
   background: var(--bg-4);
 }
+.sidebar-actions .term-split button.term-profile-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-left-color: var(--border);
+  font-size: 11px;
+}
 .sidebar-actions button.term-admin:hover {
   color: var(--warn);
 }
