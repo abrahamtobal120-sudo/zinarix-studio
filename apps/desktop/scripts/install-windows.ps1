@@ -11,6 +11,7 @@ $Electron = Join-Path $AppDir 'node_modules\electron\dist\electron.exe'
 $DataDir = Join-Path $env:LOCALAPPDATA 'zinarix-studio-dev'
 $Bin = Join-Path $DataDir 'bin'
 $Icon = Join-Path $DataDir 'zinarix-studio.ico'
+$Launcher = Join-Path $Bin 'start-local.ps1'
 $Shortcuts = @(
   (Join-Path ([Environment]::GetFolderPath('Programs')) 'Zinarix Studio (dev).lnk'),
   (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Zinarix Studio (dev).lnk')
@@ -31,6 +32,7 @@ if ($Uninstall) {
 }
 
 if (-not (Test-Path $Electron)) { throw "Falta Electron: ejecuta 'pnpm install' en la raiz del repo." }
+$NodeExe = (Get-Command node -ErrorAction Stop).Source
 if (-not (Test-Path (Join-Path $AppDir 'dist\main\main.js'))) {
   throw "Falta compilar: ejecuta 'pnpm --filter @omni/desktop build'."
 }
@@ -38,10 +40,26 @@ if (-not (Test-Path (Join-Path $AppDir 'dist\main\main.js'))) {
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 Copy-Item (Join-Path $AppDir 'build\icon.ico') $Icon -Force
 
-# Terminal launcher: opens the app detached, like the Linux one.
+# Hidden launcher: rebuild before opening, preserving diagnostics if compilation fails.
+$NodeLiteral = $NodeExe.Replace("'", "''")
+$ScriptLiteral = (Join-Path $AppDir 'scripts\start-local.mjs').Replace("'", "''")
+@"
+`$ErrorActionPreference = 'Stop'
+`$log = Join-Path `$env:LOCALAPPDATA 'zinarix-studio-dev\build.log'
+try {
+  & '$NodeLiteral' '$ScriptLiteral' @args *> `$log
+  if (`$LASTEXITCODE -ne 0) { throw "Error al compilar (codigo `$LASTEXITCODE)." }
+} catch {
+  Add-Type -AssemblyName System.Windows.Forms
+  [System.Windows.Forms.MessageBox]::Show("No se pudieron aplicar los cambios. Revisa: `$log`n`$(`$_.Exception.Message)", 'Zinarix Studio') | Out-Null
+  exit 1
+}
+"@ | Set-Content -Encoding UTF8 $Launcher
+
+# Terminal launcher uses the same automatic build as the shortcuts.
 @"
 @echo off
-start "" "$Electron" "$AppDir" %*
+start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$Launcher" %*
 "@ | Set-Content -Encoding ASCII (Join-Path $Bin 'zinarix-studio.cmd')
 
 # Put the launcher on the user's PATH (new terminals pick it up).
@@ -54,11 +72,11 @@ $shell = New-Object -ComObject WScript.Shell
 foreach ($lnk in $Shortcuts) {
   New-Item -ItemType Directory -Force -Path (Split-Path $lnk) | Out-Null
   $s = $shell.CreateShortcut($lnk)
-  $s.TargetPath = $Electron
-  $s.Arguments = "`"$AppDir`""
+  $s.TargetPath = Join-Path $PSHOME 'powershell.exe'
+  $s.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Launcher`""
   $s.WorkingDirectory = $AppDir
   $s.IconLocation = "$Icon,0"
-  $s.Description = 'Editor de codigo con cualquier modelo de IA'
+  $s.Description = 'Compila los cambios locales y abre Zinarix Studio'
   $s.Save()
 }
 

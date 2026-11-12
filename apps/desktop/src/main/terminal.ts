@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, delimiter, dirname, join } from 'node:path';
 import type { IPty } from '@lydell/node-pty';
-import { childEnv } from './env.js';
+import { terminalEnv } from './terminal-env.js';
 
 const require = createRequire(import.meta.url);
 
@@ -21,12 +21,12 @@ export interface ShellProfile {
 interface Profile extends ShellProfile, Shell {}
 
 /** Full path of a program on PATH (with PATHEXT on Windows), or undefined. */
-function which(name: string): string | undefined {
+function which(name: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
   const exts =
     process.platform === 'win32'
       ? ['', ...(process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';').map((e) => e.toLowerCase())]
       : [''];
-  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+  for (const dir of (env.Path ?? env.PATH ?? '').split(delimiter)) {
     if (!dir) continue;
     for (const ext of exts) {
       const p = join(dir, name + ext);
@@ -45,13 +45,13 @@ function firstExisting(paths: (string | undefined)[]): string | undefined {
  * PowerShell, cmd, Git Bash and WSL, by full path (a packaged app may start with a short
  * PATH, and COMSPEC can be missing). Linux/macOS: the login shell plus the other common ones.
  */
-function profiles(): Profile[] {
+function profiles(env: NodeJS.ProcessEnv = process.env): Profile[] {
   if (process.platform === 'win32') {
     const root = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows';
     const sys32 = join(root, 'System32');
     const pf = process.env.ProgramFiles ?? 'C:\\Program Files';
     const list: Profile[] = [];
-    const pwsh = which('pwsh') ?? firstExisting([join(pf, 'PowerShell', '7', 'pwsh.exe')]);
+    const pwsh = which('pwsh', env) ?? firstExisting([join(pf, 'PowerShell', '7', 'pwsh.exe')]);
     if (pwsh) list.push({ id: 'pwsh', name: 'PowerShell 7', file: pwsh, args: ['-NoLogo'] });
     const ps = join(sys32, 'WindowsPowerShell', 'v1.0', 'powershell.exe');
     list.push({
@@ -66,7 +66,7 @@ function profiles(): Profile[] {
       file: process.env.COMSPEC ?? join(sys32, 'cmd.exe'),
       args: [],
     });
-    const git = which('git');
+    const git = which('git', env);
     const bash = firstExisting([
       join(pf, 'Git', 'bin', 'bash.exe'),
       process.env['ProgramFiles(x86)'] &&
@@ -94,7 +94,7 @@ function profiles(): Profile[] {
 
 /** Shells the user can pick in the panel (see profiles). */
 export function shellProfiles(): ShellProfile[] {
-  return profiles().map(({ id, name }) => ({ id, name }));
+  return profiles(terminalEnv()).map(({ id, name }) => ({ id, name }));
 }
 
 /**
@@ -156,12 +156,12 @@ export class Terminals {
     const pty = require('@lydell/node-pty') as typeof import('@lydell/node-pty');
     // Never hand provider keys the app can read (catalog envVars, OMNI_KEY_*) to child shells.
     const env = {
-      ...childEnv(process.env),
+      ...terminalEnv(),
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
       TERM_PROGRAM: 'ZinarixStudio',
     };
-    const all = profiles();
+    const all = profiles(env);
     const picked = profile ? all.find((p) => p.id === profile) : undefined;
     if (profile && !picked) throw new Error(`Esa terminal ya no está disponible: ${profile}`);
     // A picked shell is tried alone; the default falls back through the others.

@@ -57,6 +57,8 @@ pnpm test           # pruebas
 
 Instaladores: `pnpm --filter @omni/desktop dist` (local) o empuja un tag `vX.Y.Z`: GitHub Actions crea un release en borrador, sube los de Windows, macOS y Linux, genera `SHA256SUMS` y solo entonces lo publica. Sitio web: carpeta `website/` (Vercel).
 
+En Windows, el acceso directo **Zinarix Studio (dev)** recompila el código local antes de abrir la app. Después de modificar el proyecto, cierra la app y ábrela desde ese acceso directo para aplicar los cambios automáticamente. El arranque tarda lo que dure la compilación; si falla, muestra un aviso y guarda el diagnóstico en `%LOCALAPPDATA%\zinarix-studio-dev\build.log`.
+
 ---
 
 ## Núcleo de IA y CLI (Fase 1)
