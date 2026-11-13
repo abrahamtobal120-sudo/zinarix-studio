@@ -41,7 +41,8 @@ const run = (cmd, args, env = {}) => {
   const r = spawnSync(cmd, args, {
     cwd: root,
     stdio: 'inherit',
-    env: { ...process.env, ...env },
+    // NODE_USE_SYSTEM_CA: trust the OS certificate store for downloads (see dist.mjs).
+    env: { NODE_USE_SYSTEM_CA: '1', ...process.env, ...env },
     shell: process.platform === 'win32',
   });
   if (r.status !== 0) process.exit(r.status ?? 1);

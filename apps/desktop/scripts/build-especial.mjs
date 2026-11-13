@@ -30,6 +30,12 @@ const extra = process.argv.slice(2);
 const r = spawnSync(
   join(root, 'node_modules', '.bin', 'electron-builder'),
   ['--config', cfg, '--win', 'portable', '--x64', '--publish', 'never', ...extra],
-  { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' },
+  {
+    cwd: root,
+    stdio: 'inherit',
+    // Trust the OS certificate store for electron-builder downloads (see dist.mjs).
+    env: { NODE_USE_SYSTEM_CA: '1', ...process.env },
+    shell: process.platform === 'win32',
+  },
 );
 process.exit(r.status ?? 1);

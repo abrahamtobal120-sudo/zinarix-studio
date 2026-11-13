@@ -15,7 +15,7 @@
     "build": "node build.mjs && vite build",
     "start": "electron .",
     "dev": "node build.mjs && vite build && electron .",
-    "dist": "pnpm build && electron-builder --publish never",
+    "dist": "pnpm build && node scripts/dist.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "install:linux": "bash scripts/install-linux.sh",
     "install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows.ps1",
