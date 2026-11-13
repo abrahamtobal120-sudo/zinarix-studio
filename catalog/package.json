@@ -1,6 +1,6 @@
 {
   "name": "@omni/catalog",
-  "version": "0.1.0",
+  "version": "0.6.1",
   "private": true,
   "license": "MIT",
   "description": "Catálogo de respaldo de proveedores de IA (actualizable en caliente con firma Ed25519)",

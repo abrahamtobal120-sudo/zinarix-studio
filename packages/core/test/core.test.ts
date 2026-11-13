@@ -452,6 +452,77 @@ describe('budgets with unpriced models', () => {
     expect(row.ok).toBe(0);
     expect(row.cost_usd).toBeCloseTo((1000 * 2 + 1000 * 10) / 1e6, 12);
   });
+
+  /** Streams one 400-character chunk and then keeps the connection open. */
+  const stalled = () =>
+    mockServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: 'a'.repeat(400) } }] })}\n\n`,
+      );
+    });
+
+  it('records estimated spend when the user cancels mid-stream', async () => {
+    const srv = await stalled();
+    close = srv.close;
+    const c = open(
+      { MOCK_KEY: 'mock-key-1234567890' },
+      { customProviders: [custom('mock', srv.url)], defaultModel: 'mock/m' },
+    );
+    const ctrl = new AbortController();
+    const events: OmniEvent[] = [];
+    await expect(
+      (async () => {
+        for await (const e of c.stream(
+          { messages: [{ role: 'user', content: 'b'.repeat(4000) }] },
+          ctrl.signal,
+        )) {
+          events.push(e);
+          if (e.type === 'text') ctrl.abort();
+        }
+      })(),
+    ).rejects.toMatchObject({ code: 'aborted' });
+    const row = c.db
+      .prepare('SELECT input_tokens, output_tokens, cost_usd, ok FROM usage')
+      .get() as { input_tokens: number; output_tokens: number; cost_usd: number; ok: number };
+    expect(row).toMatchObject({ input_tokens: 1000, output_tokens: 100, ok: 0 });
+    expect(row.cost_usd).toBeCloseTo((1000 * 2 + 100 * 10) / 1e6, 12);
+    const ev = c.db.prepare("SELECT event FROM audit WHERE event = 'chat_cancelled'").get();
+    expect(ev).toBeDefined();
+  });
+
+  it('records estimated spend when the consumer stops iterating mid-stream', async () => {
+    const srv = await stalled();
+    close = srv.close;
+    const c = open(
+      { MOCK_KEY: 'mock-key-1234567890' },
+      { customProviders: [custom('mock', srv.url)], defaultModel: 'mock/m' },
+    );
+    for await (const e of c.stream(
+      { messages: [{ role: 'user', content: 'b'.repeat(4000) }] },
+      new AbortController().signal,
+    ))
+      if (e.type === 'text') break;
+    const row = c.db.prepare('SELECT input_tokens, output_tokens, ok FROM usage').get();
+    expect(row).toEqual({ input_tokens: 1000, output_tokens: 100, ok: 0 });
+  });
+
+  it('records nothing when cancelled before the provider answered', async () => {
+    const srv = await mockServer(() => {
+      /* never answers */
+    });
+    close = srv.close;
+    const c = open(
+      { MOCK_KEY: 'mock-key-1234567890' },
+      { customProviders: [custom('mock', srv.url)], defaultModel: 'mock/m' },
+    );
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 100);
+    await expect(
+      drain(c.stream({ messages: [{ role: 'user', content: 'x' }] }, ctrl.signal)),
+    ).rejects.toMatchObject({ code: 'aborted' });
+    expect(c.db.prepare('SELECT COUNT(*) AS n FROM usage').get()).toEqual({ n: 0 });
+  });
 });
 
 describe('config.json cannot weaken the signed catalog', () => {
@@ -532,7 +603,9 @@ describe('vault hardening', () => {
     const file = join(home, 'vault.enc');
     await new FileVault(file, async () => 'pw').set('groq', 'gsk_x1234567890');
     const vf = JSON.parse(readFileSync(file, 'utf8'));
-    writeFileSync(file, JSON.stringify({ ...vf, kdf: { ...vf.kdf, memory: 2 ** 31 } }));
+    // New vaults are scrypt; an Argon2id one (older versions) is still parsed and bounded.
+    const kdf = { alg: 'argon2id', memory: 2 ** 31, passes: 3, parallelism: 1, salt: vf.kdf.salt };
+    writeFileSync(file, JSON.stringify({ ...vf, kdf }));
     await expect(new FileVault(file, async () => 'pw').get('groq')).rejects.toThrow(
       /kdf\.memory out of range/,
     );
@@ -572,8 +645,9 @@ describe('data directory', () => {
     expect(
       defaultDirs({ HOME: fakeHome, XDG_CONFIG_HOME: '/x/cfg', XDG_DATA_HOME: '/x/data' }, 'linux'),
     ).toEqual({
-      config: '/x/cfg/omni',
-      data: '/x/data/omni',
+      // Joined with the host's separator (\x\cfg\omni when the tests run on Windows).
+      config: join('/x/cfg', 'omni'),
+      data: join('/x/data', 'omni'),
     });
     expect(defaultDirs({ HOME: fakeHome }, 'linux')).toEqual({
       config: join(fakeHome, '.config', 'omni'),

@@ -1,6 +1,6 @@
 import { AccountSwitch } from './AccountSwitch';
 import { Icon, type IconName } from './Icon';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   MailAccount,
   MailDraft,
@@ -10,6 +10,8 @@ import type {
   MailSummaryView,
   MailTarget,
 } from '../../shared/api';
+import { confirmDialog } from '../confirm';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, toast } from '../store';
 
@@ -169,16 +171,21 @@ function MailBody({ reset }: { reset: () => void }) {
       .catch((e: unknown) => toast(errText(e)));
   }, []);
 
+  /** Latest list request: an older answer (another folder or search) arriving late is dropped. */
+  const listRequest = useRef(0);
   const loadList = useCallback(
     async (more = false) => {
       const next = more ? page + 1 : 0;
+      const req = ++listRequest.current;
       try {
         const r = await api().mail.list(folder, next, search);
+        if (req !== listRequest.current) return;
         setList((cur) =>
           more && cur ? { total: r.total, messages: [...cur.messages, ...r.messages] } : r,
         );
         setPage(next);
       } catch (e) {
+        if (req !== listRequest.current) return;
         toast(errText(e));
         if (!more) setList({ total: 0, messages: [] });
       }
@@ -344,8 +351,9 @@ function MailBody({ reset }: { reset: () => void }) {
     });
   };
 
-  const deleteDraft = () => {
-    if (!draft?.draftUid || !confirm(t('mlDraftDeleteConfirm'))) return;
+  const deleteDraft = async () => {
+    if (!draft?.draftUid || !(await confirmDialog(t('mlDraftDeleteConfirm'), { danger: true })))
+      return;
     const uid = draft.draftUid;
     void act('draft', async () => {
       await api().mail.deleteDraft(uid);
@@ -354,10 +362,11 @@ function MailBody({ reset }: { reset: () => void }) {
     });
   };
 
-  const closeDraft = () => {
+  const closeDraft = async () => {
     const edited = !!draft && !!(draft.text.trim() || draft.subject.trim() || draft.to.trim());
     // A draft opened from the Drafts folder is already saved: closing just leaves it there.
-    if (edited && !draft?.draftUid && !confirm(t('mlDiscard'))) return;
+    if (edited && !draft?.draftUid && !(await confirmDialog(t('mlDiscard'), { danger: true })))
+      return;
     setDraft(null);
   };
 
@@ -432,8 +441,12 @@ function MailBody({ reset }: { reset: () => void }) {
         setServers(false);
         setAdding(true);
       }}
-      onLogout={() => {
-        if (confirm(t('mlLogoutConfirm', { email: st.account?.email ?? '' })))
+      onLogout={async () => {
+        if (
+          await confirmDialog(t('mlLogoutConfirm', { email: st.account?.email ?? '' }), {
+            danger: true,
+          })
+        )
           void act('logout', async () => {
             await api().mail.logout();
             reset();
@@ -492,14 +505,14 @@ function MailBody({ reset }: { reset: () => void }) {
               </button>
               <input
                 value={gClient.id}
-                placeholder="Client ID (…apps.googleusercontent.com)"
+                placeholder={t('mlClientIdPh')}
                 spellCheck={false}
                 onChange={(e) => setGClient({ ...gClient, id: e.target.value })}
               />
               <input
                 type="password"
                 value={gClient.secret}
-                placeholder="Client secret"
+                placeholder={t('mlClientSecretPh')}
                 onChange={(e) => setGClient({ ...gClient, secret: e.target.value })}
               />
               <div className="git-connect-actions">
@@ -719,8 +732,13 @@ function MailBody({ reset }: { reset: () => void }) {
           )}
           <button
             title={role === '\\Trash' ? t('mlDeleteForever') : t('mlTrash')}
-            onClick={() => {
-              if (!confirm(role === '\\Trash' ? t('mlDeleteForeverConfirm') : t('mlTrashConfirm')))
+            onClick={async () => {
+              if (
+                !(await confirmDialog(
+                  role === '\\Trash' ? t('mlDeleteForeverConfirm') : t('mlTrashConfirm'),
+                  { danger: true },
+                ))
+              )
                 return;
               void act('trash', async () => {
                 await api().mail.trash(folder, msg.uid);
@@ -850,7 +868,7 @@ function MailBody({ reset }: { reset: () => void }) {
             key={m.uid}
             className={`ml-row${m.seen ? '' : ' unread'}${busy === `open:${m.uid}` ? ' busy' : ''}`}
             title={`${m.from}\n${m.subject}`}
-            onClick={() => openMsg(m)}
+            {...pressable(() => openMsg(m))}
           >
             <div className="ml-line">
               <span className="ml-from">

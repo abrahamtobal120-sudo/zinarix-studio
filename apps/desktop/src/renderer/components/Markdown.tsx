@@ -1,5 +1,6 @@
-import { Fragment, useState } from 'react';
+import { Fragment, memo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { confirmDialog } from '../confirm';
 import { t } from '../i18n';
 import { getEditor, setState, toast } from '../store';
 import { fileIcon } from './icons';
@@ -11,7 +12,13 @@ import { runInTerminal } from './Terminal';
  * can never execute script in the renderer. Supports fences, headings, lists, quotes, tables,
  * inline code, bold, italics and links (opened externally, https only).
  */
-export function Markdown({ text, streaming }: { text: string; streaming?: boolean }) {
+export const Markdown = memo(function Markdown({
+  text,
+  streaming,
+}: {
+  text: string;
+  streaming?: boolean;
+}) {
   const blocks: ReactNode[] = [];
   const lines = text.split('\n');
   let i = 0;
@@ -118,7 +125,7 @@ export function Markdown({ text, streaming }: { text: string; streaming?: boolea
     blocks.push(<p key={key++}>{inline(para.join('\n'))}</p>);
   }
   return <div className="md">{blocks}</div>;
-}
+});
 
 const FENCE = /^(\s*)```\s*([\w+#.-]*)\s*$/;
 const HR = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
@@ -351,8 +358,8 @@ function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boo
             </button>
             {SHELL.test(lang) && (
               <button
-                onClick={() => {
-                  if (!confirm(t('confirmRun', { cmd: code }))) return;
+                onClick={async () => {
+                  if (!(await confirmDialog(t('confirmRun', { cmd: code })))) return;
                   setState({ panelOpen: true });
                   setTimeout(() => void runInTerminal(code), 300);
                 }}

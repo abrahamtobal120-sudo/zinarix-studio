@@ -44,7 +44,7 @@ Copy-Item (Join-Path $AppDir 'build\icon.ico') $Icon -Force
 $NodeLiteral = $NodeExe.Replace("'", "''")
 $ScriptLiteral = (Join-Path $AppDir 'scripts\start-local.mjs').Replace("'", "''")
 @"
-`$ErrorActionPreference = 'Stop'
+`$ErrorActionPreference = 'Continue'
 `$log = Join-Path `$env:LOCALAPPDATA 'zinarix-studio-dev\build.log'
 try {
   & '$NodeLiteral' '$ScriptLiteral' @args *> `$log

@@ -52,11 +52,15 @@ const run = (cmd, args, env = {}) => {
 function configFor(id) {
   const e = EDITIONS[id];
   const c = structuredClone(pkg.build);
+  // ZINARIX_KEEP_ELECTRON_EXE=1: ship Electron's exe byte-for-byte (no icon/version edit).
+  // Windows Smart App Control blocks any new unsigned exe; the untouched Electron exe is
+  // already known to it, so the app keeps opening on PCs where that protection is on.
+  if (process.env.ZINARIX_KEEP_ELECTRON_EXE === '1')
+    c.win = { ...c.win, signAndEditExecutable: false };
   if (id === 'standard') return c;
   // "Zinarix Studio Pro + AI" -> "Zinarix-Studio-ProAI" in file names.
   const file = e.name.replace(' + ', '').replaceAll(' ', '-');
-  const swap = (s) =>
-    s.replaceAll('Zinarix-Studio', file).replaceAll('zinarix-studio', e.slug);
+  const swap = (s) => s.replaceAll('Zinarix-Studio', file).replaceAll('zinarix-studio', e.slug);
   c.appId = e.appId;
   c.productName = e.name;
   c.executableName = e.slug;
@@ -70,12 +74,56 @@ function configFor(id) {
   return c;
 }
 
+/**
+ * Code signing, only when the release workflow provides the secrets (docs/release-signing.md);
+ * without them the build stays unsigned, as before.
+ * - macOS: CSC_LINK (+ CSC_KEY_PASSWORD) = Developer ID Application certificate; with
+ *   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID the app is also notarized.
+ * - Windows: WIN_CSC_LINK (+ WIN_CSC_KEY_PASSWORD) is used by electron-builder on its own
+ *   (signtool); or Azure Trusted Signing with AZURE_TENANT_ID / AZURE_CLIENT_ID /
+ *   AZURE_CLIENT_SECRET and AZURE_SIGNING_ENDPOINT / _ACCOUNT / _PROFILE / _PUBLISHER (the
+ *   certificate's subject CN).
+ */
+function withSigning(c) {
+  const env = process.env;
+  if (process.platform === 'darwin' && env.CSC_LINK) {
+    // `identity: null` in package.json turns signing off for local and unsigned builds.
+    delete c.mac.identity;
+    // Notarization requires the hardened runtime; electron-builder's default entitlements
+    // keep Electron's JIT and native modules (node-pty, keyring) working under it.
+    c.mac.hardenedRuntime = true;
+    c.mac.notarize = Boolean(env.APPLE_ID && env.APPLE_APP_SPECIFIC_PASSWORD && env.APPLE_TEAM_ID);
+    if (!c.mac.notarize) console.warn('macOS: signed but NOT notarized (APPLE_* secrets missing)');
+  }
+  const azure = [
+    'AZURE_TENANT_ID',
+    'AZURE_CLIENT_ID',
+    'AZURE_CLIENT_SECRET',
+    'AZURE_SIGNING_ENDPOINT',
+    'AZURE_SIGNING_ACCOUNT',
+    'AZURE_SIGNING_PROFILE',
+    'AZURE_SIGNING_PUBLISHER',
+  ];
+  if (process.platform === 'win32' && azure.every((k) => env[k])) {
+    c.win = {
+      ...c.win,
+      azureSignOptions: {
+        endpoint: env.AZURE_SIGNING_ENDPOINT,
+        codeSigningAccountName: env.AZURE_SIGNING_ACCOUNT,
+        certificateProfileName: env.AZURE_SIGNING_PROFILE,
+        publisherName: env.AZURE_SIGNING_PUBLISHER,
+      },
+    };
+  }
+  return c;
+}
+
 try {
   for (const id of ids) {
     process.stdout.write(`\n== ${EDITIONS[id].name} ==\n`);
     run('node', ['build.mjs'], { ZINARIX_EDITION: id === 'standard' ? '' : id });
     const cfg = join(tmp, `${id}.json`);
-    writeFileSync(cfg, JSON.stringify(configFor(id), null, 2));
+    writeFileSync(cfg, JSON.stringify(withSigning(configFor(id)), null, 2));
     run(join(root, 'node_modules', '.bin', 'electron-builder'), ['--config', cfg, ...builderArgs]);
   }
 } finally {

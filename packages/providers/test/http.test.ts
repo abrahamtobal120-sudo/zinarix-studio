@@ -138,6 +138,98 @@ describe('request()', () => {
     ).rejects.toMatchObject({ code: 'timeout' });
   });
 
+  it('never retries a POST that timed out (it may already be running and billed)', async () => {
+    let n = 0;
+    const srv = await mockServer(() => {
+      n++; /* never answers */
+    });
+    close = srv.close;
+    await expect(
+      request(
+        { entry: entry(), baseUrl: srv.url, timeoutMs: 100, maxRetries: 3 },
+        { method: 'POST', path: '/chat/completions', body: { prompt: 'hi' } },
+      ),
+    ).rejects.toMatchObject({ code: 'timeout' });
+    expect(n).toBe(1);
+  });
+
+  it('still retries a GET that timed out', async () => {
+    let n = 0;
+    const srv = await mockServer((_req, res) => {
+      if (++n > 1) json(res, 200, { ok: true });
+    });
+    close = srv.close;
+    const res = await request(
+      { entry: entry(), baseUrl: srv.url, timeoutMs: 100, maxRetries: 1 },
+      { path: '/models' },
+    );
+    expect(await res.json()).toEqual({ ok: true });
+    expect(n).toBe(2);
+  });
+
+  it('does not retry a POST on ambiguous 5xx, but does on 429/503', async () => {
+    for (const [status, calls] of [
+      [500, 1],
+      [502, 1],
+      [504, 1],
+      [429, 2],
+      [503, 2],
+      [529, 2],
+    ] as const) {
+      let n = 0;
+      const srv = await mockServer((_req, res) =>
+        json(res, status, { error: 'x' }, { 'retry-after': '0' }),
+      );
+      await request(
+        { entry: entry(), baseUrl: srv.url, maxRetries: 1 },
+        { method: 'POST', path: '/chat/completions', body: {} },
+      ).catch(() => undefined);
+      n = srv.requests.length;
+      await srv.close();
+      expect(n, `HTTP ${status}`).toBe(calls);
+    }
+  });
+
+  it('retries a POST only when the connection failed before sending', async () => {
+    const refused = Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+    });
+    const reset = Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+    });
+    for (const [e, calls] of [
+      [refused, 2],
+      [reset, 1],
+    ] as const) {
+      let n = 0;
+      const fetchMock = (async () => {
+        n++;
+        throw e;
+      }) as unknown as typeof fetch;
+      await expect(
+        request(
+          { entry: entry(), baseUrl: 'http://x', maxRetries: 1, fetch: fetchMock },
+          { method: 'POST', path: '/chat/completions', body: {} },
+        ),
+      ).rejects.toMatchObject({ code: 'network' });
+      expect(n).toBe(calls);
+    }
+  });
+
+  it('retries a POST marked idempotent like a GET', async () => {
+    let n = 0;
+    const srv = await mockServer((_req, res) => {
+      n++;
+      json(res, n === 1 ? 500 : 200, { ok: n > 1 }, { 'retry-after': '0' });
+    });
+    close = srv.close;
+    const res = await request(
+      { entry: entry(), baseUrl: srv.url, maxRetries: 1 },
+      { method: 'POST', path: '/token', body: {}, idempotent: true },
+    );
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
   it('applies header, query and optional auth modes', async () => {
     const srv = await mockServer((_req, res) => json(res, 200, {}));
     close = srv.close;

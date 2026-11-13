@@ -3,15 +3,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  isOwnerCode,
   licenseStatus,
   normalizeKey,
   parseLicense,
-  planCode,
   signLicense,
   type LicensePayload,
 } from '../src/main/license.js';
-import { newer, parseRemote } from '../src/main/remote.js';
+import { newer, parseRemote, verifyConfig } from '../src/main/remote.js';
 import { EDITIONS, editionOf } from '../src/shared/edition.js';
 import {
   AI_FEATURES,
@@ -22,8 +20,9 @@ import {
 } from '../src/shared/plans.js';
 
 /**
- * Plans and licenses: charging is off unless the owner turns it on from the website, the
- * owner's word unlocks everything, keys are checked offline and agents stay in every plan.
+ * Plans and licenses: charging is off unless the owner turns it on from the (signed)
+ * website config, only signed keys unlock plans, keys are checked offline and agents stay in
+ * every plan.
  */
 
 const { privateKey, publicKey } = generateKeyPairSync('ed25519');
@@ -65,35 +64,30 @@ describe('license keys', () => {
     expect(() => parseLicense(key)).toThrow(/firma/);
   });
 
-  it('knows the owner word, in any case and with spaces, and nothing close to it', () => {
-    expect(isOwnerCode('tobal')).toBe(true);
-    expect(isOwnerCode('  TOBAL ')).toBe(true);
-    for (const w of ['tobal1', 'toba', '', 'zinarix', 'x'.repeat(100)])
-      expect(isOwnerCode(w)).toBe(false);
+  it('the old owner flag and plan codes in the state file grant nothing in a packaged app', () => {
+    for (const s of [{ owner: true }, { codePlan: 'proai' as const }]) {
+      const st = licenseStatus({ ...s, plans: billingOn, billingSince: NOW - 99 * DAY }, NOW, PUB);
+      expect(st.plan).toBe('free');
+    }
   });
 });
 
-describe('plan codes', () => {
-  it('each code sets its plan, in any case and with or without spaces', () => {
-    expect(planCode('zinarix at')).toBe('free');
-    expect(planCode('ZinarixPro AT')).toBe('pro');
-    expect(planCode('zinarixproat')).toBe('pro');
-    expect(planCode(' zinarixai at ')).toBe('ai');
-    expect(planCode('zinarixproai at')).toBe('proai');
-    for (const w of ['zinarix', 'zinarixpro', 'tobal', 'zinarixpro at1', '', 'x'.repeat(100)])
-      expect(planCode(w)).toBeNull();
-  });
-
-  it('a code beats charging on or off; "zinarix at" is the free plan even when open', () => {
+describe('plans forced from the state file (development builds only)', () => {
+  const dev = { devPlans: true };
+  it('a forced plan beats charging on or off; "free" is the free plan even when open', () => {
     for (const plans of [DEFAULT_PLANS, billingOn]) {
-      expect(licenseStatus({ codePlan: 'free', plans }, NOW, PUB)).toMatchObject({
+      expect(licenseStatus({ codePlan: 'free', plans }, NOW, PUB, undefined, dev)).toMatchObject({
         plan: 'free',
         features: FREE_FEATURES,
         code: true,
       });
-      expect(licenseStatus({ codePlan: 'pro', plans }, NOW, PUB).features).toEqual(PRO_FEATURES);
-      expect(licenseStatus({ codePlan: 'ai', plans }, NOW, PUB).features).toEqual(AI_FEATURES);
-      expect(licenseStatus({ codePlan: 'proai', plans }, NOW, PUB).features).toEqual(
+      expect(licenseStatus({ codePlan: 'pro', plans }, NOW, PUB, undefined, dev).features).toEqual(
+        PRO_FEATURES,
+      );
+      expect(licenseStatus({ codePlan: 'ai', plans }, NOW, PUB, undefined, dev).features).toEqual(
+        AI_FEATURES,
+      );
+      expect(licenseStatus({ codePlan: 'proai', plans }, NOW, PUB, undefined, dev).features).toEqual(
         PRO_AI_FEATURES,
       );
     }
@@ -155,12 +149,30 @@ describe('plan of an installation', () => {
     expect(old.problem).toMatch(/venció/);
   });
 
-  it('the owner word beats everything, charging on or off', () => {
+  it('a signed owner key beats everything, charging on or off', () => {
+    const license = keyFor(payload({ plan: 'proai', owner: true }));
     for (const plans of [DEFAULT_PLANS, billingOn]) {
-      const st = licenseStatus({ owner: true, plans, billingSince: NOW - 99 * DAY }, NOW, PUB);
+      const st = licenseStatus({ license, plans, billingSince: NOW - 99 * DAY }, NOW, PUB);
       expect(st.plan).toBe('owner');
       expect(st.features).toEqual(PRO_AI_FEATURES);
     }
+    const forged = license.replace(/\.[^.]+$/, '.AAAA');
+    expect(licenseStatus({ license: forged, plans: billingOn }, NOW, PUB).plan).toBe('trial');
+  });
+
+  it('a revoked key (refund, dispute) stops counting and says why', () => {
+    const st = licenseStatus(
+      {
+        license: keyFor(payload()),
+        revoked: ['cs_test_1'],
+        plans: billingOn,
+        billingSince: NOW - 30 * DAY,
+      },
+      NOW,
+      PUB,
+    );
+    expect(st.plan).toBe('free');
+    expect(st.problem).toMatch(/cancelada/);
   });
 });
 
@@ -186,6 +198,25 @@ describe('remote control file (app-config.json)', () => {
     expect(parseRemote({}).plans).toEqual(DEFAULT_PLANS);
   });
 
+  it('reads the revoked list', () => {
+    expect(parseRemote({ revoked: ['cs_live_x'] }).revoked).toEqual(['cs_live_x']);
+    expect(parseRemote({}).revoked).toEqual([]);
+  });
+
+  it('only trusts a config signed with the seller key, under its own prefix', () => {
+    const body = JSON.stringify({ billing: true });
+    const good = sign(null, Buffer.from(`zinarix-app-config:v1:${body}`), privateKey).toString(
+      'base64',
+    );
+    expect(verifyConfig(body, good, PUB)).toBe(true);
+    expect(verifyConfig(JSON.stringify({ billing: false }), good, PUB)).toBe(false);
+    // A license signature is not a config signature.
+    const raw = sign(null, Buffer.from(body), privateKey).toString('base64');
+    expect(verifyConfig(body, raw, PUB)).toBe(false);
+    expect(verifyConfig(body, 'nope', PUB)).toBe(false);
+    expect(verifyConfig(body, good)).toBe(false);
+  });
+
   it('rejects unsafe links and odd versions', () => {
     expect(() => parseRemote({ buyUrl: 'http://evil.example' })).toThrow();
     expect(() => parseRemote({ notice: { id: 'a', text: 'b', url: 'javascript:1' } })).toThrow();
@@ -207,8 +238,11 @@ describe('website: /api/license (after a Stripe payment)', () => {
     vi.unstubAllGlobals();
   });
 
+  let ip = 0;
   async function call(session: Record<string, unknown> | null, id = 'cs_test_abc123') {
     process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    if (!('STRIPE_PAYMENT_LINK' in process.env) && !process.env.STRIPE_LINK_AI)
+      process.env.STRIPE_PAYMENT_LINK = 'plink_1';
     process.env.LICENSE_PRIVATE_KEY = privateKey
       .export({ type: 'pkcs8', format: 'pem' })
       .toString()
@@ -235,15 +269,20 @@ describe('website: /api/license (after a Stripe payment)', () => {
         return res;
       },
     };
-    await handler({ query: { session_id: id } }, res);
+    await handler({ query: { session_id: id }, headers: { 'x-real-ip': `10.0.0.${++ip}` } }, res);
     return { ...out, fetchMock };
   }
 
   const paid = {
     id: 'cs_test_abc123',
     status: 'complete',
+    mode: 'payment',
     payment_status: 'paid',
-    created: 1_790_000_000,
+    created: Math.floor(Date.now() / 1000) - 60,
+    payment_intent: {
+      status: 'succeeded',
+      latest_charge: { refunded: false, amount_refunded: 0, disputed: false },
+    },
     customer_details: { email: 'ana@example.com', name: 'Ana' },
     payment_link: 'plink_1',
     metadata: {},
@@ -257,6 +296,35 @@ describe('website: /api/license (after a Stripe payment)', () => {
     expect(p.exp).toBeUndefined();
     const b = await call(paid);
     expect(b.body!.key).toBe(a.body!.key);
+    // The page only shows a hint of the email.
+    expect((a.body as { email?: string }).email).toBe('a…@example.com');
+  });
+
+  it('refunded, disputed or revoked purchases get no key', async () => {
+    const charge = paid.payment_intent.latest_charge;
+    const withCharge = (c: object) => ({
+      ...paid,
+      payment_intent: { ...paid.payment_intent, latest_charge: { ...charge, ...c } },
+    });
+    expect((await call(withCharge({ refunded: true }))).status).toBe(403);
+    expect((await call(withCharge({ amount_refunded: 500 }))).status).toBe(403);
+    expect((await call(withCharge({ disputed: true }))).status).toBe(403);
+    process.env.REVOKED_LICENSES = 'cs_test_zzz, cs_test_abc123';
+    const r = await call(paid);
+    expect(r.status).toBe(403);
+    expect(r.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a session id stops handing out the key after the claim window', async () => {
+    const old = await call({ ...paid, created: Math.floor(Date.now() / 1000) - 10 * 86_400 });
+    expect(old.status).toBe(410);
+  });
+
+  it('with no payment link configured, no purchase gets a key', async () => {
+    process.env.STRIPE_PAYMENT_LINK = '';
+    const r = await call(paid);
+    expect(r.status).toBe(503);
+    expect(r.fetchMock).not.toHaveBeenCalled();
   });
 
   it('keys can expire (per payment link metadata)', async () => {
@@ -287,17 +355,19 @@ describe('website: /api/license (after a Stripe payment)', () => {
 
 describe('editions (one app per plan)', () => {
   it('the standard app is unchanged', () => {
-    const st = licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.standard);
+    const dev = { devPlans: true };
+    const st = licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.standard, dev);
     expect(st.features).toEqual(PRO_AI_FEATURES);
     expect(st.edition).toBeUndefined();
   });
 
   it('an edition never grants more than its plan', () => {
     expect(licenseStatus({}, NOW, PUB, EDITIONS.ai).features).toEqual(FREE_FEATURES);
-    expect(licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.pro).features).toEqual(
+    const dev = { devPlans: true };
+    expect(licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.pro, dev).features).toEqual(
       PRO_FEATURES,
     );
-    expect(licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.ai).features).toEqual(
+    expect(licenseStatus({ codePlan: 'proai' }, NOW, PUB, EDITIONS.ai, dev).features).toEqual(
       AI_FEATURES,
     );
   });

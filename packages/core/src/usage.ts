@@ -1,3 +1,4 @@
+import type { ChatMessage, ToolDefinition } from '@omni/shared';
 import type { Db } from './db.js';
 
 export interface UsageRecord {
@@ -61,6 +62,32 @@ export function computeCost(
   return (
     (fresh * price.input + cached * readPrice + write * writePrice + output * price.output) / 1e6
   );
+}
+
+/** Rough token count of text (~4 characters per token), for responses cut before usage. */
+export function estimateTokens(chars: number): number {
+  return chars > 0 ? Math.ceil(chars / 4) : 0;
+}
+
+/**
+ * Rough input tokens of a request (text, tool calls and tool schemas; ~1600 per image),
+ * used only when a response was cut before the provider reported usage.
+ */
+export function estimateInputTokens(messages: ChatMessage[], tools?: ToolDefinition[]): number {
+  let chars = 0;
+  let images = 0;
+  for (const m of messages) {
+    if (typeof m.content === 'string') chars += m.content.length;
+    else
+      for (const p of m.content) {
+        if (p.type === 'text') chars += p.text.length;
+        else images++;
+      }
+    if (m.role === 'assistant')
+      for (const c of m.toolCalls ?? []) chars += c.name.length + c.arguments.length;
+  }
+  if (tools?.length) chars += JSON.stringify(tools).length;
+  return estimateTokens(chars) + images * 1600;
 }
 
 export function recordUsage(db: Db, r: UsageRecord, ts = Date.now()): void {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, openFile, setState, toast, useStore } from '../store';
 import { fileIcon } from './icons';
@@ -292,14 +293,14 @@ export function RunPanel() {
                 >
                   <Icon name="play" size={14} />
                 </button>
-                <span className="run-label" onClick={() => runTask(task)}>
+                <span className="run-label" {...pressable(() => runTask(task))}>
                   {task.label}
                   {i === 0 && <span className="run-badge">{t('runSuggested')}</span>}
                 </span>
                 <span
                   className="run-file dim small"
                   title={task.file}
-                  onClick={() => void openFile(task.file)}
+                  {...pressable(() => void openFile(task.file))}
                 >
                   {task.file}
                 </span>
@@ -316,7 +317,7 @@ export function RunPanel() {
           <>
             <div className="run-section">{t('runFilesSeen')}</div>
             {shownFiles.map((f) => (
-              <div key={f} className="run-row" title={f} onClick={() => void openFile(f)}>
+              <div key={f} className="run-row" title={f} {...pressable(() => void openFile(f))}>
                 <span className="file-icon">{fileIcon(nameOf(f))}</span>
                 <span className="run-label">{f}</span>
               </div>

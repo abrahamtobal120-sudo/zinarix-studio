@@ -1,4 +1,4 @@
-import { createHash, createPublicKey, verify } from 'node:crypto';
+import { createPublicKey, verify } from 'node:crypto';
 import type { LicenseStatus, PaidPlan, PlanFeatures, PlansConfig } from '../shared/plans.js';
 import {
   AI_FEATURES,
@@ -19,21 +19,6 @@ import { clampFeatures, EDITIONS } from '../shared/edition.js';
 export const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA8L5XRiEBieWNmEXBKBQENGnNfXs3bcTX/WYhD0tuBiU=
 -----END PUBLIC KEY-----`;
-
-/** SHA-256 of the owner's word (the app's author uses it instead of buying a license). */
-const OWNER_HASH = '74eda8cdcd7947be8e6f67efe64ea6e8b37ed31f6b29a075406629cd091ebe56';
-
-/**
- * Plan codes (SHA-256 of `zinarix-plan:<code without spaces>`): typed where a key goes, they
- * put this copy on a plan, to try each one. zinarix at: free (even while charging is off),
- * zinarixpro at: Pro, zinarixai at: AI, zinarixproai at: Pro + AI.
- */
-const PLAN_CODES: Record<string, PaidPlan> = {
-  '242803bc4121ebb5b325318a6176ac7ac928527e56b243f4d28bf4482d3ebbee': 'free',
-  '43745c65a7ffdb389eaaccdfce85190ebb0e93b240d52b91c6507aa02e382578': 'pro',
-  '66de10d753ffcecb2c929329cdb17e26f02060d90e43e1aefb5546dd52f41cf8': 'ai',
-  '3629e4aa99e26c97b6fe1a0700baa36d614e820406c9a6b9c4bf5b72c4e46c2b': 'proai',
-};
 
 const PAID: PaidPlan[] = ['pro', 'ai', 'proai'];
 
@@ -67,6 +52,8 @@ export interface LicensePayload {
   iat: number;
   /** Expires at (ms); null or absent: never. */
   exp?: number | null;
+  /** The app's author: everything, in any edition (made with scripts/license.mjs --owner). */
+  owner?: boolean;
 }
 
 const b64url = (b: Buffer) => b.toString('base64url');
@@ -74,20 +61,6 @@ const b64url = (b: Buffer) => b.toString('base64url');
 /** Keys pasted from an email often carry spaces, line breaks or quotes. */
 export function normalizeKey(input: string): string {
   return input.replace(/[\s"'`]+/g, '');
-}
-
-export function isOwnerCode(input: string): boolean {
-  const word = input.trim().toLowerCase();
-  if (!word || word.length > 64) return false;
-  return createHash('sha256').update(`zinarix-owner:${word}`).digest('hex') === OWNER_HASH;
-}
-
-/** The plan a code sets (any case, with or without spaces), or null. */
-export function planCode(input: string): PaidPlan | null {
-  const word = input.replace(/\s+/g, '').toLowerCase();
-  if (!word || word.length > 64) return null;
-  const hash = createHash('sha256').update(`zinarix-plan:${word}`).digest('hex');
-  return PLAN_CODES[hash] ?? null;
 }
 
 /** Checks a license key and returns what it grants; throws a readable error otherwise. */
@@ -118,10 +91,15 @@ export function signLicense(payload: LicensePayload, sign: (data: Buffer) => Buf
 export interface StoredLicense {
   /** The activated key, if any. */
   license?: string;
-  /** Activated with the owner's word. */
+  /** Old installs: the owner's word. Ignored now (the owner uses a signed key). */
   owner?: boolean;
-  /** Set with a plan code (zinarix at, zinarixpro at…). */
+  /**
+   * A plan forced from the state file, for screenshots and tests. Only honoured in
+   * development builds (licenseStatus(..., { devPlans: true })); packaged apps ignore it.
+   */
   codePlan?: PaidPlan;
+  /** License ids the seller revoked (refunds, disputes), from the signed app-config.json. */
+  revoked?: string[];
   /** First launch (ms). */
   firstRun?: number;
   /** When this copy first saw billing switched on (ms): the trial runs from here. */
@@ -145,8 +123,9 @@ export function licenseStatus(
   now = Date.now(),
   publicKeyPem = LICENSE_PUBLIC_KEY,
   edition: Edition = EDITIONS.standard,
+  opts: { devPlans?: boolean } = {},
 ): LicenseStatus {
-  const st = planStatus(s, now, publicKeyPem);
+  const st = planStatus(s, now, publicKeyPem, opts.devPlans === true);
   if (edition.id === 'standard') return st;
   const out: LicenseStatus = {
     ...st,
@@ -159,11 +138,15 @@ export function licenseStatus(
   return out;
 }
 
-function planStatus(s: StoredLicense, now: number, publicKeyPem: string): LicenseStatus {
+function planStatus(
+  s: StoredLicense,
+  now: number,
+  publicKeyPem: string,
+  devPlans: boolean,
+): LicenseStatus {
   const cfg = s.plans ?? DEFAULT_PLANS;
   const base = { billing: cfg.billing, buyUrl: cfg.buyUrl, free: cfg.free };
-  if (s.owner) return { ...base, plan: 'owner', features: PRO_AI_FEATURES, expires: null };
-  if (s.codePlan && s.codePlan in PLAN_FEATURES) {
+  if (devPlans && s.codePlan && s.codePlan in PLAN_FEATURES) {
     // "zinarix at": the free plan as people will get it once charging is on.
     if (s.codePlan === 'free') return { ...base, plan: 'free', features: cfg.free, code: true };
     return {
@@ -178,7 +161,12 @@ function planStatus(s: StoredLicense, now: number, publicKeyPem: string): Licens
   if (s.license) {
     try {
       const p = parseLicense(s.license, publicKeyPem);
-      if (p.exp && p.exp < now) problem = 'Tu licencia venció. Renuévala para seguir con tu plan.';
+      if (s.revoked?.includes(p.id))
+        problem = 'Esta licencia fue cancelada (reembolso o disputa del pago).';
+      else if (p.exp && p.exp < now)
+        problem = 'Tu licencia venció. Renuévala para seguir con tu plan.';
+      else if (p.owner)
+        return { ...base, plan: 'owner', features: PRO_AI_FEATURES, expires: p.exp ?? null };
       else
         return {
           ...base,

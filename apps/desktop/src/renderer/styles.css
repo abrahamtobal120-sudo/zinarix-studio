@@ -5121,8 +5121,27 @@ kbd.custom {
   display: flex;
 }
 .chat-panes > .chat-session {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
+  height: auto;
+  /* Each pane holds its own floating bits (the "go to bottom" arrow) and keeps its
+     contents inside, so nothing lands on top of the other chat. */
+  position: relative;
+  overflow: hidden;
+}
+.chat-panes > .chat-session > .chat-scroll {
+  min-height: 0;
+}
+/* A narrow pane: the input buttons go to a second line instead of spilling out. */
+@container (max-width: 400px) {
+  .chat-input-bar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .chat-input-bar > .model-chip {
+    max-width: 120px;
+  }
 }
 .chat-panes.split > .chat-session + .chat-session {
   border-left: 1px solid var(--border);
@@ -7783,4 +7802,216 @@ button.wa-add {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 2px;
+}
+
+/* A <button> standing in for a clickable row or heading (keyboard-usable): it keeps the
+   look of the element it replaced, without the button chrome. */
+button.plain-btn {
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  text-align: inherit;
+  transition: none;
+}
+button.plain-btn:hover {
+  background: none;
+}
+button.plain-btn:active {
+  transform: none;
+}
+/* Rows that act as buttons (role="button"): visible keyboard focus. */
+[role='button']:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+/* Long conversations: messages far off screen skip layout and paint until scrolled near
+   (the browser remembers their last size, so the scroll position and "stick to bottom"
+   keep working). The last messages - the one streaming among them - always render. */
+.chat-scroll > .turn:not(:nth-last-child(-n + 4)) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
+
+/* Images pasted / dropped into the chat */
+.chat-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px 0;
+}
+.chat-image {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-4);
+}
+.chat-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.chat-image button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 1px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  line-height: 0;
+  cursor: pointer;
+}
+.turn-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+.turn-images img {
+  max-width: 180px;
+  max-height: 140px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  object-fit: contain;
+  background: var(--bg-4);
+}
+
+/* In-app confirmation (confirmDialog): above any other modal. */
+.confirm-backdrop {
+  z-index: 70;
+  align-items: center;
+  padding-top: 0;
+}
+.confirm-dialog {
+  width: min(440px, 90vw);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.confirm-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Settings → MCP */
+.mcp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.mcp-server {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.mcp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mcp-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.mcp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-dim, #888);
+}
+.mcp-dot.connected {
+  background: #22a06b;
+}
+.mcp-dot.error {
+  background: #e5484d;
+}
+.mcp-dot.connecting {
+  background: #d4a72c;
+}
+.mcp-target {
+  margin-top: 2px;
+  word-break: break-all;
+}
+.mcp-err {
+  color: #e5484d;
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
+.mcp-tools {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  max-height: 220px;
+  overflow: auto;
+}
+.mcp-project {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mcp-project.warn {
+  border-color: #d4a72c;
+}
+.mcp-project button {
+  align-self: flex-start;
+}
+.mcp-editor textarea {
+  width: 100%;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.mcp-editor-bar {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+/* Google Cloud panel */
+.gc-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.gc-indent {
+  padding-left: 22px;
+}
+.gc-log {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  max-height: 6em;
+  overflow: hidden;
 }

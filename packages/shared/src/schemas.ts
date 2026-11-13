@@ -248,6 +248,11 @@ export type ChatChunk =
       cachedTokens?: number;
       /** Input tokens written to the prompt cache (billed above the base price by Anthropic). */
       cacheWriteTokens?: number;
+      /**
+       * The response was cut (cancelled or failed): counts are what was seen so far and
+       * output may be estimated from the streamed text.
+       */
+      partial?: boolean;
     }
   | { type: 'error'; code: string; message: string; retryable: boolean }
   | { type: 'raw'; adapter: string; content: unknown }

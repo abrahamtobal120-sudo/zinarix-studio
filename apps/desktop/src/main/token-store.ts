@@ -26,13 +26,15 @@ function localKey(dir: string): Buffer {
 
 export function sealLocal(dir: string, text: string): Buffer {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', localKey(dir), iv);
+  const cipher = createCipheriv('aes-256-gcm', localKey(dir), iv, { authTagLength: 16 });
   const body = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), body]);
 }
 
 export function openLocal(dir: string, data: Buffer): string {
-  const decipher = createDecipheriv('aes-256-gcm', localKey(dir), data.subarray(0, 12));
+  const decipher = createDecipheriv('aes-256-gcm', localKey(dir), data.subarray(0, 12), {
+    authTagLength: 16,
+  });
   decipher.setAuthTag(data.subarray(12, 28));
   return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString('utf8');
 }
@@ -94,19 +96,38 @@ export class TokenStore {
     return null;
   }
 
+  /**
+   * Saves the new token first and only then clears the other stores (reads try the keychain
+   * first, so a stale copy there would shadow the new one). If the save throws, the old token
+   * is still where it was.
+   */
   set(token: string): void {
-    this.delete();
-    if (keychain.available() && toKeychain(this.account, token)) return;
+    if (keychain.available() && toKeychain(this.account, token)) {
+      this.clearFiles();
+      return;
+    }
     if (safeStorage.isEncryptionAvailable()) {
       writeFileSync(this.file, safeStorage.encryptString(token), { mode: 0o600 });
+      this.clearKeychain();
+      rmSync(this.localFile, { force: true });
       return;
     }
     writeFileSync(this.localFile, sealLocal(dirname(this.file), token), { mode: 0o600 });
+    this.clearKeychain();
+    rmSync(this.file, { force: true });
   }
 
   delete(): void {
+    this.clearFiles();
+    this.clearKeychain();
+  }
+
+  private clearFiles(): void {
     rmSync(this.file, { force: true });
     rmSync(this.localFile, { force: true });
+  }
+
+  private clearKeychain(): void {
     try {
       new Entry(SERVICE, this.account).deletePassword();
     } catch {

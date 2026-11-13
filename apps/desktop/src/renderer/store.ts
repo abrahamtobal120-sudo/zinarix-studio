@@ -16,6 +16,7 @@ import { DEFAULT_PREFS } from '../shared/api';
 import type { LicenseStatus, ProFeature, RemoteNotice } from '../shared/plans';
 import { BUY_URL, FREE_FEATURES, PRO_FEATURES } from '../shared/plans';
 import { languageFor, monaco } from './monaco';
+import { confirmDialog } from './confirm';
 import { t } from './i18n';
 import { applyThemeColors, isDark } from './themes';
 
@@ -67,7 +68,7 @@ export interface State {
   workspace: WorkspaceInfo | null;
   tabs: Tab[];
   active: string | null;
-  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | 'mail' | 'watch' | null;
+  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | 'gcloud' | 'mail' | 'watch' | null;
   panelOpen: boolean;
   /** One area takes the whole window: the side panel, the terminal or the editor/browser. */
   maximized: 'side' | 'panel' | 'editor' | null;
@@ -353,10 +354,14 @@ export async function saveAll(): Promise<void> {
   for (const tab of state.tabs) if (tab.dirty) await save(tab.path);
 }
 
-export function closeTab(path = state.active): void {
+export async function closeTab(path = state.active): Promise<void> {
   if (!path) return;
   const tab = state.tabs.find((x) => x.path === path);
-  if (tab?.dirty && !confirm(t('unsavedClose', { name: tab.name }))) return;
+  if (tab?.dirty) {
+    if (!(await confirmDialog(t('unsavedClose', { name: tab.name }), { danger: true }))) return;
+    // Closed meanwhile (another way, while the question was open).
+    if (!state.tabs.some((x) => x.path === path)) return;
+  }
   const d = docs.get(path);
   d?.model.dispose();
   docs.delete(path);
@@ -472,7 +477,7 @@ export async function refreshSettings(): Promise<void> {
 export async function refreshModels(refresh = false): Promise<void> {
   const r = await api().ai.models(refresh);
   setState({ models: r.models, modelErrors: r.errors });
-  if (r.detected.length) toast(`Detectado y conectado: ${r.detected.join(', ')}`);
+  if (r.detected.length) toast(t('providersDetected', { list: r.detected.join(', ') }));
 }
 
 export async function chooseModel(ref: string): Promise<void> {

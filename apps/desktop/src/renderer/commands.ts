@@ -1,5 +1,6 @@
 import { askInChat } from './components/Chat';
 import { sendTerminalToChat, terminalFocused } from './components/Terminal';
+import { confirmDialog } from './confirm';
 import { lang, setLang, t } from './i18n';
 import {
   api,
@@ -83,7 +84,7 @@ function baseCommands(): Command[] {
       label: t('closeFolder'),
       run: async () => {
         const n = dirtyCount();
-        if (n && !confirm(t('unsavedQuit', { n }))) return;
+        if (n && !(await confirmDialog(t('unsavedQuit', { n }), { danger: true }))) return;
         await api().workspace.close();
       },
     },
@@ -118,7 +119,7 @@ function baseCommands(): Command[] {
       run: async () => (await save(), toast(t('saved'))),
     },
     { id: 'file.saveAll', label: t('cmdSaveAll'), keys: `${mod}+Alt+S`, run: () => saveAll() },
-    { id: 'tab.close', label: t('cmdCloseTab'), keys: `${mod}+W`, run: () => closeTab() },
+    { id: 'tab.close', label: t('cmdCloseTab'), keys: `${mod}+W`, run: () => void closeTab() },
     {
       id: 'view.explorer',
       label: t('explorer'),
@@ -182,6 +183,11 @@ function baseCommands(): Command[] {
       id: 'view.supabase',
       label: t('sbTitle'),
       run: () => setState((s) => ({ sidebar: s.sidebar === 'supabase' ? null : 'supabase' })),
+    },
+    {
+      id: 'view.gcloud',
+      label: t('gcTitle'),
+      run: () => setState((s) => ({ sidebar: s.sidebar === 'gcloud' ? null : 'gcloud' })),
     },
     {
       id: 'view.watch',
@@ -364,9 +370,9 @@ function baseCommands(): Command[] {
     {
       id: 'app.language',
       label: t('language'),
-      run: () => {
+      run: async () => {
         const n = dirtyCount();
-        if (n && !confirm(t('languageUnsaved', { n }))) return;
+        if (n && !(await confirmDialog(t('languageUnsaved', { n }), { danger: true }))) return;
         setLang(lang === 'en' ? 'es' : 'en');
         location.reload();
       },
@@ -380,12 +386,13 @@ function baseCommands(): Command[] {
       id: 'app.requestClose',
       label: t('closeWindow'),
       keys: `${mod}+Shift+W`,
-      run: () => {
+      run: async () => {
         const n = dirtyCount();
-        if (n && !confirm(t('unsavedQuit', { n }))) return;
+        if (n && !(await confirmDialog(t('unsavedQuit', { n }), { danger: true }))) return;
         // Closing the window stops its chats: say so when some are still working.
         const busy = runningChats();
-        if (busy && !confirm(t('chatsBusyQuit', { n: busy }))) return;
+        if (busy && !(await confirmDialog(t('chatsBusyQuit', { n: busy }), { danger: true })))
+          return;
         forgetResume();
         void api().app.quit();
       },

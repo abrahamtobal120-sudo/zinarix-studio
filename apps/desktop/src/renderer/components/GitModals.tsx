@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GitHubRepoView, GitHubStatus } from '../../shared/api';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import { api, openFile, setState, toast, useStore } from '../store';
@@ -164,7 +165,7 @@ export function CloneRepo() {
           <input
             autoFocus
             value={spec}
-            placeholder="https://github.com/usuario/repo.git · usuario/repo"
+            placeholder={t('phGitClone')}
             onChange={(e) => setSpec(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void clone(spec)}
           />
@@ -205,7 +206,11 @@ export function CloneRepo() {
               />
               <div className="gh-repos">
                 {shown.map((r) => (
-                  <div key={r.name} className="gh-repo" onClick={() => !busy && void clone(r.name)}>
+                  <div
+                    key={r.name}
+                    className="gh-repo"
+                    {...pressable(() => !busy && void clone(r.name))}
+                  >
                     <div className="gh-repo-name">
                       <Icon name={r.private ? 'lock' : 'globe'} size={13} /> {r.name}
                     </div>

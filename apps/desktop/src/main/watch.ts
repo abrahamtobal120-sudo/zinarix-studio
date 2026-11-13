@@ -6,7 +6,7 @@ import type { OmniCore } from '@omni/core';
 import { redact } from '@omni/security';
 import type { WatchItem, WatchReport, WatchSettings, WatchStatus } from '../shared/api.js';
 import { renderTree } from './agent.js';
-import { run } from './git.js';
+import { runUntrustedGit } from './git.js';
 import type { Workspace } from './workspace.js';
 
 /**
@@ -75,17 +75,32 @@ export interface WatchDeps {
 const today = () => new Date().toISOString().slice(0, 10);
 const sha = (text: string) => createHash('sha1').update(text).digest('hex');
 
-const git = (ws: Workspace, args: string[]) => run('git', args, ws.root, 30_000);
+// Runs in the background, without a click: hooks and diff drivers of the repo stay off.
+const git = (ws: Workspace, args: string[]) => runUntrustedGit(args, ws.root, 30_000);
 
 /** Cheap summary of the project's content: changes only when the code does. */
 async function fingerprint(ws: Workspace): Promise<string> {
   try {
     const [head, diff, untracked] = await Promise.all([
       git(ws, ['rev-parse', 'HEAD']).catch(() => 'no-head'),
-      git(ws, ['diff', 'HEAD', '--no-color', '--no-ext-diff']).catch(() => ''),
+      git(ws, ['diff', 'HEAD', '--no-color', '--no-ext-diff', '--no-textconv']).catch(() => ''),
       git(ws, ['ls-files', '--others', '--exclude-standard']),
     ]);
-    return sha(`${head}\0${diff}\0${untracked}`);
+    // `git diff` ignores untracked files, so their size and time stand in for their content
+    // (otherwise editing a new, never-committed file would never trigger a review).
+    const extra = await Promise.all(
+      untracked
+        .split('\n')
+        .filter(Boolean)
+        .slice(0, 5000)
+        .map(async (f) => {
+          const s = await Promise.resolve()
+            .then(() => stat(ws.resolve(f)))
+            .catch(() => undefined);
+          return s ? `${f}:${s.size}:${s.mtimeMs}` : f;
+        }),
+    );
+    return sha(`${head}\0${diff}\0${extra.join('\n')}`);
   } catch {
     // Not a git repository: names, sizes and times of the files.
     const files = await ws.listFiles(5000);
@@ -125,7 +140,7 @@ async function material(ws: Workspace, p: ProjectState | undefined): Promise<str
       known ? ['log', '--oneline', '-20', `${since}..HEAD`] : ['log', '--oneline', '-10'],
     ).catch(() => '');
     if (log.trim()) parts.push(`<recent-commits>\n${log.trim()}\n</recent-commits>`);
-    const args = ['diff', '--no-color', '--no-ext-diff', '--stat', '--patch'];
+    const args = ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--stat', '--patch'];
     let diff = await git(ws, known ? [...args, since!] : [...args, 'HEAD']).catch(() => '');
     // First look at a clean project: the last few commits show what is being worked on.
     if (!diff.trim() && !known) diff = await git(ws, [...args, 'HEAD~3']).catch(() => '');

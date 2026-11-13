@@ -155,6 +155,7 @@ textarea{display:block;width:100%;resize:none;max-height:35vh;min-height:24px;bo
   <p>Escribe el PIN que aparece en Zinarix Studio<br><small>Configuración → Celular</small></p>
   <input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······">
   <button id="go" class="primary">Conectar</button>
+  <p id="pwait" class="hide">Si el PIN es correcto, acepta la conexión en la ventana de Zinarix de la computadora…</p>
   <div class="err" id="perr"></div>
 </div>
 <div id="log" class="hide"></div>
@@ -359,7 +360,11 @@ function grow() {
 }
 
 $('go').onclick = async () => {
+  if ($('go').disabled) return;
   $('perr').textContent = '';
+  // The answer waits until the user accepts (or rejects) the device on the computer.
+  $('go').disabled = true;
+  $('pwait').classList.remove('hide');
   try {
     const key = new URLSearchParams(location.hash.slice(1)).get('k') || undefined;
     const r = await post('/api/pair', { pin: $('pin').value, key });
@@ -368,6 +373,7 @@ $('go').onclick = async () => {
     localStorage.setItem('zx.token', token);
     paired();
   } catch { $('perr').textContent = 'No se pudo conectar con la computadora'; }
+  finally { $('go').disabled = false; $('pwait').classList.add('hide'); }
 };
 $('pin').onkeydown = (e) => { if (e.key === 'Enter') $('go').click(); };
 $('pin').oninput = (e) => { e.target.value = e.target.value.replace(/\\D/g, ''); if (e.target.value.length === 6) $('go').click(); };

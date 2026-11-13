@@ -268,7 +268,11 @@ export class Mail {
    * refresh token goes to the keychain in place of a password.
    */
   async googleLogin(openUrl: (url: string) => void, name?: string): Promise<MailStatus> {
-    const g = await this.google.login(openUrl);
+    return this.addGoogle(await this.google.login(openUrl), name);
+  }
+
+  /** Keeps the Gmail mailbox of a Google sign-in that granted the mail scope. */
+  addGoogle(g: { email: string; name: string; refresh: string }, name?: string): Promise<MailStatus> {
     return this.connect(
       { email: g.email, user: g.email, name: name || g.name, auth: 'google', ...GMAIL },
       g.refresh,

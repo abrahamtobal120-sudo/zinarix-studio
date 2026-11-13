@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ChatContext,
@@ -10,6 +10,8 @@ import type {
   ToolDecision,
   ToolPreview,
 } from '../../shared/api';
+import { pressable } from '../a11y';
+import { confirmDialog } from '../confirm';
 import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import { monacoTheme } from '../themes';
@@ -71,6 +73,8 @@ interface ToolStep {
 type Part = { kind: 'text'; text: string } | ToolStep;
 
 interface Turn {
+  /** Stable identity of the message in the list (React key): survives edit / regenerate. */
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   parts?: Part[];
@@ -80,8 +84,40 @@ interface Turn {
   notices?: string[];
   reasoning?: string;
   context?: string[];
+  /** Images sent with this message (data: URLs, shown as thumbnails). */
+  images?: string[];
   /** Request of the exchange (question and answer share it): several can run at once. */
   rid?: string;
+}
+
+/** An image pasted, dropped or picked for the next message. */
+interface PendingImage {
+  mediaType: string;
+  /** base64, without the data: prefix */
+  data: string;
+  name: string;
+}
+const IMAGE_MIME = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const MAX_CHAT_IMAGES = 6;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function readImage(file: File): Promise<PendingImage> {
+  return new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const url = String(r.result);
+      const i = url.indexOf(',');
+      ok({ mediaType: file.type, data: url.slice(i + 1), name: file.name || 'imagen' });
+    };
+    r.onerror = () => fail(r.error ?? new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+let turnSeq = 0;
+/** A new message id (unique in this window; saved conversations get theirs when loaded). */
+function newTurnId(): string {
+  return `t${Date.now().toString(36)}-${(turnSeq++).toString(36)}`;
 }
 
 /** "/" commands of the message box: a ready-made prompt (or an action). */
@@ -90,7 +126,7 @@ interface Slash {
   hint: string;
   prompt?: string;
   agent?: boolean;
-  action?: 'new' | 'agent' | 'chat' | 'rules' | 'commit';
+  action?: 'new' | 'agent' | 'chat' | 'rules' | 'commit' | 'docs';
 }
 function slashCommands(): Slash[] {
   return [
@@ -106,6 +142,7 @@ function slashCommands(): Slash[] {
     { name: 'agente', hint: t('slashAgent'), action: 'agent' },
     { name: 'chat', hint: t('slashChat'), action: 'chat' },
     { name: 'nuevo', hint: t('newChat'), action: 'new' },
+    { name: 'indexar', hint: t('slashIndexDocs'), action: 'docs' },
   ];
 }
 
@@ -514,7 +551,16 @@ function DiffView({ before, after, path }: { before: string; after: string; path
   return <div className="tool-diff" ref={host} />;
 }
 
-function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecision) => void }) {
+const ToolCard = memo(function ToolCard({
+  step,
+  rid,
+  onDecide: decideFor,
+}: {
+  step: ToolStep;
+  rid?: string;
+  onDecide: (toolCallId: string, d: ToolDecision, rid?: string) => void;
+}) {
+  const onDecide = (d: ToolDecision) => decideFor(step.id, d, rid);
   const [open, setOpen] = useState(step.status === 'approval');
   useEffect(() => {
     if (step.status === 'approval') setOpen(true);
@@ -523,7 +569,12 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
   const p = step.preview;
   return (
     <div className={`tool-card ${step.status} ${p?.risk ? `risk-${p.risk}` : ''}`}>
-      <div className="tool-head" onClick={() => setOpen(!open)}>
+      <button
+        type="button"
+        className="tool-head plain-btn"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
         <span className="tool-icon">
           <Icon name={icon} size={14} />
         </span>
@@ -548,7 +599,7 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
         <span className={`tool-chevron ${open ? 'open' : ''}`}>
           <Icon name="chevron" size={12} />
         </span>
-      </div>
+      </button>
       {open && (
         <div className="tool-body">
           {p?.warning && step.status === 'approval' && (
@@ -630,7 +681,164 @@ function ToolCard({ step, onDecide }: { step: ToolStep; onDecide: (d: ToolDecisi
       )}
     </div>
   );
+});
+
+/** What a message of the list can do; one stable object per chat (see `turnActions`). */
+interface TurnActions {
+  editLast: () => void;
+  regenerate: () => void;
+  continueLast: () => void;
+  agentOff: () => void;
+  copy: (turn: Turn) => void;
+  quote: (turn: Turn) => void;
+  handoff: (turn: Turn) => void;
+  decide: (toolCallId: string, d: ToolDecision, rid?: string) => void;
 }
+
+/**
+ * One message of the chat. Memoized: while an answer streams only that message re-renders
+ * (the others keep their props), so long conversations do not re-parse all their Markdown
+ * for every token.
+ */
+const TurnView = memo(function TurnView({
+  turn,
+  live,
+  last,
+  canEdit,
+  defaultModel,
+  agentMode,
+  actions,
+}: {
+  turn: Turn;
+  live: boolean;
+  last: boolean;
+  canEdit: boolean;
+  defaultModel: string | null;
+  agentMode: boolean;
+  actions: TurnActions;
+}) {
+  return (
+    <div className={`turn ${turn.role}`}>
+      {turn.role === 'user' ? (
+        <>
+          <div className="turn-user">{turn.content}</div>
+          {turn.images && turn.images.length > 0 && (
+            <div className="turn-images">
+              {turn.images.map((src, k) => (
+                <img key={k} src={src} alt="" />
+              ))}
+            </div>
+          )}
+          {canEdit && (
+            <div className="turn-actions user">
+              <button title={t('chatEdit')} onClick={actions.editLast}>
+                <Icon name="edit" size={13} /> {t('chatEdit')}
+              </button>
+            </div>
+          )}
+          {turn.context && turn.context.length > 0 && (
+            <div className="turn-context">
+              {turn.context.map((c) => (
+                <span key={c} className="turn-context-item">
+                  <Icon name={c.startsWith('terminal:') ? 'terminal' : 'paperclip'} size={11} />
+                  {contextLabel(c)}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="turn-model">
+            {(turn.model ?? defaultModel) && (
+              <ProviderLogo id={(turn.model ?? defaultModel ?? '').split('/')[0]!} size={16} />
+            )}
+            {turn.model ?? defaultModel ?? ''}
+          </div>
+          {turn.notices?.map((n, j) => (
+            <div key={j} className="turn-notice">
+              <Icon name="warning" size={13} /> {n}
+            </div>
+          ))}
+          {turn.reasoning && (
+            <details className="turn-reasoning">
+              <summary>
+                <Icon name="thinking" size={13} /> {t('thinking')}
+              </summary>
+              {turn.reasoning}
+            </details>
+          )}
+          {(turn.parts ?? []).map((p, j) =>
+            p.kind === 'text' ? (
+              <Markdown
+                key={j}
+                text={p.text}
+                streaming={live && j === (turn.parts?.length ?? 0) - 1}
+              />
+            ) : (
+              <ToolCard key={p.id} step={p} rid={turn.rid} onDecide={actions.decide} />
+            ),
+          )}
+          {live && !turn.content && !turn.parts?.length && !turn.error && (
+            <div className="typing">
+              <span />
+              <span />
+              <span />
+            </div>
+          )}
+          {turn.error && (
+            <div className="turn-error">
+              <Icon name="warning" size={14} /> {turn.error}
+              {/key|llave|401/i.test(turn.error) && (
+                <button onClick={() => setState({ modal: { kind: 'providers' } })}>
+                  {t('providers')}
+                </button>
+              )}
+              {/tool|function/i.test(turn.error) && agentMode && (
+                <button onClick={actions.agentOff}>{t('agentOff')}</button>
+              )}
+            </div>
+          )}
+          {turn.meta && <div className="turn-meta">{turn.meta}</div>}
+          {!live && (turn.content || turn.error) && (
+            <div className="turn-actions">
+              {turn.content && (
+                <button title={t('copy')} onClick={() => actions.copy(turn)}>
+                  <Icon name="copy" size={13} />
+                  <span className="turn-action-label">{t('copy')}</span>
+                </button>
+              )}
+              {turn.content && (
+                <button title={t('chatQuote')} onClick={() => actions.quote(turn)}>
+                  <Icon name="quote" size={13} />
+                  <span className="turn-action-label">{t('chatQuote')}</span>
+                </button>
+              )}
+              {turn.content && (
+                <button title={t('chatHandoffTitle')} onClick={() => actions.handoff(turn)}>
+                  <Icon name="handoff" size={13} />
+                  <span className="turn-action-label">{t('chatHandoff')}</span>
+                </button>
+              )}
+              {last && (
+                <button title={t('chatRegenerate')} onClick={actions.regenerate}>
+                  <Icon name="refresh" size={13} />
+                  <span className="turn-action-label">{t('chatRegenerate')}</span>
+                </button>
+              )}
+              {last && turn.content && !turn.error && (
+                <button title={t('chatContinue')} onClick={actions.continueLast}>
+                  <Icon name="continue" size={13} />
+                  <span className="turn-action-label">{t('chatContinue')}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+});
 
 /**
  * One chat. Every open chat stays mounted (hidden when not shown), so a chat keeps
@@ -648,6 +856,31 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const turnsNow = useRef(turns);
   turnsNow.current = turns;
   const [input, setInput] = useState('');
+  const [images, setImages] = useState<PendingImage[]>([]);
+  const imagesNow = useRef<PendingImage[]>([]);
+  imagesNow.current = images;
+  const imagePicker = useRef<HTMLInputElement>(null);
+  /** Adds pasted / dropped / picked images (only png, jpeg, gif, webp up to 5 MB, max 6). */
+  const addImages = async (files: File[]) => {
+    const ok = files.filter((f) => IMAGE_MIME.includes(f.type));
+    if (!ok.length) return false;
+    const room = MAX_CHAT_IMAGES - imagesNow.current.length;
+    if (room <= 0) {
+      toast(t('chatImagesMax', { n: MAX_CHAT_IMAGES }));
+      return true;
+    }
+    const big = ok.filter((f) => f.size > MAX_IMAGE_BYTES);
+    if (big.length) toast(t('chatImageTooBig'));
+    const read = await Promise.all(
+      ok
+        .filter((f) => f.size <= MAX_IMAGE_BYTES)
+        .slice(0, room)
+        .map((f) => readImage(f).catch(() => null)),
+    );
+    const add = read.filter((x): x is PendingImage => x !== null);
+    if (add.length) setImages((cur) => [...cur, ...add].slice(0, MAX_CHAT_IMAGES));
+    return true;
+  };
   const [includeFile, setIncludeFile] = useState(true);
   const agentMode = meta?.agent ?? true;
   const setAgentMode = (on: boolean) => {
@@ -744,13 +977,17 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     }
     cancelCurrent();
     const loaded = pairTurns(
-      data.messages.map((m): Turn => {
+      data.messages.map((m, n): Turn => {
         const d = (m.display ?? {}) as SavedDisplay;
         const rid = d.request ? { rid: d.request } : {};
+        // Saved messages carry no id of their own: conversation + position + time is stable
+        // for as long as the conversation is shown.
+        const tid = `${data.conversation.id}:${n}:${m.ts}`;
         if (m.role === 'user')
-          return { role: 'user', content: m.content, context: d.context, ...rid };
+          return { id: tid, role: 'user', content: m.content, context: d.context, ...rid };
         return {
           ...rid,
+          id: tid,
           role: 'assistant',
           content: m.content,
           parts: d.parts?.length ? d.parts : m.content ? [{ kind: 'text', text: m.content }] : [],
@@ -851,6 +1088,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (stick.current) scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
   }, [turns]);
 
+  // A hidden chat cannot scroll: once shown (e.g. opened in the split pane) it catches up.
+  useEffect(() => {
+    if (!visible) return;
+    const el = scroller.current;
+    if (!el) return;
+    if (stick.current) el.scrollTo({ top: el.scrollHeight });
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 60);
+  }, [visible]);
+
   const currentFileContext = (): ChatContext[] => {
     const ed = getEditor();
     const model = ed?.getModel();
@@ -872,6 +1118,25 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   /** Reads the files mentioned with "@" so they travel as context. */
   const mentionContext = async (prompt: string): Promise<ChatContext[]> => {
     const out: ChatContext[] = [];
+    // "@docs:name": the passages of that indexed documentation closest to the question.
+    const docNames = [...prompt.matchAll(/(^|\s)@docs:([\w.-]+)/gi)].map((m) => m[2]!);
+    if (docNames.length) {
+      const question = prompt.replace(/(^|\s)@docs:[\w.-]+/gi, ' ').trim() || prompt;
+      for (const name of [...new Set(docNames)].slice(0, 4)) {
+        try {
+          const hits = await api().knowledge.searchDocs(question, name);
+          if (hits.length)
+            out.push({
+              source: `docs:${name}`,
+              content: hits
+                .map((h) => `## ${h.title ?? ''}\n${h.source}\n\n${h.text}`)
+                .join('\n\n---\n\n'),
+            });
+        } catch {
+          // unknown name: the mention stays as plain text (the agent can call docs_search)
+        }
+      }
+    }
     for (const path of mentionedFiles(prompt, files)) {
       try {
         const f = await api().workspace.readFile(path);
@@ -908,6 +1173,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       ...fileCtx.filter((c) => !mentions.some((m) => m.source === c.source)),
     ];
     if (pending.length) setState({ chatAttachments: [] });
+    // Queued messages keep the images for the message being typed.
+    const sentImages = fromQueue ? [] : imagesNow.current;
+    if (sentImages.length) setImages([]);
     if (!chatTab(id)?.title) updateChat(id, { title: prompt.trim().split('\n')[0]!.slice(0, 60) });
     const turns = base ?? turnsNow.current;
     if (base) setTurns(base);
@@ -927,8 +1195,17 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     stick.current = true;
     setTurns((x) => [
       ...x,
-      { role: 'user', content: prompt, context: context.map((c) => c.source), rid: requestId },
-      { role: 'assistant', content: '', parts: [], rid: requestId },
+      {
+        id: newTurnId(),
+        role: 'user',
+        content: prompt,
+        context: context.map((c) => c.source),
+        ...(sentImages.length
+          ? { images: sentImages.map((im) => `data:${im.mediaType};base64,${im.data}`) }
+          : {}),
+        rid: requestId,
+      },
+      { id: newTurnId(), role: 'assistant', content: '', parts: [], rid: requestId },
     ]);
     if (!fromQueue) setInput('');
     setRunning((r) => [...r, requestId]);
@@ -936,11 +1213,36 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     // resumed task keeps its original message, not the "go on" prompt).
     updateChat(id, { resume: chatTab(id)?.resume ?? prompt });
 
-    // Each request writes into its own answer (others may be streaming below it).
-    const update = (fn: (turn: Turn) => Turn) =>
+    // Each request writes into its own answer (others may be streaming below it). The changes
+    // that arrive within one frame (a burst of tokens, tool output) go in as a single render:
+    // one setState per token re-rendered the whole chat for every token.
+    let pendingUpdates: ((turn: Turn) => Turn)[] = [];
+    let frame: number | null = null;
+    let frameTimer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (frameTimer !== null) clearTimeout(frameTimer);
+      frame = frameTimer = null;
+      const fns = pendingUpdates;
+      if (!fns.length) return;
+      pendingUpdates = [];
+      // Cancelled meanwhile (stop, another conversation): its leftovers are dropped.
+      if (!runs.current.has(requestId)) return;
       setTurns((x) =>
-        x.map((turn) => (turn.role === 'assistant' && turn.rid === requestId ? fn(turn) : turn)),
+        x.map((turn) =>
+          turn.role === 'assistant' && turn.rid === requestId
+            ? fns.reduce((acc, fn) => fn(acc), turn)
+            : turn,
+        ),
       );
+    };
+    const update = (fn: (turn: Turn) => Turn) => {
+      pendingUpdates.push(fn);
+      if (frame !== null) return;
+      frame = requestAnimationFrame(flush);
+      // A minimised window gets no animation frames: the text still lands.
+      frameTimer = setTimeout(flush, 120);
+    };
     const updateStep = (id: string, fn: (s: ToolStep) => ToolStep) =>
       update((turn) => ({
         ...turn,
@@ -957,6 +1259,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       });
 
     const finish = () => {
+      flush();
       off();
       // Cancelled (new chat, another conversation): leave the chat alone.
       if (!runs.current.delete(requestId)) return;
@@ -1045,6 +1348,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         conversationId: conversationNow.current,
         folder: ownFolder,
         noFolder: noFolder || undefined,
+        ...(sentImages.length
+          ? { images: sentImages.map(({ mediaType, data }) => ({ mediaType, data })) }
+          : {}),
       });
     } catch (err) {
       // The request never reached the model (validation, IPC failure): show it and unlock the input.
@@ -1267,6 +1573,30 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       case 'rules':
         void runCommand('ai.rules');
         return true;
+      case 'docs': {
+        // /indexar <name> <url> · /indexar <url> · /indexar (list what is indexed)
+        const parts = rest.split(/\s+/).filter(Boolean);
+        const url = parts.find((p) => /^https?:\/\//i.test(p));
+        if (!url) {
+          const docs = await api()
+            .knowledge.docs()
+            .catch(() => []);
+          toast(
+            docs.length
+              ? `${docs.map((d) => `@docs:${d.name} · ${d.status}`).join(' · ')} — ${t('docsUsage')}`
+              : t('docsListEmpty'),
+          );
+          return true;
+        }
+        const name = parts.filter((p) => p !== url).join('-');
+        try {
+          const d = await api().knowledge.addDocs(name, url);
+          toast(t('docsAdded', { name: d.name }));
+        } catch (e) {
+          toast(e instanceof Error ? e.message : String(e));
+        }
+        return true;
+      }
       case 'commit':
         if (!root) {
           toast(t('noFolder'));
@@ -1464,7 +1794,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   const revert = async () => {
     if (!conversationId) return;
-    if (!confirm(t('revertConfirm', { n: changed.length }))) return;
+    if (!(await confirmDialog(t('revertConfirm', { n: changed.length }), { danger: true }))) return;
     let restored: string[];
     try {
       restored = await api().ai.revert(conversationId, ownFolder);
@@ -1478,6 +1808,34 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
 
   const noProviders = models.length === 0 && !settings.defaultModel;
+  const lastUser = lastUserIndex();
+
+  // The messages get one stable object whose functions call the latest closures: a new
+  // function per render would defeat TurnView's memo and re-render every message per token.
+  const latest = useRef<TurnActions | null>(null);
+  latest.current = {
+    editLast: () => void editLast(),
+    regenerate: () => void regenerate(),
+    continueLast,
+    agentOff: () => setAgentMode(false),
+    copy: copyTurn,
+    quote: quoteTurn,
+    handoff,
+    decide,
+  };
+  const turnActions = useMemo<TurnActions>(
+    () => ({
+      editLast: () => latest.current!.editLast(),
+      regenerate: () => latest.current!.regenerate(),
+      continueLast: () => latest.current!.continueLast(),
+      agentOff: () => latest.current!.agentOff(),
+      copy: (turn) => latest.current!.copy(turn),
+      quote: (turn) => latest.current!.quote(turn),
+      handoff: (turn) => latest.current!.handoff(turn),
+      decide: (toolCallId, d, rid) => latest.current!.decide(toolCallId, d, rid),
+    }),
+    [],
+  );
 
   const shownModel =
     chatModel ?? (agentMode ? settings.roles.agent : undefined) ?? settings.defaultModel;
@@ -1577,132 +1935,20 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             )}
           </div>
         )}
-        {turns.map((turn, i) => {
-          /** This answer is still streaming. */
-          const live = turn.role === 'assistant' && Boolean(turn.rid && running.includes(turn.rid));
-          /** Last exchange with nothing running: regenerate / continue apply to it. */
-          const last = i === turns.length - 1 && !busy;
-          return (
-            <div key={i} className={`turn ${turn.role}`}>
-              {turn.role === 'user' ? (
-                <>
-                  <div className="turn-user">{turn.content}</div>
-                  {!busy && i === lastUserIndex() && (
-                    <div className="turn-actions user">
-                      <button title={t('chatEdit')} onClick={() => void editLast()}>
-                        <Icon name="edit" size={13} /> {t('chatEdit')}
-                      </button>
-                    </div>
-                  )}
-                  {turn.context && turn.context.length > 0 && (
-                    <div className="turn-context">
-                      {turn.context.map((c) => (
-                        <span key={c} className="turn-context-item">
-                          <Icon
-                            name={c.startsWith('terminal:') ? 'terminal' : 'paperclip'}
-                            size={11}
-                          />
-                          {contextLabel(c)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="turn-model">
-                    {(turn.model ?? settings.defaultModel) && (
-                      <ProviderLogo
-                        id={(turn.model ?? settings.defaultModel ?? '').split('/')[0]!}
-                        size={16}
-                      />
-                    )}
-                    {turn.model ?? settings.defaultModel ?? ''}
-                  </div>
-                  {turn.notices?.map((n, j) => (
-                    <div key={j} className="turn-notice">
-                      <Icon name="warning" size={13} /> {n}
-                    </div>
-                  ))}
-                  {turn.reasoning && (
-                    <details className="turn-reasoning">
-                      <summary>
-                        <Icon name="thinking" size={13} /> {t('thinking')}
-                      </summary>
-                      {turn.reasoning}
-                    </details>
-                  )}
-                  {(turn.parts ?? []).map((p, j) =>
-                    p.kind === 'text' ? (
-                      <Markdown
-                        key={j}
-                        text={p.text}
-                        streaming={live && j === (turn.parts?.length ?? 0) - 1}
-                      />
-                    ) : (
-                      <ToolCard key={p.id} step={p} onDecide={(d) => decide(p.id, d, turn.rid)} />
-                    ),
-                  )}
-                  {live && !turn.content && !turn.parts?.length && !turn.error && (
-                    <div className="typing">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                  )}
-                  {turn.error && (
-                    <div className="turn-error">
-                      <Icon name="warning" size={14} /> {turn.error}
-                      {/key|llave|401/i.test(turn.error) && (
-                        <button onClick={() => setState({ modal: { kind: 'providers' } })}>
-                          {t('providers')}
-                        </button>
-                      )}
-                      {/tool|function/i.test(turn.error) && agentMode && (
-                        <button onClick={() => setAgentMode(false)}>{t('agentOff')}</button>
-                      )}
-                    </div>
-                  )}
-                  {turn.meta && <div className="turn-meta">{turn.meta}</div>}
-                  {!live && (turn.content || turn.error) && (
-                    <div className="turn-actions">
-                      {turn.content && (
-                        <button title={t('copy')} onClick={() => copyTurn(turn)}>
-                          <Icon name="copy" size={13} />
-                          <span className="turn-action-label">{t('copy')}</span>
-                        </button>
-                      )}
-                      {turn.content && (
-                        <button title={t('chatQuote')} onClick={() => quoteTurn(turn)}>
-                          <Icon name="quote" size={13} />
-                          <span className="turn-action-label">{t('chatQuote')}</span>
-                        </button>
-                      )}
-                      {turn.content && (
-                        <button title={t('chatHandoffTitle')} onClick={() => handoff(turn)}>
-                          <Icon name="handoff" size={13} />
-                          <span className="turn-action-label">{t('chatHandoff')}</span>
-                        </button>
-                      )}
-                      {last && (
-                        <button title={t('chatRegenerate')} onClick={() => void regenerate()}>
-                          <Icon name="refresh" size={13} />
-                          <span className="turn-action-label">{t('chatRegenerate')}</span>
-                        </button>
-                      )}
-                      {last && turn.content && !turn.error && (
-                        <button title={t('chatContinue')} onClick={continueLast}>
-                          <Icon name="continue" size={13} />
-                          <span className="turn-action-label">{t('chatContinue')}</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
+        {turns.map((turn, i) => (
+          <TurnView
+            key={turn.id}
+            turn={turn}
+            // This answer is still streaming.
+            live={turn.role === 'assistant' && Boolean(turn.rid && running.includes(turn.rid))}
+            // Last exchange with nothing running: regenerate / continue apply to it.
+            last={i === turns.length - 1 && !busy}
+            canEdit={!busy && i === lastUser}
+            defaultModel={settings.defaultModel}
+            agentMode={agentMode}
+            actions={turnActions}
+          />
+        ))}
       </div>
       {!atBottom && turns.length > 0 && !showHistory && (
         <button
@@ -1729,7 +1975,36 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           </button>
         </div>
       )}
-      <div className="chat-input">
+      <div
+        className="chat-input"
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }}
+        onDrop={(e) => {
+          const files = [...e.dataTransfer.files];
+          if (!files.some((f) => IMAGE_MIME.includes(f.type))) return;
+          e.preventDefault();
+          void addImages(files);
+        }}
+      >
+        {images.length > 0 && (
+          <div className="chat-images">
+            {images.map((im, k) => (
+              <span key={k} className="chat-image" title={im.name}>
+                <img src={`data:${im.mediaType};base64,${im.data}`} alt={im.name} />
+                <button
+                  aria-label={t('removeAttachment')}
+                  title={t('removeAttachment')}
+                  onClick={() => setImages((cur) => cur.filter((_, j) => j !== k))}
+                >
+                  <Icon name="x" size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="chat-attachments">
             {attachments.map((c) => (
@@ -1864,6 +2139,12 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           }}
           onBlur={() => setTimeout(() => setSuggest(null), 150)}
           onKeyDown={onInputKey}
+          onPaste={(e) => {
+            const files = [...e.clipboardData.files];
+            if (!files.some((f) => IMAGE_MIME.includes(f.type))) return;
+            e.preventDefault();
+            void addImages(files);
+          }}
         />
         <div className="chat-input-bar">
           <label
@@ -1896,6 +2177,25 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           >
             <Icon name="paperclip" size={15} />
           </button>
+          <button
+            className="term-pick"
+            title={t('chatAttachImage')}
+            aria-label={t('chatAttachImage')}
+            onClick={() => imagePicker.current?.click()}
+          >
+            <Icon name="image" size={15} />
+          </button>
+          <input
+            ref={imagePicker}
+            type="file"
+            accept={IMAGE_MIME.join(',')}
+            multiple
+            hidden
+            onChange={(e) => {
+              void addImages([...(e.target.files ?? [])]);
+              e.target.value = '';
+            }}
+          />
           {rulesFile && (
             <button
               className="rules-chip"
@@ -1974,11 +2274,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 }
 
 /** Asks before closing a chat that is still working, then stops and closes it. */
-export function requestCloseChat(id: string): void {
+export async function requestCloseChat(id: string): Promise<void> {
   const h = handles.get(id);
   if (h?.busy()) {
-    if (!confirm(t('chatCloseBusy'))) return;
-    h.abort();
+    if (!(await confirmDialog(t('chatCloseBusy'), { danger: true }))) return;
+    // Closed meanwhile (another way, while the question was open).
+    if (!getState().chats.some((c) => c.id === id)) return;
+    // It may have finished meanwhile: nothing left to stop then.
+    if (h.busy()) h.abort();
   }
   if (getState().chatHistoryFor === id) setState({ chatHistoryFor: null });
   closeChat(id);
@@ -2112,7 +2415,8 @@ function ChatProject({
       <div
         className={`chat-list-folder ${items.some((x) => x.c.id === focusedId) ? 'has-focus' : ''}`}
         title={folder ?? t('chatNoFolder')}
-        onClick={onToggle}
+        aria-expanded={open}
+        {...pressable(onToggle)}
       >
         <Icon name={open ? 'chevronDown' : 'chevron'} size={11} />
         <Icon name="folder" size={13} />
@@ -2167,9 +2471,9 @@ function ChatProject({
                 title={status ? `${label} · ${status}` : label}
                 draggable={Boolean(folder)}
                 onDragStart={(e) => startChatDrag(e, { chat: c.id, from: folder })}
-                onClick={() => selectChat(c.id)}
+                {...pressable(() => selectChat(c.id))}
                 onAuxClick={(e) => {
-                  if (e.button === 1) requestCloseChat(c.id);
+                  if (e.button === 1) void requestCloseChat(c.id);
                 }}
               >
                 <span className="chat-list-avatar">
@@ -2202,7 +2506,7 @@ function ChatProject({
                     title={t('chatCloseTab')}
                     onClick={(e) => {
                       e.stopPropagation();
-                      requestCloseChat(c.id);
+                      void requestCloseChat(c.id);
                     }}
                   >
                     <Icon name="x" size={11} />
@@ -2219,9 +2523,9 @@ function ChatProject({
               title={`${v.title} · ${new Date(v.updatedAt).toLocaleString()}\n${t('chatDragHint')}`}
               draggable
               onDragStart={(e) => startChatDrag(e, { conv: v.id, from: folder })}
-              onClick={() =>
-                newChat({ conversationId: v.id, title: v.title.slice(0, 60), folder: own })
-              }
+              {...pressable(() =>
+                newChat({ conversationId: v.id, title: v.title.slice(0, 60), folder: own }),
+              )}
             >
               <span className="chat-list-avatar">
                 {v.model ? (
@@ -2367,7 +2671,7 @@ export function ChatPanel() {
                   .join(' · ')}
                 onClick={() => selectChat(c.id)}
                 onAuxClick={(e) => {
-                  if (e.button === 1) requestCloseChat(c.id);
+                  if (e.button === 1) void requestCloseChat(c.id);
                 }}
               >
                 <ChatStatus c={c} />
@@ -2379,7 +2683,7 @@ export function ChatPanel() {
                     title={t('chatCloseTab')}
                     onClick={(e) => {
                       e.stopPropagation();
-                      requestCloseChat(c.id);
+                      void requestCloseChat(c.id);
                     }}
                   >
                     <Icon name="x" size={11} />

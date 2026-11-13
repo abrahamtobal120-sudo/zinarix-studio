@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { SearchHit } from '../../shared/api';
 import { globToRegExp } from '../../shared/glob';
+import { confirmDialog } from '../confirm';
 import { t } from '../i18n';
 import { api, getState, openFile, reloadFromDisk, toast, useStore } from '../store';
 import { fileIcon } from './icons';
 import { fuzzy } from './QuickPick';
 import { Icon } from './Icon';
+import { SemanticResults } from './SemanticSearch';
 
-type Mode = 'content' | 'name';
+type Mode = 'content' | 'name' | 'meaning';
 
 /** Builds the JS regex equivalent of the search options (used to highlight and replace). */
 function buildRegex(
@@ -239,7 +241,9 @@ export function SearchView() {
     const total = grouped.filter(([p]) => paths.includes(p)).reduce((n, [, l]) => n + l.length, 0);
     if (
       paths.length > 1 &&
-      !confirm(t('replaceConfirm', { n: total, f: paths.length, s: query, r: replace }))
+      !(await confirmDialog(
+        t('replaceConfirm', { n: total, f: paths.length, s: query, r: replace }),
+      ))
     )
       return;
     let changed = 0;
@@ -299,7 +303,7 @@ export function SearchView() {
       </div>
 
       <div className="sx-tabs" role="tablist">
-        {(['content', 'name'] as const).map((m) => (
+        {(['content', 'name', 'meaning'] as const).map((m) => (
           <button
             key={m}
             role="tab"
@@ -307,7 +311,11 @@ export function SearchView() {
             className={mode === m ? 'on' : ''}
             onClick={() => setMode(m)}
           >
-            {m === 'content' ? t('searchInContent') : t('searchByName')}
+            {m === 'content'
+              ? t('searchInContent')
+              : m === 'name'
+                ? t('searchByName')
+                : t('searchMeaning')}
           </button>
         ))}
       </div>
@@ -330,7 +338,13 @@ export function SearchView() {
             <input
               ref={input}
               value={query}
-              placeholder={mode === 'content' ? t('searchFiles') : t('searchNamePlaceholder')}
+              placeholder={
+                mode === 'content'
+                  ? t('searchFiles')
+                  : mode === 'name'
+                    ? t('searchNamePlaceholder')
+                    : t('searchMeaningPlaceholder')
+              }
               spellCheck={false}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -417,7 +431,8 @@ export function SearchView() {
         )}
       </div>
 
-      <div className="sx-summary">
+      {mode === 'meaning' && <SemanticResults query={query} nonce={nonce} />}
+      <div className="sx-summary" hidden={mode === 'meaning'}>
         {busy ? (
           <span className="sx-spinner" />
         ) : !workspace ? (
@@ -437,7 +452,7 @@ export function SearchView() {
         )}
       </div>
 
-      <div className="sx-results" ref={list}>
+      <div className="sx-results" ref={list} hidden={mode === 'meaning'}>
         {!query && workspace && (
           <div className="sx-empty">
             <div className="sx-empty-icon">

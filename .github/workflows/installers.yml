@@ -45,6 +45,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # install.sh checks the minisign signature of SHA256SUMS with minisign or OpenSSL 3;
+      # macOS only ships LibreSSL, so it needs minisign (as the installer tells users).
+      - run: brew install minisign
       - run: bash website/install.sh
       - run: test -d "/Applications/Zinarix Studio.app" && test -x "$HOME/.local/bin/zinarix-studio"
       - run: bash website/install.sh --uninstall && test ! -d "/Applications/Zinarix Studio.app"
@@ -74,6 +77,8 @@ jobs:
     container: fedora:latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # The base image has no openssl command; minisign checks the SHA256SUMS signature.
+      - run: dnf install -y minisign
       - run: bash website/install.sh
       - run: test -x "$HOME/.local/share/zinarix-studio/Zinarix-Studio.AppImage" && test -x "$HOME/.local/bin/zinarix-studio"
       - run: bash website/install.sh --uninstall && test ! -e "$HOME/.local/share/zinarix-studio"

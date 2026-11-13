@@ -8,6 +8,7 @@ import type {
   PhoneRepo,
   PhoneSnapshot,
 } from '../shared/api.js';
+import type { PinCheck } from './pairing.js';
 import type { PhoneRepos } from './phone.js';
 import { TokenStore } from './token-store.js';
 
@@ -32,6 +33,8 @@ interface Incoming {
   chat: string;
   /** Who it is (linked with the PIN). */
   user: string;
+  /** Display name of the user (only for the approval dialog on the computer). */
+  name?: string;
   text?: string;
   /** A button: its data, and how to mark it as handled. */
   button?: { data: string; done(note: string): Promise<void> };
@@ -112,7 +115,12 @@ function telegram(token: string, on: LinkEvents): Link {
           const m = u.message;
           // Only private chats: in a group anyone could read the answers.
           if (m?.chat?.type === 'private' && typeof m.text === 'string')
-            on.message({ chat: String(m.chat.id), user: String(m.from?.id), text: m.text });
+            on.message({
+              chat: String(m.chat.id),
+              user: String(m.from?.id),
+              name: m.from?.username ? '@' + m.from.username : m.from?.first_name,
+              text: m.text,
+            });
           const q = u.callback_query;
           if (q?.message?.chat?.type === 'private' && typeof q.data === 'string') {
             on.message({
@@ -263,7 +271,12 @@ function discord(token: string, on: LinkEvents): Link {
             const m = p.d;
             // Only DMs (no guild): in a server channel anyone could read the answers.
             if (!m.guild_id && !m.author?.bot && typeof m.content === 'string' && m.content)
-              on.message({ chat: m.channel_id, user: m.author.id, text: m.content });
+              on.message({
+                chat: m.channel_id,
+                user: m.author.id,
+                name: m.author.global_name ?? m.author.username,
+                text: m.content,
+              });
           } else if (p.t === 'INTERACTION_CREATE' && p.d.type === 3 && !p.d.guild_id) {
             const i = p.d;
             on.message({
@@ -336,8 +349,11 @@ export interface BotDeps {
   /** Sends an action to the window the phone remote controls (like the phone page). */
   action(a: PhoneAction): void;
   repos: PhoneRepos;
-  /** The phone remote's PIN (wrong tries count there too). */
-  checkPin(pin: string): boolean;
+  /**
+   * Pairs a new chat user through the phone remote: its PIN (wrong tries lock the bot for a
+   * while) and then the user's OK in a dialog on the computer (see PhoneRemote.pair).
+   */
+  pair(kind: BotKind, pin: string, who: string, onWaiting?: () => void): Promise<PinCheck>;
   onStatus(s: BotsStatus): void;
 }
 
@@ -520,20 +536,27 @@ export class ChatBots {
     const paired = this.paired();
     if (kind !== 'whatsapp' && !paired[kind].includes(m.user)) {
       const pin = /^\/?(?:start|pin)?\s*(\d[\d\s-]{4,10}\d)\s*$/i.exec(m.text ?? '')?.[1];
-      if (pin && this.deps.checkPin(pin)) {
-        paired[kind].push(m.user);
-        this.savePaired(paired);
-        this.target = { kind, chat: m.chat };
-        this.changed();
-        return this.say(kind, m.chat, `Listo, este chat quedó vinculado a Zinarix.\n\n${HELP}`);
-      }
-      return this.say(
-        kind,
-        m.chat,
-        pin
-          ? 'PIN incorrecto.'
-          : 'Para usar este bot, escribe el PIN que aparece en Zinarix (Configuración → Celular).',
-      );
+      if (!pin)
+        return this.say(
+          kind,
+          m.chat,
+          'Para usar este bot, escribe el PIN que aparece en Zinarix (Configuración → Celular).',
+        );
+      const app = kind === 'telegram' ? 'Telegram' : 'Discord';
+      const who = `${m.name ? `${m.name} ` : ''}(usuario ${m.user}) por ${app}`;
+      // Right PIN: the answer waits for the dialog on the computer, so tell them meanwhile.
+      let told: Promise<void> = Promise.resolve();
+      const r = await this.deps.pair(kind, pin, who, () => {
+        told = this.say(kind, m.chat, 'PIN correcto. Ahora acepta la conexión en la computadora…');
+      });
+      await told.catch(() => undefined);
+      if (!r.ok) return this.say(kind, m.chat, r.error.endsWith('.') ? r.error : `${r.error}.`);
+      const now = this.paired();
+      if (!now[kind].includes(m.user)) now[kind].push(m.user);
+      this.savePaired(now);
+      this.target = { kind, chat: m.chat };
+      this.changed();
+      return this.say(kind, m.chat, `Listo, este chat quedó vinculado a Zinarix.\n\n${HELP}`);
     }
     this.target = { kind, chat: m.chat };
 

@@ -193,8 +193,14 @@ interface OaiModel {
   supported_parameters?: string[];
 }
 
-function perMillion(v: string | number | undefined): number | null {
-  if (v === undefined) return null;
+/**
+ * USD per token (string or number) → USD per 1M tokens. Missing, null or blank values are
+ * unknown (null), never free: `Number('')` is 0, which would hide the spend from budgets.
+ */
+function perMillion(v: string | number | null | undefined): number | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v === 'string' && v.trim() === '') return null;
+  if (typeof v !== 'string' && typeof v !== 'number') return null;
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6 * 1e6) / 1e6 : null;
 }

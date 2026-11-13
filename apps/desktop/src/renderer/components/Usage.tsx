@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { UsageReport, UsageRowView } from '../../shared/api';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { ProviderLogo } from './ProviderLogo';
 import { api, refreshSettings, setState } from '../store';
@@ -222,10 +223,10 @@ export function UsagePanel() {
                         <span
                           className="budget-bar"
                           title={`${usd(monthSpend)} / ${usd(budget)}`}
-                          onClick={() => {
+                          {...pressable(() => {
                             setEditing(r.provider);
                             setBudgetInput(String(budget));
-                          }}
+                          })}
                         >
                           <span
                             className={`budget-fill ${pct >= 100 ? 'over' : pct >= 80 ? 'warn' : ''}`}

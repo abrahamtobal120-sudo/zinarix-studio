@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useState } from 'react';
 import type { DirEntry } from '../../shared/api';
 import { t } from '../i18n';
+import { confirmDialog } from '../confirm';
 import { api, askText, closeTab, getState, openFile, renamePath, toast, useStore } from '../store';
 import { fileIcon, folderIcon } from './icons';
 import { Icon } from './Icon';
@@ -113,11 +114,12 @@ export function Explorer() {
   };
 
   const remove = async (entry: DirEntry) => {
-    if (!confirm(t('confirmDelete', { name: entry.name }))) return;
+    if (!(await confirmDialog(t('confirmDelete', { name: entry.name }), { danger: true }))) return;
     try {
       await api().workspace.trash(entry.path);
       for (const tab of getState().tabs)
-        if (tab.path === entry.path || tab.path.startsWith(`${entry.path}/`)) closeTab(tab.path);
+        if (tab.path === entry.path || tab.path.startsWith(`${entry.path}/`))
+          await closeTab(tab.path);
       refreshDir(entry.path.split('/').slice(0, -1).join('/'));
     } catch (e) {
       toast(String((e as Error).message));

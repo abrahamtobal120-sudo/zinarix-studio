@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { runCommand } from '../commands';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
@@ -71,6 +72,9 @@ export function ActivityBar() {
       {item(sidebar === 'supabase', 'Supabase', 'supabase', () =>
         setState({ sidebar: sidebar === 'supabase' ? null : 'supabase' }),
       )}
+      {item(sidebar === 'gcloud', 'Google Cloud', 'cloud', () =>
+        setState({ sidebar: sidebar === 'gcloud' ? null : 'gcloud' }),
+      )}
       {item(sidebar === 'mail', t('mlTitle'), 'mail', () =>
         setState({ sidebar: sidebar === 'mail' ? null : 'mail' }),
       )}
@@ -126,9 +130,7 @@ export function StatusBar() {
   const workspace = useStore((s) => s.workspace);
   const settings = useStore((s) => s.settings);
   const cursor = useStore((s) => s.cursor);
-  const active = useStore((s) =>
-    s.active?.startsWith('::') ? null : s.active,
-  );
+  const active = useStore((s) => (s.active?.startsWith('::') ? null : s.active));
   const tabs = useStore((s) => s.tabs);
   const prefs = useStore((s) => s.prefs);
   const gitChanges = useStore((s) => s.gitChanges);
@@ -136,21 +138,21 @@ export function StatusBar() {
   const [provider, ...rest] = (settings.defaultModel ?? '').split('/');
   return (
     <footer className="status-bar">
-      <span className="status-item" onClick={() => void api().workspace.openDialog()}>
+      <span className="status-item" {...pressable(() => void api().workspace.openDialog())}>
         <Icon name="folder" size={13} /> {workspace?.name ?? t('openFolder')}
       </span>
       {workspace?.branch && (
         <span
           className="status-item"
           title={t('gitTitle')}
-          onClick={() => setState({ sidebar: 'git' })}
+          {...pressable(() => setState({ sidebar: 'git' }))}
         >
           <Icon name="branch" size={13} /> {workspace.branch}
           {gitChanges > 0 ? ` · ${gitChanges}` : ''}
         </span>
       )}
       {dirty > 0 && (
-        <span className="status-item" onClick={() => void runCommand('file.saveAll')}>
+        <span className="status-item" {...pressable(() => void runCommand('file.saveAll'))}>
           ● {dirty}
         </span>
       )}
@@ -163,20 +165,20 @@ export function StatusBar() {
         <span
           className={`status-item ${prefs.inlineCompletions ? '' : 'off'}`}
           title={t('setInlineHint')}
-          onClick={() => void runCommand('ai.toggleInline')}
+          {...pressable(() => void runCommand('ai.toggleInline'))}
         >
           <Icon name="agent" size={13} /> {t('inlineShort')}
         </span>
       )}
       {settings.localOnly && (
-        <span className="status-item local" onClick={() => void runCommand('ai.toggleLocal')}>
+        <span className="status-item local" {...pressable(() => void runCommand('ai.toggleLocal'))}>
           <Icon name="lock" size={13} /> {t('localOnly')}
         </span>
       )}
       <span
         className="status-item model"
         title={t('pickModel')}
-        onClick={() => setState({ modal: { kind: 'models' } })}
+        {...pressable(() => setState({ modal: { kind: 'models' } }))}
       >
         <Icon name="bolt" size={13} />{' '}
         {settings.defaultModel ? `${provider} · ${rest.join('/')}` : t('noModel')}
@@ -184,7 +186,7 @@ export function StatusBar() {
       <span
         className="status-item"
         title={t('usageTitle')}
-        onClick={() => setState({ modal: { kind: 'usage' } })}
+        {...pressable(() => setState({ modal: { kind: 'usage' } }))}
       >
         <Icon name="chart" size={13} /> {usd(settings.todayUsd)} {t('today')}
       </span>
@@ -200,7 +202,7 @@ export function Welcome() {
     if (!workspace) void api().workspace.recent().then(setRecent);
   }, [workspace]);
   const row = (label: string, keys: string, id: string, icon: IconName) => (
-    <div className="welcome-row" onClick={() => void runCommand(id)}>
+    <div className="welcome-row" {...pressable(() => void runCommand(id))}>
       <span className="welcome-row-label">
         <span
           className="tone-badge"
@@ -220,7 +222,7 @@ export function Welcome() {
       <p className="dim">{t('welcomeSub')}</p>
       {!workspace ? (
         <>
-          <div className="drop-zone" onClick={() => void api().workspace.openDialog()}>
+          <div className="drop-zone" {...pressable(() => void api().workspace.openDialog())}>
             <div className="drop-icon">
               <Icon name="folder" size={30} />
             </div>
@@ -235,7 +237,7 @@ export function Welcome() {
                 <div
                   key={r.path}
                   className="recent-row"
-                  onClick={() => void openDropped(r.path)}
+                  {...pressable(() => void openDropped(r.path))}
                   title={r.path}
                 >
                   <span>

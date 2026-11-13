@@ -71,7 +71,7 @@ export interface LicenseStatus {
   buyUrl: string;
   /** What the free plan includes (set from the website). */
   free: PlanFeatures;
-  /** Set with a plan code (zinarix at, zinarixpro at…), not a bought key. */
+  /** Forced from the state file in a development build (screenshots, tests), not a bought key. */
   code?: boolean;
   /** Who the license belongs to (Pro). */
   email?: string;

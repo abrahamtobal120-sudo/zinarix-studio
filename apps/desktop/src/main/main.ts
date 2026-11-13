@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import './system-ca.js';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
@@ -11,21 +12,25 @@ import { UI_ZOOM_STEPS } from '../shared/api.js';
 import { DEFAULT_PREFS, EVENT_CHANNEL, THEME_IDS } from '../shared/api.js';
 import { AiService } from './ai.js';
 import type { Scope } from './ai.js';
-import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName, run } from './git.js';
+import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName, runUntrustedGit } from './git.js';
 import { BrowserController } from './browser.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
 import { Vercel, linkedProject } from './vercel.js';
-import { isOwnerCode, licenseStatus, normalizeKey, parseLicense, planCode } from './license.js';
+import { CLOUD_SCOPE, GCloud } from './gcloud.js';
+import { GOOGLE_ALL_SCOPE } from './googleMail.js';
+import { licenseStatus, normalizeKey, parseLicense } from './license.js';
 import type { StoredLicense } from './license.js';
 import { startUpdates } from './updates.js';
 import { editionOf } from '../shared/edition.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
 import { PhoneRemote } from './phone.js';
-import type { PhoneRepos } from './phone.js';
+import type { PairRequest, PhoneRepos } from './phone.js';
 import { ChatBots } from './bots.js';
 import { WhatsApp } from './whatsapp.js';
 import { Watcher } from './watch.js';
+import { LspHost } from './lsp.js';
+import { Knowledge } from './knowledge.js';
 import type { RemoteNotice } from '../shared/plans.js';
 import { DOWNLOAD_URL } from '../shared/plans.js';
 import {
@@ -39,6 +44,12 @@ import {
 } from './security.js';
 import { shellProfiles, Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
+import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
+import { McpManager } from './mcp.js';
+import { DebugManager } from './debug/manager.js';
+import { ExtensionStore } from './extensions/store.js';
+
+let mcp: McpManager | undefined;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(here, '..', '..');
@@ -111,13 +122,52 @@ const phoneRepos: PhoneRepos = {
       const open = phoneOwner?.workspace?.root;
       return mapLimit(findRepos(), 8, (p) => repoView(p, p === open));
     },
-    pull: async (path) => run('git', ['pull', '--ff-only'], knownRepo(path), 300_000),
+    pull: async (path) => runUntrustedGit(['pull', '--ff-only'], knownRepo(path), 300_000),
     open: async (path) => {
       if (!phoneOwner) throw new Error('No hay ninguna ventana conectada al celular.');
       if (!(await openFolder(phoneOwner, knownRepo(path))))
         throw new Error('No se pudo abrir la carpeta.');
     },
 };
+/** How long the approval dialog waits before it counts as "no" (Cloudflare cuts at ~100 s). */
+const PAIR_APPROVAL_MS = 90_000;
+/**
+ * A device typed the right PIN: the user decides on the computer whether it gets in. The
+ * dialog is attached to the window that controls the phone, which comes to the front.
+ */
+async function approvePairing(req: PairRequest): Promise<boolean> {
+  const owner = phoneOwner?.win;
+  const parent =
+    owner && !owner.isDestroyed() ? owner : (BrowserWindow.getFocusedWindow() ?? undefined);
+  if (parent) {
+    if (parent.isMinimized()) parent.restore();
+    parent.show();
+    parent.flashFrame(true);
+  }
+  const via =
+    req.channel === 'phone' ? 'el control desde el celular' : `el bot de ${req.channel === 'telegram' ? 'Telegram' : 'Discord'}`;
+  const options: Electron.MessageBoxOptions = {
+    type: 'warning',
+    title: 'Nuevo dispositivo',
+    message: `¿Permitir que este dispositivo controle Zinarix mediante ${via}?`,
+    detail: `${req.who}\n\nEscribió el PIN correcto. Si no fuiste tú, pulsa Rechazar: el PIN cambiará. Quien se conecte podrá usar la IA y tus repositorios desde ahí.`,
+    buttons: ['Permitir', 'Rechazar'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+    signal: AbortSignal.timeout(PAIR_APPROVAL_MS),
+  };
+  try {
+    const { response } = parent
+      ? await dialog.showMessageBox(parent, options)
+      : await dialog.showMessageBox(options);
+    return response === 0;
+  } catch {
+    return false;
+  } finally {
+    if (parent && !parent.isDestroyed()) parent.flashFrame(false);
+  }
+}
 const phoneAction = (action: PhoneAction) => {
   if (phoneOwner) send(phoneOwner, { type: 'phone', action });
 };
@@ -127,13 +177,15 @@ const phone = new PhoneRemote(
     if (phoneOwner) send(phoneOwner, { type: 'phone:status', status });
   },
   phoneRepos,
+  approvePairing,
+  () => join(app.getPath('userData'), 'pairing-guard.json'),
 );
 /** Telegram / Discord bots: the same remote control, from those apps (see bots.ts). */
 const bots = new ChatBots({
   dir: () => ai.core.paths.home,
   action: phoneAction,
   repos: phoneRepos,
-  checkPin: (pin) => phone.checkPin(pin),
+  pair: (kind, pin, who, onWaiting) => phone.pair(kind, pin, who, onWaiting),
   onStatus: (status) => {
     if (phoneOwner) send(phoneOwner, { type: 'bots:status', status });
   },
@@ -164,49 +216,21 @@ function stopPhone(): void {
 
 // ---------------- repositories (for the phone) ----------------
 
-/** Folders where people usually clone: their direct subfolders with .git count as repos. */
-const CLONE_DIRS = [
-  '',
-  'Desktop',
-  'Escritorio',
-  'Documents',
-  'Documentos',
-  'projects',
-  'Projects',
-  'code',
-  'Code',
-  'dev',
-  'src',
-  'repos',
-  'git',
-  'GitHub',
-  'workspace',
-];
 const MAX_REPOS = 150;
 const isRepo = (p: string) => existsSync(join(p, '.git'));
 
 /**
- * Repositories on this computer: the ones opened or cloned in Zinarix, their sibling folders
- * and the subfolders of the usual places for code. No deep scan: it must answer quickly.
+ * Repositories the user opened or cloned in Zinarix (saved in desktop.json) and the folders
+ * open in its windows right now. Nothing else: running git in an arbitrary folder (an unzipped
+ * download in Desktop, say) would obey that folder's .git/config.
  */
 function findRepos(): string[] {
   const st = loadState();
-  const known = [...(st.repos ?? []), ...(st.recentFolders ?? [])].filter(isRepo);
-  const parents = new Set([
-    ...CLONE_DIRS.map((d) => join(homedir(), d)),
-    ...known.map((p) => dirname(p)),
-  ]);
-  const found = new Set(known);
-  for (const dir of parents) {
-    try {
-      for (const e of readdirSync(dir, { withFileTypes: true }))
-        if (e.isDirectory() && !e.name.startsWith('.') && isRepo(join(dir, e.name)))
-          found.add(join(dir, e.name));
-    } catch {
-      // The folder does not exist here (another language, another layout).
-    }
-  }
-  return [...found].slice(0, MAX_REPOS);
+  const open = [...wins.values()].flatMap((w) => (w.workspace ? [w.workspace.root] : []));
+  const found = new Set(
+    [...open, ...(st.repos ?? []), ...(st.recentFolders ?? [])].map((p) => resolve(p)),
+  );
+  return [...found].filter(isRepo).slice(0, MAX_REPOS);
 }
 
 /** A path the phone sent, only if it is one of the repositories it was shown. */
@@ -227,7 +251,7 @@ async function repoView(path: string, open: boolean): Promise<PhoneRepo> {
     open,
   };
   try {
-    const out = await run('git', ['status', '--porcelain=v2', '--branch'], path, 15_000);
+    const out = await runUntrustedGit(['status', '--porcelain=v2', '--branch'], path, 15_000);
     for (const line of out.split('\n')) {
       if (line.startsWith('# branch.head ')) view.branch = line.slice(14);
       else if (line.startsWith('# branch.ab ')) {
@@ -310,7 +334,7 @@ function saveState(patch: Partial<DesktopState>): void {
 
 /** The plan of this installation (trial, Pro, owner or free). */
 function license() {
-  return licenseStatus(loadState(), undefined, undefined, edition);
+  return licenseStatus(loadState(), undefined, undefined, edition, { devPlans: !app.isPackaged });
 }
 
 function planName(): string {
@@ -484,6 +508,60 @@ function git(w: Win): Git {
 const str = z.string().max(4096);
 const rel = z.string().max(4096);
 const big = z.string().max(50 * 1024 * 1024);
+
+/** Language servers of each window (by webContents id), rooted at its open folder. */
+const lspHosts = new Map<number, LspHost>();
+/** workspace/applyEdit requests waiting for the renderer. */
+const lspEdits = new Map<number, (applied: boolean) => void>();
+let lspEditId = 0;
+/** Debug session of each window (by webContents id). */
+const debugSessions = new Map<number, DebugManager>();
+function debugOf(w: Win): DebugManager {
+  let d = debugSessions.get(w.id);
+  if (!d) {
+    d = new DebugManager((event) => send(w, { type: 'debug', event }));
+    debugSessions.set(w.id, d);
+  }
+  return d;
+}
+let extStore: ExtensionStore | undefined;
+function extensions(): ExtensionStore {
+  return (extStore ??= new ExtensionStore(app.getPath('userData')));
+}
+
+function lspOf(w: Win): LspHost {
+  let h = lspHosts.get(w.id);
+  if (!h) {
+    h = new LspHost(
+      {
+        diagnostics: (path, diagnostics) => send(w, { type: 'lsp:diagnostics', path, diagnostics }),
+        status: (status) => send(w, { type: 'lsp:status', status }),
+        applyEdit: (edit) =>
+          new Promise<boolean>((resolve) => {
+            const id = ++lspEditId;
+            const timer = setTimeout(() => {
+              lspEdits.delete(id);
+              resolve(false);
+            }, 30_000);
+            lspEdits.set(id, (ok) => {
+              clearTimeout(timer);
+              lspEdits.delete(id);
+              resolve(ok);
+            });
+            send(w, { type: 'lsp:applyEdit', id, edit });
+          }),
+      },
+      {
+        enabled: () => prefs().lsp !== false,
+        commands: () => prefs().lspCommands ?? {},
+        dataDir: app.getPath('userData'),
+      },
+    );
+    lspHosts.set(w.id, h);
+  }
+  h.setRoot(w.workspace?.root);
+  return h;
+}
 const id = z.number().int().positive();
 /** Conversation ids are full UUIDs (history lookups also match prefixes for the CLI). */
 const conv = z.string().uuid();
@@ -528,6 +606,7 @@ function registerIpc(): void {
   handle('workspace:close', z.tuple([]), (w) => {
     w.workspace?.dispose();
     w.workspace = undefined;
+    lspHosts.get(w.id)?.setRoot(undefined);
     w.win.setTitle(APP_NAME);
     send(w, { type: 'workspace', workspace: null });
   });
@@ -653,6 +732,104 @@ function registerIpc(): void {
       }),
     ]),
     (w, requestId, req) => ai.complete(rid(w, requestId), req),
+  );
+  handle(
+    'ai:nextEdit',
+    z.tuple([
+      str,
+      z.object({
+        path: rel,
+        language: z.string().max(64),
+        edits: z.string().max(20_000),
+        startLine: z.number().int().min(1),
+        lines: z.array(z.string().max(10_000)).max(200),
+        cursor: z.object({ line: z.number().int().min(1), column: z.number().int().min(1) }),
+      }),
+    ]),
+    (w, requestId, req) => ai.nextEdit(rid(w, requestId), req),
+  );
+  // Language servers (LSP): documents in, Monaco features out (see lsp.ts).
+  const lspLang = z.string().min(1).max(64);
+  handle('lsp:open', z.tuple([rel, lspLang, big]), (w, path, language, text) =>
+    lspOf(w).open(path, language, text),
+  );
+  handle('lsp:change', z.tuple([rel, big]), (w, path, text) => lspOf(w).change(path, text));
+  handle('lsp:save', z.tuple([rel]), (w, path) => lspOf(w).save(path));
+  handle('lsp:close', z.tuple([rel]), (w, path) => lspOf(w).close(path));
+  handle('lsp:request', z.tuple([rel, z.string().min(1).max(100), z.unknown()]), (w, path, m, p) =>
+    lspOf(w).request(path, m, p),
+  );
+  handle('lsp:applyEditResult', z.tuple([z.number().int(), z.boolean()]), (_w, id, ok) =>
+    lspEdits.get(id)?.(ok),
+  );
+  handle('lsp:statuses', z.tuple([]), (w) => lspOf(w).statuses());
+  handle('lsp:restart', z.tuple([]), (w) => lspOf(w).restart());
+  // Debugger: one session per window, rooted at its open folder.
+  const bpList = z
+    .array(
+      z.object({
+        line: z.number().int().min(1).max(10_000_000),
+        condition: z.string().max(2000).optional(),
+      }),
+    )
+    .max(5000);
+  const debugConfig = z.object({
+    name: z.string().max(200),
+    type: z.string().min(1).max(64),
+    request: z.enum(['launch', 'attach']),
+    program: z.string().max(4096).optional(),
+    args: z.array(z.string().max(10_000)).max(500).optional(),
+    cwd: z.string().max(4096).optional(),
+    env: z.record(z.string().max(256), z.string().max(32_768)).optional(),
+    port: z.number().int().min(1).max(65_535).optional(),
+    host: z.string().max(255).optional(),
+    stopOnEntry: z.boolean().optional(),
+  });
+  handle('debug:configs', z.tuple([rel.optional()]), (w, file) =>
+    debugOf(w).configs(ws(w).root, file),
+  );
+  handle(
+    'debug:start',
+    z.tuple([debugConfig.nullable(), rel.optional(), z.record(rel, bpList)]),
+    (w, config, file, bps) => debugOf(w).start(ws(w).root, config, file, bps),
+  );
+  handle('debug:stop', z.tuple([]), (w) => debugOf(w).stop());
+  handle('debug:restart', z.tuple([]), (w) => debugOf(w).restart());
+  handle('debug:continue', z.tuple([]), (w) => debugOf(w).resume());
+  handle('debug:pause', z.tuple([]), (w) => debugOf(w).pause());
+  handle('debug:step', z.tuple([z.enum(['over', 'into', 'out'])]), (w, k) => debugOf(w).step(k));
+  handle('debug:scopes', z.tuple([z.number().int()]), (w, f) => debugOf(w).scopes(f));
+  handle('debug:variables', z.tuple([z.number().int()]), (w, r) => debugOf(w).variables(r));
+  handle(
+    'debug:evaluate',
+    z.tuple([z.string().max(100_000), z.number().int().optional()]),
+    (w, e, f) => debugOf(w).evaluate(e, f),
+  );
+  handle('debug:setBreakpoints', z.tuple([rel, bpList]), (w, p, b) =>
+    debugOf(w).setBreakpoints(p, b),
+  );
+  // Extensions (Open VSX): shared by every window; they all hear about changes.
+  const extId = z.string().min(1).max(300);
+  const extPart = z
+    .string()
+    .min(1)
+    .max(150)
+    .regex(/^[\w.-]+$/);
+  const extChanged = <T>(r: T): T => {
+    for (const x of wins.values()) send(x, { type: 'extensions:changed' });
+    return r;
+  };
+  handle('ext:search', z.tuple([z.string().max(200)]), (_w, q) => extensions().search(q));
+  handle('ext:icon', z.tuple([z.string().max(4096)]), (_w, url) => extensions().icon(url));
+  handle('ext:install', z.tuple([extPart, extPart]), async (_w, ns, name) =>
+    extChanged(await extensions().install(ns, name)),
+  );
+  handle('ext:uninstall', z.tuple([extId]), async (_w, id) =>
+    extChanged(await extensions().uninstall(id)),
+  );
+  handle('ext:list', z.tuple([]), () => extensions().list());
+  handle('ext:setEnabled', z.tuple([extId, z.boolean()]), async (_w, id, on) =>
+    extChanged(await extensions().setEnabled(id, on)),
   );
   handle('ai:commitMessage', z.tuple([]), async (w) => {
     const g = git(w);
@@ -781,6 +958,27 @@ function registerIpc(): void {
   );
   const mail = new Mail(app.getPath('userData'));
   ai.agent.mail = mail;
+  // MCP servers for the agent: the global ones start now, a project's once it is trusted.
+  mcp = new McpManager(app.getPath('userData'));
+  ai.agent.mcp = mcp;
+  const mcpMgr = mcp;
+  mcpMgr.sync();
+  handle('mcp:status', z.tuple([]), (w) => {
+    const root = w.workspace?.root;
+    return { servers: mcpMgr.status(root), project: mcpMgr.project(root) };
+  });
+  handle('mcp:config', z.tuple([]), () => mcpMgr.readGlobal());
+  handle('mcp:saveConfig', z.tuple([z.string().max(1_000_000)]), (_w, text) =>
+    mcpMgr.saveGlobal(text),
+  );
+  handle('mcp:restart', z.tuple([z.string().min(1).max(200)]), (_w, id) => mcpMgr.restart(id));
+  handle('mcp:setEnabled', z.tuple([z.string().min(1).max(100), z.boolean()]), (_w, n, on) =>
+    mcpMgr.setEnabled(n, on),
+  );
+  handle('mcp:trustProject', z.tuple([z.boolean()]), (w, on) => {
+    const root = w.workspace?.root;
+    if (root) mcpMgr.trustProject(root, on);
+  });
   const box = z.string().min(1).max(1000);
   const uid = z.number().int().positive();
   const host = z.string().trim().min(1).max(253);
@@ -809,9 +1007,64 @@ function registerIpc(): void {
     z.tuple([z.string().trim().min(10).max(300), z.string().trim().max(300)]),
     (_w, clientId, clientSecret) => mail.google.setClient({ clientId, clientSecret }),
   );
-  handle('mail:googleLogin', z.tuple([z.string().trim().max(200).optional()]), (_w, name) =>
-    mail.googleLogin((url) => void shell.openExternal(url), name),
+  // Google Cloud: the same OAuth client as Gmail, asking for the cloud-platform scope.
+  const gcloud = new GCloud(app.getPath('userData'), mail.google);
+  ai.agent.gcloud = gcloud;
+
+  /**
+   * One "Sign in with Google" for everything: asks for Gmail and Google Cloud together and
+   * connects each panel the user granted. The other one failing never undoes the first.
+   */
+  const googleAll = async (name?: string) => {
+    const g = await mail.google.login((url) => void shell.openExternal(url), GOOGLE_ALL_SCOPE);
+    const granted = g.scope.split(/\s+/);
+    if (granted.includes(CLOUD_SCOPE)) gcloud.addAccount(g.refresh, g.email);
+    let mailError: unknown = null;
+    if (granted.includes('https://mail.google.com/'))
+      await mail.addGoogle(g, name).catch((e: unknown) => (mailError = e));
+    return { granted, mailError };
+  };
+
+  handle('mail:googleLogin', z.tuple([z.string().trim().max(200).optional()]), async (_w, name) => {
+    const r = await googleAll(name);
+    if (r.mailError) throw r.mailError;
+    if (!r.granted.includes('https://mail.google.com/'))
+      throw new Error('No diste permiso para el correo: vuelve a iniciar sesión y marca Gmail.');
+    return mail.status();
+  });
+  const gproj = z.string().regex(/^[\w.:-]{1,100}$/);
+  const gname = z.string().regex(/^[\w.-]{1,1024}$/);
+  handle('gcloud:status', z.tuple([]), () => gcloud.status());
+  handle('gcloud:login', z.tuple([]), async () => {
+    const r = await googleAll();
+    if (!r.granted.includes(CLOUD_SCOPE))
+      throw new Error('No diste permiso para Google Cloud: vuelve a iniciar sesión y márcalo.');
+    return gcloud.status();
+  });
+  handle('gcloud:prepare', z.tuple([gproj]), (_w, p) => gcloud.prepare(p));
+  handle('gcloud:useAccount', z.tuple([accountId]), (_w, id) => gcloud.useAccount(id));
+  handle('gcloud:logout', z.tuple([accountId.optional()]), (_w, id) => gcloud.logout(id));
+  handle('gcloud:projects', z.tuple([]), () => gcloud.projects());
+  handle('gcloud:services', z.tuple([gproj, z.boolean()]), (_w, p, all) => gcloud.services(p, all));
+  handle(
+    'gcloud:setService',
+    z.tuple([gproj, z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/).max(200), z.boolean()]),
+    (_w, p, svc, on) => gcloud.setService(p, svc, on),
   );
+  handle('gcloud:datasets', z.tuple([gproj]), (_w, p) => gcloud.datasets(p));
+  handle('gcloud:tables', z.tuple([gproj, gname]), (_w, p, d) => gcloud.tables(p, d));
+  handle('gcloud:query', z.tuple([gproj, z.string().min(1).max(200_000)]), (_w, p, sql) =>
+    gcloud.query(p, sql),
+  );
+  handle('gcloud:buckets', z.tuple([gproj]), (_w, p) => gcloud.buckets(p));
+  handle('gcloud:objects', z.tuple([gname, z.string().max(1024)]), (_w, b, prefix) =>
+    gcloud.objects(b, prefix),
+  );
+  handle('gcloud:sqlInstances', z.tuple([gproj]), (_w, p) => gcloud.sqlInstances(p));
+  handle('gcloud:sqlPower', z.tuple([gproj, gname, z.boolean()]), (_w, p, i, on) =>
+    gcloud.sqlPower(p, i, on),
+  );
+  handle('gcloud:logs', z.tuple([gproj, z.string().max(2000)]), (_w, p, f) => gcloud.logs(p, f));
   const email = z.string().trim().email().max(320);
   handle('mail:logout', z.tuple([email.optional()]), (_w, e) => mail.logout(e));
   handle('mail:useAccount', z.tuple([email]), (_w, e) => mail.useAccount(e));
@@ -1016,12 +1269,17 @@ function registerIpc(): void {
       inlineCompletions: z.boolean(),
       projectRules: z.boolean(),
       keybindings: z.record(z.string().max(100), z.string().max(60)),
+      lsp: z.boolean(),
+      lspCommands: z.record(z.string().max(64), z.string().max(2000)),
+      nextEdit: z.boolean(),
     })
     .partial();
   handle('app:prefs', z.tuple([]), () => prefs());
   handle('app:setPrefs', z.tuple([prefsPatch]), (w, patch) => {
     const next = { ...prefs(), ...patch };
     saveState({ prefs: next });
+    if (patch.lsp !== undefined || patch.lspCommands)
+      for (const h of lspHosts.values()) void h.restart();
     ai.useRules = next.projectRules;
     applyZoom();
     broadcastSettings(w);
@@ -1042,6 +1300,15 @@ function registerIpc(): void {
         agent: z.boolean().optional(),
         folder: z.string().min(1).max(4096).optional(),
         noFolder: z.boolean().optional(),
+        images: z
+          .array(
+            z.object({
+              mediaType: z.enum(IMAGE_TYPES),
+              data: z.string().min(1).max(MAX_IMAGE_B64).regex(/^[A-Za-z0-9+/=]+$/),
+            }),
+          )
+          .max(MAX_IMAGES)
+          .optional(),
       }),
     ]),
     (w, requestId, { folder, noFolder, ...req }) => {
@@ -1391,17 +1658,69 @@ function registerIpc(): void {
   handle('watch:seen', z.tuple([]), () => watcher.seen());
   handle('watch:dismiss', z.tuple([z.string().uuid()]), (_w, id) => watcher.dismiss(id));
 
+  // Knowledge: memories, indexed docs (@Docs) and the project's search-by-meaning index.
+  const knowledge = new Knowledge(join(app.getPath('userData'), 'knowledge'), ai.core);
+  ai.agent.knowledge = knowledge;
+  let knowledgeTimer: NodeJS.Timeout | undefined;
+  knowledge.onChange = () => {
+    clearTimeout(knowledgeTimer);
+    knowledgeTimer = setTimeout(() => {
+      for (const w of wins.values()) send(w, { type: 'knowledge:changed' });
+    }, 200);
+  };
+  const memoryText = z.string().trim().min(1).max(2000);
+  handle('knowledge:memories', z.tuple([]), () => knowledge.memories(undefined, true));
+  handle(
+    'knowledge:addMemory',
+    z.tuple([memoryText, z.enum(['global', 'project'])]),
+    (w, text, scope) => knowledge.addMemory(text, scope, w.workspace?.root),
+  );
+  handle('knowledge:updateMemory', z.tuple([z.string().min(1).max(64), memoryText]), (_w, id, text) =>
+    knowledge.updateMemory(id, text),
+  );
+  handle('knowledge:removeMemory', z.tuple([z.string().min(1).max(64)]), (_w, id) =>
+    knowledge.removeMemory(id),
+  );
+  handle('knowledge:docs', z.tuple([]), () => knowledge.docs());
+  handle(
+    'knowledge:addDocs',
+    z.tuple([z.string().trim().max(80), z.string().trim().url().max(2048)]),
+    (_w, name, url) => knowledge.addDocs(name, url),
+  );
+  handle('knowledge:removeDocs', z.tuple([z.string().min(1).max(64)]), (_w, id) =>
+    knowledge.removeDocs(id),
+  );
+  handle('knowledge:reindexDocs', z.tuple([z.string().min(1).max(64)]), (_w, id) =>
+    knowledge.reindexDocs(id),
+  );
+  handle(
+    'knowledge:search',
+    z.tuple([z.string().trim().min(1).max(2000), z.number().int().min(1).max(50).optional()]),
+    async (w, query, limit) => {
+      if (!w.workspace) return { hits: [], semantic: false, files: 0 };
+      return knowledge.codeSearch(w.workspace, query, limit ?? 20, AbortSignal.timeout(120_000));
+    },
+  );
+  handle(
+    'knowledge:searchDocs',
+    z.tuple([z.string().trim().min(1).max(4000), z.string().max(80).optional()]),
+    (_w, query, source) => knowledge.docsSearch(query, source, 6),
+  );
+  handle('knowledge:embedModel', z.tuple([]), () => knowledge.embedModel());
+  handle('knowledge:setEmbedModel', z.tuple([str.nullable()]), (w, ref) => {
+    knowledge.setEmbedModel(ref);
+    broadcastSettings(w);
+  });
+
   handle('license:status', z.tuple([]), () => license());
   handle('license:activate', z.tuple([z.string().min(1).max(8192)]), (w, input) => {
-    const code = planCode(input);
-    if (isOwnerCode(input)) saveState({ owner: true, license: undefined, codePlan: undefined });
-    else if (code) saveState({ codePlan: code, owner: undefined, license: undefined });
-    else {
-      const key = normalizeKey(input);
-      const p = parseLicense(key);
-      if (p.exp && p.exp < Date.now()) throw new Error('Esta licencia ya venció.');
-      saveState({ license: key, owner: undefined, codePlan: undefined });
-    }
+    // Only signed keys (ZX1.…): plan codes and the owner's word are gone.
+    const key = normalizeKey(input);
+    const p = parseLicense(key);
+    if (p.exp && p.exp < Date.now()) throw new Error('Esta licencia ya venció.');
+    if (loadState().revoked?.includes(p.id))
+      throw new Error('Esta licencia fue cancelada (reembolso o disputa del pago).');
+    saveState({ license: key, owner: undefined, codePlan: undefined });
     broadcastSettings(w);
     return license();
   });
@@ -1680,6 +1999,10 @@ async function createWindow(
     send(w, { type: 'command', command: 'app.requestClose' });
   });
   win.on('closed', () => {
+    void lspHosts.get(w.id)?.dispose();
+    lspHosts.delete(w.id);
+    void debugSessions.get(w.id)?.stop();
+    debugSessions.delete(w.id);
     w.browser.destroy();
     whatsapp.release(win);
     for (const r of w.requests) ai?.abort(r);
@@ -1752,12 +2075,15 @@ let available: { version: string; url: string } | undefined;
  * changes (the last plans read stay in use).
  */
 async function refreshRemote(): Promise<boolean> {
-  const r = await fetchRemote();
+  const r = await fetchRemote({ packaged: app.isPackaged });
   if (r) {
     const st = loadState();
-    const changed = JSON.stringify(st.plans ?? null) !== JSON.stringify(r.plans);
+    const changed =
+      JSON.stringify(st.plans ?? null) !== JSON.stringify(r.plans) ||
+      JSON.stringify(st.revoked ?? []) !== JSON.stringify(r.revoked);
     saveState({
       plans: r.plans,
+      revoked: r.revoked,
       ...(r.plans.billing && !st.billingSince ? { billingSince: Date.now() } : {}),
     });
     if (changed) for (const w of wins.values()) send(w, { type: 'settings:changed' });
@@ -1842,6 +2168,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   watcher?.stop();
+  mcp?.shutdown();
   stopPhone();
   whatsapp.destroy();
   terminals.killAll();

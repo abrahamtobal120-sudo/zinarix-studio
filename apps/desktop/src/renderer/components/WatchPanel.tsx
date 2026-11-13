@@ -25,11 +25,10 @@ function place(file: string): { path: string; line?: number } {
 }
 
 function fixPrompt(r: WatchReport, it: WatchItem): string {
-  return (
-    `El Vigía revisó el proyecto y sugiere esto (${it.kind === 'fix' ? 'arreglo' : 'mejora'}):\n\n` +
-    `**${it.title}**${it.file ? ` (${it.file})` : ''}\n${it.detail}\n\n` +
-    'Revisa si sigue aplicando y, si es así, hazlo.'
-  );
+  return t('wtFixPrompt', {
+    kind: it.kind === 'fix' ? t('wtKindFix') : t('wtKindImprove'),
+    body: `**${it.title}**${it.file ? ` (${it.file})` : ''}\n${it.detail}`,
+  });
 }
 
 export function WatchPanel() {

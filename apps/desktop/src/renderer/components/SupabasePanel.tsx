@@ -19,6 +19,8 @@ import type {
   SupabaseTableView,
   SupabaseUserView,
 } from '../../shared/api';
+import { confirmDialog } from '../confirm';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, setState, toast, useStore } from '../store';
 import { runInTerminal } from './Terminal';
@@ -366,9 +368,9 @@ function SupabaseBody({ reset }: { reset: () => void }) {
     setRef(null);
   };
 
-  const runSql = () => {
+  const runSql = async () => {
     if (!ref || !sql.trim() || busy) return;
-    if (!READ_ONLY.test(sql) && !confirm(t('sbWriteConfirm'))) return;
+    if (!READ_ONLY.test(sql) && !(await confirmDialog(t('sbWriteConfirm')))) return;
     const q = sql.trim();
     void act('sql', async () => {
       setResult(await api().supabase.query(ref, q));
@@ -426,10 +428,15 @@ function SupabaseBody({ reset }: { reset: () => void }) {
     });
   };
 
-  const saveAuthConfig = () => {
+  const saveAuthConfig = async () => {
     if (!ref || !authDraft) return;
     const c = authDraft;
-    if (c.disableSignup && !authCfg?.disableSignup && !confirm(t('sbAuthSignupConfirm'))) return;
+    if (
+      c.disableSignup &&
+      !authCfg?.disableSignup &&
+      !(await confirmDialog(t('sbAuthSignupConfirm')))
+    )
+      return;
     void act('auth', async () => {
       await api().supabase.setAuthConfig(ref, c);
       const fresh = await api().supabase.authConfig(ref);
@@ -439,9 +446,13 @@ function SupabaseBody({ reset }: { reset: () => void }) {
     });
   };
 
-  const sendEmail = (kind: 'invite' | 'magiclink' | 'recovery', email: string, redirect = '') => {
+  const sendEmail = async (
+    kind: 'invite' | 'magiclink' | 'recovery',
+    email: string,
+    redirect = '',
+  ) => {
     if (!ref || !email.trim()) return;
-    if (kind === 'invite' && !confirm(t('sbMailInviteConfirm', { email }))) return;
+    if (kind === 'invite' && !(await confirmDialog(t('sbMailInviteConfirm', { email })))) return;
     void act('mail', async () => {
       await api().supabase.sendEmail(ref, kind, email.trim(), redirect);
       toast(t('sbMailSent', { email: email.trim() }));
@@ -467,7 +478,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
     });
   };
 
-  const saveSmtp = () => {
+  const saveSmtp = async () => {
     if (!ref || !smtpDraft) return;
     const { on, rate, ...d } = smtpDraft;
     const smtp = {
@@ -477,7 +488,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
       senderEmail: d.senderEmail.trim(),
       senderName: d.senderName.trim(),
     };
-    if (!on && emailCfg?.smtp && !confirm(t('sbSmtpOffConfirm'))) return;
+    if (!on && emailCfg?.smtp && !(await confirmDialog(t('sbSmtpOffConfirm'), { danger: true })))
+      return;
     void act('mail', async () => {
       await api().supabase.setSmtp(ref, on ? smtp : null, on && rate ? Number(rate) : null);
       setEmailCfg(await api().supabase.emailConfig(ref));
@@ -508,10 +520,15 @@ function SupabaseBody({ reset }: { reset: () => void }) {
     });
   };
 
-  const toggleRls = (tb: SupabaseTableView) => {
+  const toggleRls = async (tb: SupabaseTableView) => {
     if (!ref) return;
     const key = `${tb.schema}.${tb.name}`;
-    if (!confirm(tb.rls ? t('sbRlsOffConfirm', { key }) : t('sbRlsOnConfirm', { key }))) return;
+    if (
+      !(await confirmDialog(tb.rls ? t('sbRlsOffConfirm', { key }) : t('sbRlsOnConfirm', { key }), {
+        danger: true,
+      }))
+    )
+      return;
     void act('rls', async () => {
       await api().supabase.setRls(ref, tb.schema, tb.name, !tb.rls);
       setTables(await api().supabase.tables(ref));
@@ -583,8 +600,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
       onAdd={() => setAdding(true)}
       onLogout={
         st.source === 'app'
-          ? () => {
-              if (confirm(t('sbLogoutConfirm')))
+          ? async () => {
+              if (await confirmDialog(t('sbLogoutConfirm'), { danger: true }))
                 void act('logout', async () => {
                   await api().supabase.logout();
                   reset();
@@ -711,7 +728,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
               key={p.ref}
               className="git-row"
               title={`${p.ref} · ${p.region}`}
-              onClick={() => choose(p)}
+              {...pressable(() => choose(p))}
             >
               <span className={`git-icon ${statusClass(p.status)}`}>●</span>
               <span className="git-name">{p.name}</span>
@@ -797,8 +814,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                 className="primary"
                 disabled={!workspace}
                 title={t('sbPushTitle')}
-                onClick={() => {
-                  if (confirm(t('sbPushConfirm'))) inTerminal(st.cli, 'db push');
+                onClick={async () => {
+                  if (await confirmDialog(t('sbPushConfirm'))) inTerminal(st.cli, 'db push');
                 }}
               >
                 <Icon name="push" size={14} /> {t('sbPush')}
@@ -825,8 +842,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
           {project?.status === 'ACTIVE_HEALTHY' && (
             <button
               title={t('sbPause')}
-              onClick={() => {
-                if (!confirm(t('sbPauseConfirm'))) return;
+              onClick={async () => {
+                if (!(await confirmDialog(t('sbPauseConfirm'), { danger: true }))) return;
                 void act('pause', async () => {
                   await api().supabase.pause(ref);
                   toast(t('sbPausingToast'));
@@ -902,9 +919,9 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                           <div
                             className={`git-row ${preview?.key === key ? 'on' : ''}`}
                             title={tb.rls ? key : `${key}\n${t('sbNoRlsTitle')}`}
-                            onClick={() =>
-                              preview?.key === key ? setPreview(null) : showTable(tb, 'rows')
-                            }
+                            {...pressable(() =>
+                              preview?.key === key ? setPreview(null) : showTable(tb, 'rows'),
+                            )}
                           >
                             <span className="git-icon">
                               <Icon name="hash" size={12} />
@@ -986,8 +1003,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                                       <tr>
                                         <th>{t('sbColName')}</th>
                                         <th>{t('sbColType')}</th>
-                                        <th>null</th>
-                                        <th>default</th>
+                                        <th>{t('sbColNullable')}</th>
+                                        <th>{t('sbColDefault')}</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -1104,7 +1121,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                   key={f.slug}
                   className="git-row"
                   title={`${f.slug} · v${f.version}`}
-                  onClick={() => open(`${dash}/functions/${f.slug}`)}
+                  {...pressable(() => open(`${dash}/functions/${f.slug}`))}
                 >
                   <span className={`git-icon ${f.status === 'ACTIVE' ? 'added' : 'modified'}`}>
                     ●
@@ -1135,8 +1152,13 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                     )}
                     <button
                       title={t('sbFnDelete')}
-                      onClick={() => {
-                        if (!confirm(t('sbFnDeleteConfirm', { name: f.name }))) return;
+                      onClick={async () => {
+                        if (
+                          !(await confirmDialog(t('sbFnDeleteConfirm', { name: f.name }), {
+                            danger: true,
+                          }))
+                        )
+                          return;
                         void act('delete', async () => {
                           await api().supabase.deleteFunction(ref, f.slug);
                           setFns(await api().supabase.functions(ref));
@@ -1198,7 +1220,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                     <input
                       type="email"
                       value={mailTo.email}
-                      placeholder="persona@correo.com"
+                      placeholder={t('phPersonEmail')}
                       spellCheck={false}
                       onChange={(e) => setMailTo({ ...mailTo, email: e.target.value })}
                     />
@@ -1243,7 +1265,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                     <div
                       className="git-row"
                       title={t('sbSmtpSender')}
-                      onClick={() => copy(emailCfg.smtp!.senderEmail)}
+                      {...pressable(() => copy(emailCfg.smtp!.senderEmail))}
                     >
                       <span className="git-icon added">●</span>
                       <span className="git-name">
@@ -1276,7 +1298,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       {smtpDraft.on && (
                         <>
                           <label>
-                            <span>Host</span>
+                            <span>{t('sbSmtpHost')}</span>
                             <input
                               value={smtpDraft.host}
                               placeholder="smtp.resend.com"
@@ -1322,7 +1344,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                             <input
                               type="email"
                               value={smtpDraft.senderEmail}
-                              placeholder="no-reply@miapp.com"
+                              placeholder={t('phNoReplyEmail')}
                               spellCheck={false}
                               onChange={(e) =>
                                 setSmtpDraft({ ...smtpDraft, senderEmail: e.target.value })
@@ -1333,7 +1355,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                             <span>{t('sbSmtpSenderName')}</span>
                             <input
                               value={smtpDraft.senderName}
-                              placeholder="Mi App"
+                              placeholder={t('phAppName')}
                               onChange={(e) =>
                                 setSmtpDraft({ ...smtpDraft, senderName: e.target.value })
                               }
@@ -1383,14 +1405,14 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       key={k}
                       className={`git-row${tplDraft && tplKind === k ? ' on' : ''}`}
                       title={t('vcEnvEdit')}
-                      onClick={() => {
+                      {...pressable(() => {
                         if (tplDraft && tplKind === k) {
                           setTplDraft(null);
                           return;
                         }
                         setTplKind(k);
                         setTplDraft({ ...emailCfg.templates[k] });
-                      }}
+                      })}
                     >
                       <span className="git-icon">
                         <Icon name="mail" size={13} />
@@ -1454,8 +1476,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                 {workspace && (
                   <button
                     title={t('sbSecretsFileTitle')}
-                    onClick={() => {
-                      if (confirm(t('sbSecretsFileConfirm')))
+                    onClick={async () => {
+                      if (await confirmDialog(t('sbSecretsFileConfirm')))
                         inTerminal(st.cli, 'secrets set --env-file supabase/functions/.env');
                     }}
                   >
@@ -1467,7 +1489,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                 <div className="vc-form">
                   <input
                     value={secretForm.name}
-                    placeholder="NOMBRE_SECRETO"
+                    placeholder={t('phSecretName')}
                     spellCheck={false}
                     autoFocus
                     onChange={(e) =>
@@ -1512,8 +1534,13 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                         </button>
                         <button
                           title={t('vcEnvDelete')}
-                          onClick={() => {
-                            if (!confirm(t('vcEnvDeleteConfirm', { key: name }))) return;
+                          onClick={async () => {
+                            if (
+                              !(await confirmDialog(t('vcEnvDeleteConfirm', { key: name }), {
+                                danger: true,
+                              }))
+                            )
+                              return;
                             void act('secret', async () => {
                               await api().supabase.deleteSecret(ref, name);
                               setSecrets(await api().supabase.secrets(ref));
@@ -1540,13 +1567,13 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                 <div key={b.id}>
                   <div
                     className={`git-row ${files?.bucket === b.id ? 'on' : ''}`}
-                    onClick={() =>
+                    {...pressable(() =>
                       files?.bucket === b.id
                         ? setFiles(null)
                         : void act('files', async () =>
                             setFiles({ bucket: b.id, r: await api().supabase.files(ref, b.id) }),
-                          )
-                    }
+                          ),
+                    )}
                   >
                     <span className="git-icon">
                       <Icon name="folder" size={13} />
@@ -1600,10 +1627,10 @@ function SupabaseBody({ reset }: { reset: () => void }) {
               {authDraft && (
                 <div className="vc-form vc-settings">
                   <label>
-                    <span>Site URL</span>
+                    <span>{t('sbSiteUrl')}</span>
                     <input
                       value={authDraft.siteUrl}
-                      placeholder="https://miapp.com"
+                      placeholder={t('phAppUrl')}
                       spellCheck={false}
                       onChange={(e) => setAuthDraft({ ...authDraft, siteUrl: e.target.value })}
                     />
@@ -1612,7 +1639,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                     <span>{t('sbRedirectUrls')}</span>
                     <textarea
                       value={authDraft.redirectUrls.join('\n')}
-                      placeholder={'http://localhost:3000/**\nhttps://miapp.com/auth/callback'}
+                      placeholder={`http://localhost:3000/**\n${t('phAppUrl')}/auth/callback`}
                       spellCheck={false}
                       rows={3}
                       onChange={(e) =>
@@ -1688,7 +1715,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                         ? `\n${t('sbUserLastSignIn')}: ${new Date(u.lastSignIn).toLocaleString()}`
                         : ''
                     }`}
-                    onClick={() => copy(u.id, t('sbIdCopied'))}
+                    {...pressable(() => copy(u.id, t('sbIdCopied')))}
                   >
                     <span className={`git-icon ${u.confirmed ? 'added' : 'modified'}`}>●</span>
                     <span className="git-name">{u.email ?? u.id}</span>
@@ -1700,8 +1727,10 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       {u.email?.includes('@') && (
                         <button
                           title={t('sbMailRecoveryTitle')}
-                          onClick={() => {
-                            if (confirm(t('sbMailRecoveryConfirm', { email: u.email! })))
+                          onClick={async () => {
+                            if (
+                              await confirmDialog(t('sbMailRecoveryConfirm', { email: u.email! }))
+                            )
                               sendEmail('recovery', u.email!);
                           }}
                         >
@@ -1710,8 +1739,14 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       )}
                       <button
                         title={t('sbUserDelete')}
-                        onClick={() => {
-                          if (!confirm(t('sbUserDeleteConfirm', { name: u.email ?? u.id }))) return;
+                        onClick={async () => {
+                          if (
+                            !(await confirmDialog(
+                              t('sbUserDeleteConfirm', { name: u.email ?? u.id }),
+                              { danger: true },
+                            ))
+                          )
+                            return;
                           void act('delete', async () => {
                             await api().supabase.deleteUser(ref, u.id);
                             setUsers(
@@ -1750,8 +1785,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                   </button>
                   <button
                     title={t('sbPullTitle')}
-                    onClick={() => {
-                      if (confirm(t('sbPullConfirm'))) inTerminal(st.cli, 'db pull');
+                    onClick={async () => {
+                      if (await confirmDialog(t('sbPullConfirm'))) inTerminal(st.cli, 'db pull');
                     }}
                   >
                     <Icon name="pull" size={14} /> pull
@@ -1828,7 +1863,11 @@ function SupabaseBody({ reset }: { reset: () => void }) {
             <div className="tree git-list">
               {apiInfo && (
                 <>
-                  <div className="git-row" onClick={() => copy(apiInfo.url)} title={t('vcCopyUrl')}>
+                  <div
+                    className="git-row"
+                    {...pressable(() => copy(apiInfo.url))}
+                    title={t('vcCopyUrl')}
+                  >
                     <span className="git-icon">
                       <Icon name="globe" size={13} />
                     </span>
@@ -1842,7 +1881,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       key={k.name}
                       className="git-row"
                       title={t('sbCopyKey')}
-                      onClick={() => copy(k.key, t('sbKeyCopied'))}
+                      {...pressable(() => copy(k.key, t('sbKeyCopied')))}
                     >
                       <span className="git-icon">
                         <Icon name="key" size={13} />

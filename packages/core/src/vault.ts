@@ -1,5 +1,15 @@
-import { argon2Sync, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { argon2Sync, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { resolve } from 'node:path';
 import { Entry, findCredentials } from '@napi-rs/keyring';
 import { OmniError } from '@omni/shared';
 import type { CatalogEntry } from '@omni/shared';
@@ -146,58 +156,216 @@ export class KeychainStore implements KeyStore {
 
 // ---------------- Encrypted file (servers without a keychain) ----------------
 
+type Argon2Kdf = {
+  alg: 'argon2id';
+  memory: number;
+  passes: number;
+  parallelism: number;
+  salt: string;
+};
+/** Used where Argon2 is missing: Electron's BoringSSL has none (ERR_CRYPTO_ARGON2_NOT_SUPPORTED). */
+type ScryptKdf = { alg: 'scrypt'; N: number; r: number; p: number; salt: string };
+type Kdf = Argon2Kdf | ScryptKdf;
+
 interface VaultFile {
   v: 1;
-  kdf: { alg: 'argon2id'; memory: number; passes: number; parallelism: number; salt: string };
+  kdf: Kdf;
   iv: string;
   tag: string;
   data: string;
 }
 
-const KDF = { memory: 65536, passes: 3, parallelism: 1 };
+const SCRYPT = { N: 65536, r: 8, p: 1 };
 
 /**
  * Bounds for KDF parameters read from vault.enc. The file is not authenticated before the
  * key is derived, so a tampered `memory: 2**31` would hang or kill the process (local DoS).
- * Memory is in KiB: 8 MiB to 1 GiB.
+ * Argon2 memory is in KiB: 8 MiB to 1 GiB. scrypt uses 128·N·r bytes: N ≤ 2^20 and r ≤ 8
+ * keep it at 1 GiB too.
  */
 const KDF_LIMITS = {
-  memory: [8192, 1048576],
-  passes: [1, 16],
-  parallelism: [1, 16],
+  argon2id: { memory: [8192, 1048576], passes: [1, 16], parallelism: [1, 16] },
+  scrypt: { N: [16384, 1048576], r: [1, 8], p: [1, 16] },
 } as const;
 
-function checkKdf(kdf: unknown): VaultFile['kdf'] {
+function checkKdf(kdf: unknown): Kdf {
   const k = (kdf ?? {}) as Record<string, unknown>;
-  for (const [name, [min, max]] of Object.entries(KDF_LIMITS)) {
+  if ((k.alg !== 'argon2id' && k.alg !== 'scrypt') || typeof k.salt !== 'string')
+    throw new OmniError('config', 'corrupted vault: unsupported kdf');
+  for (const [name, [min, max]] of Object.entries(KDF_LIMITS[k.alg])) {
     const v = k[name];
     if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
       throw new OmniError('config', `corrupted vault: kdf.${name} out of range`);
   }
-  if (k.alg !== 'argon2id' || typeof k.salt !== 'string')
-    throw new OmniError('config', 'corrupted vault: unsupported kdf');
-  return k as VaultFile['kdf'];
+  if (k.alg === 'scrypt' && ((k.N as number) & ((k.N as number) - 1)) !== 0)
+    throw new OmniError('config', 'corrupted vault: kdf.N out of range');
+  return k as Kdf;
 }
 
-function deriveKey(password: string, salt: Buffer, p = KDF): Buffer {
-  return argon2Sync('argon2id', {
-    message: password,
-    nonce: salt,
-    memory: p.memory,
-    passes: p.passes,
-    parallelism: p.parallelism,
-    tagLength: 32,
-  });
+let argon2: boolean | undefined;
+function argon2Supported(): boolean {
+  if (argon2 !== undefined) return argon2;
+  try {
+    argon2Sync('argon2id', {
+      message: 'probe',
+      nonce: Buffer.alloc(16),
+      memory: 8192,
+      passes: 1,
+      parallelism: 1,
+      tagLength: 32,
+    });
+    argon2 = true;
+  } catch {
+    argon2 = false;
+  }
+  return argon2;
 }
 
 /**
- * ~/.omni/vault.enc: AES-256-GCM, key derived with Argon2id from a master password,
- * file mode 600. The password comes from OMNI_VAULT_PASSWORD or an interactive prompt.
+ * KDF for a vault being written. Always scrypt: Electron (the desktop app) has no Argon2,
+ * and the CLI and the desktop can share ~/.omni/vault.enc, so a file written by either one
+ * must stay readable by both. An existing scrypt file keeps its parameters and salt (same
+ * derived key, fresh IV); Argon2id vaults from older versions are read and re-saved as scrypt.
+ */
+function kdfForWrite(existing: Kdf | undefined): ScryptKdf {
+  if (existing?.alg === 'scrypt') return existing;
+  return { alg: 'scrypt', ...SCRYPT, salt: randomBytes(16).toString('base64') };
+}
+
+function argon2Unsupported(file: string): OmniError {
+  return new OmniError(
+    'unsupported',
+    `${file} was encrypted with Argon2id, which this app cannot read (the desktop app's ` +
+      `runtime has no Argon2). Unlock it once with the Zinarix CLI (\`omni auth list\`) to ` +
+      `re-save it in the compatible scrypt format, or remove the file and add the keys again.`,
+    { retryable: false },
+  );
+}
+
+function deriveKey(password: string, kdf: Kdf, file: string): Buffer {
+  const salt = Buffer.from(kdf.salt, 'base64');
+  if (kdf.alg === 'scrypt')
+    return scryptSync(password, salt, 32, {
+      N: kdf.N,
+      r: kdf.r,
+      p: kdf.p,
+      maxmem: 256 * kdf.N * kdf.r,
+    });
+  if (!argon2Supported()) throw argon2Unsupported(file);
+  try {
+    return argon2Sync('argon2id', {
+      message: password,
+      nonce: salt,
+      memory: kdf.memory,
+      passes: kdf.passes,
+      parallelism: kdf.parallelism,
+      tagLength: 32,
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === 'ERR_CRYPTO_ARGON2_NOT_SUPPORTED')
+      throw argon2Unsupported(file);
+    throw e;
+  }
+}
+
+const GCM = { authTagLength: 16 } as const;
+
+/**
+ * Saves to one vault file run one at a time inside this process (every FileVault instance
+ * for the same path shares the queue), so two concurrent `set` calls cannot both start from
+ * the same contents and drop each other's key.
+ */
+const writeQueues = new Map<string, Promise<unknown>>();
+function serialize<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const run = (writeQueues.get(key) ?? Promise.resolve()).then(fn, fn);
+  const tail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  writeQueues.set(key, tail);
+  void tail.then(() => {
+    if (writeQueues.get(key) === tail) writeQueues.delete(key);
+  });
+  return run;
+}
+
+const LOCK_WAIT_MS = 10_000;
+const LOCK_STALE_MS = 30_000;
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Cross-process lock (vault.enc.lock, created exclusively) so the CLI and the desktop app
+ * do not interleave read-modify-write cycles. A lock older than LOCK_STALE_MS is left over
+ * from a crashed process and is taken over.
+ */
+async function withFileLock<T>(lock: string, fn: () => Promise<T>): Promise<T> {
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      closeSync(openSync(lock, 'wx', 0o600));
+      break;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
+          rmSync(lock, { force: true });
+          continue;
+        }
+      } catch {
+        continue; // released between the open and the stat
+      }
+      if (Date.now() > deadline)
+        throw new OmniError(
+          'config',
+          `the vault is locked by another Zinarix process (${lock}); retry, or delete that file if no other Zinarix process is running`,
+        );
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    rmSync(lock, { force: true });
+  }
+}
+
+/** rename over an existing file; Windows refuses it briefly while another process reads it. */
+function replaceFile(tmp: string, file: string): void {
+  for (let i = 0; ; i++) {
+    try {
+      renameSync(tmp, file);
+      return;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (i >= 20 || (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY')) {
+        rmSync(tmp, { force: true });
+        throw e;
+      }
+      sleepSync(25);
+    }
+  }
+}
+
+/**
+ * ~/.omni/vault.enc: AES-256-GCM, key derived from a master password with scrypt (Argon2id
+ * files from older versions are still read), file mode 600. The password comes from
+ * OMNI_VAULT_PASSWORD or an interactive prompt.
+ *
+ * Every save re-reads the file under a lock and applies only its own change, then writes a
+ * temp file and renames it over vault.enc: concurrent saves (in this process or another,
+ * e.g. CLI + desktop) keep each other's keys, and a crash never leaves a half-written vault.
  */
 export class FileVault implements KeyStore {
   readonly name = 'file' as const;
   #cache: Record<string, string> | undefined;
+  /** mtime/size of the file the cache came from: another process may have rewritten it. */
+  #cacheStamp: string | undefined;
   #password: string | undefined;
+  /** Last derived key, so a save does not run the (deliberately slow) KDF twice. */
+  #key: { kdf: string; key: Buffer } | undefined;
 
   constructor(
     private readonly file: string,
@@ -224,9 +392,27 @@ export class FileVault implements KeyStore {
     return this.#password;
   }
 
-  private async read(): Promise<Record<string, string>> {
-    if (this.#cache) return this.#cache;
-    if (!this.exists()) return (this.#cache = {});
+  private stamp(): string | undefined {
+    try {
+      const s = statSync(this.file);
+      return `${s.mtimeMs}:${s.size}`;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async key(kdf: Kdf): Promise<Buffer> {
+    const id = JSON.stringify(kdf);
+    if (this.#key?.kdf === id) return this.#key.key;
+    const key = deriveKey(await this.password(), kdf, this.file);
+    this.#key = { kdf: id, key };
+    return key;
+  }
+
+  /** Decrypts the file as it is on disk now (no cache). */
+  private async load(): Promise<{ data: Record<string, string>; kdf?: Kdf }> {
+    const stamp = this.stamp();
+    if (!stamp) return { data: {} };
     let vf: VaultFile;
     try {
       vf = JSON.parse(readFileSync(this.file, 'utf8')) as VaultFile;
@@ -234,39 +420,73 @@ export class FileVault implements KeyStore {
       throw new OmniError('config', 'corrupted vault: invalid JSON');
     }
     const kdf = checkKdf(vf.kdf);
-    const key = deriveKey(await this.password(), Buffer.from(kdf.salt, 'base64'), kdf);
+    const key = await this.key(kdf);
+    let data: Record<string, string>;
     try {
-      const d = createDecipheriv('aes-256-gcm', key, Buffer.from(vf.iv, 'base64'));
+      const d = createDecipheriv('aes-256-gcm', key, Buffer.from(vf.iv, 'base64'), GCM);
       d.setAuthTag(Buffer.from(vf.tag, 'base64'));
       const plain = Buffer.concat([d.update(Buffer.from(vf.data, 'base64')), d.final()]).toString(
         'utf8',
       );
-      this.#cache = JSON.parse(plain) as Record<string, string>;
+      data = JSON.parse(plain) as Record<string, string>;
     } catch {
       this.#password = undefined;
+      this.#key = undefined;
       throw new OmniError('auth', 'wrong vault password or corrupted vault');
     }
-    for (const v of Object.values(this.#cache)) new Secret(v); // register for redaction
-    return this.#cache;
+    for (const v of Object.values(data)) new Secret(v); // register for redaction
+    this.#cache = data;
+    this.#cacheStamp = stamp;
+    return { data, kdf };
   }
 
-  private async write(data: Record<string, string>): Promise<void> {
-    const salt = randomBytes(16);
+  private async read(): Promise<Record<string, string>> {
+    if (this.#cache && this.#cacheStamp === this.stamp()) return this.#cache;
+    if (!this.exists()) {
+      this.#cacheStamp = undefined;
+      return (this.#cache = {});
+    }
+    const { data, kdf } = await this.load();
+    // Re-save Argon2id vaults as scrypt so the desktop app (no Argon2) can open them too.
+    if (kdf?.alg === 'argon2id') await this.update(() => undefined).catch(() => undefined);
+    return data;
+  }
+
+  /**
+   * Read-modify-write under the in-process queue and the cross-process lock: the change is
+   * applied to the file's current contents, never to a possibly stale cache.
+   */
+  private async update<T>(mutate: (data: Record<string, string>) => T): Promise<T> {
+    await this.password(); // prompt before taking the lock, never while holding it
+    return serialize(resolve(this.file).toLowerCase(), () =>
+      withFileLock(`${this.file}.lock`, async () => {
+        const current = await this.load();
+        const data = { ...current.data };
+        const result = mutate(data);
+        await this.write(data, current.kdf);
+        return result;
+      }),
+    );
+  }
+
+  private async write(data: Record<string, string>, existing: Kdf | undefined): Promise<void> {
+    const kdf = kdfForWrite(existing);
     const iv = randomBytes(12);
-    const key = deriveKey(await this.password(), salt);
-    const c = createCipheriv('aes-256-gcm', key, iv);
+    const key = await this.key(kdf);
+    const c = createCipheriv('aes-256-gcm', key, iv, GCM);
     const enc = Buffer.concat([c.update(JSON.stringify(data), 'utf8'), c.final()]);
     const vf: VaultFile = {
       v: 1,
-      kdf: { alg: 'argon2id', ...KDF, salt: salt.toString('base64') },
+      kdf,
       iv: iv.toString('base64'),
       tag: c.getAuthTag().toString('base64'),
       data: enc.toString('base64'),
     };
-    const tmp = `${this.file}.${process.pid}.tmp`;
+    const tmp = `${this.file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
     writeFileSync(tmp, JSON.stringify(vf), { mode: 0o600 });
-    renameSync(tmp, this.file);
+    replaceFile(tmp, this.file);
     this.#cache = data;
+    this.#cacheStamp = this.stamp();
   }
 
   async get(id: string) {
@@ -276,17 +496,20 @@ export class FileVault implements KeyStore {
   }
 
   async set(id: string, value: string) {
-    const data = { ...(await this.read()), [id]: value };
-    await this.write(data);
+    await this.update((data) => {
+      data[id] = value;
+    });
   }
 
   async delete(id: string) {
     if (!this.exists()) return false;
-    const data = { ...(await this.read()) };
-    if (!(id in data)) return false;
-    delete data[id];
-    await this.write(data);
-    return true;
+    // Unlocks (and checks the password) first; only rewrites when the key is there.
+    if (!(id in (await this.read()))) return false;
+    return this.update((data) => {
+      if (!(id in data)) return false;
+      delete data[id];
+      return true;
+    });
   }
 
   async list() {
@@ -297,6 +520,8 @@ export class FileVault implements KeyStore {
   destroy() {
     rmSync(this.file, { force: true });
     this.#cache = undefined;
+    this.#cacheStamp = undefined;
+    this.#key = undefined;
   }
 }
 

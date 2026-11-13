@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { CustomProviderSpec, OmniApi, ProviderView } from '../../shared/api';
 import { commands, runCommand } from '../commands';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
 import { monacoTheme } from '../themes';
@@ -276,7 +277,7 @@ function AddProvider({
             {t('provAddCommand')}
             <input
               value={command}
-              placeholder="aider, /usr/local/bin/mi-agente…"
+              placeholder={t('phAgentCommand')}
               onChange={(e) => setCommand(e.target.value)}
             />
           </label>
@@ -458,7 +459,7 @@ function Providers({ focus }: { focus?: string }) {
                     <div
                       key={x.id}
                       className={`provider-row ${x.id === selected ? 'active' : ''}`}
-                      onClick={() => (setAdding(false), setSelected(x.id))}
+                      {...pressable(() => (setAdding(false), setSelected(x.id)))}
                     >
                       <ProviderLogo id={x.id} name={x.name} size={22} />
                       <span className="provider-name">{x.name}</span>
@@ -641,9 +642,32 @@ function AiEdit() {
   const [error, setError] = useState<string | null>(null);
   const diffHost = useRef<HTMLDivElement>(null);
   const requestRef = useRef<string | null>(null);
+  /** Unsubscribes the stream of the request in flight (null = none). */
+  const offRef = useRef<(() => void) | null>(null);
   const theme = useStore((s) => s.settings.theme);
 
   const original = model && sel ? model.getValueInRange(sel) : '';
+  const noSelection = !ed || !model || !sel || sel.isEmpty();
+
+  // Closed (Esc, click outside, accept) while generating: stop listening and stop the request.
+  useEffect(
+    () => () => {
+      offRef.current?.();
+      offRef.current = null;
+      if (requestRef.current) void api().ai.abort(requestRef.current);
+      requestRef.current = null;
+    },
+    [],
+  );
+
+  // Nothing selected: close with a hint (an effect, not a timer per render: one toast).
+  const warned = useRef(false);
+  useEffect(() => {
+    if (!noSelection || warned.current) return;
+    warned.current = true;
+    close();
+    toast(t('selectFirst'));
+  }, [noSelection]);
 
   useEffect(() => {
     if (phase !== 'review' || !diffHost.current || !model) return;
@@ -664,13 +688,7 @@ function AiEdit() {
     };
   }, [phase, model, original, result, theme]);
 
-  if (!ed || !model || !sel || sel.isEmpty()) {
-    setTimeout(() => {
-      close();
-      toast(t('selectFirst'));
-    });
-    return null;
-  }
+  if (noSelection) return null;
 
   const run = async () => {
     if (!instruction.trim()) return;
@@ -680,7 +698,8 @@ function AiEdit() {
     const requestId = newRequestId();
     requestRef.current = requestId;
     let text = '';
-    const off = api().on((ev) => {
+    offRef.current?.();
+    const unsubscribe = api().on((ev) => {
       if (ev.type !== 'chat' || ev.requestId !== requestId) return;
       const e = ev.event;
       if (e.type === 'text') {
@@ -688,15 +707,22 @@ function AiEdit() {
         setResult(text);
       } else if (e.type === 'error') {
         off();
+        if (requestRef.current === requestId) requestRef.current = null;
         setError(e.message);
         setPhase('ask');
       } else if (e.type === 'cost') {
         off();
+        if (requestRef.current === requestId) requestRef.current = null;
         setResult(stripFences(text));
         setPhase('review');
         void refreshSettings();
       }
     });
+    const off = () => {
+      unsubscribe();
+      if (offRef.current === off) offRef.current = null;
+    };
+    offRef.current = off;
     const full = model.getFullModelRange();
     try {
       await api().ai.edit(requestId, {

@@ -15,3 +15,7 @@ apps/desktop/release/
 license-private*
 .vercel
 .env*
+
+# Claves locales: nunca subir
+api.md
+google-oauth.local.json

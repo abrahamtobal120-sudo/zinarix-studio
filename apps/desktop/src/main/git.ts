@@ -16,6 +16,31 @@ import type { Workspace } from './workspace.js';
 const MAX_BUFFER = 64 * 1024 * 1024;
 
 /**
+ * Always passed to git: a repository's own .git/config may set core.fsmonitor to a command,
+ * which `git status`/`diff` would run (a folder from a zip download is enough). Turning it off
+ * only makes huge repos a bit slower.
+ */
+const GIT_ALWAYS = ['-c', 'core.fsmonitor=false'];
+
+/**
+ * Extra hardening for repositories Zinarix touches in the background or from the phone (no
+ * click on the desktop): no hooks (post-merge on pull, etc.) and no exotic transports.
+ */
+export const GIT_UNTRUSTED = [
+  '-c',
+  `core.hooksPath=${process.platform === 'win32' ? 'NUL' : '/dev/null'}`,
+  '-c',
+  'protocol.ext.allow=never',
+  '-c',
+  'protocol.file.allow=user',
+];
+
+/** git with the extra hardening of GIT_UNTRUSTED (see run). */
+export function runUntrustedGit(args: string[], cwd: string, timeout?: number): Promise<string> {
+  return run('git', [...GIT_UNTRUSTED, ...args], cwd, timeout);
+}
+
+/**
  * Runs git (or gh) with an argument vector (never a shell string). Prompts are disabled so a
  * missing credential fails fast instead of hanging; the user signs in from the terminal.
  */
@@ -28,7 +53,7 @@ export function run(
   return new Promise((res, rej) =>
     execFile(
       bin,
-      args,
+      bin === 'git' ? [...GIT_ALWAYS, ...args] : args,
       {
         cwd,
         timeout,

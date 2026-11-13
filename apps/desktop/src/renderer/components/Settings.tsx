@@ -8,6 +8,8 @@ import { qrEncode } from '../qr';
 import { api, refreshSettings, setState, setTheme, toast, updatePrefs, useStore } from '../store';
 import { THEMES } from '../themes';
 import { Icon, type IconName } from './Icon';
+import { McpSection } from './McpSettings';
+import { DocsSection, MemoriesSection } from './KnowledgeSettings';
 
 const close = () => setState({ modal: null });
 
@@ -22,7 +24,7 @@ const FONTS = [
   'monospace',
 ];
 
-type Section = 'appearance' | 'editor' | 'ai' | 'phone' | 'keys';
+type Section = 'appearance' | 'editor' | 'ai' | 'memories' | 'docs' | 'mcp' | 'phone' | 'keys';
 
 function Toggle({
   label,
@@ -368,6 +370,9 @@ export function SettingsPanel() {
           {nav('appearance', t('setAppearance'), 'palette')}
           {nav('editor', t('setEditor'), 'edit')}
           {nav('ai', t('setAi'), 'agent')}
+          {nav('mcp', 'MCP', 'plug')}
+          {nav('memories', t('setMemories'), 'sparkle')}
+          {nav('docs', t('setDocsNav'), 'books')}
           {nav('phone', t('phoneTitle'), 'smartphone')}
           {nav('keys', t('shortcuts'), 'keyboard')}
         </nav>
@@ -520,6 +525,10 @@ export function SettingsPanel() {
               />
             </>
           )}
+
+          {section === 'memories' && <MemoriesSection />}
+          {section === 'docs' && <DocsSection />}
+          {section === 'mcp' && <McpSection />}
 
           {section === 'phone' && <PhoneSection />}
 

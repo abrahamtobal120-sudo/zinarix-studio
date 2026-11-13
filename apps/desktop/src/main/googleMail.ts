@@ -15,6 +15,21 @@ import { join } from 'node:path';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://mail.google.com/ openid email profile';
+/** Gmail + Google Cloud in one consent: one sign-in connects both panels. */
+export const GOOGLE_ALL_SCOPE =
+  'https://mail.google.com/ https://www.googleapis.com/auth/cloud-platform openid email profile';
+
+/**
+ * The OAuth client built into the installer (build.mjs, from ZINARIX_GOOGLE_CLIENT_ID/_SECRET
+ * or google-oauth.local.json), so customers only press "Sign in with Google". For desktop apps
+ * Google treats the secret as public; PKCE protects each sign-in.
+ */
+const BUILT_IN: GoogleClient | null = process.env.ZINARIX_GOOGLE_CLIENT_ID
+  ? {
+      clientId: process.env.ZINARIX_GOOGLE_CLIENT_ID,
+      clientSecret: process.env.ZINARIX_GOOGLE_CLIENT_SECRET ?? '',
+    }
+  : null;
 const LOGIN_TIMEOUT = 5 * 60_000;
 
 export interface GoogleClient {
@@ -42,7 +57,8 @@ export class GoogleAuth {
       }
     }
     const id = process.env.OMNI_GOOGLE_CLIENT_ID;
-    return id ? { clientId: id, clientSecret: process.env.OMNI_GOOGLE_CLIENT_SECRET ?? '' } : null;
+    if (id) return { clientId: id, clientSecret: process.env.OMNI_GOOGLE_CLIENT_SECRET ?? '' };
+    return BUILT_IN;
   }
 
   setClient(c: GoogleClient): void {
@@ -82,7 +98,8 @@ export class GoogleAuth {
    */
   async login(
     openUrl: (url: string) => void,
-  ): Promise<{ email: string; name: string; refresh: string }> {
+    scope: string = SCOPE,
+  ): Promise<{ email: string; name: string; refresh: string; scope: string }> {
     const c = this.need();
     const verifier = randomBytes(32).toString('base64url');
     const challenge = createHash('sha256').update(verifier).digest('base64url');
@@ -127,7 +144,7 @@ export class GoogleAuth {
           client_id: c.clientId,
           redirect_uri: redirect,
           response_type: 'code',
-          scope: SCOPE,
+          scope,
           code_challenge: challenge,
           code_challenge_method: 'S256',
           access_type: 'offline',
@@ -157,7 +174,20 @@ export class GoogleAuth {
         token: j.access_token,
         until: Date.now() + (Number(j.expires_in) || 3600) * 1000 - 60_000,
       });
-    return { email: claims.email, name: claims.name ?? '', refresh };
+    // What the user actually granted (Google lets them untick permissions).
+    const granted = typeof j.scope === 'string' ? j.scope : scope;
+    return { email: claims.email, name: claims.name ?? '', refresh, scope: granted };
+  }
+
+  /** Tells Google to forget a refresh token (best effort: it is dropped here anyway). */
+  async revoke(refresh: string): Promise<void> {
+    this.cache.delete(refresh);
+    await fetch('https://oauth2.googleapis.com/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token: refresh }),
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => undefined);
   }
 
   /** A valid access token for this refresh token (renewed when it is about to expire). */

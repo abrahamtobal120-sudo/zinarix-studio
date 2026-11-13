@@ -8,12 +8,14 @@ import { GitPanel } from './components/GitPanel';
 import { Icon } from './components/Icon';
 import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
 import { MailPanel } from './components/MailPanel';
 import { WatchPanel } from './components/WatchPanel';
 import { RunPanel } from './components/RunPanel';
 import { SupabasePanel } from './components/SupabasePanel';
 import { VercelPanel } from './components/VercelPanel';
+import { GCloudPanel } from './components/GCloudPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
 import {
@@ -107,17 +109,31 @@ export function App() {
   // CENTER_MIN. The dragged widths are kept and come back when the window grows.
   const room = winW - 48 - CENTER_MIN;
   const chatShown = chatOpen && !chatWide;
+  // Two chats side by side (and the list of chats) need their own room: below this
+  // each pane gets squeezed and its contents spill out.
+  const chatMin = (chatSplit ? 620 : 280) + (chatList ? 190 : 0);
   const sideShown = sidebar
-    ? Math.max(160, Math.min(sideW, room - (chatShown ? Math.min(chatW, 400) : 0)))
+    ? Math.max(160, Math.min(sideW, room - (chatShown ? Math.min(chatW, chatMin + 120) : 0)))
     : 0;
-  const chatShownW = Math.max(280, Math.min(chatW, room - sideShown));
+  const chatShownW = Math.min(
+    Math.max(280, winW - 48 - sideShown - 160),
+    Math.max(chatMin, Math.min(chatW, room - sideShown)),
+  );
   const [dragging, setDragging] = useState(false);
 
   // Drop a folder (or a file) anywhere in the window to open it. Capture phase so the
   // editor does not swallow the drop as text.
   useEffect(() => {
     let depth = 0;
-    const hasFiles = (e: DragEvent) => Boolean(e.dataTransfer?.types.includes('Files'));
+    // Images dropped on the chat's message box are attachments (Chat.tsx), not a folder to open.
+    const onChatBox = (e: DragEvent) =>
+      e.target instanceof Element &&
+      Boolean(e.target.closest('.chat-input')) &&
+      [...(e.dataTransfer?.items ?? [])].some(
+        (i) => i.kind === 'file' && i.type.startsWith('image/'),
+      );
+    const hasFiles = (e: DragEvent) =>
+      Boolean(e.dataTransfer?.types.includes('Files')) && !onChatBox(e);
     const enter = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       depth++;
@@ -287,6 +303,8 @@ export function App() {
                 <VercelPanel />
               ) : sidebar === 'supabase' ? (
                 <SupabasePanel />
+              ) : sidebar === 'gcloud' ? (
+                <GCloudPanel />
               ) : sidebar === 'mail' ? (
                 <MailPanel />
               ) : sidebar === 'watch' ? (
@@ -363,6 +381,7 @@ export function App() {
       </div>
       <StatusBar />
       <Modals />
+      <ConfirmDialog />
       <div className="app-banners">
         <NoticeBanner />
         <UpdateBanner />

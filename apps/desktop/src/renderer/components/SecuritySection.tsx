@@ -243,7 +243,7 @@ function ScanTab() {
       <div className="sv-scan-row">
         <input
           value={target}
-          placeholder="localhost · 192.168.1.0/24 · midominio.com"
+          placeholder={t('phNetTarget')}
           onChange={(e) => setTarget(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void run()}
         />
@@ -275,9 +275,11 @@ function ScanTab() {
           </span>
         </label>
       )}
-      {error && <div className="scan-error">
+      {error && (
+        <div className="scan-error">
           <Icon name="warning" size={13} /> {error}
-        </div>}
+        </div>
+      )}
       {result && (
         <div className="scan-results">
           <div className="scan-summary">
@@ -407,14 +409,14 @@ export function SecuritySection() {
 
   const exportReport = async () => {
     const lines: string[] = [
-      `# Informe de seguridad — Zinarix Studio`,
+      `# ${t('secRepTitle')}`,
       '',
-      `Fecha: ${new Date().toLocaleString()}`,
+      t('secRepDate', { date: new Date().toLocaleString() }),
       '',
     ];
-    if (score !== null) lines.push(`**Puntaje general: ${score}/100**`, '');
+    if (score !== null) lines.push(`**${t('secRepScore', { score })}**`, '');
     lines.push(
-      `Resumen: ${total.crítico} críticos · ${total.alto} altos · ${total.medio} medios · ${total.bajo} bajos`,
+      t('secRepSummary', { c: total.crítico, h: total.alto, m: total.medio, l: total.bajo }),
       '',
     );
     for (const k of SCAN_KINDS) {
@@ -422,15 +424,15 @@ export function SecuritySection() {
       if (!r) continue;
       lines.push(`## ${labelOf(k)}`, '');
       for (const n of r.notes) lines.push(`_${n}_`);
-      if (!r.findings.length) lines.push('', '✓ Sin hallazgos.', '');
+      if (!r.findings.length) lines.push('', t('secRepNone'), '');
       for (const f of r.findings)
         lines.push(
           '',
           `### [${f.severity.toUpperCase()}] ${f.title}`,
-          f.where ? `- Ubicación: \`${f.where}\`` : '',
-          f.category ? `- Categoría: ${f.category}` : '',
-          f.detail ? `- Detalle: ${f.detail}` : '',
-          f.fix ? `- Solución: ${f.fix}` : '',
+          f.where ? `- ${t('secRepWhere')}: \`${f.where}\`` : '',
+          f.category ? `- ${t('secRepCategory')}: ${f.category}` : '',
+          f.detail ? `- ${t('secRepDetail')}: ${f.detail}` : '',
+          f.fix ? `- ${t('secRepFix')}: ${f.fix}` : '',
         );
       lines.push('');
     }
@@ -659,7 +661,7 @@ export function SecuritySection() {
             <div className="sv-scan-row">
               <input
                 value={siteUrl}
-                placeholder="https://misitio.com"
+                placeholder={t('phSite')}
                 onChange={(e) => setSiteUrl(e.target.value)}
                 onKeyDown={(e) =>
                   e.key === 'Enter' && siteUrl.trim() && void run('site', { url: siteUrl.trim() })
@@ -691,7 +693,7 @@ export function SecuritySection() {
             <div className="sv-scan-row">
               <input
                 value={hashPath}
-                placeholder="~/Descargas/archivo.iso"
+                placeholder={t('phHashFile')}
                 onChange={(e) => setHashPath(e.target.value)}
                 onKeyDown={(e) =>
                   e.key === 'Enter' &&
@@ -775,13 +777,12 @@ function explain(kind: SecKind, report: SecReportView) {
     .slice(0, 40)
     .map((f) => `- [${f.severity}] ${f.title}${f.where ? ` (${f.where})` : ''}`)
     .join('\n');
-  askAgent(
-    `Analicé "${kind}" en el Centro de seguridad y encontré estos problemas:\n${lines}\n\nExplícame en palabras sencillas qué significan los más graves y ofréceme corregirlos uno por uno.`,
-  );
+  askAgent(t('secExplainPrompt', { kind, lines }));
 }
 
 function fixOne(kind: SecKind, f: FindingView) {
-  askAgent(
-    `En el análisis de seguridad "${kind}" salió este problema:\n- [${f.severity}] ${f.title}${f.where ? ` en ${f.where}` : ''}${f.detail ? `\n  ${f.detail}` : ''}${f.fix ? `\n  Sugerencia: ${f.fix}` : ''}\n\nExplícamelo en palabras sencillas y arréglalo (con mi aprobación).`,
-  );
+  const item =
+    `- [${f.severity}] ${f.title}${f.where ? t('secFixWhere', { where: f.where }) : ''}` +
+    `${f.detail ? `\n  ${f.detail}` : ''}${f.fix ? `\n  ${t('secFixSuggestion', { fix: f.fix })}` : ''}`;
+  askAgent(t('secFixPrompt', { kind, item }));
 }

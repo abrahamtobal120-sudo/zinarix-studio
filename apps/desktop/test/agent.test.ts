@@ -29,36 +29,98 @@ describe('agent safety', () => {
   ])('allows %s', (cmd) => expect(blockedReason(cmd)).toBeNull());
 
   it('declares every tool with a JSON schema', () => {
-    expect(TOOLS.map((t) => t.name).sort()).toEqual([
-      'audit_dependencies',
-      'browser_back',
-      'browser_click',
+    // The full inventory of what the AI can do on its own: adding or removing a tool must be
+    // a deliberate change to this list (grouped as in agent.ts: workspace, browser, mail,
+    // cloud, system, security).
+    const expected = [
+      // workspace
+      'tree',
+      'glob',
+      'read_many_files',
+      'list_dir',
+      'read_file',
+      'search',
+      'edit_file',
+      'write_file',
+      'run_command',
+      // browser
       'browser_open',
       'browser_read',
-      'browser_scroll',
+      'browser_click',
       'browser_type',
-      'check_site_security',
-      'edit_file',
-      'file_hash',
-      'glob',
-      'http_request',
-      'list_dir',
+      'browser_scroll',
+      'browser_back',
+      // mail
+      'mail_accounts',
+      'mail_folders',
+      'mail_list',
+      'mail_read',
+      'mail_mark',
+      'mail_move',
+      'mail_save_draft',
+      'mail_send',
+      // cloud (Supabase, Vercel)
+      'supabase_accounts',
+      'supabase_projects',
+      'supabase_project_info',
+      'supabase_tables',
+      'supabase_columns',
+      'supabase_query',
+      'supabase_pause',
+      'supabase_restore',
+      'vercel_accounts',
+      'vercel_projects',
+      'vercel_project',
+      'vercel_deployments',
+      'vercel_logs',
+      'vercel_redeploy',
+      'vercel_promote',
+      'vercel_cancel',
+      'vercel_set_env',
+      'gcloud_accounts',
+      'gcloud_projects',
+      'gcloud_services',
+      'gcloud_set_service',
+      'gcloud_bigquery_tables',
+      'gcloud_bigquery_query',
+      'gcloud_buckets',
+      'gcloud_objects',
+      'gcloud_sql_instances',
+      'gcloud_logs',
+      // system
       'network_status',
-      'port_scan',
-      'read_file',
-      'read_many_files',
-      'read_system_file',
-      'run_command',
-      'search',
-      'security_check_system',
-      'security_scan_project',
-      'set_env_var',
+      'http_request',
       'sql_query',
-      'tree',
-      'write_file',
+      'read_system_file',
       'write_system_file',
-    ]);
-    for (const t of TOOLS) expect(t.parameters).toMatchObject({ type: 'object' });
+      'set_env_var',
+      // security
+      'security_scan_project',
+      'audit_dependencies',
+      'security_check_system',
+      'port_scan',
+      'check_site_security',
+      'file_hash',
+      // knowledge and memory (knowledge.ts)
+      'semantic_search',
+      'docs_list',
+      'docs_search',
+      'remember',
+      'list_memories',
+      'forget',
+    ];
+    const names = TOOLS.map((t) => t.name);
+    expect(new Set(names).size, 'duplicate tool names').toBe(names.length);
+    expect(names.slice().sort()).toEqual(expected.slice().sort());
+    for (const t of TOOLS) {
+      expect(t.description, t.name).toBeTruthy();
+      expect(t.parameters, t.name).toMatchObject({ type: 'object' });
+      const { properties = {}, required = [] } = t.parameters as {
+        properties?: Record<string, unknown>;
+        required?: string[];
+      };
+      for (const r of required) expect(properties, `${t.name}.${r}`).toHaveProperty(r);
+    }
   });
 });
 
@@ -141,13 +203,25 @@ describe('actions beyond the project', () => {
       join(h, '.aws', 'credentials'),
       join(h, '.config', 'google-chrome', 'Default', 'Cookies'),
       join(h, '.gnupg', 'private-keys-v1.d'),
-      '/etc/shadow',
+      // System secrets of the platform the test runs on (on Windows "/etc/shadow" is just
+      // C:\etc\shadow, an ordinary path).
+      ...(process.platform === 'win32'
+        ? [
+            join(h, 'AppData', 'Roaming', 'Microsoft', 'Credentials', 'x'),
+            join(h, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies'),
+          ]
+        : ['/etc/shadow', '/etc/sudoers', '/proc/1/environ']),
     ])
       expect(deniedPath(p, 'read'), p).not.toBeNull();
     expect(deniedPath(join(h, '.bashrc'), 'write')).toBeNull();
     expect(deniedPath(join(h, '.ssh', 'config'), 'read')).toBeNull();
     expect(deniedPath('/etc/hosts', 'read')).toBeNull();
-    expect(deniedPath('/usr/bin/ls', 'write')).not.toBeNull();
+    expect(
+      deniedPath(
+        process.platform === 'win32' ? 'C:\\Windows\\System32\\drivers\\etc\\hosts' : '/usr/bin/ls',
+        'write',
+      ),
+    ).not.toBeNull();
   });
 
   it('treats anything but a single read as a SQL write', async () => {
@@ -172,10 +246,14 @@ describe('actions beyond the project', () => {
 
   it('warns about admin commands and commands outside the project', async () => {
     const { commandWarning } = await import('../src/main/system.js');
-    expect(commandWarning({ command: 'ls' }, '/p')).toBeNull();
-    expect(commandWarning({ command: 'ls', cwd: '/p/sub' }, '/p')).toBeNull();
-    expect(commandWarning({ command: 'ls', cwd: '/etc' }, '/p')?.risk).toBe('high');
-    expect(commandWarning({ command: 'pacman -Syu', admin: true }, '/p')?.warning).toMatch(
+    const { join, resolve } = await import('node:path');
+    // The workspace root is always an absolute path of the platform (C:\p on Windows).
+    const root = resolve('/p');
+    expect(commandWarning({ command: 'ls' }, root)).toBeNull();
+    expect(commandWarning({ command: 'ls', cwd: join(root, 'sub') }, root)).toBeNull();
+    expect(commandWarning({ command: 'ls', cwd: resolve('/etc') }, root)?.risk).toBe('high');
+    expect(commandWarning({ command: 'ls', cwd: resolve('/p2') }, root)?.risk).toBe('high');
+    expect(commandWarning({ command: 'pacman -Syu', admin: true }, root)?.warning).toMatch(
       /ADMINISTRADOR/,
     );
   });

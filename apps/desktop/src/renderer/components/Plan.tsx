@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { LicenseStatus, PlanId, ProFeature } from '../../shared/plans';
 import { hasPro, isActivated, TRIAL_DAYS } from '../../shared/plans';
 import { runCommand } from '../commands';
+import { confirmDialog } from '../confirm';
 import { t } from '../i18n';
 import type { Key } from '../i18n';
 import {
@@ -189,7 +190,7 @@ function ActivateForm({ onDone }: { onDone?: (l: LicenseStatus) => void }) {
           id="plan-key"
           value={key}
           spellCheck={false}
-          placeholder="ZX1.… · zinarixpro at"
+          placeholder="ZX1.…"
           onChange={(e) => setKey(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void activate()}
         />
@@ -209,7 +210,7 @@ export function LicensePanel() {
     void refreshLicense();
   }, []);
   const remove = async () => {
-    if (!confirm(t('planRemoveConfirm'))) return;
+    if (!(await confirmDialog(t('planRemoveConfirm'), { danger: true }))) return;
     setLicense(await api().license.remove());
   };
   const until = l.code

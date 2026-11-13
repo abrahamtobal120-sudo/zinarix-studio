@@ -12,6 +12,12 @@ export interface HttpRequest {
   signal?: AbortSignal;
   /** Skip auth headers (e.g. public endpoints). */
   noAuth?: boolean;
+  /**
+   * Safe to send twice. Defaults to true for GET and false for POST: a chat POST that timed
+   * out (or whose connection dropped) may already be running and billed on the provider, so
+   * it is only retried when the provider certainly did not process it (see retryPost).
+   */
+  idempotent?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 60_000;
@@ -145,6 +151,8 @@ export async function request(cfg: ProviderConfig, req: HttpRequest): Promise<Re
   if (req.body !== undefined) headers['content-type'] = 'application/json';
   if (!req.noAuth) applyAuth(cfg, url, headers);
   const body = req.body === undefined ? undefined : JSON.stringify(req.body);
+  const method = req.method ?? 'GET';
+  const idempotent = req.idempotent ?? method === 'GET';
 
   for (let attempt = 0; ; attempt++) {
     if (req.signal?.aborted) throw abortError();
@@ -158,8 +166,10 @@ export async function request(cfg: ProviderConfig, req: HttpRequest): Promise<Re
     );
     const signal = req.signal ? AbortSignal.any([req.signal, timeout.signal]) : timeout.signal;
     let err: OmniError;
+    // A network error that may have happened after the request reached the server.
+    let maybeSent = true;
     try {
-      const res = await fetchImpl(url, { method: req.method ?? 'GET', headers, body, signal });
+      const res = await fetchImpl(url, { method, headers, body, signal });
       clearTimeout(timer);
       if (res.ok) return res;
       err = await errorFromResponse(res, provider);
@@ -171,6 +181,7 @@ export async function request(cfg: ProviderConfig, req: HttpRequest): Promise<Re
       } else if (e instanceof OmniError) {
         throw e;
       } else {
+        maybeSent = !failedBeforeSending(e);
         // Network errors can echo the URL, which may carry a query-param key.
         err = new OmniError(
           'network',
@@ -194,8 +205,55 @@ export async function request(cfg: ProviderConfig, req: HttpRequest): Promise<Re
       attempt,
     });
     if (!err.retryable || attempt >= maxRetries) throw err;
+    if (!idempotent && !retryPost(err, maybeSent)) throw err;
     await sleep(backoff(attempt, err.retryAfterMs), req.signal);
   }
+}
+
+/**
+ * Connection errors raised before the request left this machine: the server never saw it.
+ * ECONNRESET, EPIPE, socket hang-ups and timeouts are absent on purpose: the request may
+ * have been received and processed.
+ */
+const NOT_SENT = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EAI_NONAME',
+  'EAI_FAIL',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'EADDRNOTAVAIL',
+  'ERR_INVALID_URL',
+  'UND_ERR_CONNECT_TIMEOUT',
+]);
+
+function errorCodes(e: unknown): string[] {
+  const out: string[] = [];
+  for (let c: unknown = e, i = 0; c && typeof c === 'object' && i < 5; i++) {
+    const code = (c as { code?: unknown }).code;
+    if (typeof code === 'string') out.push(code);
+    const errors = (c as { errors?: unknown }).errors; // AggregateError (happy eyeballs)
+    if (Array.isArray(errors)) for (const x of errors) out.push(...errorCodes(x));
+    c = (c as { cause?: unknown }).cause;
+  }
+  return out;
+}
+
+/** True when the failure certainly happened before the server received the request. */
+export function failedBeforeSending(e: unknown): boolean {
+  const codes = errorCodes(e);
+  return codes.length > 0 && codes.every((c) => NOT_SENT.has(c));
+}
+
+/**
+ * Whether a non-idempotent request may be sent again: only when the provider rejected it
+ * without processing (429 rate limit, 503 unavailable, 529 overloaded) or the connection
+ * failed before anything was sent. 500/502/504 and timeouts are ambiguous: not retried.
+ */
+function retryPost(err: OmniError, maybeSent: boolean): boolean {
+  if (err.code === 'network') return !maybeSent;
+  return err.status === 429 || err.status === 503 || err.status === 529;
 }
 
 export function isTimeoutError(e: unknown): boolean {

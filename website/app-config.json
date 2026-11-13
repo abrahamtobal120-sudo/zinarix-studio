@@ -1,7 +1,8 @@
 {
-  "_ayuda": "Archivo de control de Zinarix Studio. Las apps instaladas lo leen cada pocas horas. billing=false: todo gratis para todos. billing=true: prueba Pro de trialDays días y luego el plan gratis (free) o Pro. notice: mensaje para todas las apps (cambia el id para mandar uno nuevo). latestVersion: anuncia una versión nueva. price, priceNote y stripeLink: precio y enlace de pago que muestra la página. ai y combo: precio, nota y enlace de Stripe de los planes AI y Pro + AI en la página /pro (sin stripeLink salen como 'muy pronto').",
+  "_ayuda": "Archivo de control de Zinarix Studio. Las apps instaladas lo leen cada pocas horas. billing=false: todo gratis para todos. billing=true: prueba Pro de trialDays días y luego el plan gratis (free) o Pro. notice: mensaje para todas las apps (cambia el id para mandar uno nuevo). latestVersion: anuncia una versión nueva. price, priceNote y stripeLink: precio y enlace de pago que muestra la página. ai y combo: precio, nota y enlace de Stripe de los planes AI y Pro + AI en la página /pro (sin stripeLink salen como 'muy pronto'). revoked: ids de licencias canceladas (reembolsos, disputas; el id es el session_id de Stripe). IMPORTANTE: después de cada cambio corre `pnpm config:sign` y publica también app-config.json.sig; las apps ignoran el archivo si la firma no coincide.",
   "billing": false,
   "trialDays": 14,
+  "revoked": [],
   "free": {
     "maxChats": 2,
     "split": false,

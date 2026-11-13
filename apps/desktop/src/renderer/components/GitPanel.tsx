@@ -9,6 +9,8 @@ import type {
   GitStashView,
   GitStatusView,
 } from '../../shared/api';
+import { confirmDialog } from '../confirm';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, askText, openFile, setState, toast, useStore } from '../store';
 import { runInTerminal } from './Terminal';
@@ -178,7 +180,7 @@ export function GitPanel() {
         key={`${isStaged ? 's' : 'u'}:${f.path}`}
         className="git-row"
         title={f.from ? `${f.from} → ${f.path}` : f.path}
-        onClick={() => setState({ modal: { kind: 'diff', path: f.path, staged: isStaged } })}
+        {...pressable(() => setState({ modal: { kind: 'diff', path: f.path, staged: isStaged } }))}
       >
         <span className="git-icon">{fileIcon(f.path)}</span>
         <span className={`git-name ${b.cls}`}>{name}</span>
@@ -192,8 +194,9 @@ export function GitPanel() {
           {!isStaged && (
             <button
               title={t('gitDiscard')}
-              onClick={() => {
-                if (!confirm(t('gitDiscardConfirm', { name }))) return;
+              onClick={async () => {
+                if (!(await confirmDialog(t('gitDiscardConfirm', { name }), { danger: true })))
+                  return;
                 void act('discard', () => api().git.discard([f.path]));
               }}
             >
@@ -479,8 +482,13 @@ export function GitPanel() {
                 <span>
                   <button
                     title={t('gitDiscardAll')}
-                    onClick={() => {
-                      if (!confirm(t('gitDiscardAllConfirm', { n: unstaged.length }))) return;
+                    onClick={async () => {
+                      if (
+                        !(await confirmDialog(t('gitDiscardAllConfirm', { n: unstaged.length }), {
+                          danger: true,
+                        }))
+                      )
+                        return;
                       void act('discard', () => api().git.discard(unstaged.map((f) => f.path)));
                     }}
                   >
@@ -517,8 +525,13 @@ export function GitPanel() {
               <button
                 title={t('gitUndoCommitTitle')}
                 disabled={busy !== null || (st?.ahead === 0 && Boolean(st?.upstream))}
-                onClick={() => {
-                  if (!confirm(t('gitUndoCommitConfirm', { subject: log[0]!.subject }))) return;
+                onClick={async () => {
+                  if (
+                    !(await confirmDialog(t('gitUndoCommitConfirm', { subject: log[0]!.subject }), {
+                      danger: true,
+                    }))
+                  )
+                    return;
                   void act(
                     'undo',
                     async () => {
@@ -541,9 +554,9 @@ export function GitPanel() {
                 key={c.hash}
                 className="git-commit-row"
                 title={`${c.hash}\n${c.author} · ${c.date}`}
-                onClick={() =>
-                  setState({ modal: { kind: 'commit', hash: c.hash, subject: c.subject } })
-                }
+                {...pressable(() =>
+                  setState({ modal: { kind: 'commit', hash: c.hash, subject: c.subject } }),
+                )}
               >
                 <div className="git-commit-subject">
                   {c.subject}
@@ -588,8 +601,13 @@ export function GitPanel() {
                   )}
                   <button
                     title={t('gitRevert')}
-                    onClick={() => {
-                      if (!confirm(t('gitRevertConfirm', { subject: c.subject }))) return;
+                    onClick={async () => {
+                      if (
+                        !(await confirmDialog(t('gitRevertConfirm', { subject: c.subject }), {
+                          danger: true,
+                        }))
+                      )
+                        return;
                       void act(
                         'revert',
                         async () => {
@@ -641,7 +659,7 @@ export function GitPanel() {
               <div
                 key={(b.remote ? 'r:' : 'l:') + b.name}
                 className={`git-row ${b.current ? 'current' : ''}`}
-                onClick={() => {
+                {...pressable(() => {
                   if (b.current) return;
                   void act(
                     'checkout',
@@ -651,7 +669,7 @@ export function GitPanel() {
                     },
                     t('gitSwitched', { name: b.name }),
                   );
-                }}
+                })}
               >
                 <span className="git-icon">
                   <Icon name={b.remote ? 'cloud' : 'branch'} size={14} />
@@ -662,9 +680,11 @@ export function GitPanel() {
                   <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                       title={t('gitMerge', { branch: st?.branch ?? '' })}
-                      onClick={() => {
+                      onClick={async () => {
                         if (
-                          !confirm(t('gitMergeConfirm', { name: b.name, branch: st?.branch ?? '' }))
+                          !(await confirmDialog(
+                            t('gitMergeConfirm', { name: b.name, branch: st?.branch ?? '' }),
+                          ))
                         )
                           return;
                         void act(
@@ -679,13 +699,19 @@ export function GitPanel() {
                     {!b.remote && (
                       <button
                         title={t('gitDeleteBranch')}
-                        onClick={() => {
-                          if (!confirm(t('gitDeleteBranchConfirm', { name: b.name }))) return;
+                        onClick={async () => {
+                          if (
+                            !(await confirmDialog(t('gitDeleteBranchConfirm', { name: b.name }), {
+                              danger: true,
+                            }))
+                          )
+                            return;
                           void act('branch', async () => {
                             await api()
                               .git.deleteBranch(b.name, false)
                               .catch(async (e) => {
-                                if (!confirm(t('gitForceDelete'))) throw e;
+                                if (!(await confirmDialog(t('gitForceDelete'), { danger: true })))
+                                  throw e;
                                 await api().git.deleteBranch(b.name, true);
                               });
                             setBranches(await api().git.branches());
@@ -752,8 +778,14 @@ export function GitPanel() {
                   </button>
                   <button
                     title={t('gitStashDrop')}
-                    onClick={() => {
-                      if (!confirm(t('gitStashDropConfirm', { name: x.message || x.ref }))) return;
+                    onClick={async () => {
+                      if (
+                        !(await confirmDialog(
+                          t('gitStashDropConfirm', { name: x.message || x.ref }),
+                          { danger: true },
+                        ))
+                      )
+                        return;
                       void act('stash', async () => {
                         await api().git.stash('drop', x.ref);
                         await reload();

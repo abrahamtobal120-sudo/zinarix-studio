@@ -44,9 +44,14 @@ function entry(profile: CliProfile): CatalogEntry {
   };
 }
 
-/** A fake CLI: records its argv, stdin and cwd, then prints `lines`. */
+/**
+ * A fake CLI: records its argv, stdin and cwd, then prints `lines`. Returns the path to run:
+ * the script itself on POSIX (shebang + chmod), and on Windows a `.cmd` shim that runs it
+ * with node, the way npm installs CLIs there (so the adapter's cmd.exe launch path is used).
+ */
 function fakeCli(name: string, lines: string[], exitCode = 0): string {
   const file = join(dir, name);
+  const bin = process.platform === 'win32' ? `${file}.cmd` : file;
   writeFileSync(
     file,
     `#!/usr/bin/env node
@@ -54,14 +59,16 @@ const fs = require('node:fs');
 let input = '';
 process.stdin.on('data', (d) => (input += d));
 process.stdin.on('end', () => {
-  fs.writeFileSync(${JSON.stringify(file + '.call.json')}, JSON.stringify({ argv: process.argv.slice(2), input, cwd: process.cwd() }));
+  fs.writeFileSync(${JSON.stringify(bin + '.call.json')}, JSON.stringify({ argv: process.argv.slice(2), input, cwd: process.cwd() }));
   for (const l of ${JSON.stringify(lines)}) process.stdout.write(l + '\\n');
   process.exit(${exitCode});
 });
 `,
   );
   chmodSync(file, 0o755);
-  return file;
+  if (process.platform === 'win32')
+    writeFileSync(bin, `@"${process.execPath}" "${file}" %*\r\n@exit /b %ERRORLEVEL%\r\n`);
+  return bin;
 }
 
 function cfg(

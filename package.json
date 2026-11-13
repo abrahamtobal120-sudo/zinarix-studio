@@ -1,7 +1,7 @@
 {
   "name": "zinarix-studio",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.6.1",
   "description": "Zinarix Studio — IDE multi-IA (monorepo)",
   "license": "MIT",
   "type": "module",
@@ -19,7 +19,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "catalog:check": "node scripts/check-catalog.mjs",
+    "audit:deps": "node scripts/audit.mjs --level=high",
     "catalog:sign": "node scripts/sign-catalog.mjs sign",
+    "config:sign": "node scripts/sign-app-config.mjs",
     "omni": "node apps/cli/dist/index.js",
     "desktop": "pnpm --filter @omni/desktop build && pnpm --filter @omni/desktop start",
     "desktop:install": "pnpm --filter @omni/desktop build && node apps/desktop/scripts/install-local.mjs"

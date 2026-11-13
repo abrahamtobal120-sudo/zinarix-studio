@@ -1,16 +1,16 @@
-import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { z } from 'zod';
 import type { PhoneAction, PhoneRepo, PhoneSnapshot, PhoneStatus } from '../shared/api.js';
+import { PairingGuard, sameSecret } from './pairing.js';
+import type { PairChannel, PinCheck } from './pairing.js';
 import { phonePage } from './phonePage.js';
 import { Tunnel } from './tunnel.js';
 
 /** Preferred port (the phone keeps working after a restart); another one if it is taken. */
 const PORT = 47390;
-/** Wrong PINs before it changes (6 digits: guessing is hopeless with this limit). */
-const MAX_TRIES = 5;
 
 const Action = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('send'), text: z.string().min(1).max(20_000) }),
@@ -47,8 +47,14 @@ export function lanAddress(): string | null {
   return all.find(priv) ?? all[0] ?? null;
 }
 
-const same = (a: string, b: string) =>
-  a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const same = sameSecret;
+
+/** A new device that typed the right PIN, waiting for the user's OK on the computer. */
+export interface PairRequest {
+  channel: PairChannel;
+  /** Who is asking, in words for the dialog (address and browser, or the bot user). */
+  who: string;
+}
 
 /**
  * Remote control from a phone on the same network: a small page served over HTTP. The phone
@@ -63,7 +69,10 @@ export class PhoneRemote {
   private server: Server | null = null;
   private host = '';
   private pin = '';
-  private tries = 0;
+  /** Wrong PINs per channel, and the lock after too many (see pairing.ts). */
+  private guard: PairingGuard;
+  /** A pairing waiting for the user's OK (one at a time). */
+  private approving = false;
   private tokens = new Set<string>();
   private streams = new Set<ServerResponse>();
   private snapshot: PhoneSnapshot | null = null;
@@ -79,7 +88,13 @@ export class PhoneRemote {
     private onAction: (a: PhoneAction) => void,
     private onStatus: (s: PhoneStatus) => void,
     private repos: PhoneRepos,
-  ) {}
+    /** Asks the user on the computer whether to let a new device in (true = allowed). */
+    private approve: (req: PairRequest) => Promise<boolean>,
+    /** File that keeps the wrong-PIN counters across restarts (see pairing.ts). */
+    guardFile?: () => string,
+  ) {
+    this.guard = new PairingGuard(Date.now, guardFile);
+  }
 
   status(): PhoneStatus {
     if (!this.server) return { running: false, phones: 0 };
@@ -111,10 +126,12 @@ export class PhoneRemote {
     const server = createServer((req, res) => void this.route(req, res));
     const port = await new Promise<number>((ok, fail) => {
       const listen = (p: number) => {
-        server.once('error', (e: NodeJS.ErrnoException) =>
-          e.code === 'EADDRINUSE' && p !== 0 ? listen(0) : fail(e),
-        );
+        const onError = (e: NodeJS.ErrnoException) =>
+          e.code === 'EADDRINUSE' && p !== 0 ? listen(0) : fail(e);
+        server.once('error', onError);
         server.listen(p, '0.0.0.0', () => {
+          // Listening: this attempt's handler must not stay attached (nor fire on a later error).
+          server.off('error', onError);
           const a = server.address();
           ok(typeof a === 'object' && a ? a.port : p);
         });
@@ -202,25 +219,56 @@ export class PhoneRemote {
   }
 
   /**
-   * The PIN shown on the computer (phones and chat bots pair with it). Too many wrong tries
-   * change it, so guessing is hopeless.
+   * The PIN shown on the computer (phones and chat bots pair with it), compared in constant
+   * time. Too many wrong tries lock that channel for a while (longer each time) and change
+   * the PIN, so guessing is hopeless.
    */
-  checkPin(pin: string): boolean {
-    if (!this.server) return false;
-    if (same(pin.replace(/\D/g, '').padEnd(6, ' '), this.pin)) {
-      this.tries = 0;
-      return true;
-    }
-    if (++this.tries >= MAX_TRIES) {
+  checkPin(pin: string, channel: PairChannel): PinCheck {
+    if (!this.server) return { ok: false, error: 'El control desde el celular está apagado.' };
+    const r = this.guard.check(channel, pin, this.pin);
+    if (!r.ok && r.rotated) {
       this.newPin();
       this.onStatus(this.status());
     }
-    return false;
+    return r;
+  }
+
+  /**
+   * Full pairing of a new device: the right PIN, then the user's OK on the computer. A
+   * rejected (or unanswered) request changes the PIN: whoever typed it is not welcome.
+   */
+  async pair(
+    channel: PairChannel,
+    pin: string,
+    who: string,
+    /** The PIN was right and the dialog is about to show. */
+    onWaiting?: () => void,
+  ): Promise<PinCheck> {
+    if (this.approving)
+      return { ok: false, error: 'Ya hay otra conexión esperando aprobación en la computadora.' };
+    const r = this.checkPin(pin, channel);
+    if (!r.ok) return r;
+    this.approving = true;
+    let allowed = false;
+    try {
+      onWaiting?.();
+      allowed = await this.approve({ channel, who });
+    } catch {
+      allowed = false;
+    } finally {
+      this.approving = false;
+    }
+    if (!this.server) return { ok: false, error: 'El control desde el celular se apagó.' };
+    if (!allowed) {
+      this.newPin();
+      this.onStatus(this.status());
+      return { ok: false, error: 'La conexión fue rechazada en la computadora.' };
+    }
+    return { ok: true };
   }
 
   private newPin(): void {
     this.pin = String(randomInt(0, 1_000_000)).padStart(6, '0');
-    this.tries = 0;
   }
 
   private authorized(req: IncomingMessage, url: URL): boolean {
@@ -259,7 +307,14 @@ export class PhoneRemote {
         // Through the tunnel the address is public: the key of the link is required too.
         if (viaTunnel && !(this.remote?.url && same(key ?? '', this.remote.key)))
           return end(res, 403, { error: 'Enlace incompleto: copia otra vez el enlace de Zinarix' });
-        if (!this.checkPin(pin)) return end(res, 403, { error: 'PIN incorrecto' });
+        const ua = String(req.headers['user-agent'] ?? '').slice(0, 160);
+        const where = viaTunnel
+          ? 'Un celular a través de internet (enlace de Cloudflare)'
+          : `Un celular en tu red, dirección ${req.socket.remoteAddress ?? '?'}`;
+        const paired = await this.pair('phone', pin, ua ? `${where}\n${ua}` : where);
+        if (!paired.ok) return end(res, 403, { error: paired.error });
+        // The phone gave up while the dialog was open: nobody would get the token.
+        if (res.destroyed || !res.socket || res.socket.destroyed) return;
         const token = randomBytes(32).toString('hex');
         this.tokens.add(token);
         this.onStatus(this.status());

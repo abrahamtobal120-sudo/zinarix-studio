@@ -22,7 +22,16 @@ import { History } from './history.js';
 import { ModelService } from './models.js';
 import { ensureHome, omniPaths } from './paths.js';
 import type { OmniPaths } from './paths.js';
-import { audit, cacheRates, computeCost, periodStart, recordUsage, spend } from './usage.js';
+import {
+  audit,
+  cacheRates,
+  computeCost,
+  estimateInputTokens,
+  estimateTokens,
+  periodStart,
+  recordUsage,
+  spend,
+} from './usage.js';
 import type { Price } from './usage.js';
 import { EnvStore, FileVault, KeychainStore, Vault } from './vault.js';
 
@@ -363,6 +372,49 @@ export class OmniCore {
       let emitted = false;
       const started = Date.now();
       let usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 };
+      let gotUsage = false;
+      // Characters streamed (text, reasoning, tool arguments): the output estimate when a
+      // response is cut before the provider reports usage.
+      let outChars = 0;
+      let recorded = false;
+      /**
+       * Records what a failed, cancelled or abandoned attempt consumed: the provider bills
+       * the tokens it processed, so budgets must see them. Uses the usage seen so far and
+       * estimates what is missing from the request and the streamed text.
+       */
+      const recordCut = (code: string, status?: number) => {
+        recorded = true;
+        const u = { ...usage };
+        if (outChars > 0 || gotUsage) {
+          if (!gotUsage) u.inputTokens = estimateInputTokens(messages, req.tools);
+          u.outputTokens = Math.max(u.outputTokens, estimateTokens(outChars));
+        }
+        const spent = u.inputTokens > 0 || u.outputTokens > 0;
+        // Cancelled before the provider produced anything: nothing to bill.
+        if (code === 'aborted' && !spent) return;
+        recordUsage(this.db, {
+          ...ref,
+          role,
+          project: req.project,
+          inputTokens: u.inputTokens,
+          outputTokens: u.outputTokens,
+          cachedTokens: u.cachedTokens,
+          costUsd: spent ? this.cost(ref, u) : null,
+          latencyMs: Date.now() - started,
+          ok: false,
+        });
+        audit(this.db, code === 'aborted' ? 'chat_cancelled' : 'chat_error', {
+          provider: ref.provider,
+          model: ref.model,
+          detail: {
+            code,
+            status,
+            inputTokens: u.inputTokens,
+            outputTokens: u.outputTokens,
+            estimated: !gotUsage || u.outputTokens !== usage.outputTokens,
+          },
+        });
+      };
       try {
         const cfg = await this.providerConfig(ref.provider);
         const adapter = getAdapter(cfg.entry.adapter);
@@ -401,6 +453,7 @@ export class OmniCore {
         };
         for await (const chunk of adapter.chat(cfg, chatReq, signal)) {
           if (chunk.type === 'usage') {
+            gotUsage = true;
             usage = {
               inputTokens: chunk.inputTokens,
               outputTokens: chunk.outputTokens,
@@ -408,6 +461,8 @@ export class OmniCore {
               cacheWriteTokens: chunk.cacheWriteTokens ?? 0,
             };
           }
+          if (chunk.type === 'text' || chunk.type === 'reasoning') outChars += chunk.delta.length;
+          if (chunk.type === 'tool_call') outChars += chunk.argsDelta.length + chunk.name.length;
           if (chunk.type === 'text' || chunk.type === 'tool_call' || chunk.type === 'reasoning')
             emitted = true;
           yield chunk;
@@ -422,6 +477,7 @@ export class OmniCore {
           await this.models.list({ ...cfg, maxRetries: 0, timeoutMs: 5000 }).catch(() => undefined);
         }
         const usd = this.cost(ref, usage);
+        recorded = true;
         recordUsage(this.db, {
           ...ref,
           role,
@@ -459,26 +515,11 @@ export class OmniCore {
             ? e
             : e instanceof Error && e.name === 'TimeoutError'
               ? new OmniError('timeout', e.message, { provider: ref.provider })
-              : new OmniError('unknown', e instanceof Error ? e.message : String(e));
-        if (err.code !== 'aborted') {
-          // Tokens consumed before the failure are billed too, so they count for budgets.
-          recordUsage(this.db, {
-            ...ref,
-            role,
-            project: req.project,
-            inputTokens: usage.inputTokens,
-            outputTokens: usage.outputTokens,
-            cachedTokens: usage.cachedTokens,
-            costUsd: usage.inputTokens || usage.outputTokens ? this.cost(ref, usage) : null,
-            latencyMs: Date.now() - started,
-            ok: false,
-          });
-          audit(this.db, 'chat_error', {
-            provider: ref.provider,
-            model: ref.model,
-            detail: { code: err.code, status: err.status },
-          });
-        }
+              : signal.aborted || (e instanceof Error && e.name === 'AbortError')
+                ? new OmniError('aborted', 'aborted', { retryable: false })
+                : new OmniError('unknown', e instanceof Error ? e.message : String(e));
+        // Tokens consumed before the failure or cancel are billed too: count them for budgets.
+        if (!recorded) recordCut(signal.aborted ? 'aborted' : err.code, err.status);
         const next = chain[i + 1];
         if (emitted || !next || !err.retryable || signal.aborted) throw err;
         yield {
@@ -486,9 +527,36 @@ export class OmniCore {
           kind: 'fallback',
           message: `${ref.provider}/${ref.model} → ${next.provider}/${next.model} (${err.code})`,
         };
+      } finally {
+        // The consumer stopped iterating mid-stream (break / return()): no error reaches the
+        // catch, but the provider still billed what it streamed.
+        if (!recorded) recordCut('aborted');
       }
     }
     throw lastError;
+  }
+
+  /**
+   * Embedding vectors with the model of the "embeddings" role (or `model`). undefined when
+   * no embedding model is configured or its provider cannot embed (callers fall back to
+   * lexical search). Inputs are redacted like chat messages.
+   */
+  async embed(
+    input: string[],
+    signal: AbortSignal,
+    model?: string,
+  ): Promise<{ model: string; vectors: number[][] } | undefined> {
+    const spec = model ?? this.config.roles.embeddings;
+    if (!spec || !input.length) return undefined;
+    const ref = parseModelRef(spec);
+    const cfg = await this.providerConfig(ref.provider);
+    const adapter = getAdapter(cfg.entry.adapter);
+    if (!adapter.embed) return undefined;
+    const safe = this.config.privacy.redactSecrets
+      ? input.map((t) => redactWithReport(t).text)
+      : input;
+    const vectors = await adapter.embed(cfg, { model: ref.model, input: safe }, signal);
+    return { model: `${ref.provider}/${ref.model}`, vectors };
   }
 
   /** Collects a full response (used by `omni ask --json`, compare, tests). */

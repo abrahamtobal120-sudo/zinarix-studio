@@ -5,6 +5,16 @@
  */
 import type { ChatMessage, ModelInfo } from '@omni/shared';
 import type { LicenseStatus } from './plans.js';
+import type {
+  Breakpoint,
+  DebugConfig,
+  DebugConfigList,
+  DebugEvent,
+  DebugVariable,
+  ExtensionSearchItem,
+  InstalledExtension,
+} from './devtools.js';
+import type { LspStatus, NextEditRequestView, NextEditView } from './lsp.js';
 export type { LicenseStatus } from './plans.js';
 
 export interface WorkspaceInfo {
@@ -173,6 +183,12 @@ export interface Prefs {
   projectRules: boolean;
   /** Command id -> shortcut ("Ctrl+Shift+G"); overrides the defaults. */
   keybindings: Record<string, string>;
+  /** Language servers (Python, Go, Rust…) for go-to-definition, rename and errors. */
+  lsp: boolean;
+  /** Monaco language id -> command line of its language server (overrides the built-in one). */
+  lspCommands: Record<string, string>;
+  /** Predict the next edit (Tab jumps there); works together with inlineCompletions. */
+  nextEdit: boolean;
 }
 
 /** Steps of the interface size (Ver > Acercar / Alejar and Settings). */
@@ -191,6 +207,9 @@ export const DEFAULT_PREFS: Prefs = {
   inlineCompletions: false,
   projectRules: true,
   keybindings: {},
+  lsp: true,
+  lspCommands: {},
+  nextEdit: true,
 };
 
 export interface GitFileView {
@@ -257,6 +276,74 @@ export interface GitHubRepoView {
   private: boolean;
   updatedAt: string;
   url: string;
+}
+
+export interface GCloudStatus {
+  /** An OAuth client is set up for "Sign in with Google" (shared with the Mail panel). */
+  ready: boolean;
+  connected: boolean;
+  /** Address of the active Google account. */
+  user: string | null;
+  /** The login is kept but Google could not be reached (why); the panel retries. */
+  offline?: string;
+  accounts: { id: string; label: string }[];
+  active: string | null;
+}
+export interface GCloudProject {
+  id: string;
+  name: string;
+  number: string;
+}
+export interface GCloudService {
+  /** e.g. bigquery.googleapis.com */
+  name: string;
+  title: string;
+  enabled: boolean;
+}
+export interface GCloudDataset {
+  id: string;
+  location: string;
+}
+export interface GCloudTable {
+  id: string;
+  /** TABLE, VIEW, EXTERNAL… */
+  type: string;
+}
+export interface GCloudQueryResult {
+  columns: string[];
+  rows: (string | null)[][];
+  total: number;
+  ms: number;
+  /** Bytes BigQuery processed (what it bills). */
+  bytes: number;
+}
+export interface GCloudBucket {
+  name: string;
+  location: string;
+  storageClass: string;
+  created: number | null;
+}
+export interface GCloudObject {
+  /** Full object name (folders end in "/"). */
+  name: string;
+  folder: boolean;
+  size: number;
+  updated: number | null;
+  type: string;
+}
+export interface GCloudSqlInstance {
+  name: string;
+  version: string;
+  region: string;
+  state: string;
+  tier: string;
+  ip: string;
+}
+export interface GCloudLogEntry {
+  time: number | null;
+  severity: string;
+  text: string;
+  resource: string;
 }
 
 export interface VercelStatus {
@@ -510,6 +597,43 @@ export interface CompletionRequestView {
   suffix: string;
 }
 
+/** A memory kept between conversations (global, or for one project folder). */
+export interface MemoryView {
+  id: string;
+  text: string;
+  scope: 'global' | 'project';
+  /** Absolute project folder (scope "project"). */
+  project?: string;
+  created: number;
+}
+
+/** An external documentation site indexed for the AI (@Docs). */
+export interface DocSourceView {
+  id: string;
+  name: string;
+  url: string;
+  pages: number;
+  chunks: number;
+  indexedAt: number | null;
+  status: 'indexing' | 'ready' | 'error';
+  error?: string;
+  /** Indexed with embeddings (search by meaning) rather than words only. */
+  embedded?: boolean;
+}
+
+/** A search result of the knowledge indexes (project code or docs). */
+export interface KnowledgeHit {
+  /** Project-relative path, or the page URL for docs. */
+  source: string;
+  start: number;
+  end: number;
+  title?: string;
+  /** Docs source name. */
+  label?: string;
+  text: string;
+  score: number;
+}
+
 export interface ChatContext {
   source: string;
   content: string;
@@ -604,6 +728,8 @@ export interface ChatRequestView {
   folder?: string;
   /** Works in no folder at all (not even the window's open folder). */
   noFolder?: boolean;
+  /** Images pasted or dropped into the message (base64 without the data: prefix). */
+  images?: { mediaType: string; data: string }[];
 }
 
 export interface EditRequestView {
@@ -682,7 +808,19 @@ export type AppEvent =
   /** WhatsApp Web changed (unread count, chat open, control, answers waiting). */
   | { type: 'whatsapp:status'; status: WhatsAppStatus }
   /** The Watcher (Vigía) reviewed a project, started or stopped, or its settings changed. */
-  | { type: 'watch:status'; status: WatchStatus };
+  | { type: 'watch:status'; status: WatchStatus }
+  /** The debug session of this window changed (state, stop, output). */
+  | { type: 'debug'; event: DebugEvent }
+  /** Extensions were installed, removed, enabled or disabled (in any window). */
+  | { type: 'extensions:changed' }
+  /** Errors/warnings a language server found in a file (LSP Diagnostic[], zx-ws:/ URIs). */
+  | { type: 'lsp:diagnostics'; path: string; diagnostics: unknown[] }
+  /** A language server started, is missing, failed… */
+  | { type: 'lsp:status'; status: LspStatus }
+  /** A language server asks to change files (WorkspaceEdit); answer with lsp.applyEditResult. */
+  | { type: 'lsp:applyEdit'; id: number; edit: unknown }
+  /** Memories or indexed docs changed (added, removed, a crawl progressed). */
+  | { type: 'knowledge:changed' };
 
 /** Something the Watcher thinks should be fixed (a bug, a risk) or improved. */
 export interface WatchItem {
@@ -848,7 +986,39 @@ export type PhoneAction =
   | { kind: 'newChat' }
   | { kind: 'agent'; on: boolean };
 
+/** An MCP server of the global config or of the open project (Settings → MCP). */
+export interface McpServerView {
+  id: string;
+  name: string;
+  scope: 'global' | 'project';
+  kind: 'stdio' | 'http';
+  target: string;
+  state: 'off' | 'connecting' | 'connected' | 'error' | 'untrusted';
+  error?: string;
+  tools: { name: string; description?: string }[];
+  disabled: boolean;
+}
+
+/** The open project's MCP file (.zinarix/mcp.json or .cursor/mcp.json). */
+export interface McpProjectView {
+  root: string;
+  file: string | null;
+  trusted: boolean;
+  errors: string[];
+}
+
 export interface OmniApi {
+  mcp: {
+    status(): Promise<{ servers: McpServerView[]; project: McpProjectView | null }>;
+    /** Text of the global mcp.json. */
+    config(): Promise<string>;
+    /** Saves the global mcp.json; returns the problems found in it. */
+    saveConfig(text: string): Promise<{ errors: string[] }>;
+    restart(id: string): Promise<void>;
+    setEnabled(name: string, on: boolean): Promise<void>;
+    /** Trusts (runs) or stops trusting the open project's MCP file. */
+    trustProject(on: boolean): Promise<void>;
+  };
   workspace: {
     current(): Promise<WorkspaceInfo | null>;
     openDialog(): Promise<WorkspaceInfo | null>;
@@ -908,6 +1078,8 @@ export interface OmniApi {
     setTheme(theme: ThemeId): Promise<void>;
     /** Inline completion (ghost text) at the cursor; '' when there is nothing to suggest. */
     complete(requestId: string, req: CompletionRequestView): Promise<string>;
+    /** Predicts the next edit near the cursor (null = no suggestion). */
+    nextEdit(requestId: string, req: NextEditRequestView): Promise<NextEditView | null>;
     /** Commit message for the staged changes (or all changes when nothing is staged). */
     commitMessage(): Promise<string>;
     /** Project rules file in use (.zinarix/rules.md, AGENTS.md…) or null. */
@@ -956,6 +1128,27 @@ export interface OmniApi {
     publish(name: string, visibility: 'private' | 'public', description: string): Promise<string>;
     /** Pull request of the current branch (null when there is none or gh is not signed in). */
     pr(): Promise<GitHubPrView | null>;
+  };
+  gcloud: {
+    status(): Promise<GCloudStatus>;
+    /** "Sign in with Google" in the browser with access to Google Cloud. */
+    login(): Promise<GCloudStatus>;
+    /** Turns on the APIs Zinarix uses that the project has off; returns the ones turned on. */
+    prepare(project: string): Promise<string[]>;
+    useAccount(id: string): Promise<GCloudStatus>;
+    logout(id?: string): Promise<GCloudStatus>;
+    projects(): Promise<GCloudProject[]>;
+    /** Enabled APIs of a project, or every API Google offers (all = true). */
+    services(project: string, all: boolean): Promise<GCloudService[]>;
+    setService(project: string, service: string, enable: boolean): Promise<void>;
+    datasets(project: string): Promise<GCloudDataset[]>;
+    tables(project: string, dataset: string): Promise<GCloudTable[]>;
+    query(project: string, sql: string): Promise<GCloudQueryResult>;
+    buckets(project: string): Promise<GCloudBucket[]>;
+    objects(bucket: string, prefix: string): Promise<GCloudObject[]>;
+    sqlInstances(project: string): Promise<GCloudSqlInstance[]>;
+    sqlPower(project: string, instance: string, on: boolean): Promise<void>;
+    logs(project: string, filter: string): Promise<GCloudLogEntry[]>;
   };
   vercel: {
     status(): Promise<VercelStatus>;
@@ -1144,6 +1337,25 @@ export interface OmniApi {
     kill(id: number): Promise<void>;
   };
   /** The Watcher: an always-on reviewer that spends tokens only now and then. */
+  knowledge: {
+    memories(): Promise<MemoryView[]>;
+    addMemory(text: string, scope: 'global' | 'project'): Promise<MemoryView>;
+    updateMemory(id: string, text: string): Promise<boolean>;
+    removeMemory(id: string): Promise<boolean>;
+    docs(): Promise<DocSourceView[]>;
+    addDocs(name: string, url: string): Promise<DocSourceView>;
+    removeDocs(id: string): Promise<void>;
+    reindexDocs(id: string): Promise<void>;
+    /** Searches this window's project by meaning (embeddings, or BM25 without them). */
+    search(
+      query: string,
+      limit?: number,
+    ): Promise<{ hits: KnowledgeHit[]; semantic: boolean; files: number }>;
+    /** Best passages of the indexed docs (one source by name, or all). */
+    searchDocs(query: string, source?: string): Promise<KnowledgeHit[]>;
+    embedModel(): Promise<string | null>;
+    setEmbedModel(ref: string | null): Promise<void>;
+  };
   watch: {
     status(): Promise<WatchStatus>;
     configure(patch: Partial<WatchSettings>): Promise<WatchStatus>;
@@ -1152,6 +1364,34 @@ export interface OmniApi {
     /** Marks every report as seen (the badge goes away). */
     seen(): Promise<WatchStatus>;
     dismiss(id: string): Promise<WatchStatus>;
+  };
+  /** Debugger (DAP adapters, or Node's inspector). One session per window. */
+  debug: {
+    configs(file?: string): Promise<DebugConfigList>;
+    /** config null = debug the given file with its default configuration. */
+    start(
+      config: DebugConfig | null,
+      file: string | undefined,
+      breakpoints: Record<string, Breakpoint[]>,
+    ): Promise<void>;
+    stop(): Promise<void>;
+    restart(): Promise<void>;
+    continue(): Promise<void>;
+    pause(): Promise<void>;
+    step(kind: 'over' | 'into' | 'out'): Promise<void>;
+    scopes(frameId: number): Promise<DebugVariable[]>;
+    variables(ref: number): Promise<DebugVariable[]>;
+    evaluate(expression: string, frameId?: number): Promise<DebugVariable>;
+    setBreakpoints(path: string, breakpoints: Breakpoint[]): Promise<void>;
+  };
+  /** Extensions from Open VSX (themes, snippets, languages). */
+  extensions: {
+    search(query: string): Promise<ExtensionSearchItem[]>;
+    icon(url: string): Promise<string | null>;
+    install(namespace: string, name: string): Promise<InstalledExtension>;
+    uninstall(id: string): Promise<void>;
+    list(): Promise<InstalledExtension[]>;
+    setEnabled(id: string, enabled: boolean): Promise<void>;
   };
   app: {
     prefs(): Promise<Prefs>;
@@ -1215,9 +1455,19 @@ export interface OmniApi {
   };
   license: {
     status(): Promise<LicenseStatus>;
-    /** A license key (ZX1.…) or the owner's word. Throws with a readable reason. */
+    /** A signed license key (ZX1.…). Throws with a readable reason. */
     activate(key: string): Promise<LicenseStatus>;
     remove(): Promise<LicenseStatus>;
+  };
+  lsp: {
+    open(path: string, language: string, text: string): Promise<LspStatus | null>;
+    change(path: string, text: string): Promise<void>;
+    save(path: string): Promise<void>;
+    close(path: string): Promise<void>;
+    request(path: string, method: string, params: unknown): Promise<unknown>;
+    applyEditResult(id: number, applied: boolean): Promise<void>;
+    statuses(): Promise<LspStatus[]>;
+    restart(): Promise<void>;
   };
   on(listener: (ev: AppEvent) => void): () => void;
 }
@@ -1291,6 +1541,22 @@ export const CHANNELS = [
   'github:clone',
   'github:publish',
   'github:pr',
+  'gcloud:status',
+  'gcloud:login',
+  'gcloud:prepare',
+  'gcloud:useAccount',
+  'gcloud:logout',
+  'gcloud:projects',
+  'gcloud:services',
+  'gcloud:setService',
+  'gcloud:datasets',
+  'gcloud:tables',
+  'gcloud:query',
+  'gcloud:buckets',
+  'gcloud:objects',
+  'gcloud:sqlInstances',
+  'gcloud:sqlPower',
+  'gcloud:logs',
   'vercel:status',
   'vercel:setToken',
   'vercel:logout',
@@ -1415,6 +1681,50 @@ export const CHANNELS = [
   'watch:runNow',
   'watch:seen',
   'watch:dismiss',
+  'debug:configs',
+  'debug:start',
+  'debug:stop',
+  'debug:restart',
+  'debug:continue',
+  'debug:pause',
+  'debug:step',
+  'debug:scopes',
+  'debug:variables',
+  'debug:evaluate',
+  'debug:setBreakpoints',
+  'ext:search',
+  'ext:icon',
+  'ext:install',
+  'ext:uninstall',
+  'ext:list',
+  'ext:setEnabled',
+  'ai:nextEdit',
+  'lsp:open',
+  'lsp:change',
+  'lsp:save',
+  'lsp:close',
+  'lsp:request',
+  'lsp:applyEditResult',
+  'lsp:statuses',
+  'lsp:restart',
+  'knowledge:memories',
+  'knowledge:addMemory',
+  'knowledge:updateMemory',
+  'knowledge:removeMemory',
+  'knowledge:docs',
+  'knowledge:addDocs',
+  'knowledge:removeDocs',
+  'knowledge:reindexDocs',
+  'knowledge:search',
+  'knowledge:searchDocs',
+  'knowledge:embedModel',
+  'knowledge:setEmbedModel',
+  'mcp:status',
+  'mcp:config',
+  'mcp:saveConfig',
+  'mcp:restart',
+  'mcp:setEnabled',
+  'mcp:trustProject',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

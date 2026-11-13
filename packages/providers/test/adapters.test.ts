@@ -193,6 +193,29 @@ describe('openai-compatible', () => {
     expect(models.find((m) => m.id === 'fallback-1')!.context).toBe(1000);
   });
 
+  it('treats blank or missing prices as unknown, not free', async () => {
+    const srv = await mockServer((_req, res) =>
+      json(res, 200, {
+        data: [
+          { id: 'b/blank', pricing: { prompt: '', completion: '  ' } },
+          { id: 'b/null', pricing: { prompt: null, completion: null } },
+          { id: 'b/none' },
+          { id: 'b/free', pricing: { prompt: '0', completion: 0 } },
+        ],
+      }),
+    );
+    close = srv.close;
+    const models = await openAiCompatible.listModels({ entry: entry(), baseUrl: srv.url });
+    for (const id of ['b/blank', 'b/null', 'b/none']) {
+      const m = models.find((x) => x.id === id)!;
+      expect(m.inputPrice ?? null, id).toBeNull();
+      expect(m.outputPrice ?? null, id).toBeNull();
+    }
+    const free = models.find((x) => x.id === 'b/free')!;
+    expect(free.inputPrice).toBe(0);
+    expect(free.outputPrice).toBe(0);
+  });
+
   it('falls back to catalog models when the provider has no listing endpoint', async () => {
     const models = await openAiCompatible.listModels({
       entry: entry({ modelsEndpoint: null }),
@@ -334,6 +357,57 @@ describe('anthropic', () => {
     await expect(
       collect(anthropic, { entry: entry({ adapter: 'anthropic' }), baseUrl: srv.url }),
     ).rejects.toMatchObject({ code: 'server', retryable: true });
+  });
+
+  it('reports partial usage (seen + estimated) when the stream fails mid-response', async () => {
+    const srv = await mockServer((_req, res) =>
+      sse(res, [
+        {
+          event: 'message_start',
+          data: {
+            type: 'message_start',
+            message: {
+              usage: { input_tokens: 500, cache_read_input_tokens: 100, output_tokens: 1 },
+            },
+          },
+        },
+        {
+          event: 'content_block_start',
+          data: { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+        },
+        {
+          event: 'content_block_delta',
+          data: {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'text_delta', text: 'x'.repeat(200) },
+          },
+        },
+        {
+          event: 'error',
+          data: { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } },
+        },
+      ]),
+    );
+    close = srv.close;
+    const out: ChatChunk[] = [];
+    await expect(
+      (async () => {
+        for await (const c of anthropic.chat(
+          { entry: entry({ adapter: 'anthropic' }), baseUrl: srv.url },
+          { model: 'm1', messages: [{ role: 'user', content: 'hola' }] },
+          new AbortController().signal,
+        ))
+          out.push(c);
+      })(),
+    ).rejects.toMatchObject({ code: 'server' });
+    expect(out.find((c) => c.type === 'usage')).toEqual({
+      type: 'usage',
+      inputTokens: 600,
+      outputTokens: 50,
+      cachedTokens: 100,
+      partial: true,
+    });
   });
 
   it('paginates the models endpoint and reads context/capabilities', async () => {

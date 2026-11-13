@@ -11,3 +11,11 @@ allowBuilds:
 supportedArchitectures:
   os: [current]
   cpu: [x64, arm64]
+# Security floors for transitive dependencies (see scripts/audit.mjs):
+# monaco-editor pins dompurify 3.4.15; electron / node-gyp bring older undici.
+overrides:
+  dompurify: ^3.4.17
+  'undici@>=7 <7.30.2': ^7.30.2
+  'undici@>=4 <6.29.1': ^6.29.1
+minimumReleaseAgeExclude:
+  - electron@44.11.3

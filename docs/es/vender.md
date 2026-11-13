@@ -2,7 +2,8 @@
 
 Todo se controla con **un archivo**: `website/app-config.json`. Cada app instalada lo lee al abrir
 y cada 6 horas desde `https://zinarix-studio.vercel.app/app-config.json`. Cambias el archivo,
-publicas la página (Vercel lo hace solo al subir a GitHub) y en unas horas todas las apps ya
+**lo firmas** (`pnpm config:sign`, ver abajo), publicas la página (Vercel lo hace solo al subir
+a GitHub) y en unas horas todas las apps ya
 instaladas lo obedecen, sin reinstalar nada.
 
 No hay servidores ni bases de datos que pagar: la página es estática en Vercel (gratis), las
@@ -28,8 +29,12 @@ ventanas y todos los agentes. La app no muestra nada de planes ni de compras.
    "priceNote": "pago único · actualizaciones incluidas",
    "stripeLink": "https://buy.stripe.com/…"
    ```
-2. Sube el cambio a GitHub (`git commit` + `git push`). Vercel publica la página.
-3. Cada copia instalada, en cuanto lee el archivo, empieza **su** prueba de `trialDays` días con
+2. Fírmalo: `ZINARIX_LICENSE_KEY=…/license-private.pem pnpm config:sign` (escribe
+   `website/app-config.json.sig`). Sin una firma válida las apps instaladas **ignoran** el
+   archivo y siguen con el último bueno: así nadie puede apagar el cobro con un archivo falso o
+   un proxy. La variable `ZINARIX_CONFIG_URL` solo funciona en copias de desarrollo.
+3. Sube los dos archivos a GitHub (`git commit` + `git push`). Vercel publica la página.
+4. Cada copia instalada, en cuanto lee el archivo, empieza **su** prueba de `trialDays` días con
    todo (aunque la hayan usado gratis meses: la prueba cuenta desde que ve el cobro encendido).
    Al terminar queda en el plan gratis (`free`) hasta que active una licencia.
 
@@ -40,14 +45,20 @@ ventanas.
 
 Para volver a dejarlo gratis: `"billing": false` y publicar.
 
-## Tu palabra de dueño
+## Tu licencia de dueño
 
-En la app: **Ayuda → Plan y licencia…**, escribe `tobal` en el cuadro de la clave y pulsa
-**Activar**. Esa copia queda como "Dueño": todo, para siempre, sin importar el cobro.
+Ya no hay palabra de dueño ni códigos de plan (se podían adivinar o leer en el código). Hazte una
+licencia firmada con tu llave privada:
 
-> El código es público (licencia MIT). Quien lea el código puede encontrar cómo funciona la
-> palabra, o quitar el cobro y compilar su propia copia. Es normal en apps de código abierto:
-> la mayoría de la gente compra porque es fácil, recibe actualizaciones y te apoya.
+```bash
+ZINARIX_LICENSE_KEY=~/Desktop/zinarix-licencias-PRIVADO/license-private.pem   node scripts/license.mjs issue tu@correo.com --owner
+```
+
+Pégala en **Ayuda → Plan y licencia…**. Esa copia queda como "Dueño": todo, en cualquier
+edición, sin importar el cobro. Para probar un plan, hazte una clave de ese plan con `--days 1`.
+
+> El código es público (licencia MIT). Quien quiera puede quitar el cobro y compilar su propia
+> copia; lo que ya no se puede es activar planes en las apps oficiales sin una clave firmada.
 
 ## Cobrar con Stripe (las licencias se entregan solas)
 
@@ -65,16 +76,27 @@ En la app: **Ayuda → Plan y licencia…**, escribe `tobal` en el cuadro de la 
      con permiso solo de lectura de Checkout Sessions).
    - `LICENSE_PRIVATE_KEY`: el contenido completo de `license-private.pem` (la llave privada que
      se te entregó **fuera** del repo, en la carpeta `zinarix-licencias-PRIVADO`).
-   - `STRIPE_PAYMENT_LINK` (opcional): el id `plink_…` del enlace de Pro, para que solo esa compra dé
-     licencias.
-   - `STRIPE_LINK_AI` y `STRIPE_LINK_PROAI` (opcionales): los `plink_…` de los enlaces de AI y
-     Pro + AI; esas compras dan una clave de ese plan.
+   - `STRIPE_PAYMENT_LINK`: el id `plink_…` del enlace de Pro.
+   - `STRIPE_LINK_AI` y `STRIPE_LINK_PROAI`: los `plink_…` de los enlaces de AI y Pro + AI; esas
+     compras dan una clave de ese plan. **Hace falta al menos un enlace**: sin ninguno, la página
+     no entrega claves (antes cualquier compra en tu cuenta de Stripe daba una clave Pro).
+   - `LICENSE_CLAIM_HOURS` (opcional, 72 por omisión): cuántas horas después de pagar se puede
+     volver a sacar la clave con el enlace de `/gracias`. Después, el cliente te escribe.
+   - En **Vercel → Firewall** agrega una regla de límite de peticiones para `/api/license`
+     (la función ya limita por IP, pero solo dentro de cada instancia).
 5. Pega el enlace de pago en `stripeLink` de `website/app-config.json` y publica.
 
 El cliente paga → Stripe lo manda a `/gracias` → la página pide la licencia a `/api/license`
 (que revisa con Stripe que el pago esté hecho y la firma con tu llave privada) → el cliente la
 copia y la pega en **Ayuda → Plan y licencia…**. La misma compra siempre da la misma clave, así
-que puede volver a la página si la pierde.
+que puede volver a la página si la pierde (durante `LICENSE_CLAIM_HOURS`).
+
+## Reembolsos y disputas
+
+`/api/license` revisa el cargo en Stripe: si se reembolsó (total o parcial) o está en disputa,
+no entrega la clave. Para apagar una clave que ya se entregó, agrega su id (el `session_id`
+`cs_live_…` de la compra) a `"revoked"` en `website/app-config.json`, fírmalo y publícalo: las
+apps instaladas la desactivan al leer el archivo, y la página ya no la vuelve a dar.
 
 ## Licencias a mano (regalos, pagos por transferencia)
 

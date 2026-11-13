@@ -8,6 +8,8 @@ import type {
   VercelSettings,
   VercelStatus,
 } from '../../shared/api';
+import { confirmDialog } from '../confirm';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, setState, toast, useStore } from '../store';
 import { askAgent } from './Chat';
@@ -59,8 +61,8 @@ function inTerminal(cli: boolean, args: string) {
   setTimeout(() => void runInTerminal(`${cli ? 'vercel' : 'npx vercel'} ${args}`), 300);
 }
 
-function deploy(prod: boolean, cli: boolean) {
-  if (prod && !confirm(t('vcProdConfirm'))) return;
+async function deploy(prod: boolean, cli: boolean) {
+  if (prod && !(await confirmDialog(t('vcProdConfirm')))) return;
   inTerminal(cli, `deploy${prod ? ' --prod' : ''}`);
 }
 
@@ -409,8 +411,8 @@ function VercelBody({ reset }: { reset: () => void }) {
       onAdd={() => setAdding(true)}
       onLogout={
         st.source === 'app'
-          ? () => {
-              if (confirm(t('vcLogoutConfirm')))
+          ? async () => {
+              if (await confirmDialog(t('vcLogoutConfirm'), { danger: true }))
                 void act('logout', async () => {
                   await api().vercel.logout();
                   reset();
@@ -504,7 +506,7 @@ function VercelBody({ reset }: { reset: () => void }) {
           <div className="git-connect-actions">
             {workspace && (
               <>
-                <button className="primary" onClick={() => deploy(false, st.cli)}>
+                <button className="primary" onClick={() => void deploy(false, st.cli)}>
                   {t('vcDeployNew')}
                 </button>
                 <button onClick={() => inTerminal(st.cli, 'link')}>{t('vcLink')}</button>
@@ -541,7 +543,12 @@ function VercelBody({ reset }: { reset: () => void }) {
           </div>
           {projects?.length === 0 && <div className="git-clean">{t('vcNoProjects')}</div>}
           {shown.map((p) => (
-            <div key={p.id} className="git-row" title={p.repo ?? p.name} onClick={() => choose(p)}>
+            <div
+              key={p.id}
+              className="git-row"
+              title={p.repo ?? p.name}
+              {...pressable(() => choose(p))}
+            >
               <span className="git-icon">▲</span>
               <span className="git-name">{p.name}</span>
               <span className="git-dir">{p.framework ?? ''}</span>
@@ -581,14 +588,18 @@ function VercelBody({ reset }: { reset: () => void }) {
     });
   };
 
-  const importEnv = () => {
+  const importEnv = async () => {
     if (!envImport) return;
     const vars = parseDotenv(envImport.text);
     if (!vars.length) return toast(t('vcImportEmpty'));
     const { targets } = envImport;
     const existing = new Set(info?.envs.map((e) => e.key));
     const replaced = vars.filter((v) => existing.has(v.key)).length;
-    if (!confirm(t('vcImportConfirm', { n: vars.length, replaced, targets: targets.join(', ') })))
+    if (
+      !(await confirmDialog(
+        t('vcImportConfirm', { n: vars.length, replaced, targets: targets.join(', ') }),
+      ))
+    )
       return;
     void act('env', async () => {
       const failed: string[] = [];
@@ -716,12 +727,12 @@ function VercelBody({ reset }: { reset: () => void }) {
           <button
             className="primary"
             disabled={!workspace}
-            onClick={() => deploy(false, st.cli)}
+            onClick={() => void deploy(false, st.cli)}
             title={t('vcPreviewTitle')}
           >
             <Icon name="push" size={14} /> {t('vcPreview')}
           </button>
-          <button disabled={!workspace} onClick={() => deploy(true, st.cli)}>
+          <button disabled={!workspace} onClick={() => void deploy(true, st.cli)}>
             <Icon name="bolt" size={14} /> {t('vcProduction')}
           </button>
           {prod && (
@@ -807,7 +818,7 @@ function VercelBody({ reset }: { reset: () => void }) {
               <div
                 className="git-commit-row vc-deploy"
                 title={`${d.url}\n${d.state}`}
-                onClick={() => open(`https://${d.url}`)}
+                {...pressable(() => open(`https://${d.url}`))}
               >
                 <div className="git-commit-subject">
                   <span className={`vc-dot ${stateClass(d.state)}`}>●</span>{' '}
@@ -857,8 +868,8 @@ function VercelBody({ reset }: { reset: () => void }) {
                   {LIVE.has(d.state) ? (
                     <button
                       title={t('vcCancel')}
-                      onClick={() => {
-                        if (!confirm(t('vcCancelConfirm'))) return;
+                      onClick={async () => {
+                        if (!(await confirmDialog(t('vcCancelConfirm'), { danger: true }))) return;
                         void act('cancel', async () => {
                           await api().vercel.cancel(d.id, pick.teamId);
                           await loadDeps();
@@ -870,9 +881,13 @@ function VercelBody({ reset }: { reset: () => void }) {
                   ) : (
                     <button
                       title={t('vcRedeploy')}
-                      onClick={() => {
+                      onClick={async () => {
                         const toProd = d.target === 'production';
-                        if (!confirm(toProd ? t('vcRedeployProdConfirm') : t('vcRedeployConfirm')))
+                        if (
+                          !(await confirmDialog(
+                            toProd ? t('vcRedeployProdConfirm') : t('vcRedeployConfirm'),
+                          ))
+                        )
                           return;
                         void act('redeploy', async () => {
                           await api().vercel.redeploy(d.id, pick.teamId, toProd);
@@ -887,12 +902,12 @@ function VercelBody({ reset }: { reset: () => void }) {
                   {d.state === 'READY' && d.id !== prod?.id && (
                     <button
                       title={d.target === 'production' ? t('vcRollback') : t('vcPromote')}
-                      onClick={() => {
+                      onClick={async () => {
                         const msg =
                           d.target === 'production'
                             ? t('vcRollbackConfirm')
                             : t('vcPromoteConfirm');
-                        if (!confirm(msg)) return;
+                        if (!(await confirmDialog(msg))) return;
                         void act('promote', async () => {
                           await api().vercel.promote(projectId, d.id, teamId);
                           toast(t('vcPromoted'));
@@ -906,8 +921,13 @@ function VercelBody({ reset }: { reset: () => void }) {
                   {d.id !== prod?.id && !LIVE.has(d.state) && (
                     <button
                       title={t('vcDeleteDeploy')}
-                      onClick={() => {
-                        if (!confirm(t('vcDeleteDeployConfirm', { url: d.url }))) return;
+                      onClick={async () => {
+                        if (
+                          !(await confirmDialog(t('vcDeleteDeployConfirm', { url: d.url }), {
+                            danger: true,
+                          }))
+                        )
+                          return;
                         void act('delete', async () => {
                           await api().vercel.removeDeployment(d.id, teamId);
                           await loadDeps();
@@ -960,8 +980,9 @@ function VercelBody({ reset }: { reset: () => void }) {
             {workspace && (
               <button
                 title={t('vcEnvPullTitle')}
-                onClick={() => {
-                  if (confirm(t('vcEnvPullConfirm'))) inTerminal(st.cli, 'env pull .env.local');
+                onClick={async () => {
+                  if (await confirmDialog(t('vcEnvPullConfirm')))
+                    inTerminal(st.cli, 'env pull .env.local');
                 }}
               >
                 <Icon name="download" size={14} /> .env.local
@@ -972,7 +993,7 @@ function VercelBody({ reset }: { reset: () => void }) {
             <div className="vc-form">
               <input
                 value={envForm.key}
-                placeholder="NOMBRE_VARIABLE"
+                placeholder={t('phEnvName')}
                 spellCheck={false}
                 autoFocus
                 onChange={(e) =>
@@ -1093,8 +1114,13 @@ function VercelBody({ reset }: { reset: () => void }) {
                 </button>
                 <button
                   title={t('vcEnvDelete')}
-                  onClick={() => {
-                    if (!confirm(t('vcEnvDeleteConfirm', { key: e.key }))) return;
+                  onClick={async () => {
+                    if (
+                      !(await confirmDialog(t('vcEnvDeleteConfirm', { key: e.key }), {
+                        danger: true,
+                      }))
+                    )
+                      return;
                     void act('env', async () => {
                       await api().vercel.deleteEnv(projectId, teamId, e.id);
                       loadInfo();
@@ -1143,7 +1169,7 @@ function VercelBody({ reset }: { reset: () => void }) {
               key={d.name}
               className="git-row"
               title={d.verified ? d.name : t('vcUnverified')}
-              onClick={() => open(`https://${d.name}`)}
+              {...pressable(() => open(`https://${d.name}`))}
             >
               <span className={`git-icon ${d.verified ? 'added' : 'modified'}`}>●</span>
               <span className="git-name">{d.name}</span>
@@ -1179,8 +1205,13 @@ function VercelBody({ reset }: { reset: () => void }) {
                 </button>
                 <button
                   title={t('vcDomainRemove')}
-                  onClick={() => {
-                    if (!confirm(t('vcDomainRemoveConfirm', { name: d.name }))) return;
+                  onClick={async () => {
+                    if (
+                      !(await confirmDialog(t('vcDomainRemoveConfirm', { name: d.name }), {
+                        danger: true,
+                      }))
+                    )
+                      return;
                     void act('domain', async () => {
                       await api().vercel.removeDomain(projectId, teamId, d.name);
                       loadInfo();

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ConversationView } from '../../shared/api';
+import { confirmDialog } from '../confirm';
+import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, askText, toast, useStore } from '../store';
 import { ProviderLogo } from './ProviderLogo';
@@ -79,7 +81,8 @@ export function ChatHistory({
   };
 
   const remove = async (c: ConversationView) => {
-    if (!confirm(t('histDeleteConfirm', { title: c.title }))) return;
+    if (!(await confirmDialog(t('histDeleteConfirm', { title: c.title }), { danger: true })))
+      return;
     await api().ai.deleteConversation(c.id);
     onDeleted(c.id);
     await load();
@@ -132,7 +135,7 @@ export function ChatHistory({
               <div
                 key={c.id}
                 className={`ch-item ${c.id === current ? 'active' : ''}`}
-                onClick={() => onOpen(c.id, c.project)}
+                {...pressable(() => onOpen(c.id, c.project))}
                 title={c.project ?? ''}
               >
                 {c.model ? (

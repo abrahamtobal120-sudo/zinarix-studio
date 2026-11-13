@@ -112,7 +112,7 @@ export function EditorArea() {
               onMouseDown={(e) => {
                 if (e.button === 1) {
                   e.preventDefault();
-                  closeTab(tab.path);
+                  void closeTab(tab.path);
                 }
               }}
             >
@@ -142,7 +142,7 @@ export function EditorArea() {
                 aria-label={t('close')}
                 onClick={(e) => {
                   e.stopPropagation();
-                  closeTab(tab.path);
+                  void closeTab(tab.path);
                 }}
               >
                 {tab.dirty ? '●' : <Icon name="x" size={13} />}

@@ -17,7 +17,10 @@ import { CatalogEntry, CliProfile, OmniError, t } from '@omni/shared';
 import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact, StreamRedactor } from '@omni/security';
 import { Agent } from './agent.js';
+import { MAX_IMAGES, addImageParts, imagesAsFiles, visionMode } from './chatImages.js';
 import { RunJournal } from './runJournal.js';
+import { predictNextEdit } from './nextEdit.js';
+import type { NextEditRequestView, NextEditView } from '../shared/lsp.js';
 import { setCredentialEnvNames } from './env.js';
 import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
@@ -552,7 +555,8 @@ export class AiService {
       req.context,
       CHAT_SYSTEM + this.rulesBlock(scope),
     ) as [ChatMessage, ChatMessage];
-    const messages: ChatMessage[] = [system, ...recentHistory(req.history), user];
+    const img = this.withImages(user, req, 'chat', requestId, emit);
+    const messages: ChatMessage[] = [system, ...recentHistory(req.history), img];
     let conversationId: string;
     try {
       conversationId = this.newConversation(req, requestId, emit, scope);
@@ -576,6 +580,29 @@ export class AiService {
       forward(requestId, ev, send);
     });
     saveTurn(rec, this.core, conversationId);
+  }
+
+  /** Adds the pasted images to the user's message the way the model can take them. */
+  private withImages(
+    message: ChatMessage,
+    req: ChatRequestView,
+    role: 'chat' | 'agent',
+    requestId: string,
+    emit: Emit,
+  ): ChatMessage {
+    const images = (req.images ?? []).slice(0, MAX_IMAGES);
+    if (!images.length) return message;
+    const mode = visionMode(this.core, req.model, role);
+    if (mode === 'none') {
+      emit(requestId, {
+        type: 'notice',
+        kind: 'vision',
+        message:
+          'Este modelo no acepta imágenes: se envió solo el texto. Elige un modelo con visión (filtro 👁 en el selector).',
+      });
+      return message;
+    }
+    return mode === 'files' ? imagesAsFiles(message, images) : addImageParts(message, images);
   }
 
   /** Agent mode: multi-step tool use over the open workspace, with approvals. */
@@ -607,7 +634,13 @@ export class AiService {
       convId = this.newConversation(req, requestId, emit, scope);
       const id = convId;
       this.journal.put(requestId, { conversationId: id, prompt: req.prompt, ...rec.progress(), at });
-      const userMessage = buildContextMessages(req.prompt, req.context).at(-1)!;
+      const userMessage = this.withImages(
+        buildContextMessages(req.prompt, req.context).at(-1)!,
+        req,
+        'agent',
+        requestId,
+        emit,
+      );
       await this.agent.run({
         conversationId: convId,
         model: req.model,
@@ -688,6 +721,12 @@ export class AiService {
 
   /** System-prompt block with the project rules (style and conventions, never safety overrides). */
   rulesBlock(scope: Scope = this.scope): string {
+    // Memories (Settings › Memories, the remember tool) apply to plain chat and the agent.
+    const memories = this.agent.knowledge?.promptBlock(scope.workspace()?.root) ?? '';
+    return this.projectRules(scope) + memories;
+  }
+
+  private projectRules(scope: Scope): string {
     const f = this.rulesFile(scope);
     if (!f) return '';
     let text = '';
@@ -733,6 +772,17 @@ export class AiService {
       return cleanCompletion(r.text, prefix, suffix);
     } catch {
       return '';
+    } finally {
+      this.running.delete(requestId);
+    }
+  }
+
+  /** Next-edit prediction ("Tab" jumps to it); null = no suggestion. Abortable like complete. */
+  async nextEdit(requestId: string, req: NextEditRequestView): Promise<NextEditView | null> {
+    const ctrl = new AbortController();
+    this.running.set(requestId, ctrl);
+    try {
+      return await predictNextEdit(this.core, req, ctrl.signal);
     } finally {
       this.running.delete(requestId);
     }

@@ -180,74 +180,100 @@ async function* chat(
   let cacheWrite = 0;
   let output = 0;
   let stop: string | undefined;
-  for await (const ev of parseSse(res.body, {
-    signal,
-    idleTimeoutMs: cfg.idleTimeoutMs,
-    provider: cfg.entry.id,
-  })) {
-    const e = safeJson<AnthropicEvent>(ev.data);
-    if (!e?.type) continue;
-    switch (e.type) {
-      case 'message_start': {
-        const u = e.message?.usage ?? {};
-        cached = u.cache_read_input_tokens ?? 0;
-        cacheWrite = u.cache_creation_input_tokens ?? 0;
-        input = (u.input_tokens ?? 0) + cached + cacheWrite;
-        output = u.output_tokens ?? 0;
-        break;
-      }
-      case 'content_block_start':
-        if (e.content_block) blocks[e.index ?? 0] = { ...e.content_block };
-        if (e.content_block?.type === 'tool_use') {
-          const call = {
-            id: e.content_block.id ?? `toolu_${e.index}`,
-            name: e.content_block.name ?? '',
-          };
-          tools.set(e.index ?? 0, call);
-          yield { type: 'tool_call', id: call.id, name: call.name, argsDelta: '' };
+  // Characters streamed so far: output_tokens only arrives in the final message_delta, so a
+  // stream cut mid-answer needs an estimate (~4 chars per token) to count what was billed.
+  let streamedChars = 0;
+  let sawStart = false;
+  try {
+    for await (const ev of parseSse(res.body, {
+      signal,
+      idleTimeoutMs: cfg.idleTimeoutMs,
+      provider: cfg.entry.id,
+    })) {
+      const e = safeJson<AnthropicEvent>(ev.data);
+      if (!e?.type) continue;
+      switch (e.type) {
+        case 'message_start': {
+          const u = e.message?.usage ?? {};
+          cached = u.cache_read_input_tokens ?? 0;
+          cacheWrite = u.cache_creation_input_tokens ?? 0;
+          input = (u.input_tokens ?? 0) + cached + cacheWrite;
+          output = u.output_tokens ?? 0;
+          sawStart = true;
+          break;
         }
-        break;
-      case 'content_block_delta': {
-        const d = e.delta;
-        const block = blocks[e.index ?? 0];
-        if (block && d) {
-          if (d.type === 'text_delta') block.text = String(block.text ?? '') + (d.text ?? '');
-          if (d.type === 'thinking_delta')
-            block.thinking = String(block.thinking ?? '') + (d.thinking ?? '');
-          if (d.type === 'signature_delta') block.signature = d.signature;
-          if (d.type === 'input_json_delta')
-            partialJson.set(
-              e.index ?? 0,
-              (partialJson.get(e.index ?? 0) ?? '') + (d.partial_json ?? ''),
-            );
+        case 'content_block_start':
+          if (e.content_block) blocks[e.index ?? 0] = { ...e.content_block };
+          if (e.content_block?.type === 'tool_use') {
+            const call = {
+              id: e.content_block.id ?? `toolu_${e.index}`,
+              name: e.content_block.name ?? '',
+            };
+            tools.set(e.index ?? 0, call);
+            yield { type: 'tool_call', id: call.id, name: call.name, argsDelta: '' };
+          }
+          break;
+        case 'content_block_delta': {
+          const d = e.delta;
+          const block = blocks[e.index ?? 0];
+          if (block && d) {
+            if (d.type === 'text_delta') block.text = String(block.text ?? '') + (d.text ?? '');
+            if (d.type === 'thinking_delta')
+              block.thinking = String(block.thinking ?? '') + (d.thinking ?? '');
+            if (d.type === 'signature_delta') block.signature = d.signature;
+            if (d.type === 'input_json_delta')
+              partialJson.set(
+                e.index ?? 0,
+                (partialJson.get(e.index ?? 0) ?? '') + (d.partial_json ?? ''),
+              );
+          }
+          streamedChars +=
+            (d?.type === 'text_delta' ? d.text?.length : 0) ||
+            (d?.type === 'thinking_delta' ? d.thinking?.length : 0) ||
+            (d?.type === 'input_json_delta' ? d.partial_json?.length : 0) ||
+            0;
+          if (d?.type === 'text_delta' && d.text) yield { type: 'text', delta: d.text };
+          else if (d?.type === 'thinking_delta' && d.thinking)
+            yield { type: 'reasoning', delta: d.thinking };
+          else if (d?.type === 'input_json_delta' && d.partial_json) {
+            const call = tools.get(e.index ?? 0);
+            if (call)
+              yield { type: 'tool_call', id: call.id, name: call.name, argsDelta: d.partial_json };
+          }
+          break;
         }
-        if (d?.type === 'text_delta' && d.text) yield { type: 'text', delta: d.text };
-        else if (d?.type === 'thinking_delta' && d.thinking)
-          yield { type: 'reasoning', delta: d.thinking };
-        else if (d?.type === 'input_json_delta' && d.partial_json) {
-          const call = tools.get(e.index ?? 0);
-          if (call)
-            yield { type: 'tool_call', id: call.id, name: call.name, argsDelta: d.partial_json };
+        case 'message_delta':
+          if (e.delta?.stop_reason) stop = e.delta.stop_reason;
+          if (e.usage?.output_tokens !== undefined) output = e.usage.output_tokens;
+          break;
+        case 'error': {
+          const type = e.error?.type ?? '';
+          const code =
+            type === 'overloaded_error' || type === 'api_error'
+              ? 'server'
+              : type === 'rate_limit_error'
+                ? 'rate_limit'
+                : 'bad_request';
+          throw new OmniError(code, describeErrorBody(ev.data), {
+            provider: cfg.entry.id,
+          });
         }
-        break;
-      }
-      case 'message_delta':
-        if (e.delta?.stop_reason) stop = e.delta.stop_reason;
-        if (e.usage?.output_tokens !== undefined) output = e.usage.output_tokens;
-        break;
-      case 'error': {
-        const type = e.error?.type ?? '';
-        const code =
-          type === 'overloaded_error' || type === 'api_error'
-            ? 'server'
-            : type === 'rate_limit_error'
-              ? 'rate_limit'
-              : 'bad_request';
-        throw new OmniError(code, describeErrorBody(ev.data), {
-          provider: cfg.entry.id,
-        });
       }
     }
+  } catch (e) {
+    // Cancelled or failed mid-response: the tokens already processed are still billed.
+    // Report what was seen (message_start/message_delta), estimating output if needed.
+    if (sawStart || streamedChars > 0) {
+      yield {
+        type: 'usage',
+        inputTokens: input,
+        outputTokens: Math.max(output, Math.ceil(streamedChars / 4)),
+        cachedTokens: cached,
+        ...(cacheWrite ? { cacheWriteTokens: cacheWrite } : {}),
+        partial: true,
+      };
+    }
+    throw e;
   }
   for (const [i, json] of partialJson) {
     const block = blocks[i];

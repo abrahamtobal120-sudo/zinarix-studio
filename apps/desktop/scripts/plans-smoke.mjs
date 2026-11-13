@@ -4,7 +4,7 @@
 //  2. the owner turns charging on (trialDays 0) and sends a notice and a version: the running
 //     app picks it up, shows the notice and the version, and limits chats to the free plan;
 //  3. handing work to another AI still opens a chat on the free plan (agents are never limited);
-//  4. the owner word "tobal" unlocks everything and survives a restart.
+//  4. the old owner word and plan codes are rejected: only signed keys (ZX1.…) unlock plans.
 import { _electron as electron } from 'playwright';
 import { createServer } from 'node:http';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -186,22 +186,17 @@ ok(
 );
 await win.screenshot({ path: join(out, 'handoff-free.png') });
 
-// 4. the owner word
+// 4. the old owner word and plan codes no longer unlock anything (only signed keys do)
 await win.locator('.plan-badge').click();
-await win.locator('#plan-key').fill('Tobal');
-await win.locator('.plan-activate .primary').click();
-await win.waitForTimeout(500);
-st = await win.evaluate(() => window.omni.license.status());
-ok(st.plan === 'owner', 'la palabra "tobal" activa todo');
-await win.screenshot({ path: join(out, 'owner.png') });
-await app.close();
-
-app = await launch();
-win = await app.firstWindow();
-win.on('pageerror', (e) => errors.push(e.message));
-await win.waitForSelector('.tree-row');
-st = await win.evaluate(() => window.omni.license.status());
-ok(st.plan === 'owner', 'sigue como dueño después de reiniciar');
+for (const word of ['Tobal', 'zinarixproai at']) {
+  await win.locator('#plan-key').fill(word);
+  await win.locator('.plan-activate .primary').click();
+  await win.waitForTimeout(500);
+  st = await win.evaluate(() => window.omni.license.status());
+  ok(st.plan !== 'owner' && st.plan !== 'proai', `"${word}" ya no activa ningún plan`);
+}
+ok((await win.locator('.plan-error').count()) > 0, 'dice por qué no es una clave válida');
+await win.screenshot({ path: join(out, 'no-codes.png') });
 console.log('errors:', errors.length ? errors : 'none');
 await app.close();
 server.close();

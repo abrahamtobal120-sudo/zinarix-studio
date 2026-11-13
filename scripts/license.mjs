@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Zinarix Studio Pro licenses (Ed25519), for the seller only.
-//   node scripts/license.mjs issue <email> [--name "Nombre"] [--days 365] [--plan pro|ai|proai]
+//   node scripts/license.mjs issue <email> [--name "Nombre"] [--days 365] [--plan pro|ai|proai] [--owner]
 //                                                                          -> prints a key
 //   node scripts/license.mjs verify <key>                                  -> what a key grants
 //   node scripts/license.mjs pubkey                                        -> public key of the private key
@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const keyPath = process.env.ZINARIX_LICENSE_KEY ?? join(homedir(), '.omni-signing/license.key');
 const [cmd, arg, ...rest] = process.argv.slice(2);
+const flag = (name) => rest.includes(`--${name}`);
 const opt = (name) => {
   const i = rest.indexOf(`--${name}`);
   return i >= 0 ? rest[i + 1] : undefined;
@@ -61,6 +62,11 @@ if (cmd === 'issue') {
   const days = Number(opt('days') ?? 0);
   const payload = { v: 1, id: `manual-${randomUUID()}`, plan, email: arg };
   if (opt('name')) payload.name = opt('name');
+  // The app's author: everything in every edition (replaces the old owner word).
+  if (flag('owner')) {
+    payload.plan = 'proai';
+    payload.owner = true;
+  }
   payload.iat = iat;
   if (days > 0) payload.exp = iat + days * 86_400_000;
   const body = `ZX1.${Buffer.from(JSON.stringify(payload)).toString('base64url')}`;
