@@ -27,7 +27,7 @@ import type {
   WorkspaceInfo,
 } from '../shared/api.js';
 import { UI_ZOOM_STEPS } from '../shared/api.js';
-import { DEFAULT_PREFS, EVENT_CHANNEL, THEME_IDS } from '../shared/api.js';
+import { DEFAULT_PREFS, EVENT_CHANNEL, GCLOUD_KINDS, THEME_IDS } from '../shared/api.js';
 import { AiService } from './ai.js';
 import type { Scope } from './ai.js';
 import {
@@ -71,6 +71,7 @@ import {
 } from './security.js';
 import { shellProfiles, Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
+import { applyChrome, chromeOptions } from './windowChrome.js';
 import { isInside } from '../shared/tasks.js';
 import { SETUP_SCRIPT, TaskManager } from './tasks.js';
 import { ReviewManager } from './review.js';
@@ -96,7 +97,7 @@ import {
 import { ExtensionStore } from './extensions/store.js';
 import { HelperService, MODEL_NAME } from './helper.js';
 import { gitMention, webMention } from './mentions.js';
-import { VideoService, fromStored, toStored } from './video.js';
+import { VideoService, fromStored, readLut, toStored } from './video.js';
 import type { VideoProject } from '../shared/video.js';
 import { MEDIA_EXTENSIONS, PROJECT_EXT, mediaKindOf, validProject } from '../shared/video.js';
 
@@ -920,6 +921,7 @@ function registerIpc(): void {
     audioKbps: z.number().int().min(32).max(512),
     start: z.number().min(0),
     end: z.number().min(0),
+    loudness: z.number().min(-40).max(-5).nullable().optional(),
   });
   const mediaFilters = [
     {
@@ -952,6 +954,16 @@ function registerIpc(): void {
     return r.canceled ? [] : r.filePaths;
   });
   handle('video:probe', z.tuple([absPath]), (_w, p) => videoService().probe(resolve(p)));
+  // Fase 12: 3D LUTs for the colour page (only .cube files are read).
+  handle('video:pickLut', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Cargar LUT',
+      properties: ['openFile'],
+      filters: [{ name: 'LUT 3D (.cube)', extensions: ['cube'] }],
+    });
+    return r.canceled ? null : (r.filePaths[0] ?? null);
+  });
+  handle('video:readLut', z.tuple([absPath]), (_w, p) => readLut(resolve(p)));
   handle('video:workspacePath', z.tuple([rel]), (w, p) => {
     const abs = ws(w).resolve(p);
     return isFile(abs) && (mediaKindOf(abs) || abs.toLowerCase().endsWith(`.${PROJECT_EXT}`))
@@ -1481,6 +1493,12 @@ function registerIpc(): void {
     gcloud.sqlPower(p, i, on),
   );
   handle('gcloud:logs', z.tuple([gproj, z.string().max(2000)]), (_w, p, f) => gcloud.logs(p, f));
+  handle('gcloud:resources', z.tuple([gproj, z.enum(GCLOUD_KINDS)]), (_w, p, k) =>
+    gcloud.resources(p, k),
+  );
+  handle('gcloud:vmPower', z.tuple([gproj, gname, gname, z.boolean()]), (_w, p, zone, n, on) =>
+    gcloud.vmPower(p, zone, n, on),
+  );
   const email = z.string().trim().email().max(320);
   handle('mail:logout', z.tuple([email.optional()]), (_w, e) => mail.logout(e));
   handle('mail:useAccount', z.tuple([email]), (_w, e) => mail.useAccount(e));
@@ -1691,6 +1709,7 @@ function registerIpc(): void {
       autoImport: z.boolean(),
       helperBubble: z.boolean(),
       helperModel: z.string().regex(MODEL_NAME),
+      windowEffects: z.boolean(),
     })
     .partial();
   handle('app:prefs', z.tuple([]), () => prefs());
@@ -2095,6 +2114,23 @@ function registerIpc(): void {
     w.allowClose = true;
     w.win.close();
   });
+  // Fase 18: the window's own title bar.
+  const cssColor = z.string().trim().max(32);
+  handle('app:chrome', z.tuple([z.object({ bg: cssColor, fg: cssColor })]), (w, colors) =>
+    applyChrome(w.win, colors, prefs().windowEffects !== false, prefs().uiZoom),
+  );
+  handle('app:menuBar', z.tuple([]), () =>
+    (Menu.getApplicationMenu()?.items ?? []).filter((i) => i.visible).map((i) => i.label),
+  );
+  handle(
+    'app:popupMenu',
+    z.tuple([z.number().int().min(0).max(30), z.number().min(0), z.number().min(0)]),
+    (w, index, x, y) => {
+      const item = (Menu.getApplicationMenu()?.items ?? []).filter((i) => i.visible)[index];
+      const f = w.win.webContents.getZoomFactor();
+      item?.submenu?.popup({ window: w.win, x: Math.round(x * f), y: Math.round(y * f) });
+    },
+  );
   handle('app:resumeOnLogin', z.tuple([z.boolean()]), (_w, on) => resumeOnLogin(on));
   handle('app:interruptedRuns', z.tuple([]), () => interruptedRuns.splice(0));
   handle('app:newWindow', z.tuple([]), (w) => {
@@ -3000,6 +3036,8 @@ async function createWindow(
     icon: iconPath(),
     show: false,
     backgroundColor: light ? '#ffffff' : '#1e1e1e',
+    // Fase 18: our own title bar (menu + folder); Mica / vibrancy when the setting allows it.
+    ...chromeOptions(light, prefs().windowEffects !== false, prefs().uiZoom),
     webPreferences: {
       preload: join(appRoot, 'dist', 'preload', 'preload.cjs'),
       contextIsolation: true,

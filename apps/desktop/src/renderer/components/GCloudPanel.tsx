@@ -1,5 +1,5 @@
 import { AccountSwitch } from './AccountSwitch';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { useCallback, useEffect, useState } from 'react';
 import type {
   GCloudBucket,
@@ -8,11 +8,14 @@ import type {
   GCloudObject,
   GCloudProject,
   GCloudQueryResult,
+  GCloudResource,
+  GCloudResourceKind,
   GCloudService,
   GCloudSqlInstance,
   GCloudStatus,
   GCloudTable,
 } from '../../shared/api';
+import { GCLOUD_KINDS } from '../../shared/api';
 import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
@@ -39,7 +42,8 @@ function sqlState(state: string): string {
   return map[state]?.() ?? state;
 }
 
-type View = 'apis' | 'bigquery' | 'storage' | 'sql' | 'logs';
+type View = 'apis' | 'bigquery' | 'storage' | 'sql' | 'logs' | GCloudResourceKind;
+const VIEW_KEY = 'zinarix.gcloudView';
 
 function size(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -479,6 +483,118 @@ function LogsView({ project }: { project: string }) {
   );
 }
 
+/** Compute Engine, Cloud Run, Functions, GKE, Pub/Sub, Secrets, Firestore and IAM: one list. */
+function ResourceView({ project, kind }: { project: string; kind: GCloudResourceKind }) {
+  const rs = useLoad<GCloudResource[]>(() => api().gcloud.resources(project, kind), [project, kind]);
+  const [filter, setFilter] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const power = async (r: GCloudResource) => {
+    if (!r.zone) return;
+    const on = r.status !== 'RUNNING';
+    if (!on && !(await confirmDialog(t('gcVmStopConfirm', { name: r.name }), { danger: true })))
+      return;
+    setBusy(r.id);
+    try {
+      await api().gcloud.vmPower(project, r.zone, r.name, on);
+      toast(on ? t('gcStarting', { name: r.name }) : t('gcStopping', { name: r.name }));
+      setTimeout(rs.reload, 6000);
+    } catch (e) {
+      toast(errText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const f = filter.toLowerCase();
+  const shown = (rs.data ?? []).filter(
+    (r) => !f || `${r.name} ${r.status} ${r.detail}`.toLowerCase().includes(f),
+  );
+  const tab = GC_TABS.find((x) => x[0] === kind);
+  return (
+    <div className="tree git-list">
+      <div className="vc-toolbar">
+        <input
+          value={filter}
+          aria-label={t('gcFilter')}
+          placeholder={t('gcFilter')}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <button aria-label={t('gitRefresh')} title={t('gitRefresh')} onClick={rs.reload}>
+          <Icon name="refresh" size={13} />
+        </button>
+      </div>
+      {rs.error && <ErrorBox msg={rs.error} />}
+      {!rs.data && !rs.error && (
+        <div className="git-clean">
+          <Icon name="clock" size={13} className="spin-slow" /> …
+        </div>
+      )}
+      {rs.data && (
+        <div className="git-group">
+          <span>
+            {tab ? tab[1]() : kind} <span className="git-count">{shown.length}</span>
+          </span>
+        </div>
+      )}
+      {rs.data?.length === 0 && <div className="git-clean">{t('gcNothing')}</div>}
+      {shown.map((r) => (
+        <div key={r.id} className="git-commit-row" title={r.id}>
+          <div className="git-commit-subject">
+            <span
+              className={`vc-dot ${r.ok === true ? 'added' : r.ok === false ? 'deleted' : 'git-dir'}`}
+            >
+              ●
+            </span>{' '}
+            {r.name}
+            {r.status && (
+              <span className="git-refs">
+                <span className="git-ref">{r.status}</span>
+              </span>
+            )}
+          </div>
+          {r.detail && <div className="git-commit-meta gc-detail">{r.detail}</div>}
+          <div className="git-connect-actions">
+            {r.zone && (
+              <button disabled={busy !== null} onClick={() => void power(r)}>
+                {busy === r.id ? '…' : r.status === 'RUNNING' ? t('gcStop') : t('gcStart')}
+              </button>
+            )}
+            {r.url && (
+              <button title={r.url} onClick={() => open(r.url!)}>
+                <Icon name="globe" size={13} /> {t('gcOpenUrl')}
+              </button>
+            )}
+            <button
+              aria-label={t('gcOpenConsole')}
+              title={t('gcOpenConsole')}
+              onClick={() => open(r.console)}
+            >
+              <Icon name="external" size={13} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Tabs of the panel: id, label, icon. */
+const GC_TABS: [View, () => string, IconName][] = [
+  ['apis', () => 'APIs', 'plug'],
+  ['bigquery', () => 'BigQuery', 'database'],
+  ['storage', () => 'Storage', 'archive'],
+  ['sql', () => 'Cloud SQL', 'database'],
+  ['compute', () => 'Compute', 'cpu'],
+  ['run', () => 'Cloud Run', 'play'],
+  ['functions', () => 'Functions', 'bolt'],
+  ['gke', () => 'Kubernetes', 'layers'],
+  ['pubsub', () => 'Pub/Sub', 'send'],
+  ['firestore', () => 'Firestore', 'files'],
+  ['secrets', () => t('gcSecrets'), 'key'],
+  ['iam', () => 'IAM', 'users'],
+  ['logs', () => t('gcLogs'), 'scroll'],
+];
+const isView = (v: string | null): v is View => GC_TABS.some((x) => x[0] === v);
+
 /** Google Cloud panel: "Sign in with Google" once, then every API of the user's projects. */
 export function GCloudPanel() {
   const [st, setSt] = useState<GCloudStatus | null>(null);
@@ -488,7 +604,11 @@ export function GCloudPanel() {
   const [projects, setProjects] = useState<GCloudProject[] | null>(null);
   const [projErr, setProjErr] = useState<string | null>(null);
   const [project, setProject] = useState<string>(() => localStorage.getItem(PROJECT_KEY) ?? '');
-  const [view, setView] = useState<View>('apis');
+  const [view, setView] = useState<View>(() => {
+    const v = localStorage.getItem(VIEW_KEY);
+    return isView(v) ? v : 'apis';
+  });
+  useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
 
   const act = async (name: string, f: () => Promise<void>) => {
     setBusy(name);
@@ -681,14 +801,6 @@ export function GCloudPanel() {
     );
   }
 
-  const tabs: [View, string][] = [
-    ['apis', 'APIs'],
-    ['bigquery', 'BigQuery'],
-    ['storage', 'Storage'],
-    ['sql', 'Cloud SQL'],
-    ['logs', t('gcLogs')],
-  ];
-
   return (
     <div className="explorer git-panel">
       {title}
@@ -717,20 +829,33 @@ export function GCloudPanel() {
       )}
       {projects && project && !preparing && (
         <>
-          <div className="git-branchbar">
-            <div className="git-tabs">
-              {tabs.map(([id, label]) => (
-                <button key={id} className={view === id ? 'on' : ''} onClick={() => setView(id)}>
-                  {label}
-                </button>
-              ))}
-            </div>
+          <div className="gc-tabs" role="tablist">
+            {GC_TABS.map(([id, label, icon]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={view === id}
+                className={view === id ? 'on' : ''}
+                title={label()}
+                onClick={() => setView(id)}
+              >
+                <Icon name={icon} size={14} />
+                <span>{label()}</span>
+              </button>
+            ))}
           </div>
           {view === 'apis' && <ApisView key={project} project={project} />}
           {view === 'bigquery' && <BigQueryView key={project} project={project} />}
           {view === 'storage' && <StorageView key={project} project={project} />}
           {view === 'sql' && <SqlView key={project} project={project} />}
           {view === 'logs' && <LogsView key={project} project={project} />}
+          {(GCLOUD_KINDS as readonly string[]).includes(view) && (
+            <ResourceView
+              key={`${project}|${view}`}
+              project={project}
+              kind={view as GCloudResourceKind}
+            />
+          )}
         </>
       )}
     </div>

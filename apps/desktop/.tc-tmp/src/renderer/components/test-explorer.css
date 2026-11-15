@@ -1,0 +1,294 @@
+/* Test Explorer (sidebar) and the ✓ / ✗ marks next to each test in the editor. */
+
+.te-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.te-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 12px;
+}
+
+.te-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 6px;
+}
+
+.te-filter {
+  flex: 1;
+  min-width: 120px;
+}
+
+.te-only {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.te-summary {
+  padding: 0 10px 6px;
+}
+
+.te-project + .te-project {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+
+.te-project-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+}
+
+.te-fw {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--fg-strong);
+}
+
+.te-problem {
+  margin: 2px 10px 6px;
+  color: var(--warn);
+}
+
+.te-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  padding-right: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.te-row:hover,
+.te-row:focus-visible {
+  background: var(--hover);
+}
+
+.te-row.sel {
+  background: var(--sel);
+}
+
+.te-file {
+  padding-left: 8px;
+}
+
+.te-chev {
+  flex: none;
+  transition: transform 0.12s;
+}
+
+.te-chev.open {
+  transform: rotate(90deg);
+}
+
+.te-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.te-name.suite {
+  color: var(--fg-strong);
+}
+
+.te-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.te-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.te-row:hover .te-actions,
+.te-row:focus-within .te-actions,
+.te-project-head .te-actions {
+  opacity: 1;
+}
+
+.te-actions button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  border-radius: var(--radius);
+}
+
+.te-actions button:hover:not(:disabled) {
+  color: var(--fg-strong);
+  background: var(--bg-3);
+}
+
+.te-status {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--fg-dim);
+}
+
+.te-status.te-passed {
+  color: var(--ok);
+}
+
+.te-status.te-failed {
+  color: var(--danger);
+}
+
+.te-status.te-running::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: te-spin 0.8s linear infinite;
+}
+
+@keyframes te-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .te-status.te-running::before {
+    animation: none;
+  }
+}
+
+.te-error {
+  margin: 2px 8px 6px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--danger);
+  background: var(--code-bg);
+  font-size: var(--text-sm);
+}
+
+.te-error pre,
+.te-output pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono, monospace);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.te-error pre + pre {
+  margin-top: 6px;
+}
+
+.te-output {
+  margin: 10px 10px 0;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.te-output pre {
+  max-height: 320px;
+  overflow: auto;
+  margin-top: 6px;
+  padding: 6px;
+  background: var(--code-bg);
+}
+
+.te-meta {
+  flex: none;
+  margin-left: 6px;
+}
+
+.te-slow {
+  color: var(--warn, var(--fg-dim));
+}
+
+.te-variant .te-name {
+  font-family: var(--mono, monospace);
+  font-size: var(--text-sm);
+}
+
+.te-clear {
+  margin-left: 8px;
+}
+
+.te-error .link {
+  margin-top: 4px;
+}
+
+/* Editor gutter marks. */
+.monaco-editor .te-mark {
+  display: grid;
+  place-items: center;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.monaco-editor .te-mark.te-idle::before {
+  content: '▶';
+  font-size: var(--text-2xs);
+  color: var(--ok);
+  opacity: 0.55;
+}
+
+.monaco-editor .te-mark.te-idle:hover::before {
+  opacity: 1;
+}
+
+/* The line where a test failed, and its error at the end of the line. */
+.monaco-editor .te-fail-range {
+  text-decoration: underline wavy var(--danger);
+  text-decoration-skip-ink: none;
+}
+
+.monaco-editor .te-fail-inline {
+  color: var(--danger);
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.monaco-editor .te-mark.te-passed::before {
+  content: '✓';
+  color: var(--ok);
+}
+
+.monaco-editor .te-mark.te-failed::before {
+  content: '✗';
+  color: var(--danger);
+}
+
+.monaco-editor .te-mark.te-skipped::before {
+  content: '○';
+  color: var(--fg-dim);
+}
+
+.monaco-editor .te-mark.te-running::before {
+  content: '…';
+  color: var(--accent);
+}

@@ -55,6 +55,8 @@ import {
 import { tl } from './layout/i18nLayout';
 import { useV } from './components/video/videoStore';
 import './layout/layout.css';
+import { TitleBar } from './layout/TitleBar';
+import './layout/titlebar.css';
 
 /** Pixels a separator moves per arrow key press. */
 const SASH_STEP = 16;
@@ -518,6 +520,7 @@ export function App() {
 
   return (
     <div className={zen ? 'app zen' : 'app'}>
+      <TitleBar />
       <div className="main-row">
         {!zen && <ActivityBar />}
         {design && (

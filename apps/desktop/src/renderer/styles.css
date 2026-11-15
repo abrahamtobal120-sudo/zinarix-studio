@@ -8223,6 +8223,46 @@ button.plain-btn:active {
 .gc-indent {
   padding-left: 22px;
 }
+/* Tabs of the Google Cloud panel: a grid that wraps, so every service fits a narrow sidebar. */
+.gc-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 4px;
+  margin: 6px 10px 8px;
+}
+.gc-tabs button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: var(--text-xs);
+  line-height: 1.1;
+  cursor: pointer;
+  min-width: 0;
+}
+.gc-tabs button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gc-tabs button:hover {
+  color: var(--fg);
+  background: var(--bg-3);
+}
+.gc-tabs button.on {
+  color: var(--fg);
+  background: var(--bg-4);
+  border-color: var(--accent);
+}
+.gc-detail {
+  word-break: break-word;
+}
 .gc-log {
   white-space: pre-wrap;
   word-break: break-word;

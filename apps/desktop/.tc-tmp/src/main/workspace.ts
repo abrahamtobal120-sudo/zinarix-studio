@@ -1,0 +1,316 @@
+import { execFile, spawn } from 'node:child_process';
+import { existsSync, lstatSync, realpathSync, watch } from 'node:fs';
+import type { FSWatcher } from 'node:fs';
+import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import type { DirEntry, FileBytes, FileContent, SearchHit, WorkspaceInfo } from '../shared/api.js';
+import { bin } from './bin.js';
+
+const MAX_FILE = 10 * 1024 * 1024;
+/** Largest slice readBytes hands back in one call (images are read in several). */
+const MAX_CHUNK = 8 * 1024 * 1024;
+const IGNORED_DIRS = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  'build',
+  'out',
+  '.next',
+  '.turbo',
+  'coverage',
+  '__pycache__',
+  '.venv',
+  'target',
+]);
+
+/**
+ * A folder the user explicitly opened. Every path coming from the renderer is resolved
+ * against it and rejected if it escapes (path traversal, absolute paths, symlink tricks
+ * are bounded by the same check on the resolved path).
+ */
+export class Workspace {
+  private watcher: FSWatcher | undefined;
+
+  constructor(readonly root: string) {}
+
+  resolve(rel: string): string {
+    if (isAbsolute(rel)) throw new Error('absolute paths are not allowed');
+    const abs = resolve(this.root, rel);
+    if (!inside(this.root, abs)) throw new Error('path escapes the workspace');
+    // A symlink inside the project must not lead outside it (a cloned repo can ship one
+    // pointing at ~/.ssh or ~/.bashrc). Checked on the real path of the longest existing
+    // prefix, so new files under a linked folder are caught too.
+    const real = realish(abs);
+    if (real === null || !inside(realRoot(this.root), real))
+      throw new Error('path escapes the workspace (symbolic link)');
+    return abs;
+  }
+
+  toRel(abs: string): string {
+    return relative(this.root, abs).split(sep).join('/');
+  }
+
+  async info(): Promise<WorkspaceInfo> {
+    return { root: this.root, name: basename(this.root), branch: await gitBranch(this.root) };
+  }
+
+  async readDir(rel: string): Promise<DirEntry[]> {
+    const abs = this.resolve(rel);
+    const entries = await readdir(abs, { withFileTypes: true });
+    return entries
+      .filter((e) => e.name !== '.git')
+      .map((e) => ({ name: e.name, path: this.toRel(join(abs, e.name)), dir: e.isDirectory() }))
+      .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+  }
+
+  async readFile(rel: string): Promise<FileContent> {
+    const abs = this.resolve(rel);
+    const s = await stat(abs);
+    if (s.size > MAX_FILE) return { content: '', binary: false, tooLarge: true };
+    const buf = await readFile(abs);
+    const probe = buf.subarray(0, 8000);
+    if (probe.includes(0)) return { content: '', binary: true, tooLarge: false };
+    return { content: buf.toString('utf8'), binary: false, tooLarge: false };
+  }
+
+  /** A slice of any file (binary or huge), for the image, hex and large-file viewers. */
+  async readBytes(rel: string, offset: number, length: number): Promise<FileBytes> {
+    const abs = this.resolve(rel);
+    const fh = await open(abs, 'r');
+    try {
+      const { size } = await fh.stat();
+      const start = Math.min(offset, size);
+      const n = Math.max(0, Math.min(length, MAX_CHUNK, size - start));
+      const bytes = new Uint8Array(n);
+      let done = 0;
+      while (done < n) {
+        const { bytesRead } = await fh.read(bytes, done, n - done, start + done);
+        if (bytesRead === 0) break;
+        done += bytesRead;
+      }
+      return { bytes: done === n ? bytes : bytes.subarray(0, done), size };
+    } finally {
+      await fh.close();
+    }
+  }
+
+  async writeFile(rel: string, content: string): Promise<void> {
+    await writeFile(this.resolve(rel), content, 'utf8');
+  }
+
+  async createFile(rel: string): Promise<void> {
+    const abs = this.resolve(rel);
+    const fh = await open(abs, 'wx');
+    await fh.close();
+  }
+
+  async createDir(rel: string): Promise<void> {
+    await mkdir(this.resolve(rel), { recursive: false });
+  }
+
+  async rename(from: string, to: string): Promise<void> {
+    const dest = this.resolve(to);
+    if (existsSync(dest)) throw new Error('destination already exists');
+    await rename(this.resolve(from), dest);
+  }
+
+  /**
+   * Lists project files (quick open, search by name, agent tree/glob). Uses ripgrep when
+   * installed so .gitignore is respected; otherwise walks the folder skipping heavy dirs.
+   */
+  async listFiles(limit = 20000): Promise<string[]> {
+    const rg = await rgFiles(this.root, limit).catch(() => undefined);
+    if (rg) return rg.map((p) => p.split(sep).join('/')).sort();
+    const out: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      if (out.length >= limit) return;
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (out.length >= limit) return;
+        const abs = join(dir, e.name);
+        if (e.isDirectory()) {
+          if (!IGNORED_DIRS.has(e.name)) await walk(abs);
+        } else if (e.isFile()) out.push(this.toRel(abs));
+      }
+    };
+    await walk(this.root);
+    return out.sort();
+  }
+
+  /** Global search: ripgrep when installed (respects .gitignore), JS fallback otherwise. */
+  async search(
+    query: string,
+    regex: boolean,
+    caseSensitive: boolean,
+    limit = 2000,
+  ): Promise<SearchHit[]> {
+    if (!query) return [];
+    const rg = await ripgrep(this.root, query, regex, caseSensitive, limit).catch(() => undefined);
+    if (rg) return rg.map((h) => ({ ...h, path: h.path.split(sep).join('/') }));
+    const re = new RegExp(
+      regex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      caseSensitive ? '' : 'i',
+    );
+    const hits: SearchHit[] = [];
+    for (const path of await this.listFiles()) {
+      if (hits.length >= limit) break;
+      const f = await this.readFile(path).catch(() => undefined);
+      if (!f || f.binary || f.tooLarge) continue;
+      f.content.split('\n').forEach((text, i) => {
+        const m = re.exec(text);
+        if (m && hits.length < limit)
+          hits.push({ path, line: i + 1, column: m.index + 1, text: text.slice(0, 300) });
+      });
+    }
+    return hits;
+  }
+
+  watch(onChange: () => void): void {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      this.watcher = watch(this.root, { recursive: true }, (_ev, file) => {
+        if (file && /(^|[\\/])(\.git|node_modules)([\\/]|$)/.test(String(file))) return;
+        clearTimeout(timer);
+        timer = setTimeout(onChange, 250);
+      });
+    } catch {
+      // recursive watch unsupported: explorer refreshes on demand
+    }
+  }
+
+  dispose(): void {
+    this.watcher?.close();
+  }
+}
+
+function inside(root: string, abs: string): boolean {
+  const r = relative(root, abs);
+  return !(r === '..' || r.startsWith(`..${sep}`) || isAbsolute(r));
+}
+
+function realRoot(root: string): string {
+  try {
+    return realpathSync(root);
+  } catch {
+    return root;
+  }
+}
+
+/**
+ * Real path of the longest existing prefix of `p`, plus the not-yet-existing rest.
+ * null = a dangling symlink on the way (its target cannot be checked, so it is refused).
+ */
+function realish(p: string): string | null {
+  let cur = p;
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync(cur), ...rest);
+    } catch (e) {
+      const parent = dirname(cur);
+      // A dangling symlink (lstat works, realpath fails) must not be followed blindly.
+      if (isLink(cur)) return null;
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || parent === cur) return p;
+      rest.unshift(basename(cur));
+      cur = parent;
+    }
+  }
+}
+
+function isLink(p: string): boolean {
+  try {
+    return lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+function gitBranch(cwd: string): Promise<string | null> {
+  return new Promise((res) =>
+    execFile(
+      bin('git'),
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd, timeout: 2000 },
+      (err, stdout) => res(err ? null : stdout.trim() || null),
+    ),
+  );
+}
+
+function rgFiles(cwd: string, limit: number): Promise<string[]> {
+  return new Promise((res, rej) => {
+    const child = spawn(bin('rg'), ['--files', '--hidden', '--glob', '!.git'], { cwd });
+    const files: string[] = [];
+    let buf = '';
+    child.on('error', rej);
+    child.stdout.on('data', (d: Buffer) => {
+      buf += d.toString('utf8');
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const l of lines) if (l && files.length < limit) files.push(l.replace(/^\.[\\/]/, ''));
+      if (files.length >= limit) child.kill();
+    });
+    // rg exits 1 when there are no files: still a valid (empty) answer.
+    child.on('close', (code) =>
+      code === 0 || code === 1 || files.length ? res(files) : rej(new Error(`rg ${code}`)),
+    );
+  });
+}
+
+function ripgrep(
+  cwd: string,
+  query: string,
+  regex: boolean,
+  caseSensitive: boolean,
+  limit: number,
+): Promise<SearchHit[]> {
+  return new Promise((res, rej) => {
+    const args = [
+      '--json',
+      '--max-count',
+      '200',
+      caseSensitive ? '--case-sensitive' : '--ignore-case',
+    ];
+    if (!regex) args.push('--fixed-strings');
+    args.push('--', query, '.');
+    const child = spawn(bin('rg'), args, { cwd });
+    const hits: SearchHit[] = [];
+    let buf = '';
+    child.on('error', rej);
+    child.stdout.on('data', (d: Buffer) => {
+      buf += d.toString('utf8');
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        try {
+          const j = JSON.parse(line) as {
+            type: string;
+            data: {
+              path: { text: string };
+              line_number: number;
+              lines: { text: string };
+              submatches: { start: number }[];
+            };
+          };
+          if (j.type === 'match' && hits.length < limit) {
+            hits.push({
+              path: j.data.path.text.replace(/^\.[\\/]/, ''),
+              line: j.data.line_number,
+              column: (j.data.submatches[0]?.start ?? 0) + 1,
+              text: j.data.lines.text.replace(/\r?\n$/, '').slice(0, 300),
+            });
+          }
+          if (hits.length >= limit) child.kill();
+        } catch {
+          // partial line
+        }
+      }
+    });
+    child.on('close', () => res(hits));
+  });
+}

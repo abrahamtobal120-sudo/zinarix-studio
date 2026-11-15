@@ -1,0 +1,194 @@
+/* Fase 2 — review of one agent exchange's diff, and the "rewind here" dialog. */
+
+.diff-review {
+  width: min(1200px, 95vw);
+  height: 84vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.diff-review .spacer {
+  flex: 1;
+}
+.diff-review-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.diff-review-files {
+  width: 200px;
+  flex: none;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.diff-review-files button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.diff-review-files button:hover {
+  background: var(--bg-3);
+}
+.diff-review-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-review-badge {
+  font-size: var(--text-xs);
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--danger);
+  color: var(--bg);
+}
+.diff-review-body {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 10px 12px;
+}
+.diff-review-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--fg-dim);
+}
+.diff-review-file {
+  margin-bottom: 16px;
+}
+.diff-review-file > header {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  background: var(--bg-2);
+}
+.diff-review-hunk {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 6px 0;
+  overflow: hidden;
+}
+.diff-review-hunk-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-3);
+  font-size: var(--text-sm);
+}
+.diff-review-hunk-head button.on {
+  border-color: var(--focus);
+  color: var(--focus);
+}
+.diff-review-hunk pre {
+  margin: 0;
+  padding: 6px 0;
+  overflow-x: auto;
+  background: var(--code-bg);
+  font:
+    12px/1.45 'JetBrains Mono',
+    Menlo,
+    Consolas,
+    monospace;
+  user-select: text;
+}
+.diff-review-hunk pre > div {
+  padding: 0 10px;
+  white-space: pre;
+}
+.diff-review-hunk .sign {
+  display: inline-block;
+  width: 1.5em;
+  opacity: 0.7;
+}
+.diff-review-hunk .l-add {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.diff-review-hunk .l-del {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+/* A rejected block: its additions go away, its old lines come back. */
+.diff-review-hunk.rejected .l-add {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.diff-review-hunk.rejected .l-del {
+  color: var(--fg);
+}
+.diff-review-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.rewind-dialog p {
+  margin: 0;
+}
+.rewind-warn {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  color: var(--warn, var(--danger));
+}
+.rewind-files {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: var(--text-sm);
+}
+.rewind-files li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.rewind-files code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rewind-files .edited,
+.diff-review-file .changed-since {
+  color: var(--warn, var(--danger));
+}
+.rewind-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rewind-options button {
+  justify-content: flex-start;
+}
+@media (prefers-reduced-motion: reduce) {
+  .diff-review * {
+    scroll-behavior: auto !important;
+  }
+}

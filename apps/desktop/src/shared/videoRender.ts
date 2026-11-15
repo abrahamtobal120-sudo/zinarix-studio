@@ -39,6 +39,7 @@ import {
 import type { LookExpr } from './videoFx.js';
 import { animLengths, combineExpr, ffmpegEffects, windowExpr } from './videoFx.js';
 import { duckExpr } from './videoEasy.js';
+import { ffmpegGrade, lutKey } from './videoColor.js';
 
 const duckFilter = (p: VideoProject, track: Track, offset: number): string[] => {
   const e = duckExpr(p, track, offset);
@@ -256,7 +257,14 @@ function maxLookScale(c: Clip): number {
 }
 
 /** Video filters of one clip: size, flips, effects, timing, opacity, rotation, size, fades. */
-function videoChain(p: VideoProject, pc: Piece, W: number, H: number, fps: number): string {
+function videoChain(
+  p: VideoProject,
+  pc: Piece,
+  W: number,
+  H: number,
+  fps: number,
+  lutFiles: Record<string, string>,
+): string {
   const tr = transformOf(pc.clip);
   const kScale = pieceKeys(pc, 'scale');
   const kRot = pieceKeys(pc, 'rotation');
@@ -278,6 +286,8 @@ function videoChain(p: VideoProject, pc: Piece, W: number, H: number, fps: numbe
   if (tr.flipH === true) f.push('hflip');
   if (tr.flipV === true) f.push('vflip');
   f.push(`fps=${fps}`, 'format=rgba');
+  const lk = lutKey(pc.clip.color);
+  f.push(...ffmpegGrade(pc.clip.color, lk ? (lutFiles[lk] ?? null) : null));
   f.push(...ffmpegEffects(pc.clip.effects, H / 1080));
   // Timing first: from here on t / T count the piece's own seconds from 0.
   f.push(`setpts=(PTS-STARTPTS)/${num(pc.speed)}`);
@@ -370,6 +380,69 @@ function panFilter(pan: number): string[] {
   return [`pan=stereo|c0=${l}*c0|c1=${r}*c1`];
 }
 
+/** What the first (measuring) pass of loudnorm reports, fed back into the real export. */
+export interface LoudnessMeasure {
+  input_i: number;
+  input_tp: number;
+  input_lra: number;
+  input_thresh: number;
+  target_offset: number;
+}
+
+/** True peak ceiling and the widest loudness range kept as it is (dB). */
+const TRUE_PEAK = -1.5;
+const LRA_DEFAULT = 11;
+
+/**
+ * The loudnorm filter. Without a measure it only measures (print_format=json, first pass);
+ * with one it applies a single linear gain when it can (second pass), which keeps the dynamics
+ * and lands on the target within a fraction of a dB.
+ */
+export function loudnormFilter(target: number, m?: LoudnessMeasure | null): string {
+  const I = num(Math.min(-5, Math.max(-70, target)));
+  if (!m) return `loudnorm=I=${I}:TP=${TRUE_PEAK}:LRA=${LRA_DEFAULT}:print_format=json`;
+  // A range wider than the target would make loudnorm compress (dynamic mode): allow it.
+  const lra = num(Math.min(50, Math.max(LRA_DEFAULT, Math.ceil(m.input_lra + 1))));
+  return (
+    `loudnorm=I=${I}:TP=${TRUE_PEAK}:LRA=${lra}` +
+    `:measured_I=${num(m.input_i)}:measured_TP=${num(m.input_tp)}` +
+    `:measured_LRA=${num(m.input_lra)}:measured_thresh=${num(m.input_thresh)}` +
+    `:offset=${num(m.target_offset)}:linear=true:print_format=summary`
+  );
+}
+
+/** The JSON loudnorm prints at the end of the first pass (null when it is not there). */
+export function parseLoudnorm(log: string): LoudnessMeasure | null {
+  const at = log.lastIndexOf('"input_i"');
+  if (at < 0) return null;
+  const start = log.lastIndexOf('{', at);
+  const end = log.indexOf('}', at);
+  if (start < 0 || end < 0) return null;
+  try {
+    const j = JSON.parse(log.slice(start, end + 1)) as Record<string, string>;
+    const out = {
+      input_i: Number(j.input_i),
+      input_tp: Number(j.input_tp),
+      input_lra: Number(j.input_lra),
+      input_thresh: Number(j.input_thresh),
+      target_offset: Number(j.target_offset),
+    };
+    // Silence measures as -inf: there is nothing to normalise then.
+    return Object.values(out).every(Number.isFinite) ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface RenderExtras {
+  /** lutKey → file name of the LUT in FFmpeg's working folder (the runner writes them). */
+  lutFiles?: Record<string, string>;
+  /** First loudness pass: audio only, nothing written (`-f null`). */
+  measure?: boolean;
+  /** Second pass: what the first one measured (null = silence, no normalisation). */
+  loudness?: LoudnessMeasure | null;
+}
+
 export function buildRender(
   p: VideoProject,
   o: ExportOptions,
@@ -377,7 +450,11 @@ export function buildRender(
   encoder: string[] = x264(o),
   /** Clip id → PNG of each title, drawn at the export size. */
   textImages: Record<string, string> = {},
+  extras: RenderExtras = {},
 ): RenderPlan {
+  const lutFiles = extras.lutFiles ?? {};
+  const measure = !!extras.measure;
+  const target = o.loudness ?? null;
   const D = Math.max(0.04, o.end - o.start);
   const W = o.width;
   const H = o.height;
@@ -388,7 +465,8 @@ export function buildRender(
   let n = 0;
   let clips = 0;
 
-  graph.push(`color=c=black:s=${W}x${H}:r=${fps}:d=${num(D)},format=yuv420p[base0]`);
+  if (!measure)
+    graph.push(`color=c=black:s=${W}x${H}:r=${fps}:d=${num(D)},format=yuv420p[base0]`);
   let base = 'base0';
   let layer = 0;
 
@@ -428,7 +506,7 @@ export function buildRender(
       const pcA = piece(p, c, o.start, o.end, media);
       const pcV = piece(p, c, o.start, o.end, media, leadOf(p, c), tailOf(p, c));
       if (!pcV || !media) continue;
-      const wantVideo = !track.hidden && media.hasVideo;
+      const wantVideo = !measure && !track.hidden && media.hasVideo;
       const wantAudio = !!pcA && heard && media.hasAudio && c.volume > 0 && media.kind === 'video';
       if (!wantVideo && !wantAudio) continue;
       if (wantVideo) {
@@ -437,7 +515,7 @@ export function buildRender(
         clips++;
         const v = `v${i}`;
         const next = `base${++layer}`;
-        graph.push(`[${i}:v]${videoChain(p, pcV, W, H, fps)}[${v}]`);
+        graph.push(`[${i}:v]${videoChain(p, pcV, W, H, fps, lutFiles)}[${v}]`);
         graph.push(
           `[${base}][${v}]overlay=${overlayXY(p, pcV)}:eof_action=pass:enable='between(t,${num(pcV.offset)},${num(pcV.offset + pcV.dur)})'[${next}]`,
         );
@@ -470,13 +548,31 @@ export function buildRender(
     }
   }
 
-  graph.push(`[${base}]format=yuv420p[vout]`);
+  if (!measure) graph.push(`[${base}]format=yuv420p[vout]`);
+  // Loudness: measured on the final mix; loudnorm works at 192 kHz, so back to 48 kHz after.
+  const norm =
+    target === null || !audio.length
+      ? ''
+      : measure
+        ? `,${loudnormFilter(target)}`
+        : extras.loudness
+          ? `,${loudnormFilter(target, extras.loudness)},aresample=48000`
+          : '';
   if (!audio.length) graph.push(`anullsrc=r=48000:cl=stereo,atrim=0:${num(D)}[aout]`);
-  else if (audio.length === 1) graph.push(`[${audio[0]}]apad,atrim=0:${num(D)}[aout]`);
+  else if (audio.length === 1)
+    graph.push(`[${audio[0]}]apad,atrim=0:${num(D)}${norm}[aout]`);
   else
     graph.push(
-      `${audio.map((a) => `[${a}]`).join('')}amix=inputs=${audio.length}:duration=longest:dropout_transition=0:normalize=0,apad,atrim=0:${num(D)}[aout]`,
+      `${audio.map((a) => `[${a}]`).join('')}amix=inputs=${audio.length}:duration=longest:dropout_transition=0:normalize=0,apad,atrim=0:${num(D)}${norm}[aout]`,
     );
+  if (measure)
+    return {
+      inputs,
+      filter: graph.join(';\n'),
+      output: ['-map', '[aout]', '-f', 'null', '-'],
+      duration: D,
+      clips,
+    };
 
   const output = [
     '-map',

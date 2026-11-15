@@ -633,6 +633,24 @@ export async function chooseModel(ref: string): Promise<void> {
 
 export function applyTheme(theme: ThemeId): void {
   applyThemeColors(theme);
+  void syncChrome();
+}
+
+/**
+ * Fase 18: gives main the colors of our title bar for − □ × and marks the page with the
+ * material main applied (html[data-material]), so the bars are see-through only over it.
+ */
+export async function syncChrome(): Promise<void> {
+  const css = getComputedStyle(document.documentElement);
+  const bg = css.getPropertyValue('--activity').trim();
+  const fg = css.getPropertyValue('--fg').trim();
+  try {
+    const st = await api().app.chrome({ bg, fg });
+    document.documentElement.dataset.chrome = st.kind;
+    document.documentElement.dataset.material = st.material;
+  } catch {
+    document.documentElement.dataset.material = 'none';
+  }
 }
 
 export async function setTheme(theme: ThemeId): Promise<void> {
@@ -654,6 +672,7 @@ export async function loadPrefs(): Promise<void> {
 export async function updatePrefs(patch: Partial<Prefs>): Promise<void> {
   setState((s) => ({ prefs: { ...s.prefs, ...patch } }));
   setState({ prefs: await api().app.setPrefs(patch) });
+  if (patch.uiZoom !== undefined || patch.windowEffects !== undefined) void syncChrome();
 }
 
 /** Refreshes the git badge (changed files) of the activity bar. */

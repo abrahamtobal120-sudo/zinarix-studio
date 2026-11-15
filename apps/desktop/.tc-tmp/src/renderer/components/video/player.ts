@@ -1,0 +1,290 @@
+/**
+ * Real-time preview: a master clock drives one media element per clip near the playhead
+ * (seeked and played in sync), and every frame the visible video tracks are composited on a
+ * canvas, bottom track first. Elements live off-DOM and are recycled when far from the playhead.
+ */
+import type { Clip, VideoProject } from '../../../shared/video';
+import {
+  clipEnd,
+  compositeOrder,
+  fadeAt,
+  leadOf,
+  mediaOf,
+  projectDuration,
+  sourceAt,
+  speedOf,
+  tailOf,
+  trackAudible,
+  trackOf,
+  trackVolume,
+  transformAt,
+  visualAt,
+  visualClipsAt,
+} from '../../../shared/video';
+import type { Look } from '../../../shared/videoFx';
+import { cssFilter } from '../../../shared/videoFx';
+import { duckGainAt } from '../../../shared/videoEasy';
+import { textCanvas } from './textDraw';
+import { getV, setV } from './videoStore';
+
+type El = HTMLVideoElement | HTMLAudioElement;
+
+/** Seconds of drift tolerated while playing before re-seeking an element. */
+const DRIFT = 0.2;
+/** Clips this close ahead get their element ready (seeked) before the playhead reaches them. */
+const PRELOAD = 2;
+const MAX_ELEMENTS = 24;
+
+export class Player {
+  private els = new Map<string, { el: El; mediaId: string; used: number }>();
+  private images = new Map<string, HTMLImageElement>();
+  private raf = 0;
+  private clockStart = 0;
+  private clockFrom = 0;
+  private canvas: HTMLCanvasElement | null = null;
+  private lastDrawKey = '';
+  /** Edits (transform, fades…) repaint a paused frame too. */
+  private lastProject: VideoProject | null = null;
+  private stopped = false;
+  /** Since when a layer has been waiting for its frame (seek / load), 0 when none is. */
+  private waitingSince = 0;
+
+  attach(canvas: HTMLCanvasElement | null): void {
+    this.canvas = canvas;
+    this.lastDrawKey = '';
+  }
+
+  start(): void {
+    this.stopped = false;
+    const loop = () => {
+      if (this.stopped) return;
+      this.tick();
+      this.raf = requestAnimationFrame(loop);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  dispose(): void {
+    this.stopped = true;
+    cancelAnimationFrame(this.raf);
+    for (const { el } of this.els.values()) {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+    }
+    this.els.clear();
+  }
+
+  /** Restarts the clock from the current playhead (after play, seek or a rate change). */
+  resync(): void {
+    this.clockStart = performance.now();
+    this.clockFrom = getV().playhead;
+  }
+
+  private element(c: Clip, url: string, kind: 'video' | 'audio'): El {
+    let e = this.els.get(c.id);
+    if (e && e.mediaId !== c.mediaId) {
+      e.el.pause();
+      this.els.delete(c.id);
+      e = undefined;
+    }
+    if (!e) {
+      const el = document.createElement(kind);
+      el.crossOrigin = 'anonymous';
+      el.preload = 'auto';
+      if (el instanceof HTMLVideoElement) el.playsInline = true;
+      el.src = url;
+      e = { el, mediaId: c.mediaId, used: performance.now() };
+      this.els.set(c.id, e);
+    }
+    e.used = performance.now();
+    return e.el;
+  }
+
+  private image(mediaId: string, url: string): HTMLImageElement {
+    let img = this.images.get(mediaId);
+    if (!img) {
+      img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = url;
+      img.onload = () => (this.lastDrawKey = '');
+      this.images.set(mediaId, img);
+    }
+    return img;
+  }
+
+  private tick(): void {
+    const s = getV();
+    const p = s.project;
+    let t = s.playhead;
+    const end = projectDuration(p);
+    if (s.playing) {
+      t = this.clockFrom + ((performance.now() - this.clockStart) / 1000) * s.rate;
+      // Stop at the end going forwards, at 0 going backwards (not at 0 on the first frame of play).
+      if ((s.rate > 0 && t >= end) || (s.rate < 0 && t <= 0) || end <= 0) {
+        t = Math.min(Math.max(0, t), end);
+        setV({ playing: false, playhead: t, rate: 1 });
+      } else setV({ playhead: t });
+    }
+    this.syncElements(p, t, s.playing && s.rate > 0 ? s.rate : 0);
+    this.draw(p, t);
+  }
+
+  private syncElements(p: VideoProject, t: number, rate: number): void {
+    const s = getV();
+    const live = new Set<string>();
+    for (const c of p.clips) {
+      const m = mediaOf(p, c.mediaId);
+      const url = s.urls[c.mediaId];
+      if (c.text || !m || !url || m.missing || m.kind === 'image') continue;
+      // Pictures run on before / after the clip during transitions; the sound does not.
+      const lead = m.kind === 'video' ? leadOf(p, c) : 0;
+      const tail = m.kind === 'video' ? tailOf(p, c) : 0;
+      const from = c.start - lead;
+      const ahead = from - t;
+      const active = t >= from && t < clipEnd(c) + tail;
+      if (!active && !(ahead > 0 && ahead < PRELOAD)) continue;
+      const track = trackOf(p, c.trackId);
+      const el = this.element(c, url, m.kind === 'audio' ? 'audio' : 'video');
+      live.add(c.id);
+      const last = Math.max(0, (m.duration || Infinity) - 0.5 / p.fps);
+      const target = Math.min(Math.max(0, sourceAt(c, active ? t : from)), last);
+      const inside = t >= c.start && t < clipEnd(c);
+      el.muted = !trackAudible(p, track) || !m.hasAudio || c.volume <= 0;
+      el.volume = Math.min(
+        1,
+        Math.max(
+          0,
+          c.volume * trackVolume(track) * duckGainAt(p, track, t) * (inside ? fadeAt(c, t) : 0),
+        ),
+      );
+      if (active && rate > 0) {
+        // HTML media plays forward only, up to 16×.
+        const r = Math.min(16, Math.max(0.0625, rate * speedOf(c)));
+        if (el.playbackRate !== r) el.playbackRate = r;
+        if (Math.abs(el.currentTime - target) > DRIFT * Math.max(1, r)) el.currentTime = target;
+        if (el.paused) void el.play().catch(() => undefined);
+      } else {
+        if (!el.paused) el.pause();
+        if (Math.abs(el.currentTime - target) > 0.5 / p.fps) el.currentTime = target;
+      }
+    }
+    for (const [id, e] of this.els) {
+      if (live.has(id)) continue;
+      if (!e.el.paused) e.el.pause();
+    }
+    // Recycle the oldest idle elements.
+    if (this.els.size > MAX_ELEMENTS) {
+      const idle = [...this.els.entries()]
+        .filter(([id]) => !live.has(id))
+        .sort((a, b) => a[1].used - b[1].used);
+      for (const [id, e] of idle.slice(0, this.els.size - MAX_ELEMENTS)) {
+        e.el.removeAttribute('src');
+        e.el.load();
+        this.els.delete(id);
+      }
+    }
+  }
+
+  private draw(p: VideoProject, t: number): void {
+    const cv = this.canvas;
+    if (!cv) return;
+    const s = getV();
+    const W = Math.max(2, Math.round(p.width * s.quality));
+    const H = Math.max(2, Math.round(p.height * s.quality));
+    let resized = false;
+    if (cv.width !== W || cv.height !== H) {
+      cv.width = W;
+      cv.height = H;
+      this.lastDrawKey = '';
+      resized = true;
+    }
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    // Paused on the same frame with every layer ready: nothing to repaint.
+    const layers: {
+      c: Clip;
+      src: CanvasImageSource;
+      w: number;
+      h: number;
+      ready: boolean;
+      look: Look;
+    }[] = [];
+    for (const track of compositeOrder(p)) {
+      if (track.hidden) continue;
+      for (const c of visualClipsAt(p, track.id, t)) {
+        const look = visualAt(p, c, t)!;
+        if (c.text) {
+          layers.push({ c, src: textCanvas(c.text, W, H), w: W, h: H, ready: true, look });
+          continue;
+        }
+        const m = mediaOf(p, c.mediaId);
+        const url = s.urls[c.mediaId];
+        if (!m || !url || (!m.hasVideo && m.kind !== 'image')) continue;
+        if (m.kind === 'image') {
+          const img = this.image(m.id, url);
+          layers.push({
+            c,
+            src: img,
+            w: img.naturalWidth,
+            h: img.naturalHeight,
+            ready: img.complete && img.naturalWidth > 0,
+            look,
+          });
+        } else {
+          const e = this.els.get(c.id);
+          if (!e || !(e.el instanceof HTMLVideoElement)) continue;
+          const v = e.el;
+          layers.push({
+            c,
+            src: v,
+            w: v.videoWidth,
+            h: v.videoHeight,
+            ready: v.readyState >= 2 && !v.seeking,
+            look,
+          });
+        }
+      }
+    }
+    const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}`).join(',')}`;
+    if (!s.playing && key === this.lastDrawKey && p === this.lastProject) return;
+    this.lastProject = p;
+    const allReady = layers.every((l) => l.ready);
+    this.lastDrawKey = allReady ? key : '';
+    // While a video is seeking (scrubbing, stepping frames) keep the last picture instead of
+    // flashing black; give up after a moment so a file that never loads does not freeze the view.
+    if (!allReady) {
+      const now = performance.now();
+      if (!this.waitingSince) this.waitingSince = now;
+      if (now - this.waitingSince < 400 && !resized) return;
+    } else this.waitingSince = 0;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    for (const l of layers) {
+      if (!l.ready || !l.w || !l.h) continue;
+      // Fit inside the frame, centred, then the clip's transform (same maths as the export).
+      const tr = transformAt(l.c, t);
+      const lk = l.look;
+      const alpha = tr.opacity * fadeAt(l.c, t) * lk.alpha;
+      if (alpha <= 0 || lk.reveal <= 0) continue;
+      const k = Math.min(W / l.w, H / l.h) * tr.scale * lk.scale;
+      const dw = l.w * k;
+      const dh = l.h * k;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, alpha);
+      ctx.translate(W / 2 + (tr.x + lk.dx) * W, H / 2 + (tr.y + lk.dy) * H);
+      if (tr.rotation) ctx.rotate((tr.rotation * Math.PI) / 180);
+      if (tr.flipH || tr.flipV) ctx.scale(tr.flipH ? -1 : 1, tr.flipV ? -1 : 1);
+      if (lk.reveal < 1) {
+        // Wipes uncover the picture from its left edge (the same as the export).
+        ctx.beginPath();
+        ctx.rect(tr.flipH ? dw / 2 - dw * lk.reveal : -dw / 2, -dh / 2, dw * lk.reveal, dh);
+        ctx.clip();
+      }
+      const filter = cssFilter(l.c.effects, H / 1080);
+      if (filter !== 'none') ctx.filter = filter;
+      ctx.drawImage(l.src, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    }
+  }
+}

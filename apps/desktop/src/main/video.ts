@@ -9,13 +9,15 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import type { ExportOptions, MediaItem, VideoProject } from '../shared/video.js';
 import { mediaKindOf, uid } from '../shared/video.js';
-import { buildRender } from '../shared/videoRender.js';
+import { buildRender, parseLoudnorm } from '../shared/videoRender.js';
+import type { LoudnessMeasure } from '../shared/videoRender.js';
+import { LUT_MAX_BYTES, cleanGrade, lutKey, mixLut, parseCube, serializeCube } from '../shared/videoColor.js';
 import { findExecutable } from './lspProtocol.js';
 
 export interface FfmpegInfo {
@@ -90,6 +92,44 @@ function run(bin: string, args: string[], timeoutMs = 120_000): Promise<Buffer> 
       else reject(new Error(err.trim().split('\n').slice(-3).join('\n') || `exit ${code}`));
     });
   });
+}
+
+/** Reads a .cube LUT for the preview (only .cube files, bounded size). */
+export async function readLut(path: string): Promise<string> {
+  if (!isAbsolute(path) || extname(path).toLowerCase() !== '.cube')
+    throw new Error('Solo se admiten archivos .cube.');
+  const st = await stat(path);
+  if (!st.isFile() || st.size > LUT_MAX_BYTES) throw new Error('El LUT es demasiado grande.');
+  const text = await readFile(path, 'utf8');
+  parseCube(text); // refuse anything that is not a 3D LUT before the renderer sees it
+  return text;
+}
+
+/**
+ * Writes every LUT the project uses into `dir` as a clean .cube (strength baked in) and returns
+ * lutKey → file name. FFmpeg runs inside `dir`, so the filter graph only ever names "lut0.cube"
+ * (no drive letters or quotes to escape).
+ */
+export async function prepareLuts(
+  project: VideoProject,
+  dir: string,
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const c of project.clips) {
+    const g = cleanGrade(c.color);
+    const key = lutKey(g);
+    if (!g?.lut || !key || out[key]) continue;
+    let text: string;
+    try {
+      text = await readLut(g.lut);
+    } catch (e) {
+      throw new Error(`No se pudo leer el LUT ${basename(g.lut)}: ${(e as Error).message}`);
+    }
+    const name = `lut${Object.keys(out).length}.cube`;
+    await writeFile(join(dir, name), serializeCube(mixLut(parseCube(text), g.lutMix ?? 1)), 'utf8');
+    out[key] = name;
+  }
+  return out;
 }
 
 interface ProbeJson {
@@ -428,63 +468,64 @@ export class VideoService {
       await writeFile(file, png);
       textImages[id] = file;
     }
-    const plan = buildRender(project, opts, tmpOut, undefined, textImages);
-    // Long graphs go in a file: Windows caps a command line at 32 K characters.
-    const script = join(tmpdir(), `zinarix-${job.id}.ffgraph`);
-    await writeFile(script, plan.filter, 'utf8');
-    const args = [
-      '-hide_banner',
-      '-v',
-      'error',
-      '-y',
-      ...plan.inputs,
-      '-filter_complex_script',
-      script,
-      ...plan.output.slice(0, -1),
-      '-progress',
-      'pipe:1',
-      '-nostats',
-      plan.output.at(-1)!,
-    ];
+    // A folder of its own: LUT files and the graph script live there, FFmpeg runs inside it.
+    const work = await mkdtemp(join(tmpdir(), `zinarix-${job.id}-`));
+    const script = join(work, 'graph.ffgraph');
+    let result: { ok: boolean; error?: string; log?: string };
     this.update(job, { state: 'running', startedAt: Date.now(), progress: 0 });
-    const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
-      const p = spawn(ffmpeg, args, { windowsHide: true });
-      this.procs.set(job.id, p);
-      let err = '';
-      let buf = '';
-      let lastSent = 0;
-      p.stdout.on('data', (d: Buffer) => {
-        buf += d.toString();
-        const lines = buf.split('\n');
-        buf = lines.pop() ?? '';
-        for (const line of lines) {
-          const m = /^out_time_(?:us|ms)=(\d+)/.exec(line.trim());
-          if (!m) continue;
-          const done = Math.min(1, Number(m[1]) / 1e6 / plan.duration);
-          const now = Date.now();
-          if (now - lastSent < 250 && done < 1) continue;
-          lastSent = now;
-          const elapsed = (now - (job.startedAt ?? now)) / 1000;
-          this.update(job, {
-            progress: done,
-            eta: done > 0.02 ? Math.max(0, (elapsed / done) * (1 - done)) : null,
-          });
-        }
+    try {
+      const lutFiles = await prepareLuts(project, work);
+      // Loudness: a quick audio-only pass measures the mix, the export then applies the gain.
+      let loudness: LoudnessMeasure | null = null;
+      if (opts.loudness != null) {
+        const m = buildRender(project, opts, tmpOut, undefined, textImages, {
+          lutFiles,
+          measure: true,
+        });
+        await writeFile(script, m.filter, 'utf8');
+        const r = await this.ffmpegRun(job, ffmpeg, work, [
+          '-hide_banner',
+          '-nostats',
+          '-v',
+          'info',
+          '-y',
+          ...m.inputs,
+          '-filter_complex_script',
+          script,
+          ...m.output,
+        ]);
+        if (!r.ok) throw new Error(r.error === 'canceled' ? 'canceled' : r.error);
+        loudness = parseLoudnorm(r.log ?? '');
+      }
+      const plan = buildRender(project, opts, tmpOut, undefined, textImages, {
+        lutFiles,
+        loudness,
       });
-      p.stderr.on('data', (d: Buffer) => (err = (err + d.toString()).slice(-4000)));
-      p.on('error', (e) => resolve({ ok: false, error: e.message }));
-      p.on('close', (code, signal) => {
-        this.procs.delete(job.id);
-        if (signal) resolve({ ok: false, error: 'canceled' });
-        else
-          resolve(
-            code === 0
-              ? { ok: true }
-              : { ok: false, error: err.trim().split('\n').slice(-4).join('\n') || `exit ${code}` },
-          );
-      });
-    });
-    await unlink(script).catch(() => undefined);
+      await writeFile(script, plan.filter, 'utf8');
+      result = await this.ffmpegRun(
+        job,
+        ffmpeg,
+        work,
+        [
+          '-hide_banner',
+          '-v',
+          'error',
+          '-y',
+          ...plan.inputs,
+          '-filter_complex_script',
+          script,
+          ...plan.output.slice(0, -1),
+          '-progress',
+          'pipe:1',
+          '-nostats',
+          plan.output.at(-1)!,
+        ],
+        plan.duration,
+      );
+    } catch (e) {
+      result = { ok: false, error: (e as Error).message };
+    }
+    rmSync(work, { recursive: true, force: true });
     for (const f of Object.values(textImages)) await unlink(f).catch(() => undefined);
     if (result.ok) {
       try {
@@ -503,6 +544,58 @@ export class VideoService {
           : { state: 'error', error: result.error },
       );
     }
+  }
+
+  /**
+   * One FFmpeg run of a job (cancelable). With `duration`, `-progress` lines on stdout move the
+   * job's progress bar. `log` is the end of stderr (loudnorm prints its measure there).
+   */
+  private ffmpegRun(
+    job: VideoJob,
+    ffmpeg: string,
+    cwd: string,
+    args: string[],
+    duration = 0,
+  ): Promise<{ ok: boolean; error?: string; log?: string }> {
+    return new Promise((resolve) => {
+      if (job.state === 'canceled') return resolve({ ok: false, error: 'canceled' });
+      const p = spawn(ffmpeg, args, { windowsHide: true, cwd });
+      this.procs.set(job.id, p);
+      let err = '';
+      let buf = '';
+      let lastSent = 0;
+      p.stdout.on('data', (d: Buffer) => {
+        if (!duration) return;
+        buf += d.toString();
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          const m = /^out_time_(?:us|ms)=(\d+)/.exec(line.trim());
+          if (!m) continue;
+          const done = Math.min(1, Number(m[1]) / 1e6 / duration);
+          const now = Date.now();
+          if (now - lastSent < 250 && done < 1) continue;
+          lastSent = now;
+          const elapsed = (now - (job.startedAt ?? now)) / 1000;
+          this.update(job, {
+            progress: done,
+            eta: done > 0.02 ? Math.max(0, (elapsed / done) * (1 - done)) : null,
+          });
+        }
+      });
+      p.stderr.on('data', (d: Buffer) => (err = (err + d.toString()).slice(-20000)));
+      p.on('error', (e) => resolve({ ok: false, error: e.message }));
+      p.on('close', (code, signal) => {
+        this.procs.delete(job.id);
+        if (signal) resolve({ ok: false, error: 'canceled' });
+        else
+          resolve(
+            code === 0
+              ? { ok: true, log: err }
+              : { ok: false, error: err.trim().split('\n').slice(-4).join('\n') || `exit ${code}` },
+          );
+      });
+    });
   }
 
   // ---------------- cache ----------------

@@ -1029,6 +1029,11 @@ const es = {
   gcStopping: "Apagando {name}…",
   gcLogFilter: "Filtro, p. ej. severity>=ERROR",
   gcNoLogs: "No hay registros con ese filtro.",
+  gcFilter: "Filtrar…",
+  gcNothing: "No hay nada de este servicio en el proyecto.",
+  gcOpenUrl: "Abrir",
+  gcSecrets: "Secretos",
+  gcVmStopConfirm: "¿Apagar la VM {name}? Lo que corra en ella se detiene.",
   vcLoading: 'Conectando con Vercel…',
   vcIntro:
     'Conecta tu cuenta de Vercel para ver tus proyectos y despliegues, y desplegar desde aquí. Pega un token de acceso:',
@@ -3170,6 +3175,11 @@ const en: Record<Key, string> = {
   gcStopping: "Stopping {name}…",
   gcLogFilter: "Filter, e.g. severity>=ERROR",
   gcNoLogs: "No log entries match that filter.",
+  gcFilter: "Filter…",
+  gcNothing: "This service has nothing in the project.",
+  gcOpenUrl: "Open",
+  gcSecrets: "Secrets",
+  gcVmStopConfirm: "Stop VM {name}? Whatever runs on it stops.",
   vcLoading: 'Connecting to Vercel…',
   vcIntro:
     'Connect your Vercel account to see your projects and deployments, and deploy from here. Paste an access token:',

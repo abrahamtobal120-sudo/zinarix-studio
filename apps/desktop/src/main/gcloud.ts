@@ -7,6 +7,8 @@ import type {
   GCloudObject,
   GCloudProject,
   GCloudQueryResult,
+  GCloudResource,
+  GCloudResourceKind,
   GCloudService,
   GCloudSqlInstance,
   GCloudStatus,
@@ -542,5 +544,215 @@ export class GCloud {
         resource: e.resource?.type ?? e.logName?.split('/').pop() ?? '',
       };
     });
+  }
+
+  // ---- Other services (one generic list each) ----
+
+  /**
+   * Lists one Google Cloud service of a project in a common shape. If its API is off in the
+   * project, req() turns it on (once) and retries, so opening a tab is enough to use it.
+   */
+  async resources(project: string, kind: GCloudResourceKind): Promise<GCloudResource[]> {
+    const P = enc(checkProject(project));
+    const con = (path: string) => `https://console.cloud.google.com/${path}?project=${P}`;
+    const last = (s = '') => s.split('/').pop() ?? s;
+    /** "projects/x/locations/us-central1/services/y" → "us-central1". */
+    const loc = (s = '') => /\/locations\/([^/]+)/.exec(s)?.[1] ?? '';
+    const date = (t?: string) => (t ? new Date(t).toLocaleString() : '');
+    const line = (...xs: (string | undefined)[]) => xs.filter(Boolean).join(' · ');
+    switch (kind) {
+      case 'compute': {
+        type Vm = {
+          name: string;
+          status?: string;
+          machineType?: string;
+          networkInterfaces?: { networkIP?: string; accessConfigs?: { natIP?: string }[] }[];
+        };
+        const j = await this.req<{ items?: Record<string, { instances?: Vm[] }> }>(
+          `https://compute.googleapis.com/compute/v1/projects/${P}/aggregated/instances?maxResults=500&returnPartialSuccess=true`,
+        );
+        const out: GCloudResource[] = [];
+        for (const [scope, v] of Object.entries(j.items ?? {}))
+          for (const i of v.instances ?? []) {
+            const zone = last(scope);
+            const nic = i.networkInterfaces?.[0];
+            const ext = nic?.accessConfigs?.find((a) => a.natIP)?.natIP;
+            out.push({
+              id: `${zone}/${i.name}`,
+              name: i.name,
+              status: i.status ?? '',
+              ok: i.status === 'RUNNING' ? true : null,
+              detail: line(zone, last(i.machineType), ext ?? nic?.networkIP),
+              url: ext ? `http://${ext}` : undefined,
+              console: con(`compute/instancesDetail/zones/${zone}/instances/${enc(i.name)}`),
+              zone,
+            });
+          }
+        return out.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      case 'run': {
+        const j = await this.req<{
+          services?: {
+            name: string;
+            uri?: string;
+            updateTime?: string;
+            terminalCondition?: { state?: string };
+          }[];
+        }>(`https://run.googleapis.com/v2/projects/${P}/locations/-/services?pageSize=500`);
+        return (j.services ?? []).map((x) => {
+          const st = x.terminalCondition?.state ?? '';
+          const region = loc(x.name);
+          return {
+            id: x.name,
+            name: last(x.name),
+            status: st.replace('CONDITION_', ''),
+            ok: st === 'CONDITION_SUCCEEDED' ? true : st === 'CONDITION_FAILED' ? false : null,
+            detail: line(region, date(x.updateTime)),
+            url: x.uri,
+            console: con(`run/detail/${region}/${enc(last(x.name))}/metrics`),
+          };
+        });
+      }
+      case 'functions': {
+        const j = await this.req<{
+          functions?: {
+            name: string;
+            state?: string;
+            environment?: string;
+            url?: string;
+            buildConfig?: { runtime?: string };
+            serviceConfig?: { uri?: string };
+          }[];
+        }>(
+          `https://cloudfunctions.googleapis.com/v2/projects/${P}/locations/-/functions?pageSize=500`,
+        );
+        return (j.functions ?? []).map((f) => {
+          const region = loc(f.name);
+          return {
+            id: f.name,
+            name: last(f.name),
+            status: f.state ?? '',
+            ok: f.state === 'ACTIVE' ? true : f.state === 'FAILED' ? false : null,
+            detail: line(region, f.buildConfig?.runtime, f.environment?.replace('GEN_', 'gen ')),
+            url: f.url ?? f.serviceConfig?.uri,
+            console: con(`functions/details/${region}/${enc(last(f.name))}`),
+          };
+        });
+      }
+      case 'gke': {
+        const j = await this.req<{
+          clusters?: {
+            name: string;
+            location?: string;
+            status?: string;
+            currentNodeCount?: number;
+            currentMasterVersion?: string;
+          }[];
+        }>(`https://container.googleapis.com/v1/projects/${P}/locations/-/clusters`);
+        return (j.clusters ?? []).map((c) => ({
+          id: `${c.location}/${c.name}`,
+          name: c.name,
+          status: c.status ?? '',
+          ok: c.status === 'RUNNING' ? true : c.status === 'ERROR' ? false : null,
+          detail: line(
+            c.location,
+            c.currentNodeCount !== undefined ? `${c.currentNodeCount} nodos` : '',
+            c.currentMasterVersion,
+          ),
+          console: con(`kubernetes/clusters/details/${c.location}/${enc(c.name)}/details`),
+        }));
+      }
+      case 'pubsub': {
+        type Sub = { name: string; topic?: string; pushConfig?: { pushEndpoint?: string } };
+        const [t, s] = await Promise.all([
+          this.req<{ topics?: { name: string }[] }>(
+            `https://pubsub.googleapis.com/v1/projects/${P}/topics?pageSize=500`,
+          ),
+          this.req<{ subscriptions?: Sub[] }>(
+            `https://pubsub.googleapis.com/v1/projects/${P}/subscriptions?pageSize=500`,
+          ),
+        ]);
+        const subs = s.subscriptions ?? [];
+        return [
+          ...(t.topics ?? []).map((x) => {
+            const n = subs.filter((y) => y.topic === x.name).length;
+            return {
+              id: x.name,
+              name: last(x.name),
+              status: 'TOPIC',
+              ok: true,
+              detail: `${n} ${n === 1 ? 'suscripción' : 'suscripciones'}`,
+              console: con(`cloudpubsub/topic/detail/${enc(last(x.name))}`),
+            };
+          }),
+          ...subs.map((y) => ({
+            id: y.name,
+            name: last(y.name),
+            status: y.pushConfig?.pushEndpoint ? 'PUSH' : 'PULL',
+            ok: null,
+            detail: `→ ${last(y.topic)}`,
+            console: con(`cloudpubsub/subscription/detail/${enc(last(y.name))}`),
+          })),
+        ];
+      }
+      case 'secrets': {
+        // Names and dates only: secret values never leave Google from here.
+        const j = await this.req<{ secrets?: { name: string; createTime?: string }[] }>(
+          `https://secretmanager.googleapis.com/v1/projects/${P}/secrets?pageSize=500`,
+        );
+        return (j.secrets ?? []).map((x) => ({
+          id: x.name,
+          name: last(x.name),
+          status: '',
+          ok: null,
+          detail: date(x.createTime),
+          console: con(`security/secret-manager/secret/${enc(last(x.name))}/versions`),
+        }));
+      }
+      case 'firestore': {
+        const j = await this.req<{
+          databases?: { name: string; locationId?: string; type?: string }[];
+        }>(`https://firestore.googleapis.com/v1/projects/${P}/databases`);
+        return (j.databases ?? []).map((d) => ({
+          id: d.name,
+          name: last(d.name),
+          status: d.type === 'DATASTORE_MODE' ? 'DATASTORE' : 'NATIVE',
+          ok: true,
+          detail: d.locationId ?? '',
+          console: con(`firestore/databases/${enc(last(d.name))}/data`),
+        }));
+      }
+      case 'iam': {
+        const j = await this.req<{ bindings?: { role: string; members?: string[] }[] }>(
+          `https://cloudresourcemanager.googleapis.com/v1/projects/${P}:getIamPolicy`,
+          { method: 'POST', body: {} },
+        );
+        const roles = new Map<string, string[]>();
+        for (const b of j.bindings ?? [])
+          for (const m of b.members ?? [])
+            roles.set(m, [...(roles.get(m) ?? []), b.role.replace(/^roles\//, '')]);
+        return [...roles.entries()]
+          .map(([m, rs]) => {
+            const at = m.indexOf(':');
+            return {
+              id: m,
+              name: at < 0 ? m : m.slice(at + 1),
+              status: at < 0 ? '' : m.slice(0, at).toUpperCase(),
+              ok: null,
+              detail: rs.join(', '),
+              console: con('iam-admin/iam'),
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    }
+  }
+
+  /** Starts or stops a Compute Engine VM (Google finishes it in the background). */
+  async vmPower(project: string, zone: string, name: string, on: boolean): Promise<void> {
+    await this.req(
+      `https://compute.googleapis.com/compute/v1/projects/${enc(checkProject(project))}/zones/${enc(checkName(zone, 'Zona'))}/instances/${enc(checkName(name, 'VM'))}/${on ? 'start' : 'stop'}`,
+      { method: 'POST', body: {} },
+    );
   }
 }

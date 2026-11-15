@@ -1,0 +1,435 @@
+/* ---------- debugger: gutter ---------- */
+.monaco-editor .dbg-bp,
+.monaco-editor .dbg-bp-hint {
+  display: grid !important;
+  place-items: center;
+  cursor: pointer;
+}
+.monaco-editor .dbg-bp::before,
+.monaco-editor .dbg-bp-hint::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dbg-breakpoint);
+}
+.monaco-editor .dbg-bp-hint::before {
+  background: color-mix(in srgb, var(--dbg-breakpoint) 45%, transparent);
+}
+.monaco-editor .dbg-bp.cond::before {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(0.85);
+}
+.monaco-editor .dbg-bp.unbound::before {
+  background: transparent;
+  border: 1.5px solid var(--dbg-unbound);
+}
+.monaco-editor .dbg-arrow {
+  display: grid !important;
+  place-items: center;
+}
+.monaco-editor .dbg-arrow::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid var(--dbg-current);
+  margin-left: 2px;
+}
+.monaco-editor .dbg-arrow.frame::after {
+  border-left-color: var(--dbg-frame);
+}
+.monaco-editor .dbg-line {
+  background: color-mix(in srgb, var(--dbg-current) 22%, transparent);
+}
+.monaco-editor .dbg-line-frame {
+  background: color-mix(in srgb, var(--dbg-frame) 18%, transparent);
+}
+
+/* ---------- debugger: floating toolbar over the editor ---------- */
+.editor-area {
+  position: relative;
+}
+.dbg-float {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-dropdown);
+  pointer-events: none;
+}
+.dbg-float .dbg-toolbar {
+  pointer-events: auto;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev);
+  border-radius: var(--radius);
+  padding: 2px 4px;
+}
+.dbg-toolbar {
+  display: inline-flex;
+  gap: 2px;
+}
+.dbg-toolbar button {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  color: var(--fg);
+}
+.dbg-toolbar button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.dbg-toolbar button:disabled {
+  opacity: 0.4;
+}
+.dbg-toolbar button:first-child {
+  color: var(--ok);
+}
+.dbg-toolbar button:last-child {
+  color: var(--danger);
+}
+
+/* ---------- debugger: side panel ---------- */
+.dbg-panel .dbg-start {
+  padding: 0 10px 8px;
+}
+.dbg-start-btn {
+  width: 100%;
+  margin-bottom: 6px;
+}
+.dbg-config {
+  width: 100%;
+  margin-bottom: 6px;
+}
+.dbg-status {
+  margin: 6px 0 0;
+}
+.dbg-sections {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+}
+.dbg-section + .dbg-section {
+  border-top: 1px solid var(--border);
+}
+.dbg-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 26px;
+  padding: 0 6px 0 6px;
+}
+.dbg-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  flex: 1;
+}
+.dbg-section-body {
+  padding-bottom: 6px;
+}
+.dbg-empty {
+  margin: 2px 12px 6px;
+}
+.dbg-tree {
+  font-family: var(--mono, 'JetBrains Mono', Consolas, monospace);
+  font-size: var(--text-sm);
+}
+.dbg-var,
+.dbg-frame,
+.dbg-bp-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: default;
+}
+.dbg-var[role='button'],
+.dbg-frame,
+.dbg-bp-row {
+  cursor: pointer;
+}
+.dbg-var:hover,
+.dbg-frame:hover,
+.dbg-bp-row:hover,
+.dbg-watch:hover {
+  background: var(--hover);
+}
+.dbg-var.scope .dbg-var-name {
+  color: var(--fg-strong);
+  font-family: inherit;
+}
+.dbg-twisty {
+  display: inline-grid;
+  place-items: center;
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--fg-dim);
+}
+.dbg-var-name {
+  color: var(--dbg-var);
+}
+:root[data-theme='light'] .dbg-var-name {
+  color: #8b2f8b;
+}
+.dbg-var-sep {
+  color: var(--fg-dim);
+}
+.dbg-var-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+.dbg-var-value.err {
+  color: var(--danger);
+}
+.dbg-frame.selected {
+  background: var(--sel);
+}
+.dbg-frame.external {
+  opacity: 0.6;
+}
+.dbg-frame-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dbg-watch {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.dbg-watch > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.dbg-row-x {
+  display: inline-grid;
+  place-items: center;
+  background: transparent;
+  padding: 2px 4px;
+  color: var(--fg-dim);
+  opacity: 0;
+}
+.dbg-watch:hover .dbg-row-x,
+.dbg-bp-row:hover .dbg-row-x,
+.dbg-console-in .dbg-row-x,
+.dbg-row-x:focus-visible {
+  opacity: 1;
+}
+.dbg-row-x:hover {
+  color: var(--fg);
+}
+.dbg-bp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dbg-breakpoint);
+  flex-shrink: 0;
+  margin: 0 4px 0 2px;
+}
+.dbg-bp-dot.cond {
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.85);
+}
+.dbg-bp-dot.unbound {
+  background: transparent;
+  border: 1.5px solid var(--fg-dim);
+}
+.dbg-bp-file {
+  font-family: inherit;
+}
+.dbg-bp-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- bottom panel: view switcher ---------- */
+.panel-views {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  flex-shrink: 0;
+}
+.panel-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 8px;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--fg-dim);
+}
+.panel-view:hover {
+  color: var(--fg);
+}
+.panel-view.active {
+  color: var(--fg-strong);
+  border-bottom-color: var(--brand);
+}
+.panel-view-badge {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--bg-4);
+  color: var(--fg);
+  font-size: var(--text-2xs);
+  line-height: 16px;
+  text-align: center;
+}
+.panel-other-actions {
+  margin-left: auto;
+}
+
+/* ---------- problems ---------- */
+.prob-view,
+.dbg-console {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.prob-bar {
+  padding: 2px 10px 4px;
+}
+.prob-filter {
+  width: min(340px, 100%);
+  height: 24px;
+  font-size: var(--text-sm);
+}
+.prob-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-size: var(--text-sm);
+}
+.prob-empty {
+  margin: 6px 14px;
+}
+.prob-file,
+.prob-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  padding: 0 10px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.prob-row {
+  padding-left: 28px;
+}
+.prob-file:hover,
+.prob-row:hover {
+  background: var(--hover);
+}
+.prob-file-name {
+  color: var(--fg-strong);
+}
+.prob-file-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prob-badge {
+  margin-left: 4px;
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--bg-4);
+  font-size: var(--text-2xs);
+  line-height: 16px;
+  text-align: center;
+}
+.prob-sev {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  flex-shrink: 0;
+}
+.prob-sev.err {
+  color: var(--danger);
+}
+.prob-sev.warn {
+  color: var(--warn);
+}
+.prob-sev.info {
+  color: var(--accent);
+}
+.prob-msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prob-pos {
+  flex-shrink: 0;
+}
+.status-err {
+  color: var(--danger);
+}
+.status-warn {
+  color: var(--warn);
+}
+.status-bar .status-err,
+.status-bar .status-warn {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* ---------- debug console ---------- */
+.dbg-console-out {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 14px;
+  font-family: var(--mono, 'JetBrains Mono', Consolas, monospace);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dbg-line-out.stderr,
+.dbg-line-out.error {
+  color: var(--danger);
+}
+.dbg-line-out.info {
+  color: var(--fg-dim);
+}
+.dbg-line-out.input {
+  color: var(--accent);
+}
+.dbg-line-out.result {
+  color: var(--ok);
+}
+.dbg-console-in {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 5px 14px;
+  border-top: 1px solid var(--border);
+}
+.dbg-console-in input {
+  flex: 1;
+  height: 24px;
+  font-family: var(--mono, 'JetBrains Mono', Consolas, monospace);
+  font-size: var(--text-sm);
+  background: transparent;
+  border: none;
+  outline: none;
+}

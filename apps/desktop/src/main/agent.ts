@@ -47,6 +47,7 @@ import { childEnv } from './env.js';
 import { MCP_PREFIX, type McpManager } from './mcp.js';
 import { dropOldImages } from './chatImages.js';
 import { isSecretFile, protectedWrite } from './guard.js';
+import { alwaysAsks, decide, type PolicyContext } from '../shared/approvalPolicy.js';
 
 export { globToRegExp };
 import type { Workspace } from './workspace.js';
@@ -87,6 +88,7 @@ import {
   expandPath,
   httpRequest,
   isSecretName,
+  isWriteSql,
   networkStatus,
   profileFile,
   profileWithVar,
@@ -568,6 +570,13 @@ const READ_ONLY = new Set([
  * What an "always" answer covers: the exact same command, or edits/writes to ordinary
  * project files. null = must be approved every time.
  */
+/** What the approval policy needs to know about this app's tools and files. */
+const POLICY: PolicyContext = {
+  readOnly: READ_ONLY,
+  isProtected: (p) => protectedWrite(p) !== null,
+  isWriteSql,
+};
+
 export function approvalKey(name: string, a: Record<string, unknown>): string | null {
   if (name === 'run_command') return `cmd:${String(a.command ?? '').trim()}`;
   if (protectedWrite(String(a.path ?? ''))) return null;
@@ -1530,7 +1539,10 @@ A project hook did not let you finish yet. Address it, then answer.`,
     const b = this.mcp?.binding(call.name);
     if (!b) return finish(false, `Unknown tool ${call.name}.`, 'herramienta MCP desconocida');
     const ann = b.tool.annotations ?? {};
-    if (opts.mode === 'plan' && !planAllows(call.name, READ_ONLY, ann.readOnlyHint === true))
+    const mode = opts.mode ?? 'agent';
+    if (
+      decide(mode, call.name, a, { ...POLICY, mcpReadOnly: ann.readOnlyHint === true }) === 'deny'
+    )
       return finish(false, PLAN_REFUSAL, 'bloqueado: modo Plan');
     const destructive = ann.destructiveHint === true && ann.readOnlyHint !== true;
     const key = destructive ? null : `mcp:${b.scope}:${b.server}:${b.tool.name}`;
@@ -1884,9 +1896,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
         'no permitida para este subagente',
       );
     if (
-      opts.mode === 'plan' &&
       !call.name.startsWith(MCP_PREFIX) &&
-      !planAllows(call.name, READ_ONLY)
+      decide(opts.mode ?? 'agent', call.name, a, POLICY) === 'deny'
     )
       return refuse(PLAN_REFUSAL, 'bloqueado: modo Plan');
     const ws = this.ws(opts);
@@ -1969,23 +1980,26 @@ A project hook did not let you finish yet. Address it, then answer.`,
               ? cloudPreview(call.name, a)
               : MEDIA_TOOL_NAMES.has(call.name) && this.media
                 ? await mediaPreview(this.media, call.name, a)
-              : KNOWLEDGE_TOOL_NAMES.has(call.name)
-                ? knowledgePreview(call.name, a, this.knowledge)
-                : call.name === 'run_command'
-                  ? commandWarning(opts.scope?.task ? { ...a, cwd: undefined } : a, ws?.root)
-                  : null;
+                : KNOWLEDGE_TOOL_NAMES.has(call.name)
+                  ? knowledgePreview(call.name, a, this.knowledge)
+                  : call.name === 'run_command'
+                    ? commandWarning(opts.scope?.task ? { ...a, cwd: undefined } : a, ws?.root)
+                    : null;
       // Fase 5: refused before asking (approving it would not make it run anyway).
       if (call.name === 'run_command' && opts.scope?.task) {
         const c = taskCommand(opts.scope.task, a);
         if ('error' in c) return finish(false, c.error, 'fuera del worktree');
       }
+      // mail_send, git push, Vercel changes, Supabase writes: asked every time, no "Always".
+      const forced = alwaysAsks(call.name, a, POLICY);
       if (sys) {
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));
           if (blocked) return finish(false, `Refused: ${blocked}.`, blocked);
         }
-        if (!sys.allowKey || !s.alwaysAllow.has(sys.allowKey)) {
-          const { allowKey, ...view } = sys;
+        if (forced || !sys.allowKey || !s.alwaysAllow.has(sys.allowKey)) {
+          const { allowKey: offered, ...view } = sys;
+          const allowKey = forced ? undefined : offered;
           opts.emit({
             type: 'tool_approval',
             id: call.id,
@@ -2005,17 +2019,18 @@ A project hook did not let you finish yet. Address it, then answer.`,
       } else if (
         ws &&
         NEEDS_APPROVAL.has(call.name) &&
-        !s.alwaysAllow.has(approvalKey(call.name, a) ?? '') &&
+        (forced || !s.alwaysAllow.has(approvalKey(call.name, a) ?? '')) &&
         // Auto-approve: edits of ordinary project files; commands and protected files still ask.
-        !(opts.mode === 'auto' && call.name !== 'run_command' && approvalKey(call.name, a))
+        decide(opts.mode ?? 'agent', call.name, a, POLICY) !== 'auto'
       ) {
         // "Always" covers the same command, or ordinary project files; never files that make
         // other programs run code or hold secrets (a later injection could abuse it).
-        const key = approvalKey(call.name, a);
+        const key = forced ? null : approvalKey(call.name, a);
         const guarded = call.name === 'run_command' ? null : protectedWrite(String(a.path ?? ''));
         const preview = {
           ...(await this.preview(ws, call.name, a)),
           ...(guarded ? { risk: 'high' as const, warning: guarded, noAlways: true } : {}),
+          ...(forced ? { noAlways: true } : {}),
         };
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));

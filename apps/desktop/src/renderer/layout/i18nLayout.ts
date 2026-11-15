@@ -24,6 +24,10 @@ const es = {
   lyZenExit: 'Salir del modo Zen',
   lyDensityCompact: 'Densidad compacta',
   lyDensityComfortable: 'Densidad cómoda',
+  lyMenuBar: 'Menú de la aplicación',
+  lyWindowEffects: 'Efectos de ventana',
+  lyWindowEffectsHint:
+    'Mica en Windows 11 y transparencia en macOS, detrás de la barra de título y la barra de actividad. Se apaga solo con alto contraste.',
 };
 
 type LyKey = keyof typeof es;
@@ -51,6 +55,10 @@ const en: Record<LyKey, string> = {
   lyZenExit: 'Leave Zen mode',
   lyDensityCompact: 'Compact density',
   lyDensityComfortable: 'Comfortable density',
+  lyMenuBar: 'Application menu',
+  lyWindowEffects: 'Window effects',
+  lyWindowEffectsHint:
+    'Mica on Windows 11 and translucency on macOS, behind the title bar and the activity bar. Turns itself off with high contrast.',
 };
 
 export function tl(key: LyKey, vars: Record<string, string | number> = {}): string {

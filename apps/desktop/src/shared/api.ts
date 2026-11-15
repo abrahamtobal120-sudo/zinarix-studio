@@ -6,6 +6,7 @@ import type { DesignApplyResult, DesignOp, DesignSessionView } from './design.js
  */
 import type { ChatMessage, ModelInfo } from '@omni/shared';
 import type { LicenseStatus } from './plans.js';
+import type { ChromeState } from './windowChrome.js';
 import type { TestDiscovery, TestEvent, TestRunRequest, TestRunSummary } from './testing.js';
 import type {
   Breakpoint,
@@ -237,6 +238,8 @@ export interface Prefs {
   helperBubble: boolean;
   /** Local Ollama model of the help assistant ("qwen2.5:1.5b"). */
   helperModel: string;
+  /** Fase 18: Mica (Windows 11) or vibrancy (macOS) behind the title bar and the side bar. */
+  windowEffects: boolean;
 }
 
 /** Steps of the interface size (Ver > Acercar / Alejar and Settings). */
@@ -261,6 +264,7 @@ export const DEFAULT_PREFS: Prefs = {
   autoImport: true,
   helperBubble: true,
   helperModel: 'qwen2.5:1.5b',
+  windowEffects: true,
 };
 
 export interface GitFileView {
@@ -496,6 +500,34 @@ export interface GCloudLogEntry {
   severity: string;
   text: string;
   resource: string;
+}
+/** Google Cloud services the panel lists in a generic way (one tab each). */
+export const GCLOUD_KINDS = [
+  'compute',
+  'run',
+  'functions',
+  'gke',
+  'pubsub',
+  'secrets',
+  'firestore',
+  'iam',
+] as const;
+export type GCloudResourceKind = (typeof GCLOUD_KINDS)[number];
+/** One thing of a Google Cloud service: a VM, a Cloud Run service, a topic, a member… */
+export interface GCloudResource {
+  id: string;
+  name: string;
+  /** Raw state from Google ("RUNNING", "READY"…), empty when the service has none. */
+  status: string;
+  /** true healthy, false failed, null stopped or unknown. */
+  ok: boolean | null;
+  detail: string;
+  /** Public address (Cloud Run, Functions, a VM's external IP). */
+  url?: string;
+  /** Page of the resource in the Google Cloud console. */
+  console: string;
+  /** Compute Engine zone (to start or stop the VM). */
+  zone?: string;
 }
 
 export interface VercelStatus {
@@ -1495,6 +1527,10 @@ export interface OmniApi {
     sqlInstances(project: string): Promise<GCloudSqlInstance[]>;
     sqlPower(project: string, instance: string, on: boolean): Promise<void>;
     logs(project: string, filter: string): Promise<GCloudLogEntry[]>;
+    /** Compute Engine, Cloud Run, Functions, GKE, Pub/Sub, Secret Manager, Firestore or IAM. */
+    resources(project: string, kind: GCloudResourceKind): Promise<GCloudResource[]>;
+    /** Starts or stops a Compute Engine VM. */
+    vmPower(project: string, zone: string, name: string, on: boolean): Promise<void>;
   };
   vercel: {
     status(): Promise<VercelStatus>;
@@ -1807,6 +1843,15 @@ export interface OmniApi {
     /** Absolute path of a File from a drag-and-drop event (Electron webUtils). */
     pathForFile(file: File): string;
     platform: string;
+    /**
+     * Fase 18: colors of the theme's bar for the system's − □ × buttons; main also sets
+     * Mica / vibrancy (or takes it off: setting, high contrast) and says what it applied.
+     */
+    chrome(colors: { bg: string; fg: string }): Promise<ChromeState>;
+    /** Labels of the app menu (Archivo, Editar…), drawn in our title bar. */
+    menuBar(): Promise<string[]>;
+    /** Opens one menu of the app menu below its label (x, y in CSS pixels of the page). */
+    popupMenu(index: number, x: number, y: number): Promise<void>;
   };
   phone: {
     status(): Promise<PhoneStatus>;
@@ -1862,6 +1907,10 @@ export interface OmniApi {
     /** File dialog for media to import (absolute paths). */
     pickMedia(): Promise<string[]>;
     probe(path: string): Promise<MediaItem & { url: string }>;
+    /** Fase 12: file dialog for a .cube LUT (absolute path, null when canceled). */
+    pickLut(): Promise<string | null>;
+    /** The text of a .cube LUT (refused when it is not a valid 3D LUT). */
+    readLut(path: string): Promise<string>;
     /** Absolute path of a file of the open folder (the explorer gives relative ones). */
     workspacePath(rel: string): Promise<string | null>;
     mediaUrl(path: string): Promise<string | null>;
@@ -2102,6 +2151,8 @@ export const CHANNELS = [
   'gcloud:sqlInstances',
   'gcloud:sqlPower',
   'gcloud:logs',
+  'gcloud:resources',
+  'gcloud:vmPower',
   'vercel:status',
   'vercel:setToken',
   'vercel:logout',
@@ -2208,6 +2259,9 @@ export const CHANNELS = [
   'app:openExternal',
   'app:openLink',
   'app:quit',
+  'app:chrome',
+  'app:menuBar',
+  'app:popupMenu',
   'app:resumeOnLogin',
   'app:interruptedRuns',
   'app:newWindow',
@@ -2302,6 +2356,8 @@ export const CHANNELS = [
   'video:tools',
   'video:pickMedia',
   'video:probe',
+  'video:pickLut',
+  'video:readLut',
   'video:workspacePath',
   'video:mediaUrl',
   'video:thumbnails',

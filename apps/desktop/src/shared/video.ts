@@ -5,6 +5,8 @@
  * Times are in seconds.
  */
 import type { ClipAnim, Effects, Look, TextSpec, Transition } from './videoFx.js';
+import type { ColorGrade } from './videoColor.js';
+import { cleanGrade, validGrade } from './videoColor.js';
 import {
   LOOK_NONE,
   TEXT_DEFAULT_DUR,
@@ -64,6 +66,8 @@ export interface Clip {
   keyframes?: Keyframes;
   /** Colour and blur effects (videoFx.ts). */
   effects?: Effects;
+  /** Fase 12: colour grade (wheels, temperature, LUT), applied before the effects. */
+  color?: ColorGrade;
   /** Entry / exit animation. */
   anim?: ClipAnim;
   /** Transition from the clip right before it on the track (or a reveal when there is none). */
@@ -864,7 +868,8 @@ export function validProject(x: unknown): x is VideoProject {
         validEffects(c.effects) &&
         validAnim(c.anim) &&
         validTransition(c.transition) &&
-        validText(c.text),
+        validText(c.text) &&
+        validGrade(c.color),
     ) &&
     p.tracks.every(
       (t) =>
@@ -895,6 +900,24 @@ export function setEffects(
     if (!ids.has(c.id) || !editable(p, c)) return c;
     hit = true;
     return { ...c, effects: clean };
+  });
+  return hit ? { ...p, clips } : p;
+}
+
+/** Sets (or clears, with undefined) the colour grade of some clips. */
+export function setGrade(
+  p: VideoProject,
+  ids: ReadonlySet<string>,
+  grade: ColorGrade | undefined,
+): VideoProject {
+  const clean = cleanGrade(grade);
+  let hit = false;
+  const clips = p.clips.map((c) => {
+    if (!ids.has(c.id) || !editable(p, c) || isText(c)) return c;
+    hit = true;
+    const next = { ...c, color: clean };
+    if (!clean) delete next.color;
+    return next;
   });
   return hit ? { ...p, clips } : p;
 }
@@ -1138,7 +1161,14 @@ export interface ExportOptions {
   /** Timeline range to render. */
   start: number;
   end: number;
+  /** Fase 12: normalise the mix to this integrated loudness (LUFS), measured in a first pass. */
+  loudness?: number | null;
 }
+
+/** Loudness targets offered at export (LUFS): streaming platforms, broadcast, podcasts. */
+export const LOUDNESS_TARGETS = [-14, -16, -23] as const;
+export const LOUDNESS_MIN = -40;
+export const LOUDNESS_MAX = -5;
 
 export function defaultExport(
   p: VideoProject,

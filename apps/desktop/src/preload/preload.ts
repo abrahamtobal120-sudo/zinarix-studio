@@ -134,6 +134,8 @@ const api: OmniApi = {
     sqlInstances: call('gcloud:sqlInstances') as OmniApi['gcloud']['sqlInstances'],
     sqlPower: call('gcloud:sqlPower') as OmniApi['gcloud']['sqlPower'],
     logs: call('gcloud:logs') as OmniApi['gcloud']['logs'],
+    resources: call('gcloud:resources') as OmniApi['gcloud']['resources'],
+    vmPower: call('gcloud:vmPower') as OmniApi['gcloud']['vmPower'],
   },
   vercel: {
     status: call('vercel:status') as OmniApi['vercel']['status'],
@@ -299,6 +301,9 @@ const api: OmniApi = {
     installUpdate: call('app:installUpdate') as OmniApi['app']['installUpdate'],
     pathForFile: (file: File) => webUtils.getPathForFile(file),
     platform: process.platform,
+    chrome: call('app:chrome') as OmniApi['app']['chrome'],
+    menuBar: call('app:menuBar') as OmniApi['app']['menuBar'],
+    popupMenu: call('app:popupMenu') as OmniApi['app']['popupMenu'],
   },
   phone: {
     status: call('phone:status') as OmniApi['phone']['status'],
@@ -356,6 +361,8 @@ const api: OmniApi = {
     tools: call('video:tools') as OmniApi['video']['tools'],
     pickMedia: call('video:pickMedia') as OmniApi['video']['pickMedia'],
     probe: call('video:probe') as OmniApi['video']['probe'],
+    pickLut: call('video:pickLut') as OmniApi['video']['pickLut'],
+    readLut: call('video:readLut') as OmniApi['video']['readLut'],
     workspacePath: call('video:workspacePath') as OmniApi['video']['workspacePath'],
     mediaUrl: call('video:mediaUrl') as OmniApi['video']['mediaUrl'],
     thumbnails: call('video:thumbnails') as OmniApi['video']['thumbnails'],

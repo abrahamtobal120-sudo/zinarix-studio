@@ -24,6 +24,7 @@ import { HelperSettings } from './helper/HelperSettings';
 import { CloudSection } from './CloudSettings';
 import { SuggestionSettings } from './SuggestionSettings';
 import { ModalShell } from './ModalShell';
+import { tl } from '../layout/i18nLayout';
 
 const close = () => setState({ modal: null });
 
@@ -469,6 +470,12 @@ export function SettingsPanel() {
                 <b>{prefs.uiZoom}%</b>
               </span>
             </label>
+            <Toggle
+              label={tl('lyWindowEffects')}
+              hint={tl('lyWindowEffectsHint')}
+              checked={prefs.windowEffects !== false}
+              onChange={(v) => void updatePrefs({ windowEffects: v })}
+            />
             <h3>{t('setFont')}</h3>
             <label className="settings-field">
               <span>{t('setFontSize')}</span>

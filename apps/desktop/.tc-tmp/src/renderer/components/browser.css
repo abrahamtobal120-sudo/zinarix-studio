@@ -1,0 +1,291 @@
+/* Built-in browser: toolbar, address bar suggestions, history and bookmarks.
+   (The base rules of the pane live in styles.css; these refine and extend them.) */
+
+.browser-bar {
+  gap: 6px;
+  padding: 6px 10px;
+  min-width: 0;
+  background: var(--bg-3);
+  border-bottom: 1px solid var(--border);
+}
+.browser-tabs {
+  padding-bottom: 0;
+}
+.browser-nav,
+.browser-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.browser-bar .bicon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.browser-bar .bicon.on {
+  background: var(--sel-soft);
+  color: var(--fg-strong);
+}
+
+.browser-omni-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+}
+.browser-omni {
+  width: 100%;
+  height: 32px;
+  padding: 0 4px 0 12px;
+  border-radius: 16px;
+  background: var(--bg);
+}
+.browser-omni.open {
+  border-radius: 16px 16px 0 0;
+  border-bottom-color: transparent;
+}
+.browser-omni .browser-ai-pill {
+  max-width: 40%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.browser-star {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-dim);
+}
+.browser-star:hover {
+  background: var(--hover);
+  color: var(--fg-strong);
+}
+.browser-star.on {
+  color: var(--star);
+}
+
+.browser-favicon {
+  display: block;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+/* ---- suggestions under the address bar */
+.browser-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: var(--z-popover);
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--brand);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.28);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.browser-suggest li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 14px;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+.browser-suggest li.on {
+  background: var(--hover);
+}
+.browser-suggest-star {
+  color: var(--star);
+  flex-shrink: 0;
+  display: grid;
+}
+
+/* ---- rows shared by the suggestions, the history and the bookmarks */
+.browser-row-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--fg-dim);
+}
+.browser-row-title {
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: 55%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-strong);
+}
+.browser-row-url {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-dim);
+  font-size: var(--text-sm);
+}
+
+/* The page is hidden while the suggestions are open (a native view covers the DOM). */
+.browser-paused {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--fg-dim);
+  font-size: var(--text-base);
+}
+
+/* ---- history / bookmarks panel (drawn where the page goes) */
+.browser-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.browser-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.browser-panel-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--fg-strong);
+  flex-shrink: 0;
+}
+.browser-panel-search {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--fg-dim);
+}
+.browser-panel-search:focus-within {
+  border-color: var(--brand);
+}
+.browser-panel-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--fg-strong);
+  font-size: var(--text-base);
+}
+.browser-panel-search input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.browser-panel-clear {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: var(--text-base);
+  color: var(--danger);
+}
+.browser-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px 14px;
+}
+.browser-panel-body h4 {
+  margin: 14px 8px 4px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--fg-dim);
+}
+.browser-panel-empty {
+  margin: 40px auto;
+  max-width: 360px;
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: var(--text-base);
+}
+.browser-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+}
+.browser-row:hover {
+  background: var(--hover);
+}
+.browser-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  background: transparent;
+  text-align: left;
+  font-size: var(--text-base);
+  border-radius: 8px;
+}
+.browser-row-time {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.browser-row .browser-row-x {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  opacity: 0;
+}
+.browser-row:hover .browser-row-x,
+.browser-row-x:focus-visible {
+  opacity: 1;
+}
+
+.browser-marks {
+  margin-bottom: 4px;
+}
+
+/* A narrow pane: the less important buttons go first, nothing overlaps. */
+@media (max-width: 900px) {
+  .browser-row-url {
+    display: none;
+  }
+  .browser-row-title {
+    max-width: none;
+    flex: 1;
+  }
+}

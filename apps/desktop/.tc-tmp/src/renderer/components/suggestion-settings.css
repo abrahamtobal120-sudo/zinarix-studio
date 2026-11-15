@@ -1,0 +1,46 @@
+/* Fase 8 — Settings › AI: suggestion metric (theme variables only). */
+.settings-toggle.sx-disabled {
+  opacity: 0.55;
+}
+.zx-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+.zx-stats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.zx-stats-actions {
+  display: flex;
+  gap: 6px;
+}
+.zx-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.zx-stats-table th,
+.zx-stats-table td {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.zx-stats-table th {
+  color: var(--fg-dim);
+  font-weight: 500;
+}
+.zx-stats-kind {
+  color: var(--fg-dim);
+}
+.zx-stats-warn {
+  color: var(--warn);
+  margin-top: 2px;
+}
+.zx-stats-slow {
+  color: var(--warn);
+}

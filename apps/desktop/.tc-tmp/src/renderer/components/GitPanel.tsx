@@ -1,0 +1,904 @@
+import { Icon } from './Icon';
+import { useCallback, useEffect, useState } from 'react';
+import type {
+  GitBranchView,
+  GitCommitView,
+  GitFileView,
+  GitHubPrView,
+  GitHubStatus,
+  GitStashView,
+  GitStatusView,
+} from '../../shared/api';
+import { confirmDialog } from '../confirm';
+import { pressable } from '../a11y';
+import { t, type Key } from '../i18n';
+import { errText } from '../errText';
+import { api, askText, openFile, setState, toast, useStore } from '../store';
+import { openLink } from '../links';
+import { runInTerminal } from './Terminal';
+import { fileIcon } from './icons';
+import { CodeReview } from './CodeReview';
+
+/** Letter and color class for a porcelain status. */
+function badge(f: GitFileView, staged: boolean): { letter: string; cls: string } {
+  if (f.conflict) return { letter: '!', cls: 'conflict' };
+  if (f.untracked) return { letter: 'U', cls: 'added' };
+  const c = staged ? f.index : f.work;
+  const map: Record<string, [string, string]> = {
+    M: ['M', 'modified'],
+    A: ['A', 'added'],
+    D: ['D', 'deleted'],
+    R: ['R', 'renamed'],
+    C: ['C', 'renamed'],
+    T: ['T', 'modified'],
+  };
+  const [letter, cls] = map[c] ?? [c, 'modified'];
+  return { letter, cls };
+}
+
+/** Translated text for the operation in progress (busy ids are internal). */
+const BUSY_KEYS = {
+  init: 'gitBusyInit',
+  commit: 'gitBusyCommit',
+  ai: 'gitBusyAi',
+  stage: 'gitBusyStage',
+  discard: 'gitBusyDiscard',
+  sync: 'gitBusySync',
+  pull: 'gitBusyPull',
+  push: 'gitBusyPush',
+  fetch: 'gitBusyFetch',
+  stash: 'gitBusyStash',
+  remote: 'gitBusyRemote',
+  undo: 'gitBusyUndo',
+  revert: 'gitBusyRevert',
+  branch: 'gitBusyBranch',
+  checkout: 'gitBusyCheckout',
+  merge: 'gitBusyMerge',
+} as const satisfies Record<string, Key>;
+const busyText = (id: string): string =>
+  id in BUSY_KEYS ? t(BUSY_KEYS[id as keyof typeof BUSY_KEYS]) : id;
+
+export function GitPanel() {
+  const workspace = useStore((s) => s.workspace);
+  const fsVersion = useStore((s) => s.fsVersion);
+  const [st, setSt] = useState<GitStatusView | null>(null);
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [view, setView] = useState<'changes' | 'history' | 'branches' | 'stash'>('changes');
+  const [log, setLog] = useState<GitCommitView[]>([]);
+  const [branches, setBranches] = useState<GitBranchView[]>([]);
+  const [gh, setGh] = useState<GitHubStatus | null>(null);
+  const [amend, setAmend] = useState(false);
+  const [stashes, setStashes] = useState<GitStashView[]>([]);
+  const [pr, setPr] = useState<GitHubPrView | null>(null);
+  const [filter, setFilter] = useState('');
+  // A list (history, branches, stash) that failed to load: shown with a retry, not as empty.
+  const [listErr, setListErr] = useState<string | null>(null);
+  const [listTry, setListTry] = useState(0);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!workspace) return;
+    try {
+      const s = await api().git.status();
+      setSt(s);
+      setState({ gitChanges: s.files.length });
+    } catch (e) {
+      toast(errText(e));
+    }
+  }, [workspace]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, fsVersion]);
+  useEffect(() => {
+    void api()
+      .github.status()
+      .then(setGh)
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!st?.isRepo) return;
+    setListErr(null);
+    const fail = (e: unknown) => setListErr(errText(e));
+    if (view === 'history') void api().git.log().then(setLog).catch(fail);
+    if (view === 'branches') void api().git.branches().then(setBranches).catch(fail);
+    if (view === 'stash') void api().git.stashList().then(setStashes).catch(fail);
+  }, [view, st?.isRepo, st?.branch, fsVersion, listTry]);
+  useEffect(() => setFilter(''), [view]);
+
+  // Quiet fetch when the panel opens, so "↓ behind" is real without pressing anything.
+  const hasRemoteNow = (st?.remotes.length ?? 0) > 0;
+  useEffect(() => {
+    if (!hasRemoteNow) return;
+    void api()
+      .git.sync('fetch')
+      .then(() => refresh())
+      .catch(() => {});
+  }, [hasRemoteNow, refresh]);
+
+  // Pull request of the current branch (needs gh signed in).
+  useEffect(() => {
+    setPr(null);
+    if (!gh?.loggedIn || !st?.upstream) return;
+    // Switching branches quickly: an older answer must not show the previous branch's PR.
+    let cancelled = false;
+    void api()
+      .github.pr()
+      .then((r) => {
+        if (!cancelled) setPr(r);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [gh?.loggedIn, st?.branch, st?.upstream, st?.ahead]);
+
+  const act = async (label: string, fn: () => Promise<unknown>, done?: string) => {
+    setBusy(label);
+    try {
+      await fn();
+      if (done) toast(done);
+    } catch (e) {
+      toast(errText(e));
+    } finally {
+      setBusy(null);
+      await refresh();
+    }
+  };
+
+  if (!workspace) {
+    return (
+      <div className="explorer">
+        <div className="sidebar-title">
+          <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
+        </div>
+        <div className="sidebar-empty">
+          <p>{t('noFolder')}</p>
+          <button className="primary" onClick={() => setState({ modal: { kind: 'clone' } })}>
+            <Icon name="download" size={14} /> {t('gitClone')}
+          </button>
+          <p />
+          <button onClick={() => void api().workspace.openDialog()}>{t('openFolder')}</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (st && !st.isRepo) {
+    return (
+      <div className="explorer">
+        <div className="sidebar-title">
+          <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
+        </div>
+        <div className="sidebar-empty">
+          <p>{t('gitNoRepo')}</p>
+          <button
+            className="primary"
+            disabled={busy !== null}
+            onClick={() => void act('init', () => api().git.init(), t('gitInitDone'))}
+          >
+            {t('gitInit')}
+          </button>
+          <p />
+          <button onClick={() => setState({ modal: { kind: 'clone' } })}>
+            <Icon name="download" size={14} /> {t('gitClone')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const staged = st?.files.filter((f) => !f.untracked && f.index !== ' ' && f.index !== '?') ?? [];
+  const unstaged =
+    st?.files.filter((f) => f.untracked || (f.work !== ' ' && f.work !== '?') || f.conflict) ?? [];
+
+  const commit = (push = false) =>
+    act(
+      'commit',
+      async () => {
+        if (!staged.length && !amend) await api().git.stage([]);
+        await api().git.commit(message, amend);
+        setMessage('');
+        setAmend(false);
+        if (push) await api().git.sync('push');
+      },
+      push ? t('gitCommittedPushed') : t('gitCommitted'),
+    );
+
+  const generate = () =>
+    act('ai', async () => {
+      setMessage(await api().ai.commitMessage());
+    });
+
+  const row = (f: GitFileView, isStaged: boolean) => {
+    const b = badge(f, isStaged);
+    const name = f.path.split('/').pop()!;
+    const dir = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : '';
+    return (
+      <div
+        key={`${isStaged ? 's' : 'u'}:${f.path}`}
+        className="git-row"
+        title={f.from ? `${f.from} → ${f.path}` : f.path}
+        {...pressable(() => setState({ modal: { kind: 'diff', path: f.path, staged: isStaged } }))}
+      >
+        <span className="git-icon">{fileIcon(f.path)}</span>
+        <span className={`git-name ${b.cls}`}>{name}</span>
+        <span className="git-dir">{dir}</span>
+        <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
+          {(isStaged ? f.index : f.work) !== 'D' && (
+            <button title={t('gitOpenFile')} onClick={() => void openFile(f.path)}>
+              <Icon name="file" size={15} />
+            </button>
+          )}
+          {!isStaged && (
+            <button
+              title={t('gitDiscard')}
+              onClick={async () => {
+                if (!(await confirmDialog(t('gitDiscardConfirm', { name }), { danger: true })))
+                  return;
+                void act('discard', () => api().git.discard([f.path]));
+              }}
+            >
+              <Icon name="undo" size={15} />
+            </button>
+          )}
+          <button
+            title={isStaged ? t('gitUnstage') : t('gitStage')}
+            aria-label={isStaged ? t('gitUnstage') : t('gitStage')}
+            onClick={() =>
+              void act('stage', () =>
+                isStaged ? api().git.unstage([f.path]) : api().git.stage([f.path]),
+              )
+            }
+          >
+            <span aria-hidden="true">{isStaged ? '−' : '+'}</span>
+          </button>
+        </span>
+        <span className={`git-badge ${b.cls}`}>{b.letter}</span>
+      </div>
+    );
+  };
+
+  const sync = (op: 'pull' | 'push' | 'fetch') =>
+    act(
+      op,
+      () => api().git.sync(op),
+      t(op === 'pull' ? 'gitPulled' : op === 'push' ? 'gitPushed' : 'gitFetched'),
+    );
+
+  const hasRemote = (st?.remotes.length ?? 0) > 0;
+
+  const listError = (
+    <div className="git-clean" role="alert">
+      <Icon name="warning" size={14} /> {t('uxLoadFailed', { err: listErr ?? '' })}{' '}
+      <button className="link" onClick={() => setListTry((n) => n + 1)}>
+        {t('uxRetry')}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="explorer git-panel">
+      {reviewOpen && (
+        <CodeReview onClose={() => setReviewOpen(false)} branch={st?.branch ?? undefined} />
+      )}
+      <div className="sidebar-title">
+        <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
+        <span className="sidebar-actions">
+          <button title={t('gitRefresh')} onClick={() => void refresh()}>
+            <Icon name="refresh" size={15} />
+          </button>
+          {st?.isRepo && (
+            <button title={t('gitReviewAi')} onClick={() => setReviewOpen(true)}>
+              <Icon name="shield" size={15} />
+            </button>
+          )}
+          {hasRemote && (
+            <>
+              <button
+                title={t('gitSyncTitle')}
+                disabled={busy !== null}
+                onClick={() =>
+                  void act(
+                    'sync',
+                    async () => {
+                      if (st?.behind) await api().git.sync('pull');
+                      if (st?.ahead || !st?.upstream) await api().git.sync('push');
+                    },
+                    t('gitSynced'),
+                  )
+                }
+              >
+                <Icon name="sync" size={15} />
+              </button>
+              <button
+                title={t('gitPull')}
+                disabled={busy !== null}
+                onClick={() => void sync('pull')}
+              >
+                <Icon name="pull" size={15} />
+              </button>
+              <button
+                title={t('gitPush')}
+                disabled={busy !== null}
+                onClick={() => void sync('push')}
+              >
+                <Icon name="push" size={15} />
+              </button>
+            </>
+          )}
+          <button
+            title={t('gitStash')}
+            disabled={!st?.files.length}
+            onClick={async () => {
+              const msg = await askText(t('gitStashMessage'));
+              if (msg === null || msg === undefined) return;
+              void act('stash', () => api().git.stash('push', msg), t('gitStashed'));
+            }}
+          >
+            <Icon name="stash" size={15} />
+          </button>
+          {st?.webUrl && (
+            <button title={t('gitOpenWeb')} onClick={() => openLink(st.webUrl!)}>
+              <Icon name="external" size={15} />
+            </button>
+          )}
+        </span>
+      </div>
+
+      <div className="git-branchbar">
+        <button
+          className="git-branch"
+          title={t('gitBranches')}
+          onClick={() => setView(view === 'branches' ? 'changes' : 'branches')}
+        >
+          <Icon name="branch" size={13} /> {st?.branch ?? '—'}
+        </button>
+        {st?.ahead || st?.behind ? (
+          <span className="git-track" title={st?.upstream ?? ''}>
+            {st.behind ? `↓${st.behind} ` : ''}
+            {st.ahead ? `↑${st.ahead}` : ''}
+          </span>
+        ) : null}
+        {pr ? (
+          <button
+            className={`git-pr ${pr.checks}`}
+            title={`#${pr.number} ${pr.title}\n${prState(pr)}`}
+            onClick={() => openLink(pr.url)}
+          >
+            <Icon name="github" size={12} /> #{pr.number}{' '}
+            {pr.checks === 'pass'
+              ? '✓'
+              : pr.checks === 'fail'
+                ? '✗'
+                : pr.checks === 'pending'
+                  ? '…'
+                  : ''}
+          </button>
+        ) : (
+          gh?.loggedIn &&
+          st?.upstream &&
+          st.webUrl?.startsWith('https://github.com/') && (
+            <button
+              className="link git-pr-new"
+              title={t('gitPrCreateTitle')}
+              onClick={() => {
+                setState({ panelOpen: true });
+                setTimeout(() => void runInTerminal('gh pr create --web'), 300);
+              }}
+            >
+              {t('gitPrCreate')}
+            </button>
+          )
+        )}
+        <span className="spacer" />
+        <div className="git-tabs">
+          {(['changes', 'history', 'branches', 'stash'] as const).map((v) => (
+            <button key={v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>
+              {t(
+                v === 'changes'
+                  ? 'gitChanges'
+                  : v === 'history'
+                    ? 'gitHistory'
+                    : v === 'branches'
+                      ? 'gitBranches'
+                      : 'gitStashTab',
+              )}
+              {v === 'changes' && st?.files.length ? ` ${st.files.length}` : ''}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Remote / GitHub connector */}
+      {!hasRemote && st?.isRepo && (
+        <div className="git-connect">
+          <div className="git-connect-title">
+            <Icon name="cloud" size={15} /> {t('gitNoRemote')}
+          </div>
+          <div className="git-connect-actions">
+            <button className="primary" onClick={() => setState({ modal: { kind: 'publish' } })}>
+              {t('ghPublish')}
+            </button>
+            <button
+              onClick={async () => {
+                const url = (await askText(t('gitRemoteUrl')))?.trim();
+                if (url) void act('remote', () => api().git.addRemote(url), t('gitRemoteAdded'));
+              }}
+            >
+              {t('gitAddRemote')}
+            </button>
+          </div>
+        </div>
+      )}
+      {gh && !gh.loggedIn && (
+        <div className="git-gh-hint">
+          {gh.installed ? t('ghNotLogged') : t('ghNotInstalled')}{' '}
+          {gh.installed ? (
+            <button
+              className="link"
+              onClick={() => {
+                setState({ panelOpen: true });
+                setTimeout(() => void runInTerminal('gh auth login --web'), 300);
+              }}
+            >
+              {t('ghLogin')}
+            </button>
+          ) : (
+            <button
+              className="link"
+              onClick={() => void api().app.openExternal('https://cli.github.com/')}
+            >
+              cli.github.com
+            </button>
+          )}
+        </div>
+      )}
+
+      {view === 'changes' && (
+        <>
+          <div className="git-commit">
+            <textarea
+              value={message}
+              rows={3}
+              placeholder={t('gitMessage', { branch: st?.branch ?? '' })}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  void commit();
+                }
+              }}
+            />
+            <div className="git-commit-bar">
+              <button
+                className="primary"
+                disabled={
+                  busy !== null || (!message.trim() && !amend) || (!st?.files.length && !amend)
+                }
+                onClick={() => void commit()}
+                title="Ctrl+Enter"
+              >
+                <Icon name="check" size={14} />{' '}
+                {staged.length || amend ? t('gitCommit') : t('gitCommitAll')}
+              </button>
+              {hasRemote && !amend && (
+                <button
+                  disabled={busy !== null || !message.trim() || !st?.files.length}
+                  onClick={() => void commit(true)}
+                  title={t('gitCommitPushTitle')}
+                >
+                  <Icon name="push" size={14} /> {t('gitCommitPush')}
+                </button>
+              )}
+              <button
+                disabled={busy !== null || !st?.files.length}
+                onClick={() => void generate()}
+                title={t('gitAiMessageTitle')}
+              >
+                {busy === 'ai' ? '…' : <Icon name="agent" size={14} />} {t('gitAiMessage')}
+              </button>
+              <label className="check" title={t('gitAmendTitle')}>
+                <input
+                  type="checkbox"
+                  checked={amend}
+                  disabled={!st?.hasCommits}
+                  onChange={(e) => setAmend(e.target.checked)}
+                />
+                {t('gitAmend')}
+              </label>
+            </div>
+          </div>
+          <div className="tree git-list">
+            {busy && (
+              <div className="git-busy">
+                <Icon name="clock" size={13} className="spin-slow" /> {busyText(busy)}…
+              </div>
+            )}
+            {staged.length > 0 && (
+              <>
+                <div className="git-group">
+                  <span>
+                    {t('gitStaged')} <span className="git-count">{staged.length}</span>
+                  </span>
+                  <button
+                    title={t('gitUnstageAll')}
+                    aria-label={t('gitUnstageAll')}
+                    onClick={() => void act('stage', () => api().git.unstage([]))}
+                  >
+                    <span aria-hidden="true">−</span>
+                  </button>
+                </div>
+                {staged.map((f) => row(f, true))}
+              </>
+            )}
+            <div className="git-group">
+              <span>
+                {t('gitUnstaged')} <span className="git-count">{unstaged.length}</span>
+              </span>
+              {unstaged.length > 0 && (
+                <span>
+                  <button
+                    title={t('gitDiscardAll')}
+                    aria-label={t('gitDiscardAll')}
+                    onClick={async () => {
+                      if (
+                        !(await confirmDialog(t('gitDiscardAllConfirm', { n: unstaged.length }), {
+                          danger: true,
+                        }))
+                      )
+                        return;
+                      void act('discard', () => api().git.discard(unstaged.map((f) => f.path)));
+                    }}
+                  >
+                    <Icon name="undo" size={15} />
+                  </button>
+                  <button
+                    title={t('gitStageAll')}
+                    aria-label={t('gitStageAll')}
+                    onClick={() => void act('stage', () => api().git.stage([]))}
+                  >
+                    <span aria-hidden="true">+</span>
+                  </button>
+                </span>
+              )}
+            </div>
+            {unstaged.map((f) => row(f, false))}
+            {st && st.files.length === 0 && (
+              <div className="git-clean">
+                <Icon name="check" size={14} /> {t('gitClean')}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {view === 'history' && (
+        <div className="tree git-list">
+          {log.length > 0 && (
+            <div className="git-filter">
+              <input
+                value={filter}
+                placeholder={t('gitFilterCommits')}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+              <button
+                title={t('gitUndoCommitTitle')}
+                disabled={busy !== null || (st?.ahead === 0 && Boolean(st?.upstream))}
+                onClick={async () => {
+                  if (
+                    !(await confirmDialog(t('gitUndoCommitConfirm', { subject: log[0]!.subject }), {
+                      danger: true,
+                    }))
+                  )
+                    return;
+                  void act(
+                    'undo',
+                    async () => {
+                      await api().git.undoCommit();
+                      setLog(await api().git.log());
+                    },
+                    t('gitUndoneCommit'),
+                  );
+                }}
+              >
+                <Icon name="undo" size={14} /> {t('gitUndoCommit')}
+              </button>
+            </div>
+          )}
+          {listErr ? listError : log.length === 0 && <div className="git-clean">{t('gitNoCommits')}</div>}
+          {log
+            .filter((c) => matches(filter, c.subject, c.author, c.short, c.refs))
+            .map((c) => (
+              <div
+                key={c.hash}
+                className="git-commit-row"
+                title={`${c.hash}\n${c.author} · ${c.date}`}
+                {...pressable(() =>
+                  setState({ modal: { kind: 'commit', hash: c.hash, subject: c.subject } }),
+                )}
+              >
+                <div className="git-commit-subject">
+                  {c.subject}
+                  {c.refs && (
+                    <span className="git-refs">
+                      {c.refs
+                        .split(',')
+                        .map((r) => r.trim().replace(/^HEAD -> /, ''))
+                        .filter(Boolean)
+                        .slice(0, 3)
+                        .map((r) => (
+                          <span key={r} className="git-ref">
+                            {r}
+                          </span>
+                        ))}
+                    </span>
+                  )}
+                </div>
+                <div className="git-commit-meta">
+                  <code>{c.short}</code> · {c.author} · {c.date}
+                </div>
+                <span
+                  className="git-row-actions git-commit-actions"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    title={t('gitCopyHash')}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(c.hash);
+                      toast(t('gitCopiedHash', { hash: c.short }));
+                    }}
+                  >
+                    <Icon name="copy" size={14} />
+                  </button>
+                  {st?.webUrl && (
+                    <button
+                      title={t('gitOpenWeb')}
+                      onClick={() => openLink(`${st.webUrl}/commit/${c.hash}`)}
+                    >
+                      <Icon name="external" size={14} />
+                    </button>
+                  )}
+                  <button
+                    title={t('gitRevert')}
+                    onClick={async () => {
+                      if (
+                        !(await confirmDialog(t('gitRevertConfirm', { subject: c.subject }), {
+                          danger: true,
+                        }))
+                      )
+                        return;
+                      void act(
+                        'revert',
+                        async () => {
+                          await api().git.revert(c.hash);
+                          setLog(await api().git.log());
+                        },
+                        t('gitReverted'),
+                      );
+                    }}
+                  >
+                    <Icon name="undo" size={14} />
+                  </button>
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {view === 'branches' && (
+        <div className="tree git-list">
+          <div className="git-group">
+            <span>{t('gitBranches')}</span>
+            <button
+              title={t('gitNewBranch')}
+              onClick={async () => {
+                const name = (await askText(t('gitNewBranch')))?.trim();
+                if (name)
+                  void act('branch', async () => {
+                    await api().git.checkout(name, true);
+                    setBranches(await api().git.branches());
+                  });
+              }}
+            >
+              <Icon name="plus" size={15} />
+            </button>
+          </div>
+          {listErr && listError}
+          {branches.length > 6 && (
+            <div className="git-filter">
+              <input
+                value={filter}
+                placeholder={t('gitFilterBranches')}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+            </div>
+          )}
+          {branches
+            .filter((b) => matches(filter, b.name))
+            .map((b) => (
+              <div
+                key={(b.remote ? 'r:' : 'l:') + b.name}
+                className={`git-row ${b.current ? 'current' : ''}`}
+                {...pressable(() => {
+                  if (b.current) return;
+                  void act(
+                    'checkout',
+                    async () => {
+                      await api().git.checkout(b.name, false);
+                      setBranches(await api().git.branches());
+                    },
+                    t('gitSwitched', { name: b.name }),
+                  );
+                })}
+              >
+                <span className="git-icon">
+                  <Icon name={b.remote ? 'cloud' : 'branch'} size={14} />
+                </span>
+                <span className="git-name">{b.name}</span>
+                <span className="git-dir">{b.upstream ?? ''}</span>
+                {!b.current && (
+                  <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      title={t('gitMerge', { branch: st?.branch ?? '' })}
+                      onClick={async () => {
+                        if (
+                          !(await confirmDialog(
+                            t('gitMergeConfirm', { name: b.name, branch: st?.branch ?? '' }),
+                          ))
+                        )
+                          return;
+                        void act(
+                          'merge',
+                          () => api().git.merge(b.name),
+                          t('gitMerged', { name: b.name }),
+                        );
+                      }}
+                    >
+                      <Icon name="git" size={14} />
+                    </button>
+                    {!b.remote && (
+                      <button
+                        title={t('gitDeleteBranch')}
+                        onClick={async () => {
+                          if (
+                            !(await confirmDialog(t('gitDeleteBranchConfirm', { name: b.name }), {
+                              danger: true,
+                            }))
+                          )
+                            return;
+                          void act('branch', async () => {
+                            await api()
+                              .git.deleteBranch(b.name, false)
+                              .catch(async (e: unknown) => {
+                                // Only an unmerged branch can be forced (-D); any other
+                                // failure is shown as it is.
+                                if (!/not fully merged/i.test(errText(e))) throw e;
+                                if (!(await confirmDialog(t('gitForceDelete'), { danger: true })))
+                                  throw e;
+                                await api().git.deleteBranch(b.name, true);
+                              });
+                            setBranches(await api().git.branches());
+                          });
+                        }}
+                      >
+                        <Icon name="trash" size={14} />
+                      </button>
+                    )}
+                  </span>
+                )}
+                {b.current && <span className="git-badge added">●</span>}
+              </div>
+            ))}
+          {hasRemote && (
+            <button className="link git-fetch" onClick={() => void sync('fetch')}>
+              <Icon name="refresh" size={13} /> {t('gitFetch')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {view === 'stash' && (
+        <div className="tree git-list">
+          {listErr
+            ? listError
+            : stashes.length === 0 && <div className="git-clean">{t('gitNoStash')}</div>}
+          {stashes.map((x) => {
+            const reload = async () => setStashes(await api().git.stashList());
+            return (
+              <div key={x.ref} className="git-commit-row" title={x.ref}>
+                <div className="git-commit-subject">{x.message || x.ref}</div>
+                <div className="git-commit-meta">
+                  <code>{x.ref}</code> · {x.date}
+                </div>
+                <span className="git-row-actions git-commit-actions">
+                  <button
+                    title={t('gitStashPop')}
+                    onClick={() =>
+                      void act(
+                        'stash',
+                        async () => {
+                          await api().git.stash('pop', x.ref);
+                          await reload();
+                        },
+                        t('gitStashPopped'),
+                      )
+                    }
+                  >
+                    <Icon name="download" size={14} />
+                  </button>
+                  <button
+                    title={t('gitStashApply')}
+                    onClick={() =>
+                      void act(
+                        'stash',
+                        async () => {
+                          await api().git.stash('apply', x.ref);
+                          await reload();
+                        },
+                        t('gitStashApplied'),
+                      )
+                    }
+                  >
+                    <Icon name="copy" size={14} />
+                  </button>
+                  <button
+                    title={t('gitStashDrop')}
+                    onClick={async () => {
+                      if (
+                        !(await confirmDialog(
+                          t('gitStashDropConfirm', { name: x.message || x.ref }),
+                          { danger: true },
+                        ))
+                      )
+                        return;
+                      void act('stash', async () => {
+                        await api().git.stash('drop', x.ref);
+                        await reload();
+                      });
+                    }}
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Case-insensitive match of every word of `q` against any of the fields. */
+function matches(q: string, ...fields: string[]): boolean {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = fields.join(' ').toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+
+function prState(pr: GitHubPrView): string {
+  const state = pr.isDraft
+    ? t('gitPrDraft')
+    : pr.state === 'OPEN'
+      ? t('gitPrOpen')
+      : pr.state === 'MERGED'
+        ? t('gitPrMerged')
+        : t('gitPrClosed');
+  const review =
+    pr.review === 'APPROVED'
+      ? t('gitPrApproved')
+      : pr.review === 'CHANGES_REQUESTED'
+        ? t('gitPrChanges')
+        : '';
+  const checks =
+    pr.checks === 'pass'
+      ? t('gitPrChecksPass')
+      : pr.checks === 'fail'
+        ? t('gitPrChecksFail')
+        : pr.checks === 'pending'
+          ? t('gitPrChecksPending')
+          : '';
+  return [state, review, checks].filter(Boolean).join(' · ');
+}
