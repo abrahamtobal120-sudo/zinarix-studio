@@ -25,6 +25,7 @@ import {
   SPEED_MIN,
   clipEnd,
   compositeOrder,
+  hasKeyframes,
   leadOf,
   mediaOf,
   sourceAt,
@@ -55,6 +56,8 @@ export interface RenderPlan {
   duration: number;
   /** How many clips made it in (0 = only black + silence). */
   clips: number;
+  /** Fase 13: small text files the runner writes into FFmpeg's working folder first. */
+  files?: Record<string, string>;
 }
 
 /** Numbers only ever reach the graph through here (a bad project file cannot inject filters). */
@@ -490,12 +493,41 @@ export function buildRender(
     audio.push(label);
   };
 
+  const files: Record<string, string> = {};
   // Video tracks, bottom (V1) to top; their clips bring their own sound unless muted.
   for (const track of compositeOrder(p)) {
     const heard = trackAudible(p, track) && trackVolume(track) > 0;
-    for (const c of p.clips
-      .filter((x) => x.trackId === track.id)
-      .sort((a, b) => a.start - b.start)) {
+    const sorted = p.clips.filter((x) => x.trackId === track.id).sort((a, b) => a.start - b.start);
+    // Fase 13: runs of plain titles (captions) are one input (a concat list of their pictures)
+    // and one overlay, instead of one of each per title.
+    const inRun = new Set<string>();
+    if (!measure && !track.hidden)
+      for (const run of titleRuns(p, sorted, textImages)) {
+        const cues = run
+          .map((c) => ({
+            path: textImages[c.id]!,
+            s: Math.max(c.start, o.start) - o.start,
+            e: Math.min(clipEnd(c), o.end) - o.start,
+          }))
+          .filter((q) => q.e - q.s >= 1 / fps);
+        for (const c of run) inRun.add(c.id);
+        if (!cues.length) continue;
+        const name = `titles${Object.keys(files).length}.ffconcat`;
+        files[name] = concatList(cues);
+        inputs.push('-f', 'concat', '-safe', '0', '-i', name);
+        const i = n++;
+        clips++;
+        const tr = transformOf(run[0]!);
+        const next = `base${++layer}`;
+        const on = cues.map((q) => `between(t,${num(q.s)},${num(q.e)})`).join('+');
+        graph.push(`[${i}:v]format=rgba,setpts=PTS-STARTPTS+${num(cues[0]!.s)}/TB[v${i}]`);
+        graph.push(
+          `[${base}][v${i}]overlay=x=(W-w)/2+${num(clamp(tr.x, ...RANGE.x))}*W:y=(H-h)/2+${num(clamp(tr.y, ...RANGE.y))}*H:eof_action=pass:enable='${on}'[${next}]`,
+        );
+        base = next;
+      }
+    for (const c of sorted) {
+      if (inRun.has(c.id)) continue;
       const textPath = c.text ? textImages[c.id] : undefined;
       const media = c.text
         ? textPath
@@ -594,7 +626,69 @@ export function buildRender(
     num(D),
     outPath,
   ];
-  return { inputs, filter: graph.join(';\n'), output, duration: D, clips };
+  return {
+    inputs,
+    filter: graph.join(';\n'),
+    output,
+    duration: D,
+    clips,
+    ...(Object.keys(files).length ? { files } : {}),
+  };
+}
+
+/** Fewest titles in a row worth a concat input (fewer keep the usual per-title path). */
+const RUN_MIN = 4;
+
+/** A title nothing animates: its picture can be shown as is, for its time. */
+function plainTitle(p: VideoProject, c: Clip, textImages: Record<string, string>): boolean {
+  if (!c.text || !textImages[c.id]) return false;
+  if (c.anim || hasKeyframes(c) || c.effects || c.color || c.transition) return false;
+  if (c.fadeIn || c.fadeOut || speedOf(c) !== 1) return false;
+  if (leadOf(p, c) > 0 || tailOf(p, c) > 0) return false;
+  const tr = transformOf(c);
+  return tr.scale === 1 && tr.rotation === 0 && tr.opacity === 1 && !tr.flipH && !tr.flipV;
+}
+
+/** Runs of plain titles in a row on one track, at the same place on screen. */
+function titleRuns(
+  p: VideoProject,
+  sorted: readonly Clip[],
+  textImages: Record<string, string>,
+): Clip[][] {
+  const runs: Clip[][] = [];
+  let cur: Clip[] = [];
+  const close = () => {
+    if (cur.length >= RUN_MIN) runs.push(cur);
+    cur = [];
+  };
+  for (const c of sorted) {
+    if (!plainTitle(p, c, textImages)) {
+      close();
+      continue;
+    }
+    const prev = cur[cur.length - 1];
+    if (prev) {
+      const a = transformOf(prev);
+      const b = transformOf(c);
+      if (a.x !== b.x || a.y !== b.y || c.start < clipEnd(prev) - 1e-6) close();
+    }
+    cur.push(c);
+  }
+  close();
+  return runs;
+}
+
+/** An ffconcat list: each picture until the next one starts (the gaps are hidden by enable). */
+function concatList(cues: { path: string; s: number; e: number }[]): string {
+  const quote = (path: string) => `'${path.split('\\').join('/').replace(/'/g, "'\\''")}'`;
+  const lines = ['ffconcat version 1.0'];
+  cues.forEach((c, i) => {
+    const until = cues[i + 1]?.s ?? c.e;
+    lines.push(`file ${quote(c.path)}`, `duration ${num(Math.max(0.001, until - c.s))}`);
+  });
+  // The last entry is listed twice, or its duration is ignored.
+  lines.push(`file ${quote(cues[cues.length - 1]!.path)}`);
+  return `${lines.join('\n')}\n`;
 }
 
 /** Software H.264 (the hardware encoders come with the render queue). */

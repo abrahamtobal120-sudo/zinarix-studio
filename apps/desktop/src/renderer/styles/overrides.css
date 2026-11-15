@@ -1,0 +1,130 @@
+/* The only renderer CSS outside every cascade layer (checked by test/uiTokens.test.ts).
+ *
+ * Monaco and xterm inject their CSS without a layer, and unlayered CSS wins over any layer
+ * whatever the specificity. Our rules on elements they draw (editor decorations, breakpoints,
+ * test marks, next-edit hints) would stop applying inside a layer, so they live here.
+ * Only selectors that start with .monaco-editor or .xterm (or ::-webkit-scrollbar) belong here.
+ */
+
+/* from components/debug.css */
+.monaco-editor .dbg-bp,
+.monaco-editor .dbg-bp-hint {
+  display: grid !important;
+  place-items: center;
+  cursor: pointer;
+}
+.monaco-editor .dbg-bp::before,
+.monaco-editor .dbg-bp-hint::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dbg-breakpoint);
+}
+.monaco-editor .dbg-bp-hint::before {
+  background: color-mix(in srgb, var(--dbg-breakpoint) 45%, transparent);
+}
+.monaco-editor .dbg-bp.cond::before {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(0.85);
+}
+.monaco-editor .dbg-bp.unbound::before {
+  background: transparent;
+  border: 1.5px solid var(--dbg-unbound);
+}
+.monaco-editor .dbg-arrow {
+  display: grid !important;
+  place-items: center;
+}
+.monaco-editor .dbg-arrow::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid var(--dbg-current);
+  margin-left: 2px;
+}
+.monaco-editor .dbg-arrow.frame::after {
+  border-left-color: var(--dbg-frame);
+}
+.monaco-editor .dbg-line {
+  background: color-mix(in srgb, var(--dbg-current) 22%, transparent);
+}
+.monaco-editor .dbg-line-frame {
+  background: color-mix(in srgb, var(--dbg-frame) 18%, transparent);
+}
+
+/* from components/test-explorer.css */
+.monaco-editor .te-mark {
+  display: grid;
+  place-items: center;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.monaco-editor .te-mark.te-idle::before {
+  content: '▶';
+  font-size: var(--text-2xs);
+  color: var(--ok);
+  opacity: 0.55;
+}
+.monaco-editor .te-mark.te-idle:hover::before {
+  opacity: 1;
+}
+.monaco-editor .te-fail-range {
+  text-decoration: underline wavy var(--danger);
+  text-decoration-skip-ink: none;
+}
+.monaco-editor .te-fail-inline {
+  color: var(--danger);
+  font-style: italic;
+  opacity: 0.85;
+}
+.monaco-editor .te-mark.te-passed::before {
+  content: '✓';
+  color: var(--ok);
+}
+.monaco-editor .te-mark.te-failed::before {
+  content: '✗';
+  color: var(--danger);
+}
+.monaco-editor .te-mark.te-skipped::before {
+  content: '○';
+  color: var(--fg-dim);
+}
+.monaco-editor .te-mark.te-running::before {
+  content: '…';
+  color: var(--accent);
+}
+
+/* from next-edit.css */
+.monaco-editor .zx-ne-old {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.monaco-editor .zx-ne-old-text {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  opacity: 0.75;
+}
+.monaco-editor .zx-ne-del-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+  opacity: 0.6;
+}
+.monaco-editor .zx-ne-hint {
+  color: var(--accent);
+  font-style: italic;
+  opacity: 0.9;
+}
+.monaco-editor .zx-ne-zone {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border-left: 2px solid var(--ok);
+  color: var(--fg);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+.monaco-editor .zx-ne-new {
+  padding-left: 2px;
+}

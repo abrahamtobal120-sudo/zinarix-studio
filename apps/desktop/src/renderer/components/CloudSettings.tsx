@@ -27,8 +27,10 @@ export function CloudSection() {
     });
   }, []);
 
+  // null while the status loads; the Supabase list is only needed when the cloud is not connected.
+  const connected = status ? status.connected : null;
   useEffect(() => {
-    if (!status || status.connected) return;
+    if (connected !== false) return;
     void api()
       .supabase.status()
       .then(async (s) => {
@@ -39,7 +41,7 @@ export function CloudSection() {
         setRef((r) => r || list[0]?.ref || '');
       })
       .catch((e) => toast(errText(e)));
-  }, [status?.connected]);
+  }, [connected]);
 
   const run = async (fn: () => Promise<CloudSyncStatus>) => {
     setBusy(true);

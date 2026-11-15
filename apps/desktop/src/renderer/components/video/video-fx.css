@@ -1,3 +1,4 @@
+@layer features {
 /* Video Studio, phase 2: text, effects, transitions and mixer panels (theme variables only). */
 
 .vs-fx-panel {
@@ -167,4 +168,5 @@
   width: 10px;
   background: linear-gradient(90deg, rgb(255 255 255 / 0.55), transparent);
   pointer-events: none;
+}
 }

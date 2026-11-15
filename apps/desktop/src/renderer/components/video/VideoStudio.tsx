@@ -12,6 +12,9 @@ import { Icon, type IconName } from '../Icon';
 import { ExportDialog, RenderQueue } from './ExportDialog';
 import { Inspector } from './Inspector';
 import { EasyPanel } from './EasyPanel';
+import { ColorPanel } from './ColorPanel';
+import { rippleToPlayhead, rollToPlayhead, slideSelected, slipSelected } from './proEdit';
+import { tp } from './proStrings';
 import { EffectsPanel, MixerPanel, TextPanel, TransitionsPanel } from './FxPanels';
 import { MediaLibrary, pickAndImport } from './MediaLibrary';
 import { tv, type VideoKey } from './strings';
@@ -61,7 +64,7 @@ const TABS: { id: StudioTab; key: VideoKey; icon: IconName; phase?: number; soon
   { id: 'stickers', key: 'tabStickers', icon: 'smile', phase: 3, soon: 'soonStickers' },
   { id: 'effects', key: 'tabEffects', icon: 'sparkle' },
   { id: 'transitions', key: 'tabTransitions', icon: 'layers' },
-  { id: 'filters', key: 'tabFilters', icon: 'palette', phase: 3, soon: 'soonFilters' },
+  { id: 'color', key: 'tabColor', icon: 'palette' },
   { id: 'ai', key: 'tabAi', icon: 'cpu', phase: 4, soon: 'soonAi' },
 ];
 
@@ -273,6 +276,8 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
                 <TransitionsPanel />
               ) : tab === 'audio' ? (
                 <MixerPanel />
+              ) : tab === 'color' ? (
+                <ColorPanel />
               ) : (
                 <div className="vs-soon">
                   <span className="vs-soon-icon">
@@ -662,6 +667,13 @@ const SHORTCUTS: [VideoKey, string][] = [
   ['kSave', 'Ctrl+S'],
   ['kExport', 'Ctrl+E'],
 ];
+/** Fase 12 trim tools (their labels live in proStrings.ts). */
+const PRO_SHORTCUTS: [() => string, string][] = [
+  [() => tp('kSlip'), 'Alt+← / Alt+→'],
+  [() => tp('kSlide'), ', / .'],
+  [() => tp('kRippleTrim'), 'Q / W'],
+  [() => tp('kRoll'), 'R'],
+];
 
 function ShortcutsDialog() {
   return (
@@ -688,6 +700,14 @@ function ShortcutsDialog() {
             {SHORTCUTS.map(([k, combo]) => (
               <tr key={k}>
                 <td>{tv(k)}</td>
+                <td>
+                  <kbd>{combo}</kbd>
+                </td>
+              </tr>
+            ))}
+            {PRO_SHORTCUTS.map(([label, combo]) => (
+              <tr key={combo}>
+                <td>{label()}</td>
                 <td>
                   <kbd>{combo}</kbd>
                 </td>
@@ -794,7 +814,12 @@ function useStudioKeys(active: boolean): void {
         if (k === 'd') return run(() => duplicateSelection());
         return;
       }
-      if (e.altKey) return;
+      if (e.altKey) {
+        // Fase 12: slip the selected clip a frame at a time.
+        if (!s.dialog && !mod && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))
+          return run(() => slipSelected((e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 10 : 1)));
+        return;
+      }
       if (s.dialog) return;
       switch (e.key) {
         case ' ':
@@ -817,6 +842,12 @@ function useStudioKeys(active: boolean): void {
           return run(() => zoomBy(1 / 1.5));
         case '?':
           return run(() => setV({ dialog: 'shortcuts' }));
+        case ',':
+        case '<':
+          return run(() => slideSelected(e.shiftKey ? -10 : -1));
+        case '.':
+        case '>':
+          return run(() => slideSelected(e.shiftKey ? 10 : 1));
       }
       switch (k) {
         case 'j':
@@ -835,6 +866,12 @@ function useStudioKeys(active: boolean): void {
           return run(() => setV({ snap: !s.snap }));
         case 'm':
           return run(addMarkerAtPlayhead);
+        case 'q':
+          return run(() => rippleToPlayhead('left'));
+        case 'w':
+          return run(() => rippleToPlayhead('right'));
+        case 'r':
+          return run(rollToPlayhead);
         case 'z':
           if (e.shiftKey) return run(zoomToFit);
       }

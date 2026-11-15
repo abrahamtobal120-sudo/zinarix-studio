@@ -1,3 +1,4 @@
+@layer features {
 /* Fase 5A — background tasks panel (each task in its own git worktree). */
 
 .tasks-panel {
@@ -265,4 +266,5 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
 }

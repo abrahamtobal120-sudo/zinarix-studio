@@ -1,3 +1,4 @@
+@layer features {
 /* Built-in browser: toolbar, address bar suggestions, history and bookmarks.
    (The base rules of the pane live in styles.css; these refine and extend them.) */
 
@@ -288,4 +289,5 @@
     max-width: none;
     flex: 1;
   }
+}
 }

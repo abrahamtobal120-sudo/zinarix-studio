@@ -23,6 +23,8 @@ export function chromeOptions(
   enabled: boolean,
   zoom: number,
 ): BrowserWindowConstructorOptions {
+  // Windows paints Mica and the menus light or dark by this, not by our theme.
+  nativeTheme.themeSource = light ? 'light' : 'dark';
   const m = material(enabled);
   // Close to the bar colors of the dark and light themes; the renderer sets the real ones.
   const bg = light ? '#f3f3f3' : '#181818';
@@ -48,11 +50,12 @@ export function chromeOptions(
  */
 export function applyChrome(
   win: BrowserWindow,
-  colors: { bg: string; fg: string },
+  colors: { bg: string; fg: string; dark: boolean },
   enabled: boolean,
   zoom: number,
 ): ChromeState {
   const kind = chromeKind(process.platform);
+  nativeTheme.themeSource = colors.dark ? 'dark' : 'light';
   const m = material(enabled);
   try {
     if (process.platform === 'darwin') {

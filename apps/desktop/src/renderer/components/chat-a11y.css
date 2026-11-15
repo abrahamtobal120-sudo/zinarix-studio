@@ -1,3 +1,4 @@
+@layer features {
 /* Chat: send button with its menu, offline banner, keyboard-reachable tab and list actions. */
 
 .send-split {
@@ -109,4 +110,5 @@
 }
 .chat-list-folder:focus-within button {
   opacity: 1;
+}
 }

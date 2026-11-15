@@ -1847,7 +1847,7 @@ export interface OmniApi {
      * Fase 18: colors of the theme's bar for the system's − □ × buttons; main also sets
      * Mica / vibrancy (or takes it off: setting, high contrast) and says what it applied.
      */
-    chrome(colors: { bg: string; fg: string }): Promise<ChromeState>;
+    chrome(colors: { bg: string; fg: string; dark: boolean }): Promise<ChromeState>;
     /** Labels of the app menu (Archivo, Editar…), drawn in our title bar. */
     menuBar(): Promise<string[]>;
     /** Opens one menu of the app menu below its label (x, y in CSS pixels of the page). */

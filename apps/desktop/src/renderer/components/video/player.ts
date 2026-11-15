@@ -24,6 +24,7 @@ import {
 import type { Look } from '../../../shared/videoFx';
 import { cssFilter } from '../../../shared/videoFx';
 import { duckGainAt } from '../../../shared/videoEasy';
+import { gradedLayer, gradePending, onLutLoaded } from './colorGrade';
 import { textCanvas } from './textDraw';
 import { getV, setV } from './videoStore';
 
@@ -49,6 +50,9 @@ export class Player {
   /** Since when a layer has been waiting for its frame (seek / load), 0 when none is. */
   private waitingSince = 0;
 
+  /** Repaint when a LUT finishes loading (its clips were drawn ungraded meanwhile). */
+  private offLut = onLutLoaded(() => (this.lastDrawKey = ''));
+
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
     this.lastDrawKey = '';
@@ -66,6 +70,7 @@ export class Player {
 
   dispose(): void {
     this.stopped = true;
+    this.offLut();
     cancelAnimationFrame(this.raf);
     for (const { el } of this.els.values()) {
       el.pause();
@@ -246,7 +251,7 @@ export class Player {
         }
       }
     }
-    const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}`).join(',')}`;
+    const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}:${gradePending(l.c.color)}`).join(',')}`;
     if (!s.playing && key === this.lastDrawKey && p === this.lastProject) return;
     this.lastProject = p;
     const allReady = layers.every((l) => l.ready);
@@ -281,9 +286,12 @@ export class Player {
         ctx.rect(tr.flipH ? dw / 2 - dw * lk.reveal : -dw / 2, -dh / 2, dw * lk.reveal, dh);
         ctx.clip();
       }
+      // Colour grade (Fase 12): graded on the CPU at the drawn size (capped while playing).
+      const cap = s.playing ? Math.min(1, 960 / Math.max(dw, 1)) : 1;
+      const graded = l.c.color ? gradedLayer(l.src, l.c.color, dw * cap, dh * cap) : null;
       const filter = cssFilter(l.c.effects, H / 1080);
       if (filter !== 'none') ctx.filter = filter;
-      ctx.drawImage(l.src, -dw / 2, -dh / 2, dw, dh);
+      ctx.drawImage(graded ?? l.src, -dw / 2, -dh / 2, dw, dh);
       ctx.restore();
     }
   }

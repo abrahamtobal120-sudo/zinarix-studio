@@ -331,7 +331,7 @@ export function App() {
   const chatShown = chatOn && !chatWide;
   // Two chats side by side (and the list of chats) need their own room: below this
   // each pane gets squeezed and its contents spill out.
-  // The list of chats is 230px wide (styles.css .chat-list).
+  // The list of chats is 230px wide (styles/ .chat-list).
   const chatMin = (chatSplit ? 620 : 280) + (chatList ? 230 : 0);
   const sideHi = Math.max(
     160,

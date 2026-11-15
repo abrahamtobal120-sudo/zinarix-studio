@@ -3,6 +3,7 @@ import type { VideoJobView } from '../../../shared/api';
 import type { ExportOptions } from '../../../shared/video';
 import {
   EXPORT_PRESETS,
+  LOUDNESS_TARGETS,
   RESOLUTIONS,
   FPS_CHOICES,
   defaultExport,
@@ -12,6 +13,7 @@ import {
 } from '../../../shared/video';
 import { api, toast } from '../../store';
 import { Icon } from '../Icon';
+import { type ProKey, tp } from './proStrings';
 import { fmtBytes, fmtDuration, tv } from './strings';
 import { textPngs } from './textDraw';
 import { getV, holdEscape, setV, useV } from './videoStore';
@@ -24,9 +26,12 @@ export function ExportDialog() {
   const [opts, setOpts] = useState<ExportOptions>(() => defaultExport(project));
   const [range, setRange] = useState<'all' | 'io'>(hasRange ? 'io' : 'all');
   const [busy, setBusy] = useState(false);
+  // Fase 12: kept across preset changes (a preset is about the picture).
+  const [loudness, setLoudness] = useState<number | null>(null);
 
   const final: ExportOptions = {
     ...opts,
+    loudness,
     start: range === 'io' ? (project.inPoint ?? 0) : 0,
     end: range === 'io' ? (project.outPoint ?? total) : total,
   };
@@ -169,6 +174,21 @@ export function ExportDialog() {
               {[96, 128, 192, 256, 320].map((k) => (
                 <option key={k} value={k}>
                   AAC {k} kbps
+                </option>
+              ))}
+            </select>
+          </label>
+          <label title={tp('loudHint')}>
+            <span>{tp('loudness')}</span>
+            <select
+              className="vs-select"
+              value={loudness ?? ''}
+              onChange={(e) => setLoudness(e.target.value === '' ? null : Number(e.target.value))}
+            >
+              <option value="">{tp('loudOff')}</option>
+              {LOUDNESS_TARGETS.map((l) => (
+                <option key={l} value={l}>
+                  {tp(`loud_${-l}` as ProKey)}
                 </option>
               ))}
             </select>

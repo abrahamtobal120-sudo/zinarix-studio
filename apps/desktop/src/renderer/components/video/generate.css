@@ -1,3 +1,4 @@
+@layer features {
 /* Fase 10: Generate panel of the Media Library. Theme variables only. */
 .vs-gen {
   display: flex;
@@ -82,4 +83,5 @@
 }
 .vs-gen-ok {
   color: var(--ok);
+}
 }

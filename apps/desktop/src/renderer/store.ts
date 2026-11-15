@@ -633,19 +633,19 @@ export async function chooseModel(ref: string): Promise<void> {
 
 export function applyTheme(theme: ThemeId): void {
   applyThemeColors(theme);
-  void syncChrome();
+  void syncChrome(theme);
 }
 
 /**
  * Fase 18: gives main the colors of our title bar for − □ × and marks the page with the
  * material main applied (html[data-material]), so the bars are see-through only over it.
  */
-export async function syncChrome(): Promise<void> {
+export async function syncChrome(theme: ThemeId = state.settings.theme): Promise<void> {
   const css = getComputedStyle(document.documentElement);
   const bg = css.getPropertyValue('--activity').trim();
   const fg = css.getPropertyValue('--fg').trim();
   try {
-    const st = await api().app.chrome({ bg, fg });
+    const st = await api().app.chrome({ bg, fg, dark: isDark(theme) });
     document.documentElement.dataset.chrome = st.kind;
     document.documentElement.dataset.material = st.material;
   } catch {

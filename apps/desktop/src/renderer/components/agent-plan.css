@@ -1,3 +1,4 @@
+@layer features {
 /* Fase 3 — chat modes, the agent's task list, ask_user questions and the plan bar. */
 
 .mode-menu-wrap {
@@ -215,4 +216,5 @@
   .task-list-bar span {
     transition: none;
   }
+}
 }

@@ -1,3 +1,4 @@
+@layer features {
 /* Video Studio, phase 11: the Easy panel (theme variables only). */
 
 .vs-easy-sec {
@@ -57,4 +58,5 @@
   align-items: center;
   gap: 6px;
   font-size: var(--text-xs);
+}
 }

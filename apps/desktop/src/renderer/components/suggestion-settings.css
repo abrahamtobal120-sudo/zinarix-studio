@@ -1,3 +1,4 @@
+@layer features {
 /* Fase 8 — Settings › AI: suggestion metric (theme variables only). */
 .settings-toggle.sx-disabled {
   opacity: 0.55;
@@ -43,4 +44,5 @@
 }
 .zx-stats-slow {
   color: var(--warn);
+}
 }

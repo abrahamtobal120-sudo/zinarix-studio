@@ -44,7 +44,7 @@ const es = {
   tabStickers: 'Stickers',
   tabEffects: 'Efectos',
   tabTransitions: 'Transiciones',
-  tabFilters: 'Filtros',
+  tabColor: 'Color',
   tabAi: 'IA',
   comingPhase: 'Disponible en la fase {n} de Video Studio.',
   comingList: 'Llegará: {what}.',
@@ -53,7 +53,6 @@ const es = {
   soonStickers: 'stickers, emojis, formas, flechas y contadores',
   soonEffects: 'más de 80 efectos y capas de ajuste',
   soonTransitions: 'más de 60 transiciones con duración ajustable',
-  soonFilters: 'corrección de color, curvas, LUTs y scopes',
   soonAi: 'subtítulos automáticos, cortar silencios, edición por transcripción y reencuadre 9:16',
 
   import: 'Importar',
@@ -371,7 +370,7 @@ const en: Record<VideoKey, string> = {
   tabStickers: 'Stickers',
   tabEffects: 'Effects',
   tabTransitions: 'Transitions',
-  tabFilters: 'Filters',
+  tabColor: 'Colour',
   tabAi: 'AI',
   comingPhase: 'Coming in phase {n} of Video Studio.',
   comingList: 'On the way: {what}.',
@@ -380,7 +379,6 @@ const en: Record<VideoKey, string> = {
   soonStickers: 'stickers, emoji, shapes, arrows and counters',
   soonEffects: 'over 80 effects and adjustment layers',
   soonTransitions: 'over 60 transitions with adjustable length',
-  soonFilters: 'color correction, curves, LUTs and scopes',
   soonAi: 'auto captions, silence removal, transcript editing and 9:16 reframing',
 
   import: 'Import',

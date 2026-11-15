@@ -1,0 +1,279 @@
+/* Part of the old styles.css, cut without reordering a rule. Layer `features`; the order of
+ * the layers is declared once, at the top of ui/tokens.css. */
+@layer features {
+/* ---------- polish: calmer, more professional look ---------- */
+/* Inter (SIL Open Font License 1.1, rsms.me/inter) gives the UI one crisp typeface on every OS. */
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/Inter-roman.var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+body {
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: var(--text-base);
+  font-feature-settings: 'cv11', 'ss01', 'calt';
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.003em;
+}
+
+/* Sidebar and panel headers. */
+.sidebar-title,
+.panel-header {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.sidebar {
+  border-right: 1px solid var(--border);
+}
+
+/* Tabs: flat, with a thin accent line under the open one. */
+.tabs {
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  border-right: 1px solid var(--border);
+  font-size: var(--text-base);
+}
+.tab.active {
+  background: var(--bg);
+  box-shadow: inset 0 -2px 0 0 var(--brand);
+}
+
+/* Status bar blends with the chrome instead of a bright colored strip. */
+.status-bar {
+  height: 24px;
+  font-size: var(--text-sm);
+  border-top: 1px solid var(--border);
+}
+.status-item:hover {
+  color: var(--fg-strong);
+  background: var(--hover);
+}
+
+/* Notifications slide in at the top right, under the tabs and clear of the message box. */
+.toast {
+  top: 46px;
+  bottom: auto;
+  left: auto;
+  right: 16px;
+  transform: none;
+  max-width: min(420px, 80vw);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 14px 10px 30px;
+  color: var(--fg-strong);
+  font-size: var(--text-base);
+}
+.toast::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Chat welcome: smaller logo without the glow, tidy suggestion list. */
+.chat-empty {
+  margin-top: 12%;
+}
+.chat-logo {
+  width: 44px;
+  height: 44px;
+  filter: none;
+}
+.chat-suggestion {
+  background: transparent;
+  border-color: var(--border);
+  border-radius: 9px;
+  padding: 9px 12px;
+}
+.chat-suggestion:hover {
+  background: var(--hover);
+  border-color: color-mix(in srgb, var(--fg-dim) 40%, var(--border));
+}
+.tone-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--fg-dim);
+  background: var(--bg-4);
+}
+.chat-suggestion:hover .tone-badge {
+  color: var(--brand);
+}
+
+/* Message box: a single raised surface; toggles are quiet until switched on. */
+.chat-input {
+  background: var(--bg-3);
+  border-color: var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.chat-input:focus-within {
+  border-color: color-mix(in srgb, var(--focus) 60%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 16%, transparent);
+}
+.chat-input-bar .pill {
+  border-color: transparent;
+  color: var(--fg-dim);
+  background: transparent;
+}
+.chat-input-bar .pill:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+.chat-input-bar .pill.on {
+  color: var(--fg-strong);
+  background: var(--bg-4);
+  border-color: transparent;
+}
+.turn-user {
+  background: var(--bg-3);
+  border-color: var(--border);
+}
+
+/* Primary buttons share the accent color. */
+button.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+button.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Thinner, quieter scrollbars. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--fg-dim) 26%, transparent);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+/* A bold line on its own reads as a small label: space above, close to its text below. */
+.md p.md-label {
+  margin: 18px 0 4px;
+  color: var(--fg-strong);
+}
+.md > p.md-label:first-child {
+  margin-top: 0;
+}
+.vc-filter {
+  font-size: var(--text-xs);
+  padding: 1px 4px;
+  margin-right: 8px;
+}
+.vc-env-actions {
+  padding: 0 10px 6px 12px;
+}
+.vc-form {
+  margin: 0 10px 8px 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vc-form input,
+.vc-form textarea {
+  width: 100%;
+  font-family: var(--mono, monospace);
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+.vc-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: var(--text-xs);
+}
+.vc-targets label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.vc-domain-add {
+  padding-top: 4px;
+}
+.vc-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-xs);
+  color: var(--fg-dim);
+}
+.vc-settings select {
+  width: 100%;
+  font-size: var(--text-sm);
+}
+.vc-settings label.vc-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+.vc-form .vc-check input,
+.vc-targets input {
+  width: auto;
+}
+.sb-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 2px 10px 6px;
+}
+.sb-pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sb-tabs {
+  flex-wrap: wrap;
+}
+.sb-subtabs {
+  margin: 2px 8px 0 28px;
+  flex-wrap: wrap;
+}
+.sb-subtabs button.sb-warn {
+  color: var(--danger);
+}
+.sb-sql-tools {
+  padding: 6px 8px 0;
+}
+.sb-sql-tools select {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+.sb-grid-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.sb-grid-meta .link {
+  font-size: var(--text-xs);
+}
+}

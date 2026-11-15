@@ -1,3 +1,4 @@
+@layer features {
 /* Test Explorer (sidebar) and the ✓ / ✗ marks next to each test in the editor. */
 
 .te-panel {
@@ -242,53 +243,8 @@
 }
 
 /* Editor gutter marks. */
-.monaco-editor .te-mark {
-  display: grid;
-  place-items: center;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  cursor: pointer;
-}
 
-.monaco-editor .te-mark.te-idle::before {
-  content: '▶';
-  font-size: var(--text-2xs);
-  color: var(--ok);
-  opacity: 0.55;
-}
 
-.monaco-editor .te-mark.te-idle:hover::before {
-  opacity: 1;
-}
 
 /* The line where a test failed, and its error at the end of the line. */
-.monaco-editor .te-fail-range {
-  text-decoration: underline wavy var(--danger);
-  text-decoration-skip-ink: none;
-}
-
-.monaco-editor .te-fail-inline {
-  color: var(--danger);
-  font-style: italic;
-  opacity: 0.85;
-}
-
-.monaco-editor .te-mark.te-passed::before {
-  content: '✓';
-  color: var(--ok);
-}
-
-.monaco-editor .te-mark.te-failed::before {
-  content: '✗';
-  color: var(--danger);
-}
-
-.monaco-editor .te-mark.te-skipped::before {
-  content: '○';
-  color: var(--fg-dim);
-}
-
-.monaco-editor .te-mark.te-running::before {
-  content: '…';
-  color: var(--accent);
 }

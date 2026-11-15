@@ -502,6 +502,8 @@ export class VideoService {
         loudness,
       });
       await writeFile(script, plan.filter, 'utf8');
+      for (const [name, text] of Object.entries(plan.files ?? {}))
+        if (/^[\w.-]{1,64}$/.test(name)) await writeFile(join(work, name), text, 'utf8');
       result = await this.ffmpegRun(
         job,
         ffmpeg,

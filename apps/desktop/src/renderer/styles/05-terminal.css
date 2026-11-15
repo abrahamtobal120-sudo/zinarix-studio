@@ -1,0 +1,187 @@
+/* Part of the old styles.css, cut without reordering a rule. Layer `features`; the order of
+ * the layers is declared once, at the top of ui/tokens.css. */
+@layer features {
+/* ---------- terminal ---------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+}
+.term-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin-left: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.term-tabs::-webkit-scrollbar {
+  display: none;
+}
+.term-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 200px;
+  height: 24px;
+  padding: 0 4px 0 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  letter-spacing: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-dim);
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.term-tab:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.term-tab.active {
+  background: var(--bg-3);
+  color: var(--fg-strong);
+}
+.term-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -5px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.term-tab.admin .icon {
+  color: var(--warn);
+}
+.term-tab.admin.active::after {
+  background: var(--warn);
+}
+.term-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.term-tab-n {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+.term-tab-close {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  opacity: 0;
+}
+.term-tab:hover .term-tab-close,
+.term-tab.active .term-tab-close,
+.term-tab-close:focus-visible {
+  opacity: 0.7;
+}
+.term-tab-close:hover {
+  opacity: 1;
+  background: var(--bg-4);
+}
+.term-split {
+  display: inline-flex;
+  border-radius: var(--radius-sm);
+}
+.term-split:hover {
+  background: var(--hover);
+}
+.sidebar-actions .term-split button + button {
+  min-width: 16px;
+  padding: 2px 2px;
+  border-left: 1px solid transparent;
+}
+.sidebar-actions .term-split:hover button + button {
+  border-left-color: var(--border);
+}
+.sidebar-actions .term-split button.on {
+  color: var(--fg);
+  background: var(--bg-4);
+}
+.sidebar-actions .term-split button.term-profile-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-left-color: var(--border);
+  font-size: var(--text-xs);
+}
+.sidebar-actions button.term-admin:hover {
+  color: var(--warn);
+}
+.term-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  align-self: center;
+  background: var(--border);
+}
+.term-shell-menu {
+  min-width: 240px;
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+}
+.term-shell-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+}
+.term-shell-menu button > span:first-of-type {
+  flex: 1;
+}
+.term-shell-menu button.admin .icon {
+  color: var(--warn);
+}
+.term-shell-menu button:hover .icon {
+  color: inherit;
+}
+.term-menu-head {
+  padding: 4px 8px 3px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.term-menu-hint {
+  font-size: var(--text-xs);
+  opacity: 0.6;
+}
+.sidebar-actions button.term-to-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 4px;
+  letter-spacing: 0;
+  width: auto;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.terminal-host {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 4px 2px 12px;
+  position: relative;
+}
+.xterm-host {
+  height: 100%;
+}
+}

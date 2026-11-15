@@ -207,7 +207,28 @@ export interface Track {
   solo?: boolean;
   /** Ducking: 0–1, the level this track drops to while a voice plays elsewhere (missing = off). */
   duck?: number;
+  /** Fase 13: the track automatic captions go to (its titles are replaced when they are redone). */
+  role?: 'captions';
 }
+
+/** Fase 13: a transcribed word, in seconds of the media file. */
+export interface TranscriptWord {
+  s: number;
+  e: number;
+  w: string;
+  /** Engine confidence 0–1, when it gives one. */
+  p?: number;
+}
+
+export interface Transcript {
+  /** 'whisper.cpp', 'openai/whisper-1'… */
+  engine: string;
+  lang?: string;
+  words: TranscriptWord[];
+  /** When it was made (ms since 1970). */
+  at: number;
+}
+export const TRANSCRIPT_MAX_WORDS = 100_000;
 
 export interface Marker {
   id: string;
@@ -229,6 +250,8 @@ export interface VideoProject {
   markers: Marker[];
   inPoint: number | null;
   outPoint: number | null;
+  /** Fase 13: transcripts by media id. */
+  transcripts?: Record<string, Transcript>;
 }
 
 export const IMAGE_DEFAULT = 5;
@@ -879,7 +902,28 @@ export function validProject(x: unknown): x is VideoProject {
         (t.pan === undefined || (Number.isFinite(t.pan) && t.pan >= -1 && t.pan <= 1)) &&
         (t.duck === undefined || (Number.isFinite(t.duck) && t.duck >= 0 && t.duck <= 1)),
     ) &&
-    p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string')
+    p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string') &&
+    validTranscripts(p.transcripts)
+  );
+}
+
+function validTranscripts(x: unknown): boolean {
+  if (x === undefined) return true;
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return false;
+  return Object.values(x as Record<string, Transcript>).every(
+    (t) =>
+      !!t &&
+      typeof t.engine === 'string' &&
+      Array.isArray(t.words) &&
+      t.words.length <= TRANSCRIPT_MAX_WORDS &&
+      t.words.every(
+        (w) =>
+          !!w &&
+          typeof w.w === 'string' &&
+          w.w.length <= 200 &&
+          Number.isFinite(w.s) &&
+          Number.isFinite(w.e),
+      ),
   );
 }
 

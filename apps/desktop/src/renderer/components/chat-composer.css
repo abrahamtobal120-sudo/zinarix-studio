@@ -1,3 +1,4 @@
+@layer features {
 /* Chat message box, bottom bar: "+" menu and options on the left, model and send on the
    right. Every control is the same 26px height, quiet until hovered or switched on.
    Selectors start with .chat-input so they win over the older rules in styles.css. */
@@ -146,4 +147,5 @@
     animation: none;
     transition: none;
   }
+}
 }

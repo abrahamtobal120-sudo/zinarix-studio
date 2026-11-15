@@ -89,7 +89,7 @@ export function phonePage(nonce: string, lang: PhoneLang = 'es'): string {
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Zinarix Studio</title>
 <style nonce="${nonce}">
-/* Same look as the chat of the desktop app (styles.css: dark / light, chat, tool cards). */
+/* Same look as the chat of the desktop app (ui/tokens.css: dark / light, chat, tool cards). */
 :root{
   --bg:#1a1b1e;--bg-2:#202125;--bg-3:#26272c;--bg-4:#32343c;--border:#33353d;
   --fg:#c8ccd4;--fg-dim:#8a8f9a;--strong:#fff;--hover:#26282e;

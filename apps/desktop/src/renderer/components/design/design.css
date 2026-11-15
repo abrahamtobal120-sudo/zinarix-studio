@@ -1,3 +1,4 @@
+@layer features {
 /* Panel de Edición (visual editor). */
 .design-host {
   flex: 1;
@@ -674,4 +675,5 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
 }

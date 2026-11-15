@@ -1,3 +1,4 @@
+@layer features {
 /* Fase 2 — review of one agent exchange's diff, and the "rewind here" dialog. */
 
 .diff-review {
@@ -191,4 +192,5 @@
   .diff-review * {
     scroll-behavior: auto !important;
   }
+}
 }

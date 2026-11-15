@@ -1,12 +1,96 @@
 /* Zinarix UI — design tokens (Phase 16).
  *
  * The one place for spacing, type, radii, elevation, motion, layers and the few fixed colors.
- * Theme colors (--bg, --fg, --accent… the 25 variables of themes.ts) stay in the theme blocks
- * of styles.css and in themes.ts; everything here is derived from them or is theme-independent.
+ * Theme colors (--bg, --fg, --accent… the 25 variables of themes.ts): the Dark and Light themes
+ * are the first blocks of this file, the custom themes live in themes.ts. Everything else here is
+ * derived from them or is theme-independent.
  *
- * Rule (checked by test/uiTokens.test.ts): a hex color, a font-size in px or a z-index above 10
- * written anywhere else in the renderer CSS fails the build. Add a token here instead.
+ * Rules: a hex color anywhere else in the renderer CSS fails `pnpm lint` (stylelint, color-no-hex);
+ * a hex color, a font-size in px or a z-index above 10 fails `pnpm test` (test/uiTokens.test.ts).
+ * Add a token here instead.
  */
+
+/* Cascade layers, declared once and first. A later layer wins over an earlier one whatever the
+ * specificity, so a utility always beats a component. CSS outside every layer wins over all of
+ * them: only styles/overrides.css (our touches on Monaco and xterm, whose own CSS has no layer)
+ * may stay that way. */
+@layer reset, tokens, base, components, features, utilities;
+
+@layer tokens {
+/* Base themes. Neutral grays with one accent color; custom themes override these from themes.ts. */
+:root,
+:root[data-theme='dark'] {
+  --bg: #1b1b1f;
+  --bg-2: #17171a;
+  --bg-3: #222226;
+  --bg-4: #2c2c31;
+  --activity: #131316;
+  --border: #2a2a2f;
+  --fg: #d6d6dc;
+  --fg-dim: #8c8c96;
+  --fg-strong: #f4f4f6;
+  --accent: #6d5ef6;
+  --accent-hover: #7d6ff8;
+  --accent-fg: #ffffff;
+  --focus: #7d6ff8;
+  --sel: #2a2840;
+  --hover: #26262b;
+  --status: #131316;
+  --status-fg: #9a9aa4;
+  --danger: #f1595b;
+  --ok: #83d6a0;
+  --warn: #e0b341;
+  --code-bg: #141519;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --brand-1: #8b5cff;
+  --brand-2: #3b82f6;
+  --brand: #7d6ff8;
+  --brand-grad: linear-gradient(135deg, #8b5cff, #3b82f6);
+  --radius: 7px;
+  --radius-sm: 5px;
+  --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 38%, transparent);
+  --sel-soft: color-mix(in srgb, var(--brand) 18%, transparent);
+  --elev: 0 2px 8px rgba(0, 0, 0, 0.35);
+  /* WhatsApp green, with dark text on it (white on #25d366 is 1.98:1). */
+  --wa: #25d366;
+  --wa-fg: #0b1a10;
+}
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-2: #f7f7f8;
+  --bg-3: #f1f1f3;
+  --bg-4: #e9e9ec;
+  --activity: #f0f0f2;
+  --border: #e3e3e7;
+  --fg: #2b2b31;
+  --fg-dim: #6e6e78;
+  --fg-strong: #0f0f12;
+  --accent: #5b4cf0;
+  --accent-hover: #4d3fe0;
+  --accent-fg: #ffffff;
+  --hover: #ececef;
+  --status: #f0f0f2;
+  --status-fg: #5b5b65;
+  --danger: #c72e2e;
+  --ok: #2e7d32;
+  --warn: #8a6d00;
+  --code-bg: #f6f8fa;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+  --brand-1: #7c3aed;
+  --brand-2: #2563eb;
+  --brand: #6d4df2;
+  --brand-grad: linear-gradient(135deg, #7c3aed, #2563eb);
+  --radius: 7px;
+  --radius-sm: 5px;
+  --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
+  --sel-soft: color-mix(in srgb, var(--brand) 14%, transparent);
+  --elev: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --focus: #6d4df2;
+  --sel: #e4e9ff;
+  /* WhatsApp green: darker in light themes so text and white-on-green pass AA. */
+  --wa: #0f7a6d;
+  --wa-fg: #ffffff;
+}
 
 :root {
   /* ---- Spacing: 4 px base ---- */
@@ -147,7 +231,11 @@
   --dbg-var: #8b2f8b;
 }
 
-/* Numbers that change in place (timecodes, costs, counters) keep their width. */
-.tabular {
-  font-variant-numeric: tabular-nums;
+}
+
+@layer utilities {
+  /* Numbers that change in place (timecodes, costs, counters) keep their width. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }

@@ -2,7 +2,7 @@ import type { ThemeId } from '../shared/api';
 import { monaco } from './monaco';
 
 /**
- * Color themes. Each one is a base (the dark or light stylesheet in styles.css) plus CSS
+ * Color themes. Each one is a base (the dark or light block at the top of ui/tokens.css) plus CSS
  * variable overrides for the app chrome and a Monaco theme for the editor.
  */
 
@@ -44,7 +44,7 @@ export type ThemeVars = Record<RequiredVar, string>;
 export interface ThemeDef {
   label: string;
   dark: boolean;
-  /** Overrides of the CSS variables declared in styles.css (:root). Empty for the base themes. */
+  /** Overrides of the CSS variables declared in ui/tokens.css (:root). Empty for the base themes. */
   vars: Readonly<Record<string, string>>;
   /** Editor colors (Monaco), on top of vs / vs-dark. */
   editor: Record<string, string>;

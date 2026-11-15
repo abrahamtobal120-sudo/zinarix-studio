@@ -1,0 +1,458 @@
+/* Zinarix UI primitives (Phase 16C). Only tokens: no hex, no px font sizes, named layers.
+ * They live in the `components` layer, under `features` (the app CSS). The generic element rules
+ * of the app (button, input…) skip [data-ui] elements, so they do not repaint the primitives. */
+@layer components {
+  .ui-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ---- Button / IconButton ---- */
+  .ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1-5);
+    font: inherit;
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
+  }
+  .ui-btn-md {
+    height: 28px;
+    padding: 0 var(--space-3);
+  }
+  .ui-btn-sm {
+    height: 22px;
+    padding: 0 var(--space-2);
+    font-size: var(--text-xs);
+  }
+  .ui-btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .ui-btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+  .ui-btn-secondary {
+    background: var(--bg-4);
+    color: var(--fg);
+    border-color: var(--border);
+  }
+  .ui-btn-secondary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bg-4) 85%, var(--fg) 15%);
+  }
+  .ui-btn-ghost {
+    background: transparent;
+    color: var(--fg);
+  }
+  .ui-btn-ghost:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .ui-btn-danger {
+    background: var(--danger);
+    color: var(--on-color);
+  }
+  .ui-btn-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 85%, var(--black) 15%);
+  }
+  .ui-btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+  .ui-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .ui-btn.is-loading {
+    cursor: progress;
+  }
+  .ui-icon-btn.ui-btn-md {
+    width: 28px;
+    padding: 0;
+  }
+  .ui-icon-btn.ui-btn-sm {
+    width: 22px;
+    padding: 0;
+  }
+  .ui-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: var(--radius-full);
+    animation: ui-spin 0.7s linear infinite;
+  }
+  @keyframes ui-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ---- Input / Textarea / Field ---- */
+  .ui-input {
+    width: 100%;
+    font: inherit;
+    font-size: var(--text-sm);
+    color: var(--fg);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-1-5) var(--space-2);
+    outline: none;
+  }
+  .ui-input::placeholder {
+    color: var(--fg-dim);
+  }
+  .ui-input:focus-visible {
+    border-color: var(--focus);
+    box-shadow: 0 0 0 1px var(--focus);
+  }
+  .ui-input[aria-invalid='true'] {
+    border-color: var(--danger);
+  }
+  .ui-input:disabled {
+    opacity: 0.55;
+  }
+  .ui-textarea {
+    min-height: 64px;
+    resize: vertical;
+    line-height: var(--leading-normal);
+  }
+  .ui-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .ui-field-label {
+    font-size: var(--text-sm);
+    color: var(--fg-strong);
+  }
+  .ui-field-help {
+    font-size: var(--text-xs);
+    color: var(--fg-dim);
+  }
+  .ui-field-error {
+    font-size: var(--text-xs);
+    color: var(--danger);
+  }
+
+  /* ---- Tabs ---- */
+  .ui-tabs-list {
+    display: flex;
+    gap: var(--space-0-5);
+    border-bottom: 1px solid var(--border);
+  }
+  .ui-tabs-trigger {
+    font: inherit;
+    font-size: var(--text-sm);
+    color: var(--fg-dim);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: var(--space-1-5) var(--space-3);
+    margin-bottom: -1px;
+    cursor: pointer;
+  }
+  .ui-tabs-trigger:hover {
+    color: var(--fg);
+  }
+  .ui-tabs-trigger[data-state='active'] {
+    color: var(--fg-strong);
+    border-bottom-color: var(--accent);
+  }
+  .ui-tabs-trigger:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+  .ui-tabs-trigger:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .ui-tabs-content {
+    padding-top: var(--space-3);
+  }
+  .ui-tabs-content:focus-visible {
+    outline: 2px solid var(--focus);
+  }
+
+  /* ---- Tooltip ---- */
+  .ui-tooltip {
+    z-index: var(--z-tooltip);
+    max-width: 320px;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+    line-height: var(--leading-tight);
+    color: var(--fg-strong);
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--elevation-2);
+    animation: ui-fade-in var(--duration-fast) var(--ease-enter);
+  }
+
+  /* ---- Menu ---- */
+  .ui-menu {
+    z-index: var(--z-menu);
+    min-width: 180px;
+    padding: var(--space-1);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elevation-3);
+    font-size: var(--text-sm);
+    animation: ui-fade-in var(--duration-fast) var(--ease-enter);
+  }
+  .ui-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-xs);
+    color: var(--fg);
+    cursor: default;
+    outline: none;
+    user-select: none;
+  }
+  .ui-menu-item[data-highlighted],
+  .ui-menu-item[data-state='open'] {
+    background: var(--sel);
+    color: var(--fg-strong);
+  }
+  .ui-menu-item[data-disabled] {
+    opacity: 0.5;
+  }
+  .ui-menu-item.is-danger {
+    color: var(--danger);
+  }
+  .ui-menu-icon {
+    display: inline-flex;
+    width: 16px;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .ui-menu-label {
+    flex: 1;
+  }
+  .ui-menu-kbd,
+  .ui-menu-chevron {
+    margin-left: var(--space-4);
+    color: var(--fg-dim);
+  }
+  .ui-menu-sep {
+    height: 1px;
+    margin: var(--space-1) 0;
+    background: var(--border);
+  }
+  .ui-menu-heading {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--fg-dim);
+  }
+
+  /* ---- Dialog (the box itself keeps the CSS of each dialog, like ModalShell) ---- */
+  .ui-dialog-title {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--fg-strong);
+  }
+
+  /* ---- Toast ---- */
+  .ui-toasts {
+    position: fixed;
+    right: var(--space-4);
+    bottom: var(--space-8);
+    z-index: var(--z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    pointer-events: none;
+  }
+  .ui-toasts-polite,
+  .ui-toasts-assertive {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .ui-toast {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 240px;
+    max-width: 420px;
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--fg-strong);
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elevation-3);
+    pointer-events: auto;
+    animation: ui-fade-in var(--duration-normal) var(--ease-enter);
+  }
+  .ui-toast-ok {
+    border-left-color: var(--ok);
+  }
+  .ui-toast-error {
+    border-left-color: var(--danger);
+  }
+  .ui-toast-text {
+    flex: 1;
+  }
+  .ui-toast-action,
+  .ui-toast-close {
+    font: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-xs);
+    padding: var(--space-0-5) var(--space-1-5);
+    cursor: pointer;
+  }
+  .ui-toast-action {
+    color: var(--accent-11);
+    font-weight: 600;
+  }
+  .ui-toast-close {
+    color: var(--fg-dim);
+    font-size: var(--text-md);
+    line-height: 1;
+  }
+  .ui-toast-action:hover,
+  .ui-toast-close:hover {
+    background: var(--hover);
+  }
+  .ui-toast-action:focus-visible,
+  .ui-toast-close:focus-visible {
+    outline: 2px solid var(--focus);
+  }
+
+  /* ---- Badge ---- */
+  .ui-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 var(--space-1-5);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    line-height: 1;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+  }
+  .ui-badge-neutral {
+    background: var(--gray-4);
+    color: var(--fg);
+  }
+  .ui-badge-accent {
+    background: var(--accent-4);
+    color: var(--accent-12);
+  }
+  .ui-badge-ok {
+    background: color-mix(in oklch, var(--ok) 20%, var(--bg));
+    color: var(--fg-strong);
+  }
+  .ui-badge-warn {
+    background: color-mix(in oklch, var(--warn) 22%, var(--bg));
+    color: var(--fg-strong);
+  }
+  .ui-badge-danger {
+    background: color-mix(in oklch, var(--danger) 20%, var(--bg));
+    color: var(--fg-strong);
+  }
+
+  /* ---- Kbd ---- */
+  .ui-kbd {
+    display: inline-flex;
+    gap: var(--space-0-5);
+    font-family: inherit;
+  }
+  .ui-kbd-key {
+    min-width: 18px;
+    padding: 0 var(--space-1);
+    font-size: var(--text-2xs);
+    line-height: 16px;
+    text-align: center;
+    color: var(--fg-dim);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* ---- Skeleton ---- */
+  .ui-skeleton-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1-5);
+  }
+  .ui-skeleton {
+    display: block;
+    width: 100%;
+    border-radius: var(--radius-xs);
+    background: linear-gradient(90deg, var(--gray-3), var(--gray-5), var(--gray-3));
+    background-size: 200% 100%;
+    animation: ui-shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes ui-shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+
+  /* ---- EmptyState ---- */
+  .ui-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-8) var(--space-4);
+    text-align: center;
+    color: var(--fg-dim);
+  }
+  .ui-empty-icon {
+    color: var(--fg-dim);
+    opacity: 0.8;
+  }
+  .ui-empty-title {
+    font-size: var(--text-md);
+    font-weight: 600;
+    color: var(--fg-strong);
+  }
+  .ui-empty-text {
+    max-width: 360px;
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+  .ui-empty-action {
+    margin-top: var(--space-2);
+  }
+
+  @keyframes ui-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}

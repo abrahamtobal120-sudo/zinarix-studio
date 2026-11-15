@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import type { CustomProviderSpec, OmniApi, ProviderView } from '../../shared/api';
-import { commands, runCommand } from '../commands';
+import { commands } from '../commands';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { openLink } from '../links';
@@ -13,7 +13,6 @@ import {
   getEditor,
   getState,
   newRequestId,
-  openFile,
   refreshModels,
   refreshSettings,
   setState,
@@ -29,12 +28,10 @@ import { SettingsPanel } from './Settings';
 import { Icon } from './Icon';
 import { ModalShell } from './ModalShell';
 import { clearProvidersOptions, peekProvidersOptions } from './providersNav';
-import { fileIcon } from './icons';
-import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
+import { Palette as UnifiedPalette } from './Palette';
 import { describeTask, detectRunTasks, runTask, type RunTask } from './RunPanel';
 import { ProviderLogo } from './ProviderLogo';
-import type { PickItem } from './QuickPick';
 import { LicensePanel, Onboarding, UpgradeModal, WhatsNew } from './Plan';
 import { Licenses } from './Licenses';
 
@@ -82,9 +79,9 @@ export function Modals() {
   const inputBox = useStore((s) => s.inputBox);
   return (
     <>
-      {modal?.kind === 'palette' && <Palette />}
+      {modal?.kind === 'palette' && <UnifiedPalette initial=">" />}
       {modal?.kind === 'tasks' && <TaskPick />}
-      {modal?.kind === 'quickOpen' && <QuickOpen />}
+      {modal?.kind === 'quickOpen' && <UnifiedPalette />}
       {modal?.kind === 'models' && <ModelPicker role={modal.role} pick={modal.pick} />}
       {modal?.kind === 'providers' && <Providers focus={modal.focus} />}
       {modal?.kind === 'aiEdit' && <AiEdit />}
@@ -104,21 +101,6 @@ export function Modals() {
       {modal?.kind === 'licenses' && <Licenses />}
       {inputBox && <InputBox />}
     </>
-  );
-}
-
-function Palette() {
-  const items: PickItem[] = commands().map((c) => ({ id: c.id, label: c.label, hint: c.keys }));
-  return (
-    <QuickPick
-      placeholder={t('palette')}
-      items={items}
-      onClose={close}
-      onPick={(it) => {
-        close();
-        void runCommand(it.id);
-      }}
-    />
   );
 }
 
@@ -154,39 +136,6 @@ function TaskPick() {
         close();
         const task = tasks[Number(it.id)];
         if (task) runTask(task);
-      }}
-    />
-  );
-}
-
-function QuickOpen() {
-  const [files, setFiles] = useState<string[]>([]);
-  useEffect(() => {
-    if (getState().workspace) void api().workspace.listFiles().then(setFiles);
-  }, []);
-  const items = useMemo(
-    () => files.map((f) => ({ id: f, label: f.split('/').pop()!, detail: f })),
-    [files],
-  );
-  return (
-    <QuickPick
-      placeholder={t('quickOpen')}
-      items={items}
-      limit={100}
-      renderItem={(it, q) => {
-        const dir = it.id.includes('/') ? it.id.slice(0, it.id.lastIndexOf('/')) : '';
-        return (
-          <span className="qo-row">
-            <span className="qo-icon">{fileIcon(it.id)}</span>
-            <span className="qo-name">{q ? fuzzyMarks(q, it.label) : it.label}</span>
-            <span className="qo-dir">{dir}</span>
-          </span>
-        );
-      }}
-      onClose={close}
-      onPick={(it) => {
-        close();
-        void openFile(it.id);
       }}
     />
   );

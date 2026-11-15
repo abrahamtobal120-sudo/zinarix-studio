@@ -2116,7 +2116,7 @@ function registerIpc(): void {
   });
   // Fase 18: the window's own title bar.
   const cssColor = z.string().trim().max(32);
-  handle('app:chrome', z.tuple([z.object({ bg: cssColor, fg: cssColor })]), (w, colors) =>
+  handle('app:chrome', z.tuple([z.object({ bg: cssColor, fg: cssColor, dark: z.boolean() })]), (w, colors) =>
     applyChrome(w.win, colors, prefs().windowEffects !== false, prefs().uiZoom),
   );
   handle('app:menuBar', z.tuple([]), () =>

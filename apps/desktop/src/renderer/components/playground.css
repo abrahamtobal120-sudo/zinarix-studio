@@ -1,3 +1,4 @@
+@layer features {
 /* Fase 9 — Playground de modelos y Build. Theme variables only. */
 
 .pg {
@@ -527,4 +528,5 @@
   .pg-build {
     grid-template-columns: minmax(0, 1fr);
   }
+}
 }

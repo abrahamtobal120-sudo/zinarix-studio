@@ -1,3 +1,4 @@
+@layer features {
 /* Fase 6 — "Revisar cambios": AI review of local changes, a branch or a pull request. */
 
 .code-review {
@@ -301,4 +302,5 @@
 .cr-ignore .cr-dim {
   flex-basis: 100%;
   font-size: var(--text-sm);
+}
 }

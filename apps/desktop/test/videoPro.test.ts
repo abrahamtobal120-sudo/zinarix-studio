@@ -144,14 +144,15 @@ describe('.cube LUTs', () => {
     const l = parseCube(cube(17, (r, g, b) => [r, g, b]));
     expect(l.size).toBe(17);
     expect(l.title).toBe('test');
-    for (const c of [
+    const cases: [number, number, number][] = [
       [0, 0, 0],
       [0.3, 0.6, 0.9],
       [1, 1, 1],
       [0.123, 0.987, 0.5],
-    ] as const) {
+    ];
+    for (const c of cases) {
       const o = applyLut(l, ...c);
-      for (let i = 0; i < 3; i++) expect(o[i]).toBeCloseTo(c[i], 5);
+      for (let i = 0; i < 3; i++) expect(o[i]).toBeCloseTo(c[i]!, 5);
     }
   });
 
@@ -178,13 +179,14 @@ describe('.cube LUTs', () => {
   it('a mixed LUT equals blending its result with the input', () => {
     const l = parseCube(cube(9, warm));
     const half = mixLut(l, 0.5);
-    for (const c of [
+    const cases: [number, number, number][] = [
       [0.2, 0.4, 0.6],
       [0.9, 0.1, 0.33],
-    ] as const) {
+    ];
+    for (const c of cases) {
       const full = applyLut(l, ...c);
       const mixed = applyLut(half, ...c);
-      for (let i = 0; i < 3; i++) expect(mixed[i]).toBeCloseTo((c[i] + full[i]!) / 2, 5);
+      for (let i = 0; i < 3; i++) expect(mixed[i]).toBeCloseTo((c[i]! + full[i]!) / 2, 5);
     }
     expect(mixLut(l, 1)).toBe(l);
   });

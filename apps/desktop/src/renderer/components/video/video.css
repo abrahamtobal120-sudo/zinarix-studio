@@ -1,3 +1,4 @@
+@layer features {
 /* Zinarix Video Studio — uses the app's theme variables (styles.css), so it follows the theme. */
 
 .vs-root {
@@ -1620,4 +1621,5 @@ body.vs-open .toast {
   transform: rotate(45deg);
   pointer-events: none;
   z-index: 2;
+}
 }
