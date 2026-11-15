@@ -5,7 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { annotate } from './htmlSource.js';
 
-const TYPES: Record<string, string> = {
+export const PREVIEW_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.htm': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -112,7 +112,7 @@ export class PreviewServer {
       }
       if (!st?.isFile()) return send(404, notFound());
       const ext = extname(abs).toLowerCase();
-      const type = TYPES[ext] ?? 'application/octet-stream';
+      const type = PREVIEW_TYPES[ext] ?? 'application/octet-stream';
       const buf = await readFile(abs);
       res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
       if (req.method === 'HEAD') return void res.end();

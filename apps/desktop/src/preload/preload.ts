@@ -15,6 +15,8 @@ const api: OmniApi = {
     undo: call('design:undo') as OmniApi['design']['undo'],
     redo: call('design:redo') as OmniApi['design']['redo'],
     stale: call('design:stale') as OmniApi['design']['stale'],
+    show: call('design:show') as OmniApi['design']['show'],
+    detect: call('design:detect') as OmniApi['design']['detect'],
   },
   mcp: {
     status: call('mcp:status') as OmniApi['mcp']['status'],

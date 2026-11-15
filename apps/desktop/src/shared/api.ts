@@ -1089,6 +1089,13 @@ export interface OmniApi {
     redo(): Promise<DesignApplyResult | null>;
     /** The page changed on disk since the preview loaded it. */
     stale(file: string): Promise<boolean>;
+    /**
+     * How a framework project is shown: its dev server at `url` (live), its built files
+     * (built) or nothing yet (none). `dir` is the app's folder ("" = the project).
+     */
+    show(how: { mode: 'live' | 'built' | 'none'; dir: string; url?: string }): Promise<DesignSessionView>;
+    /** Address of a dev server answering on this computer, the app's usual one first. */
+    detect(dir: string): Promise<string | null>;
   };
   mcp: {
     status(): Promise<{ servers: McpServerView[]; project: McpProjectView | null }>;
@@ -1894,6 +1901,8 @@ export const CHANNELS = [
   'design:undo',
   'design:redo',
   'design:stale',
+  'design:show',
+  'design:detect',
   'video:tools',
   'video:pickMedia',
   'video:probe',

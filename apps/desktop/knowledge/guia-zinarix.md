@@ -4,7 +4,7 @@ Zinarix Studio es un editor de código que funciona con cualquier inteligencia a
 
 ## Cómo se ve la ventana
 
-- A la izquierda está la **barra de actividad**: una columna de iconos que abre los paneles (Explorador, Buscar, Control de código (Git), Panel de Edición, Ejecutar, Vercel, Supabase, Google Cloud, Correo, Vigía, Chat de IA, Video Studio, Terminal, Navegador, WhatsApp). Abajo en esa columna están Centro de seguridad, Consumo de créditos, Proveedores de IA, Paleta de comandos y Ajustes.
+- A la izquierda está la **barra de actividad**: una columna de iconos que abre los paneles (Explorador, Buscar, Control de código (Git), Ejecutar, Chat de IA, Vigía, Panel de Edición, Video Studio, Terminal…). El botón **Más** abre las demás integraciones y herramientas (Vercel, Supabase, Google Cloud, Correo, WhatsApp, Navegador, Consumo de créditos, Paleta de comandos). Abajo en esa columna están Centro de seguridad, Proveedores de IA y Ajustes. Si pasas el mouse sobre un icono ves su nombre.
 - En el centro está el **editor**, con pestañas para cada archivo abierto.
 - A la derecha está el **Chat de IA**.
 - Abajo está la **barra de estado**: muestra la carpeta abierta, la rama de Git, archivos sin guardar y el modelo de IA elegido. Si haces clic en el modelo puedes cambiarlo.
@@ -71,7 +71,7 @@ Mientras escribes, la IA sugiere código en gris; presiona Tab para aceptar. Se 
 
 ## Consumo de créditos (cuánto gastas)
 
-Abre **Consumo de créditos** con el icono de gráfica en la barra de actividad. Muestra el gasto de hoy y del mes por proveedor, una gráfica de 30 días y presupuestos con aviso al 80 %.
+Abre **Consumo de créditos** desde el botón **Más** de la barra de actividad (o en la Paleta de comandos, Ctrl+Shift+P, escribe "Consumo"). Muestra el gasto de hoy y del mes por proveedor, una gráfica de 30 días y presupuestos con aviso al 80 %.
 
 ## Ajustes
 
@@ -120,7 +120,7 @@ Abre **Ver > Control de código (Git)** (Ctrl+Shift+G). Ahí ves los cambios con
 
 ## Navegador integrado
 
-Abre el **Navegador** con el icono del globo. La IA puede abrir páginas, leerlas, hacer clic y escribir (con permiso por sitio). No inicies sesión con cuentas sensibles en ese navegador.
+Abre el **Navegador** desde el botón **Más** de la barra de actividad (o en la Paleta de comandos escribe "Abrir navegador"). La IA puede abrir páginas, leerlas, hacer clic y escribir (con permiso por sitio). No inicies sesión con cuentas sensibles en ese navegador.
 
 ## Panel de Edición (editor visual)
 
@@ -136,11 +136,11 @@ Editor de video integrado: **Ver > Zinarix Video Studio** (Ctrl+Shift+V) o el ic
 - **Vercel**: despliega tu sitio web.
 - **Supabase**: base de datos, usuarios, funciones y almacenamiento.
 - **Google Cloud**: BigQuery, Storage, Cloud SQL y más.
-Cada uno tiene su icono en la barra de actividad.
+Ejecutar tiene su icono en la barra de actividad; Vercel, Supabase y Google Cloud están en el botón **Más**.
 
 ## Correo
 
-El panel **Correo** (icono de sobre) lee y envía correos de tu cuenta.
+El panel **Correo** (en el botón **Más**) lee, responde y envía correos de tu cuenta.
 
 ## Vigía
 
@@ -149,7 +149,7 @@ El panel **Correo** (icono de sobre) lee y envía correos de tu cuenta.
 ## Celular, WhatsApp, Telegram y Discord
 
 - **Ajustes > Celular**: activa "Permitir control desde el celular", conecta el celular a la misma red Wi-Fi, escanea el código QR y escribe el PIN. También hay acceso desde cualquier lugar.
-- **WhatsApp**: el icono de WhatsApp abre WhatsApp Web y puedes controlar Zinarix por WhatsApp.
+- **WhatsApp**: en el botón **Más** abre WhatsApp Web y puedes controlar Zinarix por WhatsApp.
 - Bots de **Telegram y Discord**: en Ajustes > Celular, después de activar "Permitir control desde el celular" aparece la sección Telegram y Discord; pega el token del bot y pulsa Conectar.
 
 ## Centro de seguridad

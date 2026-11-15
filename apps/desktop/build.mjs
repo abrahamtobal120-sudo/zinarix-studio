@@ -5,6 +5,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeKnowledge } from './scripts/helper-knowledge.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -81,4 +82,6 @@ mkdirSync(join(root, 'dist/catalog/keys'), { recursive: true });
 for (const f of ['providers.json', 'providers.json.sig', 'keys/catalog.pub']) {
   cpSync(join(catalogDir, f), join(root, 'dist/catalog', f));
 }
+// What "Ayuda de Zinarix" knows about the app (dist/helper/knowledge.json, packaged with dist/**).
+writeKnowledge(join(root, 'dist/helper/knowledge.json'));
 process.stdout.write('main + preload built\n');

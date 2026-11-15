@@ -157,8 +157,13 @@ export function chunkMarkdown(md, source, maxLen = 1100) {
       buf = '';
     };
     for (const para of s.body.join('\n').split(/\n\s*\n/)) {
-      if (buf && buf.length + para.length > maxLen) flush();
-      buf += (buf ? '\n\n' : '') + (para.length > maxLen * 2 ? para.slice(0, maxLen * 2) : para);
+      // A very long paragraph (a list without blank lines) is cut at its lines.
+      const pieces = para.length > maxLen ? para.split('\n') : [para];
+      const sep = pieces.length > 1 ? '\n' : '\n\n';
+      for (const piece of pieces) {
+        if (buf && buf.length + piece.length > maxLen) flush();
+        buf += (buf ? sep : '') + piece.slice(0, maxLen * 2);
+      }
     }
     flush();
   }
@@ -167,11 +172,12 @@ export function chunkMarkdown(md, source, maxLen = 1100) {
 
 export function buildKnowledge() {
   const src = (p) => read(join(appDir, 'src', p));
-  const debugStrings = join(appDir, 'src', 'renderer', 'i18nDebug.ts');
-  const es = {
-    ...(existsSync(debugStrings) ? spanishStrings(read(debugStrings)) : {}),
-    ...spanishStrings(src('renderer/i18n.ts')),
-  };
+  // The strings kept apart (video, debugger, language servers), then the main ones.
+  const es = {};
+  for (const f of ['components/video/strings.ts', 'i18nDebug.ts', 'i18nLsp.ts', 'i18n.ts']) {
+    const p = join(appDir, 'src', 'renderer', f);
+    if (existsSync(p)) Object.assign(es, spanishStrings(read(p)));
+  }
   const generated = [
     '# Referencia de Zinarix Studio (generada del código)',
     '## Menús de la barra superior',
