@@ -241,60 +241,7 @@ kbd {
   display: flex;
   min-height: 0;
 }
-.activity-bar {
-  width: 52px;
-  background: var(--activity);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 6px;
-  gap: 2px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--border);
-}
-.activity {
-  display: grid;
-  place-items: center;
-  color: var(--fg);
-  position: relative;
-  width: 40px;
-  height: 40px;
-  margin: 1px 0;
-  font-size: 19px;
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius);
-  opacity: 0.6;
-  filter: grayscale(0.5);
-  transition:
-    opacity 0.13s ease,
-    background 0.13s ease;
-}
-:root[data-theme='light'] .activity {
-  opacity: 0.85;
-  filter: none;
-}
-.activity:hover {
-  opacity: 1;
-  background: var(--hover);
-}
-.activity.active {
-  opacity: 1;
-  filter: none;
-  color: var(--fg-strong);
-  background: var(--sel-soft);
-}
-.activity.active::before {
-  content: '';
-  position: absolute;
-  left: -7px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 22px;
-  border-radius: 2px;
-  background: var(--brand-grad);
-}
+/* Activity bar: see "side panel redesign" at the end of this file. */
 .sidebar {
   background: var(--bg-2);
   display: flex;
@@ -4172,9 +4119,6 @@ button.link {
 }
 
 /* ---------- git panel ---------- */
-.activity {
-  position: relative;
-}
 .activity-badge {
   position: absolute;
   right: 1px;
@@ -6544,21 +6488,6 @@ button.big {
 }
 
 /* ---------- colored icons ---------- */
-.activity {
-  color: var(--tone, var(--fg));
-  opacity: 0.8;
-  filter: none;
-}
-:root[data-theme='light'] .activity {
-  opacity: 0.9;
-}
-.activity:hover {
-  background: color-mix(in srgb, var(--tone, var(--fg)) 12%, transparent);
-}
-.activity.active {
-  color: var(--tone, var(--fg-strong));
-  background: color-mix(in srgb, var(--tone, var(--fg)) 18%, transparent);
-}
 .tone-badge {
   display: inline-grid;
   place-items: center;
@@ -6792,35 +6721,6 @@ body {
   --status-fg: #5b5b65;
   --radius: 7px;
   --radius-sm: 5px;
-}
-
-/* Activity bar: one quiet color for every icon; the selected one is bright with an accent bar. */
-.activity,
-:root[data-theme='light'] .activity {
-  color: var(--fg-dim);
-  opacity: 1;
-  filter: none;
-  width: 38px;
-  height: 38px;
-}
-.activity:hover {
-  color: var(--fg-strong);
-  background: var(--hover);
-}
-.activity.active {
-  color: var(--fg-strong);
-  background: transparent;
-}
-.activity.active::before {
-  left: -7px;
-  width: 2px;
-  height: 20px;
-  background: var(--brand);
-}
-.activity-bar {
-  width: 48px;
-  padding-top: 8px;
-  gap: 4px;
 }
 
 /* Sidebar and panel headers. */
@@ -8262,36 +8162,6 @@ body.dragging-y * {
 }
 .sv-nav-count {
   line-height: 15px;
-}
-
-/* Activity bar: scrolls (without a visible scrollbar) instead of cutting off its last
-   buttons on short windows, and the buttons shrink below 700px of height. */
-.activity-bar {
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.activity-bar::-webkit-scrollbar {
-  display: none;
-}
-/* The overflow clips anything outside the bar: keep the selected marker inside it. */
-.activity.active::before {
-  left: -5px;
-}
-@media (max-height: 700px) {
-  .activity,
-  :root[data-theme='light'] .activity {
-    width: 32px;
-    height: 32px;
-  }
-  .activity-bar {
-    gap: 1px;
-  }
-  .activity.active::before {
-    left: -8px;
-    height: 16px;
-  }
 }
 
 /* Settings and Providers fit under the backdrop's 8vh top padding. */

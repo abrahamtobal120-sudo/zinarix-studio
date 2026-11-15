@@ -128,6 +128,70 @@ export class History {
     };
   }
 
+  /**
+   * Every conversation with what changes when it is edited (title, folder, model, last
+   * message, message count): the cloud sync compares it to tell what to upload.
+   */
+  fingerprints(): { id: string; updatedAt: number; fp: string }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT c.id, c.title, c.updated_at AS updatedAt, c.model, c.project,
+           (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS n
+         FROM conversations c`,
+      )
+      .all() as {
+      id: string;
+      title: string;
+      updatedAt: number;
+      model: string | null;
+      project: string | null;
+      n: number;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      updatedAt: r.updatedAt,
+      fp: JSON.stringify([r.title, r.updatedAt, r.model, r.project, r.n]),
+    }));
+  }
+
+  /**
+   * Writes a conversation exactly as given (same id, timestamps and messages), replacing any
+   * local copy. Used by the cloud sync to bring in a conversation from another device.
+   */
+  importConversation(
+    c: Omit<Conversation, 'messageCount'>,
+    messages: Omit<StoredMessage, 'role'>[],
+  ): void {
+    this.db.exec('BEGIN');
+    try {
+      this.db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(c.id);
+      this.db
+        .prepare(
+          `INSERT INTO conversations (id, title, created_at, updated_at, model, project)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET title = excluded.title, created_at = excluded.created_at,
+             updated_at = excluded.updated_at, model = excluded.model, project = excluded.project`,
+        )
+        .run(c.id, c.title.slice(0, 120), c.createdAt, c.updatedAt, c.model, c.project);
+      const ins = this.db.prepare(
+        'INSERT INTO messages (conversation_id, ts, role, content_json, model, display_json) VALUES (?, ?, ?, ?, ?, ?)',
+      );
+      for (const m of messages)
+        ins.run(
+          c.id,
+          m.ts,
+          m.message.role,
+          JSON.stringify(redactDeep(m.message)),
+          m.model ?? null,
+          m.display == null ? null : JSON.stringify(redactDeep(m.display)),
+        );
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
   rename(id: string, title: string): void {
     this.db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);
   }

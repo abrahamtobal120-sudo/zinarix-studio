@@ -1,3 +1,4 @@
+import './debug.css';
 import { useEffect, useState } from 'react';
 import type { DebugConfig, DebugVariable } from '../../shared/devtools';
 import { pressable } from '../a11y';

@@ -5,6 +5,9 @@ import { t } from '../i18n';
 import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
 import { tv } from './video/strings';
+import { td } from '../i18nDebug';
+import { useProblemCounts } from './Problems';
+import { useDebug } from '../debug';
 import { toggleStudio, useV } from './video/videoStore';
 import {
   BROWSER_TAB,
@@ -77,6 +80,7 @@ function useBarItems() {
     search: view('search', t('search'), 'search'),
     git: view('git', t('gitTitle'), 'git', gitChanges),
     run: view('run', t('runTitle'), 'run'),
+    debug: view('debug', td('dbgTitle'), 'bug'),
     chat: tool('chat', t('chat'), 'agent', 'toggle', chatOpen, () =>
       setState({ chatOpen: !chatOpen }),
     ),
@@ -188,6 +192,7 @@ export function ActivityBar() {
       {button(items.search)}
       {button(items.git)}
       {button(items.run)}
+      {button(items.debug)}
       {sep('s1')}
       {button(items.chat)}
       {button(items.watch)}
@@ -257,6 +262,36 @@ function usd(n: number): string {
   return n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
 }
 
+function ProblemStatus() {
+  const { errors, warnings } = useProblemCounts();
+  return (
+    <span
+      className="status-item"
+      title={td('probTitle')}
+      aria-label={td('probCount', { e: errors, w: warnings })}
+      {...pressable(() => setState({ panelOpen: true, panelView: 'problems' }))}
+    >
+      <span className={errors ? 'status-err' : ''}>⊗ {errors}</span>{' '}
+      <span className={warnings ? 'status-warn' : ''}>⚠ {warnings}</span>
+    </span>
+  );
+}
+
+function DebugStatus() {
+  const state = useDebug((v) => v.state);
+  const name = useDebug((v) => v.name);
+  if (state === 'idle') return null;
+  return (
+    <span
+      className="status-item status-debug"
+      title={td('dbgTitle')}
+      {...pressable(() => setState({ sidebar: 'debug' }))}
+    >
+      <Icon name="bug" size={13} /> {name ?? td('dbgTitle')}
+    </span>
+  );
+}
+
 export function StatusBar() {
   const workspace = useStore((s) => s.workspace);
   const settings = useStore((s) => s.settings);
@@ -282,6 +317,8 @@ export function StatusBar() {
           {gitChanges > 0 ? ` · ${gitChanges}` : ''}
         </span>
       )}
+      <ProblemStatus />
+      <DebugStatus />
       {dirty > 0 && (
         <span className="status-item" {...pressable(() => void runCommand('file.saveAll'))}>
           ● {dirty}

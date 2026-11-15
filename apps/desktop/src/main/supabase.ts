@@ -438,6 +438,20 @@ from auth.users order by created_at desc limit 200`,
     return { url: `https://${ref}.supabase.co`, keys };
   }
 
+  /**
+   * The project's secret key (service_role, or a new sb_secret_ key). Main process only: it
+   * is never sent to the UI. legacy: a JWT, which also goes in the Authorization header.
+   */
+  async serviceKey(ref: string): Promise<{ key: string; legacy: boolean }> {
+    const list = await this.req<{ name: string; api_key?: string | null; type?: string }[]>(
+      `/v1/projects/${checkRef(ref)}/api-keys?reveal=true`,
+    );
+    const legacy = list.find((k) => k.name === 'service_role' && k.api_key)?.api_key;
+    const key = legacy ?? list.find((k) => k.type === 'secret' && k.api_key)?.api_key;
+    if (!key) throw new Error('El proyecto no tiene una clave secreta (service_role).');
+    return { key, legacy: !!legacy };
+  }
+
   async deleteUser(ref: string, id: string): Promise<void> {
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('ID de usuario no válido.');
     await this.query(ref, `delete from auth.users where id = ${lit(id)}`);
@@ -589,12 +603,8 @@ from auth.users order by created_at desc limit 200`,
     email: string,
     redirectTo: string,
   ): Promise<void> {
-    const list = await this.req<{ name: string; api_key?: string | null; type?: string }[]>(
-      `/v1/projects/${checkRef(ref)}/api-keys?reveal=true`,
-    );
-    const legacy = list.find((k) => k.name === 'service_role' && k.api_key)?.api_key;
-    const secret = legacy ?? list.find((k) => k.type === 'secret' && k.api_key)?.api_key;
-    if (!secret) throw new Error('El proyecto no tiene una clave secreta (service_role).');
+    const { key: secret, legacy: isLegacy } = await this.serviceKey(ref);
+    const legacy = isLegacy ? secret : undefined;
     const url = new URL(
       `/auth/v1/${kind === 'magiclink' ? 'otp' : kind === 'recovery' ? 'recover' : 'invite'}`,
       `https://${ref}.supabase.co`,

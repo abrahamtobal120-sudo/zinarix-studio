@@ -55,6 +55,16 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE conversations ADD COLUMN project TEXT;
    ALTER TABLE messages ADD COLUMN display_json TEXT;
    CREATE INDEX conversations_project ON conversations (project, updated_at);`,
+  // 3: cloud sync (the user's own Supabase). Usage rows from other devices carry their device
+  // id (NULL: this one); sync_state remembers what was last exchanged, by a cheap fingerprint.
+  `ALTER TABLE usage ADD COLUMN device TEXT;
+   CREATE INDEX usage_device_ts ON usage (device, ts);
+   CREATE TABLE sync_state (
+     kind TEXT NOT NULL,
+     id TEXT NOT NULL,
+     fp TEXT NOT NULL,
+     PRIMARY KEY (kind, id)
+   );`,
 ];
 
 export type Db = DatabaseSync;

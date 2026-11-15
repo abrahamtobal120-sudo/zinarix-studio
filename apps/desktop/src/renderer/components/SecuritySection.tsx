@@ -466,6 +466,9 @@ export function SecuritySection() {
             <button
               key={c.id}
               className={`sv-nav-item ${cat === c.id ? 'on' : ''}`}
+              // On a narrow tab the menu shows only icons: the name stays as a tooltip.
+              title={c.label}
+              aria-current={cat === c.id ? 'page' : undefined}
               onClick={() => setCat(c.id)}
             >
               <span className="sv-nav-icon">

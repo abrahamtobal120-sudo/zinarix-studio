@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { runCommand } from './commands';
 import { ChatPanel, runPhoneAction } from './components/Chat';
-import { ActivityBar, StatusBar } from './components/Chrome';
+import { ActivityBar, AppsPanel, StatusBar } from './components/Chrome';
 import { EditorArea } from './components/Editor';
 import { Explorer } from './components/Explorer';
 import { GitPanel } from './components/GitPanel';
@@ -13,6 +13,7 @@ import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './componen
 import { MailPanel } from './components/MailPanel';
 import { WatchPanel } from './components/WatchPanel';
 import { RunPanel } from './components/RunPanel';
+import { DebugPanel } from './components/DebugPanel';
 import { SupabasePanel } from './components/SupabasePanel';
 import { VercelPanel } from './components/VercelPanel';
 import { GCloudPanel } from './components/GCloudPanel';
@@ -79,24 +80,35 @@ function Sash({
         onStart?.();
         onDrag(e.key === fwd ? SASH_STEP : -SASH_STEP);
       }}
-      onMouseDown={(e) => {
+      // Pointer capture: the separator keeps getting the moves (and the release) even when the
+      // cursor passes over an iframe (mail, design) or leaves the window, so the drag neither
+      // stops halfway nor stays stuck after letting go.
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
         e.preventDefault();
+        const el = e.currentTarget;
+        el.setPointerCapture(e.pointerId);
         onStart?.();
         last.current = dir === 'x' ? e.clientX : e.clientY;
         const cls = dir === 'x' ? 'dragging' : 'dragging-y';
-        const move = (ev: MouseEvent) => {
+        const move = (ev: PointerEvent) => {
           const now = dir === 'x' ? ev.clientX : ev.clientY;
+          if (now === last.current) return;
           onDrag(now - last.current);
           last.current = now;
         };
         const up = () => {
-          window.removeEventListener('mousemove', move);
-          window.removeEventListener('mouseup', up);
+          el.removeEventListener('pointermove', move);
+          el.removeEventListener('pointerup', up);
+          el.removeEventListener('pointercancel', up);
+          el.removeEventListener('lostpointercapture', up);
           document.body.classList.remove(cls);
         };
         document.body.classList.add(cls);
-        window.addEventListener('mousemove', move);
-        window.addEventListener('mouseup', up);
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+        el.addEventListener('pointercancel', up);
+        el.addEventListener('lostpointercapture', up);
       }}
     />
   );
@@ -258,14 +270,22 @@ export function App() {
   const chatShown = chatOpen && !chatWide;
   // Two chats side by side (and the list of chats) need their own room: below this
   // each pane gets squeezed and its contents spill out.
-  const chatMin = (chatSplit ? 620 : 280) + (chatList ? 190 : 0);
-  const sideShown = sidebar && !design
-    ? Math.max(160, Math.min(sideW, room - (chatShown ? Math.min(chatW, chatMin + 120) : 0)))
-    : 0;
-  const chatShownW = Math.min(
-    Math.max(280, winW - 48 - sideShown - 160),
-    Math.max(chatMin, Math.min(chatW, room - sideShown)),
+  // The list of chats is 230px wide (styles.css .chat-list).
+  const chatMin = (chatSplit ? 620 : 280) + (chatList ? 230 : 0);
+  const sideHi = Math.max(
+    160,
+    Math.min(900, room - (chatShown ? Math.min(chatW, chatMin + 120) : 0)),
   );
+  const sideShown = sidebar && !design ? Math.max(160, Math.min(sideW, sideHi)) : 0;
+  // The chat goes from its minimum up to leaving the editor 160px: the size the user drags
+  // to is the size shown (before, it was clamped again to keep the editor at 360px, so on
+  // 1366-1440px screens with the list or the split view the chat did not move at all).
+  const chatHi = Math.max(280, Math.min(chatSplit ? 1600 : 900, winW - 48 - sideShown - 160));
+  const chatLo = Math.min(chatMin, chatHi);
+  const chatShownW = Math.min(chatHi, Math.max(chatLo, chatW));
+  // Read by the drag handlers, which keep the closure of the render where the drag began.
+  const limits = useRef({ sideHi, chatLo, chatHi });
+  limits.current = { sideHi, chatLo, chatHi };
   // The bottom panel never takes the whole window: the editor keeps PANEL_ROOM px.
   const panelMax = Math.max(PANEL_MIN, winH - PANEL_ROOM);
   const panelShownH = Math.max(PANEL_MIN, Math.min(panelH, panelMax));
@@ -345,18 +365,18 @@ export function App() {
 
   // Separators. A drag starts from the size actually shown (it can be smaller than the stored
   // one on a narrow window), then each move adds its delta to the latest size; the result is
-  // clamped and remembered for the next launch.
-  const sideMaxW = 900;
-  const chatMaxW = chatSplit ? 1600 : 900;
+  // clamped to what can actually be shown (so dragging past the limit leaves no dead zone on
+  // the way back) and remembered for the next launch.
   const dragSide = (d: number) =>
     setSideW((w) => {
-      const next = Math.min(sideMaxW, Math.max(160, w + d));
+      const next = Math.min(limits.current.sideHi, Math.max(160, w + d));
       localStorage.setItem(SIDE_W_KEY, String(Math.round(next)));
       return next;
     });
   const dragChat = (d: number) =>
     setChatW((w) => {
-      const next = Math.min(chatMaxW, Math.max(280, w - d));
+      const { chatLo, chatHi } = limits.current;
+      const next = Math.min(chatHi, Math.max(chatLo, w - d));
       localStorage.setItem(CHAT_W_KEY, String(Math.round(next)));
       return next;
     });
@@ -448,6 +468,8 @@ export function App() {
                 <GitPanel />
               ) : sidebar === 'run' ? (
                 <RunPanel />
+              ) : sidebar === 'debug' ? (
+                <DebugPanel />
               ) : sidebar === 'vercel' ? (
                 <VercelPanel />
               ) : sidebar === 'supabase' ? (
@@ -458,6 +480,8 @@ export function App() {
                 <MailPanel />
               ) : sidebar === 'watch' ? (
                 <WatchPanel />
+              ) : sidebar === 'apps' ? (
+                <AppsPanel />
               ) : (
                 <SearchView />
               )}

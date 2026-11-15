@@ -321,9 +321,9 @@ function register(language: string): void {
   d.push(
     monaco.languages.registerCodeActionProvider(sel, {
       async provideCodeActions(model, range, ctx) {
-        const diagnostics = ctx.markers
-          .filter((m) => m.owner === 'lsp')
-          .map((m) => (m as unknown as { _lsp?: unknown })._lsp ?? markerToDiagnostic(m));
+        const diagnostics = ctx.markers.map(
+          (m) => (m as unknown as { _lsp?: unknown })._lsp ?? markerToDiagnostic(m),
+        );
         const r = await request<LspCodeAction[]>(model, 'textDocument/codeAction', {
           range: toLspRange(range),
           context: { diagnostics },

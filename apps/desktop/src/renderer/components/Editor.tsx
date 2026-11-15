@@ -4,6 +4,9 @@ import { tabKeyDown } from '../a11y';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
 import { registerInlineCompletions } from '../inline';
+import { installLsp } from '../lsp';
+import { attachDebugToEditor, installDebug } from '../debug';
+import { DebugToolbar } from './DebugPanel';
 import { monacoTheme } from '../themes';
 import type { Prefs } from '../../shared/api';
 import {
@@ -48,6 +51,8 @@ export function EditorArea() {
   useEffect(() => {
     if (!host.current) return;
     registerInlineCompletions();
+    installLsp();
+    installDebug();
     const ed = monaco.editor.create(host.current, {
       model: null,
       ...prefOptions(getState().prefs),
@@ -63,7 +68,10 @@ export function EditorArea() {
       stickyScroll: { enabled: true },
       scrollBeyondLastLine: false,
       padding: { top: 6 },
+      // Breakpoints and the debugger's current line.
+      glyphMargin: true,
     });
+    const dbg = attachDebugToEditor(ed);
     editorRef.current = ed;
     attachEditor(ed);
     const sub = ed.onDidChangeCursorPosition((e) =>
@@ -71,6 +79,7 @@ export function EditorArea() {
     );
     return () => {
       sub.dispose();
+      dbg.dispose();
       attachEditor(null);
       ed.dispose();
     };
@@ -176,6 +185,9 @@ export function EditorArea() {
         <div className="breadcrumbs">{activeTab.path.split('/').join(' › ')}</div>
       )}
       <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />
+      <div className="dbg-float">
+        <DebugToolbar />
+      </div>
       {activeTab?.notice && <div className="notice-pane">{activeTab.notice}</div>}
       {activeTab?.viewer && <FileViewerPane key={activeTab.path} tab={activeTab} />}
       {hasBrowserTab && <BrowserPane visible={isBrowser} />}

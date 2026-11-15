@@ -7,6 +7,34 @@ import type { ChatContext } from '../../shared/api';
 import { t } from '../i18n';
 import { api, attachToChat, getState, setState, toast, toggleMaximized, useStore } from '../store';
 import { Icon } from './Icon';
+import { DebugConsole, ProblemsView, useProblemCounts } from './Problems';
+import { td } from '../i18nDebug';
+import { useDebug } from '../debug';
+
+/** Switcher of the bottom panel: terminal, problems, debug console. */
+function PanelViews() {
+  const view = useStore((s) => s.panelView);
+  const { errors, warnings } = useProblemCounts();
+  const debugOn = useDebug((v) => v.state !== 'idle' || v.console.length > 0);
+  const tab = (id: 'terminal' | 'problems' | 'debug', label: string, badge?: number) => (
+    <button
+      role="tab"
+      aria-selected={view === id}
+      className={`panel-view ${view === id ? 'active' : ''}`}
+      onClick={() => setState({ panelView: id })}
+    >
+      {label.toUpperCase()}
+      {badge ? <span className="panel-view-badge">{badge > 99 ? '99+' : badge}</span> : null}
+    </button>
+  );
+  return (
+    <div className="panel-views" role="tablist">
+      {tab('terminal', t('terminal'))}
+      {tab('problems', td('probTitle'), errors + warnings)}
+      {(debugOn || view === 'debug') && tab('debug', td('dbgConsole'))}
+    </div>
+  );
+}
 
 interface Term {
   id: number;
@@ -148,6 +176,7 @@ export let runInTerminal: (text: string) => Promise<void> = async () => {};
 export function TerminalPanel() {
   const theme = useStore((s) => s.settings.theme);
   const maximized = useStore((s) => s.maximized === 'panel');
+  const view = useStore((s) => s.panelView);
   const host = useRef<HTMLDivElement>(null);
   const [ids, setIds] = useState<number[]>([]);
   const isWindows = navigator.userAgent.includes('Windows');
@@ -292,7 +321,9 @@ export function TerminalPanel() {
   return (
     <div className="panel">
       <div className="panel-header">
-        <span className="panel-title">{t('terminal').toUpperCase()}</span>
+        <PanelViews />
+        {view === 'terminal' ? (
+        <>
         <div
           className="term-tabs"
           role="tablist"
@@ -377,8 +408,34 @@ export function TerminalPanel() {
             <Icon name="x" size={14} />
           </button>
         </span>
+        </>
+        ) : (
+          <span className="sidebar-actions panel-other-actions">
+            <button
+              className={maximized ? 'on' : ''}
+              title={maximized ? t('restoreSize') : t('maximize')}
+              aria-label={maximized ? t('restoreSize') : t('maximize')}
+              onClick={() => toggleMaximized('panel')}
+            >
+              <Icon name={maximized ? 'minimize' : 'maximize'} size={14} />
+            </button>
+            <button
+              title={t('termHide')}
+              aria-label={t('termHide')}
+              onClick={() => setState({ panelOpen: false })}
+            >
+              <Icon name="x" size={14} />
+            </button>
+          </span>
+        )}
       </div>
-      <div className="terminal-host" ref={host} />
+      <div
+        className="terminal-host"
+        ref={host}
+        style={view === 'terminal' ? undefined : { display: 'none' }}
+      />
+      {view === 'problems' && <ProblemsView />}
+      {view === 'debug' && <DebugConsole />}
       {menu && (
         <div
           className="context-menu term-shell-menu"

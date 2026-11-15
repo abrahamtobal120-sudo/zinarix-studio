@@ -44,6 +44,10 @@ export type DesignKey = 'undo' | 'redo' | 'save' | 'escape' | 'ai';
 /** Preview → panel. */
 export type DesignPreviewMsg =
   | { type: 'ready'; title: string; tree: DesignLayer[] }
+  /** The page changed by itself (an app that draws its screens with JavaScript). */
+  | { type: 'tree'; title: string; tree: DesignLayer[] }
+  /** The address inside the app changed (its own links and buttons, in live mode). */
+  | { type: 'location'; path: string }
   /** The page was scrolled (the panel keeps it to restore it after a reload). */
   | { type: 'scroll'; y: number }
   | { type: 'hover'; src: DesignSrc | null }
@@ -80,7 +84,35 @@ export type DesignKind =
   | 'svelte'
   | 'angular'
   | 'remix'
+  /** A desktop app (Electron): it has screens, but they are not a web page to preview. */
+  | 'desktop'
   | 'unknown';
+
+/**
+ * A web app found in the folder (the folder itself, or one of the apps of a monorepo) that
+ * the panel can show by its dev server or by its built files.
+ */
+export interface DesignApp {
+  /** Project-relative folder of its package.json ("" = the folder itself). */
+  dir: string;
+  kind: DesignKind;
+  /** Plain words: "React con Vite", "Next.js". */
+  label: string;
+  /** Address its dev server usually runs on ("http://localhost:5173"). */
+  devUrl: string | null;
+  /** Project-relative folder with a built index.html ("dist", "apps/web/build"), if any. */
+  built: string | null;
+}
+
+/**
+ * How the panel shows the project:
+ * - edit: plain HTML pages, edited with clicks and written to the files;
+ * - live: a running dev server (Vite, Next…) shown through the panel; click to select and
+ *   ask the AI to change it in the code;
+ * - built: the built files (dist/, build/, out/), also changed through the AI;
+ * - none: nothing to show yet (a framework project whose preview is not running).
+ */
+export type DesignMode = 'edit' | 'live' | 'built' | 'none';
 
 export interface DesignPage {
   /** Project-relative file ("index.html", "blog/post.html"). */
@@ -109,6 +141,13 @@ export interface DesignSessionView {
   /** Address the preview frame loads (zxp://…), null when nothing can be shown. */
   base: string | null;
   history: DesignHistory;
+  mode: DesignMode;
+  /** The web app shown (or to show) in live/built mode. */
+  app: DesignApp | null;
+  /** Every web app found in the folder (more than one in a monorepo). */
+  apps: DesignApp[];
+  /** Dev server address shown in live mode. */
+  live: string | null;
 }
 
 /** Result of an edit: the new history, and whether the preview must reload to stay in sync. */

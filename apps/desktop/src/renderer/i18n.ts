@@ -1,4 +1,17 @@
 const es = {
+  // Barra de actividades: el panel "Más" (integraciones y herramientas).
+  appsBar: 'Barra de actividades',
+  appsTitle: 'Más',
+  appsIntegrations: 'Integraciones',
+  appsTools: 'Herramientas',
+  appsVercel: 'Despliegues, dominios y registros de tus sitios',
+  appsSupabase: 'Base de datos, tablas, funciones y SQL',
+  appsGcloud: 'APIs, BigQuery, Storage y Cloud SQL',
+  appsMail: 'Lee, responde y envía correos',
+  appsWhatsapp: 'Tus chats, y habla con la IA desde el celular',
+  appsBrowser: 'Navegador integrado, aislado de tus archivos',
+  appsUsage: 'Lo que gastaste por día y por modelo',
+  appsPalette: 'Todos los comandos, con su atajo',
   histTitle: 'Historial de chats',
   // Panels: Git, Explorer, Search, Run, Watch (UI review fixes).
   gitBusyInit: 'Inicializando el repositorio',
@@ -1714,6 +1727,19 @@ const es = {
 export type Key = keyof typeof es;
 
 const en: Record<Key, string> = {
+  // Activity bar: the "More" panel (integrations and tools).
+  appsBar: 'Activity bar',
+  appsTitle: 'More',
+  appsIntegrations: 'Integrations',
+  appsTools: 'Tools',
+  appsVercel: 'Deployments, domains and logs of your sites',
+  appsSupabase: 'Database, tables, functions and SQL',
+  appsGcloud: 'APIs, BigQuery, Storage and Cloud SQL',
+  appsMail: 'Read, reply and send email',
+  appsWhatsapp: 'Your chats, and talk to the AI from your phone',
+  appsBrowser: 'Built-in browser, isolated from your files',
+  appsUsage: 'What you spent per day and per model',
+  appsPalette: 'Every command, with its shortcut',
   histTitle: 'Chat history',
   // Panels: Git, Explorer, Search, Run, Watch (UI review fixes).
   gitBusyInit: 'Initializing the repository',

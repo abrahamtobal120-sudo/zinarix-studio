@@ -243,8 +243,12 @@ function ListPanel({
                     <Favicon src={list.icons[hostOf(e.url)]} />
                   </span>
                   <span className="browser-row-title">{e.title || hostOf(e.url) || e.url}</span>
-                  <span className="browser-row-url">{e.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
-                  {kind === 'history' && <span className="browser-row-time">{timeLabel(e.at)}</span>}
+                  <span className="browser-row-url">
+                    {e.url.replace(/^https?:\/\/(www\.)?/, '')}
+                  </span>
+                  {kind === 'history' && (
+                    <span className="browser-row-time">{timeLabel(e.at)}</span>
+                  )}
                 </button>
                 <button
                   className="bicon browser-row-x"
@@ -252,7 +256,11 @@ function ListPanel({
                   aria-label={kind === 'history' ? t('browserForget') : t('browserBookmarkRemove')}
                   onClick={() => void remove(e)}
                 >
-                  {kind === 'history' ? <Icon d={ICON.stop} size={12} /> : <UiIcon name="trash" size={13} />}
+                  {kind === 'history' ? (
+                    <Icon d={ICON.stop} size={12} />
+                  ) : (
+                    <UiIcon name="trash" size={13} />
+                  )}
                 </button>
               </div>
             ))}
@@ -544,7 +552,9 @@ export function BrowserPane({ visible }: { visible: boolean }) {
               spellCheck={false}
               aria-autocomplete="list"
               aria-expanded={suggesting}
-              style={!editing && st.url ? { position: 'absolute', opacity: 0, width: 1 } : undefined}
+              style={
+                !editing && st.url ? { position: 'absolute', opacity: 0, width: 1 } : undefined
+              }
               onFocus={(e) => {
                 editTab.current = tabs.active;
                 setEditing(true);
@@ -616,7 +626,9 @@ export function BrowserPane({ visible }: { visible: boolean }) {
                     <Favicon src={suggest.icons[hostOf(e.url)]} />
                   </span>
                   <span className="browser-row-title">{e.title || hostOf(e.url)}</span>
-                  <span className="browser-row-url">{e.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  <span className="browser-row-url">
+                    {e.url.replace(/^https?:\/\/(www\.)?/, '')}
+                  </span>
                   {e.bookmark && (
                     <span className="browser-suggest-star">
                       <UiIcon name="starFilled" size={12} />

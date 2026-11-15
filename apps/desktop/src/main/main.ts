@@ -76,6 +76,7 @@ import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
 import { McpManager } from './mcp.js';
 import { DebugManager } from './debug/manager.js';
 import { ExtensionStore } from './extensions/store.js';
+import { HelperService, MODEL_NAME } from './helper.js';
 import { VideoService, fromStored, toStored } from './video.js';
 import type { VideoProject } from '../shared/video.js';
 import { MEDIA_EXTENSIONS, PROJECT_EXT, mediaKindOf, validProject } from '../shared/video.js';
@@ -1251,6 +1252,7 @@ function registerIpc(): void {
     if (root) mcpMgr.trustProject(root, on);
   });
   registerDesignIpc();
+  registerHelperIpc();
   const box = z.string().min(1).max(1000);
   const uid = z.number().int().positive();
   const host = z.string().trim().min(1).max(253);
@@ -1551,6 +1553,8 @@ function registerIpc(): void {
       lsp: z.boolean(),
       lspCommands: z.record(z.string().max(64), z.string().max(2000)),
       nextEdit: z.boolean(),
+      helperBubble: z.boolean(),
+      helperModel: z.string().regex(MODEL_NAME),
     })
     .partial();
   handle('app:prefs', z.tuple([]), () => prefs());
@@ -2077,6 +2081,50 @@ async function designCall<T>(fn: () => Promise<T>): Promise<T> {
     if (e instanceof EditError) throw e;
     throw new Error(`No se pudo guardar el cambio: ${(e as Error).message}`);
   }
+}
+
+/** Ayuda de Zinarix (main/helper.ts): local Ollama model + the app's own docs. */
+function registerHelperIpc(): void {
+  const helper = new HelperService(
+    join(appRoot, 'dist', 'helper', 'knowledge.json'),
+    // The cloud model is only used when the user picked it in the helper (cloud: true).
+    async function* (messages, signal) {
+      for await (const ev of ai.core.stream({ role: 'chat', maxTokens: 800, messages }, signal))
+        if (ev.type === 'text') yield ev.delta;
+    },
+  );
+  app.on('before-quit', () => helper.close());
+  const reqId = z.string().min(1).max(200);
+  handle('helper:status', z.tuple([]), () => helper.status(prefs().helperModel));
+  handle(
+    'helper:ask',
+    z.tuple([
+      reqId,
+      z.object({
+        question: z.string().min(1).max(4000),
+        history: z
+          .array(
+            z.object({
+              role: z.enum(['user', 'assistant']),
+              content: z.string().max(20_000),
+            }),
+          )
+          .max(40),
+        cloud: z.boolean().optional(),
+      }),
+    ]),
+    (w, requestId, req) => {
+      void helper.ask(rid(w, requestId), { ...req, model: prefs().helperModel }, (event) =>
+        send(w, { type: 'helper', requestId, event }),
+      );
+    },
+  );
+  handle('helper:pull', z.tuple([reqId, z.string().regex(MODEL_NAME)]), (w, requestId, model) =>
+    helper.pull(rid(w, requestId), model, (event) =>
+      send(w, { type: 'helper:pull', event: { ...event, requestId } }),
+    ),
+  );
+  handle('helper:abort', z.tuple([reqId]), (w, requestId) => helper.abort(rid(w, requestId)));
 }
 
 function registerDesignIpc(): void {

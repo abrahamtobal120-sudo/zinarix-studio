@@ -223,7 +223,14 @@ if (process.env.DBG)
   console.log('   toast after ctrl+s:', await win.locator('.toast').allTextContents());
 check('project saved', existsSync(projPath));
 
-// 8. Esc closes the studio; Ctrl+Shift+V reopens.
+// 8. Esc first closes the open render-queue drop-down, then the studio; Ctrl+Shift+V reopens.
+const queueOpen = (await win.locator('.vs-queue').count()) > 0;
+if (queueOpen) {
+  await win.keyboard.press('Escape');
+  await win.waitForTimeout(200);
+  check('esc closes the render queue first', !(await win.locator('.vs-queue').count()));
+  check('studio still open after that', (await win.locator('.vs-root.vs-in').count()) === 1);
+}
 await win.keyboard.press('Escape');
 await win.waitForTimeout(400);
 check('esc closes studio', !(await win.locator('.vs-root.vs-in').count()));
@@ -232,6 +239,30 @@ await win.keyboard.press('Control+Shift+V');
 await win.waitForTimeout(500);
 check('ctrl+shift+v reopens', (await win.locator('.vs-root.vs-in').count()) === 1);
 await shot('8-reopened');
+
+// 9. Layout: nothing spills out of the window, at a normal and at a small size.
+const layoutCheck = async (label) => {
+  const r = await win.evaluate(() => {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const box = (s) => document.querySelector(s)?.getBoundingClientRect();
+    const bottom = box('.vs-bottom');
+    const top = box('.vs-top');
+    const center = box('.vs-center');
+    return {
+      timelineInside: !!bottom && bottom.bottom <= H + 1 && bottom.height >= 140,
+      topFits: !!top && document.querySelector('.vs-top').scrollWidth <= W + 1,
+      viewerRoom: !!center && center.width >= 300 && center.height >= 200,
+    };
+  });
+  check(`layout ${label}`, r.timelineInside && r.topFits && r.viewerRoom, JSON.stringify(r));
+};
+await layoutCheck('1440x900');
+await win.setViewportSize?.({ width: 820, height: 600 });
+await win.waitForTimeout(500);
+await layoutCheck('820x600');
+await shot('9-small-window');
+await win.setViewportSize?.({ width: 1440, height: 900 });
 
 console.log(logs.filter((l) => !/Autofill|DevTools|Electron Security/.test(l)).join('\n'));
 await app.close();

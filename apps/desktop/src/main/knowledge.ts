@@ -193,6 +193,22 @@ export class Knowledge {
     return true;
   }
 
+  /** Adds or replaces a memory as given (same id): the cloud sync bringing one from another PC. */
+  async putMemory(item: MemoryView): Promise<void> {
+    const f = this.memoryFile();
+    const clean: MemoryView = {
+      id: String(item.id).slice(0, 64),
+      text: redact(String(item.text)).slice(0, MAX_MEMORY_CHARS),
+      scope: item.scope === 'project' ? 'project' : 'global',
+      ...(item.scope === 'project' && item.project ? { project: String(item.project) } : {}),
+      created: Number(item.created) || Date.now(),
+    };
+    const i = f.items.findIndex((m) => m.id === clean.id);
+    if (i >= 0) f.items[i] = clean;
+    else f.items.push(clean);
+    await this.saveMemories();
+  }
+
   /** System-prompt block with the memories that apply (empty when there are none). */
   promptBlock(project?: string): string {
     const items = this.memories(project);

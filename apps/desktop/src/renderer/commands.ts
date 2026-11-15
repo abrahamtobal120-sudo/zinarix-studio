@@ -1,6 +1,19 @@
 import { askInChat, closeChatFromTab, focusedChatTab } from './components/Chat';
 import { listTerminals, sendTerminalToChat, terminalFocused } from './components/Terminal';
 import { confirmDialog } from './confirm';
+import { goToNextProblem } from './components/Problems';
+import {
+  getDebug,
+  pause,
+  restartDebug,
+  startDebug,
+  stepInto,
+  stepOut,
+  stepOver,
+  stopDebug,
+  toggleBreakpointAtCursor,
+} from './debug';
+import { td } from './i18nDebug';
 import { studioCommand, videoCommands } from './components/video/videoCommands';
 import { lang, setLang, t } from './i18n';
 import { comboFromEvent } from './keys';
@@ -188,6 +201,45 @@ function baseCommands(): Command[] {
       label: t('runTitle'),
       run: () => setState((s) => ({ sidebar: s.sidebar === 'run' ? null : 'run' })),
     },
+    {
+      id: 'view.debug',
+      label: td('dbgTitle'),
+      keys: `${mod}+Shift+D`,
+      run: () => setState((s) => ({ sidebar: s.sidebar === 'debug' ? null : 'debug' })),
+    },
+    {
+      id: 'debug.start',
+      label: `${td('dbgStart')} / ${td('dbgContinue')}`,
+      keys: 'F5',
+      run: () => {
+        setState({ sidebar: 'debug' });
+        return startDebug();
+      },
+    },
+    { id: 'debug.stop', label: td('dbgStop'), keys: 'Shift+F5', run: () => stopDebug() },
+    { id: 'debug.restart', label: td('dbgRestart'), keys: 'Ctrl+Shift+F5', run: () => restartDebug() },
+    { id: 'debug.pause', label: td('dbgPause'), keys: 'F6', run: () => pause() },
+    { id: 'debug.stepOver', label: td('dbgStepOver'), keys: 'F10', run: () => stepOver() },
+    { id: 'debug.stepInto', label: td('dbgStepInto'), keys: 'F11', run: () => stepInto() },
+    { id: 'debug.stepOut', label: td('dbgStepOut'), keys: 'Shift+F11', run: () => stepOut() },
+    {
+      id: 'debug.toggleBreakpoint',
+      label: td('dbgToggleBp'),
+      keys: 'F9',
+      run: () => toggleBreakpointAtCursor(),
+    },
+    {
+      id: 'view.problems',
+      label: td('probTitle'),
+      keys: `${mod}+Shift+M`,
+      run: () =>
+        setState((s) =>
+          s.panelOpen && s.panelView === 'problems'
+            ? { panelOpen: false }
+            : { panelOpen: true, panelView: 'problems' },
+        ),
+    },
+    { id: 'problems.next', label: td('problemsNext'), keys: 'F8', run: () => goToNextProblem() },
     {
       id: 'view.vercel',
       label: t('vcTitle'),
@@ -461,6 +513,49 @@ function onAltKey(e: KeyboardEvent): void {
   e.stopPropagation();
   void runCommand(c.id);
 }
+/**
+ * Debugger keys (F5, F9, F10, F11…), handled here instead of the app menu: F11 steps into
+ * only while the program is paused (otherwise it stays full screen, as in VS Code), and the
+ * step keys do nothing outside a session. A shortcut the user gave to another command wins.
+ */
+const DEBUG_KEYS: Record<string, string> = {
+  F5: 'debug.start',
+  'Shift+F5': 'debug.stop',
+  'Ctrl+Shift+F5': 'debug.restart',
+  F6: 'debug.pause',
+  F9: 'debug.toggleBreakpoint',
+  F10: 'debug.stepOver',
+  F11: 'debug.stepInto',
+  'Shift+F11': 'debug.stepOut',
+  F8: 'problems.next',
+  [`${mod}+Shift+D`]: 'view.debug',
+  [`${mod}+Shift+M`]: 'view.problems',
+};
+function onDebugKey(e: KeyboardEvent): void {
+  const combo = comboFromEvent(e);
+  if (!combo) return;
+  if ((e.target as Element | null)?.closest?.('.key-recorder')) return;
+  const custom = getState().prefs.keybindings;
+  const own = Object.keys(custom).find((k) => custom[k] === combo);
+  const id = own ?? (Object.values(custom).includes(combo) ? undefined : DEBUG_KEYS[combo]);
+  if (!id || own) return; // custom shortcuts are run by App.tsx
+  const state = getDebug().state;
+  if (id.startsWith('debug.step') && state !== 'stopped') return;
+  if ((id === 'debug.stop' || id === 'debug.restart' || id === 'debug.pause') && state === 'idle')
+    return;
+  e.preventDefault();
+  e.stopPropagation();
+  void runCommand(id);
+}
+const DEBUG_KEYS_FLAG = '__zxDebugKeys';
+if (!w0()[DEBUG_KEYS_FLAG]) {
+  w0()[DEBUG_KEYS_FLAG] = true;
+  window.addEventListener('keydown', onDebugKey, true);
+}
+function w0(): Record<string, unknown> {
+  return window as unknown as Record<string, unknown>;
+}
+
 const ALT_KEYS_FLAG = '__zxAltKeys';
 const w = window as unknown as Record<string, unknown>;
 if (!w[ALT_KEYS_FLAG]) {

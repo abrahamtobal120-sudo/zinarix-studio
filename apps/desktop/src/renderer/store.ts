@@ -100,6 +100,8 @@ export interface State {
     | 'gcloud'
     | 'mail'
     | 'watch'
+    /** "Más": integrations (Vercel, Supabase, Google Cloud, mail...) and tools, as a list. */
+    | 'apps'
     /** Run and debug (launch configs, call stack, variables, watch, breakpoints). */
     | 'debug'
     /** Panel de Edición: takes the whole editor area (the chat stays beside it). */
