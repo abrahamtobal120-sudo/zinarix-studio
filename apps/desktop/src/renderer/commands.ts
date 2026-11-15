@@ -195,6 +195,19 @@ function baseCommands(): Command[] {
       run: () => setState((s) => ({ sidebar: s.sidebar === 'watch' ? null : 'watch' })),
     },
     {
+      id: 'view.design',
+      label: t('dzOpen'),
+      run: () => setState({ sidebar: 'design', maximized: null }),
+    },
+    {
+      id: 'design.visitor',
+      label: t('dzCmdVisitor'),
+      run: () => {
+        setState({ sidebar: 'design', maximized: null });
+        window.dispatchEvent(new CustomEvent('zx-design', { detail: 'visitor' }));
+      },
+    },
+    {
       id: 'view.mail',
       label: t('mlTitle'),
       run: () => setState((s) => ({ sidebar: s.sidebar === 'mail' ? null : 'mail' })),

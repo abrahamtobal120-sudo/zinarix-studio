@@ -1,5 +1,7 @@
 # Base Code - OSS
 
+> Ahora se recomienda la base VSCodium: ver [vscodium.md](vscodium.md).
+
 La base descargada vive en `vendor/vscode-main`. Es una base experimental separada del escritorio actual; los proveedores, agentes, navegador e integraciones de `apps/desktop` todavia no estan conectados al workbench de VS Code.
 
 ## Preparar en Windows

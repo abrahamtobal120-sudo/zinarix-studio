@@ -25,9 +25,7 @@
   },
   "dependencies": {
     "@lydell/node-pty": "1.2.0-beta.15",
-    "@napi-rs/keyring": "^1.2.0",
-    "ffmpeg-static": "^5.3.0",
-    "ffprobe-static": "^3.1.0"
+    "@napi-rs/keyring": "^1.2.0"
   },
   "devDependencies": {
     "@omni/catalog": "workspace:*",
@@ -45,6 +43,8 @@
     "electron-builder": "^26.15.3",
     "electron-updater": "6.8.10",
     "esbuild": "^0.28.2",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
     "imapflow": "^2.10.0",
     "mailparser": "^3.14.1",
     "monaco-editor": "0.57.0",
@@ -99,7 +99,17 @@
           "StartupWMClass": "Zinarix Studio",
           "Keywords": "code;editor;ia;ai;ide;"
         }
-      }
+      },
+      "extraResources": [
+        {
+          "from": "node_modules/ffmpeg-static/ffmpeg",
+          "to": "ffmpeg/ffmpeg"
+        },
+        {
+          "from": "node_modules/ffprobe-static/bin/linux/${arch}/ffprobe",
+          "to": "ffmpeg/ffprobe"
+        }
+      ]
     },
     "deb": {
       "depends": [
@@ -143,7 +153,17 @@
       "icon": "build/icon.png",
       "artifactName": "Zinarix-Studio-${version}-${arch}.${ext}",
       "hardenedRuntime": false,
-      "identity": null
+      "identity": null,
+      "extraResources": [
+        {
+          "from": "node_modules/ffmpeg-static/ffmpeg",
+          "to": "ffmpeg/ffmpeg"
+        },
+        {
+          "from": "node_modules/ffprobe-static/bin/darwin/${arch}/ffprobe",
+          "to": "ffmpeg/ffprobe"
+        }
+      ]
     },
     "dmg": {
       "title": "Zinarix Studio"
@@ -164,7 +184,17 @@
         }
       ],
       "icon": "build/icon.png",
-      "artifactName": "Zinarix-Studio-${version}-${arch}-setup.${ext}"
+      "artifactName": "Zinarix-Studio-${version}-${arch}-setup.${ext}",
+      "extraResources": [
+        {
+          "from": "node_modules/ffmpeg-static/ffmpeg.exe",
+          "to": "ffmpeg/ffmpeg.exe"
+        },
+        {
+          "from": "node_modules/ffprobe-static/bin/win32/${arch}/ffprobe.exe",
+          "to": "ffmpeg/ffprobe.exe"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,

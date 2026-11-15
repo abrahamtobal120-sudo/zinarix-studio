@@ -1,5 +1,6 @@
 import './system-ca.js';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
@@ -50,6 +51,9 @@ import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
 import { McpManager } from './mcp.js';
 import { DebugManager } from './debug/manager.js';
 import { ExtensionStore } from './extensions/store.js';
+import { VideoService, fromStored, toStored } from './video.js';
+import type { VideoProject } from '../shared/video.js';
+import { MEDIA_EXTENSIONS, PROJECT_EXT, mediaKindOf, validProject } from '../shared/video.js';
 
 let mcp: McpManager | undefined;
 
@@ -66,6 +70,11 @@ protocol.registerSchemesAsPrivileged([
   {
     scheme: 'app',
     privileges: { standard: true, secure: true, supportFetchAPI: true, codeCache: true },
+  },
+  // Video Studio media (only files the user picked): streamed with byte ranges.
+  {
+    scheme: 'zmedia',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true },
   },
   // Pages of the open project shown (and edited) in the Panel de Edición.
   { scheme: 'zxp', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -500,6 +509,28 @@ function folderFromArgv(argv: string[]): string | undefined {
   return undefined;
 }
 
+// ---------------- Video Studio ----------------
+
+let video: VideoService | undefined;
+/** Project files the user opened or saved through a dialog (saving there needs no new dialog). */
+const videoPaths = new Set<string>();
+/** Export targets the user chose in the save dialog (the only places exports may write). */
+const videoOutputs = new Set<string>();
+const videoJobOwner = new Map<string, Win>();
+function videoService(): VideoService {
+  return (video ??= new VideoService(
+    appRoot,
+    app.getPath('userData'),
+    (job) => {
+      const w = videoJobOwner.get(job.id);
+      if (w) send(w, { type: 'video:job', job });
+      if (job.state === 'done' && Notification.isSupported())
+        new Notification({ title: 'Video exportado', body: basename(job.out) }).show();
+    },
+    app.isPackaged ? process.resourcesPath : undefined,
+  ));
+}
+
 function ws(w: Win): Workspace {
   if (!w.workspace) throw new Error('No hay carpeta abierta');
   return w.workspace;
@@ -770,6 +801,173 @@ function registerIpc(): void {
   );
   handle('lsp:statuses', z.tuple([]), (w) => lspOf(w).statuses());
   handle('lsp:restart', z.tuple([]), (w) => lspOf(w).restart());
+
+  // ---------------- Video Studio ----------------
+  const absPath = z.string().min(1).max(4096);
+  const projectArg = z.custom<VideoProject>((x) => validProject(x), 'proyecto de video no válido');
+  const exportArg = z.object({
+    width: z.number().int().min(16).max(8192),
+    height: z.number().int().min(16).max(8192),
+    fps: z.number().min(1).max(240),
+    crf: z.number().int().min(0).max(51),
+    preset: z.enum(['veryfast', 'fast', 'medium', 'slow']),
+    audioKbps: z.number().int().min(32).max(512),
+    start: z.number().min(0),
+    end: z.number().min(0),
+  });
+  const mediaFilters = [
+    {
+      name: 'Medios',
+      extensions: [...MEDIA_EXTENSIONS.video, ...MEDIA_EXTENSIONS.audio, ...MEDIA_EXTENSIONS.image],
+    },
+    { name: 'Video', extensions: [...MEDIA_EXTENSIONS.video] },
+    { name: 'Audio', extensions: [...MEDIA_EXTENSIONS.audio] },
+    { name: 'Imágenes', extensions: [...MEDIA_EXTENSIONS.image] },
+  ];
+  const projectFilters = [{ name: 'Proyecto de Zinarix Video', extensions: [PROJECT_EXT] }];
+  const isFile = (p: string) => existsSync(p) && statSync(p).isFile();
+  const videoDir = () => {
+    const d = join(app.getPath('userData'), 'video');
+    mkdirSync(d, { recursive: true });
+    return d;
+  };
+  const safeName = (n: string, fallback: string) => n.replace(/[\\/:*?"<>|]+/g, ' ').trim() || fallback;
+  handle('video:tools', z.tuple([]), () => {
+    const t = videoService().tools();
+    return { ffmpeg: Boolean(t.ffmpeg && t.ffprobe), version: t.version };
+  });
+  handle('video:pickMedia', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Importar medios',
+      properties: ['openFile', 'multiSelections'],
+      filters: mediaFilters,
+    });
+    return r.canceled ? [] : r.filePaths;
+  });
+  handle('video:probe', z.tuple([absPath]), (_w, p) => videoService().probe(resolve(p)));
+  handle('video:workspacePath', z.tuple([rel]), (w, p) => {
+    const abs = ws(w).resolve(p);
+    return isFile(abs) && (mediaKindOf(abs) || abs.toLowerCase().endsWith(`.${PROJECT_EXT}`)) ? abs : null;
+  });
+  // Only media files: the protocol never serves anything else the renderer names.
+  handle('video:mediaUrl', z.tuple([absPath]), (_w, p) =>
+    mediaKindOf(p) && isFile(p) ? videoService().urlFor(resolve(p)) : null,
+  );
+  handle(
+    'video:thumbnails',
+    z.tuple([absPath, z.number().min(0).max(1e6), z.number().int().min(1).max(200)]),
+    (_w, p, d, n) => {
+      if (!mediaKindOf(p) || !isFile(p)) throw new Error('archivo no válido');
+      return videoService().thumbnails(resolve(p), d, n);
+    },
+  );
+  handle('video:waveform', z.tuple([absPath]), (_w, p) => {
+    if (!mediaKindOf(p) || !isFile(p)) throw new Error('archivo no válido');
+    return videoService().waveform(resolve(p));
+  });
+  handle(
+    'video:saveProject',
+    z.tuple([projectArg, absPath.nullable(), z.boolean()]),
+    async (w, project, path, saveAs) => {
+      let target = path && !saveAs && videoPaths.has(resolve(path)) ? resolve(path) : null;
+      if (!target) {
+        const r = await dialog.showSaveDialog(w.win, {
+          title: 'Guardar proyecto de video',
+          defaultPath: `${safeName(project.name, 'proyecto')}.${PROJECT_EXT}`,
+          filters: projectFilters,
+        });
+        if (r.canceled || !r.filePath) return null;
+        target = resolve(r.filePath);
+      }
+      // The previous version goes to the history (the last 20 per project).
+      if (isFile(target)) {
+        const hist = join(videoDir(), 'versions', createHash('sha1').update(target).digest('hex').slice(0, 16));
+        mkdirSync(hist, { recursive: true });
+        writeFileSync(join(hist, `${Date.now()}.${PROJECT_EXT}`), readFileSync(target));
+        for (const f of readdirSync(hist).sort().slice(0, -20)) rmSync(join(hist, f), { force: true });
+      }
+      writeFileSync(target, JSON.stringify(toStored(project, dirname(target)), null, 1), 'utf8');
+      videoPaths.add(target);
+      return target;
+    },
+  );
+  handle('video:openProject', z.tuple([absPath.nullable()]), async (w, path) => {
+    let target = path ? resolve(path) : null;
+    if (!target) {
+      const r = await dialog.showOpenDialog(w.win, {
+        title: 'Abrir proyecto de video',
+        properties: ['openFile'],
+        filters: projectFilters,
+      });
+      if (r.canceled || !r.filePaths[0]) return null;
+      target = resolve(r.filePaths[0]);
+    }
+    if (!target.toLowerCase().endsWith(`.${PROJECT_EXT}`) || !isFile(target))
+      throw new Error('No es un proyecto de video.');
+    const parsed: unknown = JSON.parse(readFileSync(target, 'utf8'));
+    if (!validProject(parsed)) throw new Error('El archivo del proyecto está dañado.');
+    const project = fromStored(parsed, dirname(target));
+    for (const m of project.media) if (!m.missing) videoService().urlFor(m.path);
+    videoPaths.add(target);
+    return { path: target, project };
+  });
+  handle('video:autosave', z.tuple([projectArg.nullable(), absPath.nullable()]), (_w, project, path) => {
+    const file = join(videoDir(), 'autosave.json');
+    if (!project) return void rmSync(file, { force: true });
+    writeFileSync(file, JSON.stringify({ savedAt: Date.now(), path, project }), 'utf8');
+  });
+  handle('video:recover', z.tuple([]), () => {
+    const file = join(videoDir(), 'autosave.json');
+    if (!isFile(file)) return null;
+    try {
+      const j = JSON.parse(readFileSync(file, 'utf8')) as { savedAt: number; path: string | null; project: unknown };
+      if (!validProject(j.project)) return null;
+      // Autosaves keep absolute paths (no project folder to be relative to).
+      const project = fromStored(j.project, j.path ? dirname(j.path) : videoDir());
+      for (const m of project.media) if (!m.missing) videoService().urlFor(m.path);
+      if (j.path) videoPaths.add(resolve(j.path));
+      return { project, path: j.path, savedAt: j.savedAt };
+    } catch {
+      return null;
+    }
+  });
+  handle('video:relink', z.tuple([z.string().max(512)]), async (w, name) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: `Volver a vincular: ${name}`,
+      properties: ['openFile'],
+      filters: mediaFilters,
+    });
+    return r.canceled ? null : (r.filePaths[0] ?? null);
+  });
+  handle('video:exportPath', z.tuple([z.string().max(512)]), async (w, name) => {
+    const r = await dialog.showSaveDialog(w.win, {
+      title: 'Exportar video',
+      defaultPath: join(app.getPath('videos'), `${safeName(name, 'video')}.mp4`),
+      filters: [{ name: 'MP4 (H.264)', extensions: ['mp4'] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    const out = resolve(r.filePath.toLowerCase().endsWith('.mp4') ? r.filePath : `${r.filePath}.mp4`);
+    videoOutputs.add(out);
+    return out;
+  });
+  // Exports write only where the user chose in the save dialog.
+  handle('video:export', z.tuple([projectArg, exportArg, absPath]), (w, project, options, out) => {
+    const target = resolve(out);
+    if (!videoOutputs.has(target)) throw new Error('Elige primero dónde guardar el video.');
+    if (!(options.end > options.start)) throw new Error('El rango a exportar está vacío.');
+    const job = videoService().enqueue(project, options, target);
+    videoJobOwner.set(job.id, w);
+    send(w, { type: 'video:job', job });
+    return job;
+  });
+  handle('video:jobs', z.tuple([]), () => videoService().list());
+  handle('video:cancel', z.tuple([z.string().max(64)]), (_w, jobId) => videoService().cancel(jobId));
+  handle('video:reveal', z.tuple([absPath]), (_w, p) => {
+    const target = resolve(p);
+    if (isFile(target) && (videoOutputs.has(target) || videoPaths.has(target))) shell.showItemInFolder(target);
+  });
+  handle('video:cacheSize', z.tuple([]), () => videoService().cacheSize());
+  handle('video:clearCache', z.tuple([]), () => videoService().clearCache());
   // Debugger: one session per window, rooted at its open folder.
   const bpList = z
     .array(
@@ -1865,6 +2063,7 @@ const MIME: Record<string, string> = {
 };
 
 function registerProtocol(): void {
+  protocol.handle('zmedia', (req) => videoService().serve(req));
   protocol.handle('app', async (req) => {
     const url = new URL(req.url);
     const path = normalize(
@@ -1960,6 +2159,7 @@ function buildMenu(): void {
           click: cmd('terminal.toChat'),
         },
         { label: 'Chat de IA', accelerator: 'CmdOrCtrl+Alt+I', click: cmd('view.chat') },
+        { label: 'Zinarix Video Studio', accelerator: 'CmdOrCtrl+Shift+V', click: cmd('video.toggle') },
         { label: 'Alternar tema claro/oscuro', click: cmd('view.toggleTheme') },
         { type: 'separator' },
         { label: 'Agrandar todo', accelerator: 'CmdOrCtrl+=', click: () => stepZoom(1) },
@@ -2294,6 +2494,7 @@ app.on('window-all-closed', () => {
   stopPhone();
   whatsapp.destroy();
   terminals.killAll();
+  video?.dispose();
   ai?.close();
   app.quit();
 });

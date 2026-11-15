@@ -16,6 +16,7 @@ import { Readable } from 'node:stream';
 import type { ExportOptions, MediaItem, VideoProject } from '../shared/video.js';
 import { mediaKindOf, uid } from '../shared/video.js';
 import { buildRender } from '../shared/videoRender.js';
+import { findExecutable } from './lspProtocol.js';
 
 export interface FfmpegInfo {
   ffmpeg: string | null;
@@ -56,8 +57,8 @@ export function findFfmpeg(appRoot: string, resourcesPath?: string): FfmpegInfo 
   };
   const pick = (list: (string | undefined)[], name: string): string | null => {
     for (const p of list) if (p && existsSync(p)) return p;
-    const r = spawnSync(name, ['-version'], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
-    return r.status === 0 ? name : null;
+    // The system one, by absolute path from PATH (never a planted copy in the working folder).
+    return findExecutable(name);
   };
   const ffmpeg = pick(candidates.ffmpeg, 'ffmpeg');
   const ffprobe = pick(candidates.ffprobe, 'ffprobe');

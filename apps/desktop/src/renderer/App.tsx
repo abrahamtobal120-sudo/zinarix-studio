@@ -16,6 +16,7 @@ import { RunPanel } from './components/RunPanel';
 import { SupabasePanel } from './components/SupabasePanel';
 import { VercelPanel } from './components/VercelPanel';
 import { GCloudPanel } from './components/GCloudPanel';
+import { DesignPanel } from './components/DesignPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
 import {
@@ -104,7 +105,9 @@ export function App() {
     (maxWanted === 'editor' && !noTabs)
       ? maxWanted
       : null;
-  const chatWide = chatOpen && noTabs && !panelOpen && !max;
+  // The Panel de Edición takes the editor's place (and the side bar's): the chat stays.
+  const design = sidebar === 'design';
+  const chatWide = chatOpen && noTabs && !panelOpen && !max && !design;
   // On a narrow window the side bar gives way first, then the chat, so the editor keeps
   // CENTER_MIN. The dragged widths are kept and come back when the window grows.
   const room = winW - 48 - CENTER_MIN;
@@ -112,7 +115,7 @@ export function App() {
   // Two chats side by side (and the list of chats) need their own room: below this
   // each pane gets squeezed and its contents spill out.
   const chatMin = (chatSplit ? 620 : 280) + (chatList ? 190 : 0);
-  const sideShown = sidebar
+  const sideShown = sidebar && !design
     ? Math.max(160, Math.min(sideW, room - (chatShown ? Math.min(chatW, chatMin + 120) : 0)))
     : 0;
   const chatShownW = Math.min(
@@ -289,7 +292,12 @@ export function App() {
     <div className="app">
       <div className="main-row">
         <ActivityBar />
-        {sidebar && (!max || max === 'side') && (
+        {design && (
+          <div className="design-host">
+            <DesignPanel />
+          </div>
+        )}
+        {sidebar && !design && (!max || max === 'side') && (
           <>
             <aside
               className="sidebar"
@@ -332,7 +340,7 @@ export function App() {
         {/* With no file open the chat takes the whole center, like a chat app. */}
         <div
           className={max === 'panel' ? 'center center-max-panel' : 'center'}
-          style={chatWide || max === 'side' ? { display: 'none' } : undefined}
+          style={chatWide || max === 'side' || design ? { display: 'none' } : undefined}
         >
           <EditorArea />
           {terminalMounted && (

@@ -63,6 +63,9 @@ export function ActivityBar() {
         () => setState({ sidebar: sidebar === 'git' ? null : 'git' }),
         gitChanges,
       )}
+      {item(sidebar === 'design', t('dzTitle'), 'palette', () =>
+        setState({ sidebar: sidebar === 'design' ? 'explorer' : 'design', maximized: null }),
+      )}
       {item(sidebar === 'run', t('runTitle'), 'run', () =>
         setState({ sidebar: sidebar === 'run' ? null : 'run' }),
       )}
@@ -107,6 +110,7 @@ export function ActivityBar() {
       )}
       <div className="spacer" />
       {sidebar &&
+        sidebar !== 'design' &&
         item(
           sideMax,
           sideMax ? t('restoreSize') : t('maximizeSide'),

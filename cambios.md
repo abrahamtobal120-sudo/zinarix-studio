@@ -1,3 +1,55 @@
+# Cambios: revisión general de la app (14 de noviembre de 2026)
+
+Revisión del código de `apps/desktop` (proceso principal e interfaz). Antes de empezar: typecheck sin errores, 471 pruebas pasando y **10 errores de lint**. Todo lo de esta lista **ya está aplicado**. Las rutas son relativas a `apps/desktop/src/`.
+
+## Seguridad (proceso principal)
+
+| # | Problema | Arreglo | Archivos |
+|---|---|---|---|
+| 1 | En Windows, `git` y `rg` se lanzaban por nombre con la carpeta del proyecto como directorio de trabajo, y Windows busca ahí antes que en el PATH. Un `git.exe` escondido en un repo descargado se ejecutaba con solo abrir la carpeta. | Nuevo `main/bin.ts`: `bin('git' \| 'rg' \| 'gh')` busca la ruta absoluta del `.exe` solo en el PATH. | `bin.ts`, `workspace.ts`, `git.ts`, `security.ts` |
+| 2 | Los servidores de lenguaje y MCP que se instalan como `.cmd` (npm) arrancan con shell, y el shim llama a `node` por nombre. cmd.exe tomaba el `node.bat` que hubiera en el proyecto. | `NoDefaultCurrentDirectoryInExePath=1` en el entorno de esos procesos. | `lsp.ts`, `mcp.ts` |
+| 3 | La protección de escritura de hooks de git, `package.json`, CI, etc. distinguía mayúsculas. `.GIT/hooks/pre-commit` o `Package.json` se aprobaban solos si antes se eligió "siempre". | Todas las reglas de `EXECUTES` ignoran mayúsculas/minúsculas. | `guard.ts` |
+| 4 | El Vigilante mandaba al proveedor de IA el diff de `.env`, claves, etc. (y en proyectos sin git, el archivo completo). | Esos archivos se excluyen del diff (`:(exclude,literal)`) y de los archivos recientes. | `watch.ts` |
+| 5 | El mensaje de commit con IA y "ver commit" corrían los `textconv` que define el propio repo. Además, git recibía las claves de los proveedores en su entorno. | `--no-textconv`/`--no-ext-diff` en `patch()` y `show()`. git usa `childEnv` (gh conserva el entorno completo, puede usar `GH_TOKEN`). | `git.ts` |
+| 6 | Un `launch.json` con `${env:ANTHROPIC_API_KEY}` le pasaba la clave al programa depurado con otro nombre. | `${env:X}` devuelve vacío si `X` es una credencial. | `debug/config.ts` |
+| 7 | En Windows, detener un comando del agente solo cerraba `powershell.exe`. Un `npm run dev` seguía vivo con su puerto ocupado. | `taskkill /T /F` cierra todo el árbol de procesos. | `agent.ts` |
+| 8 | "Terminal de administrador" solo escapaba la comilla `'`. PowerShell también acepta `‘ ’ ‚ ‛` como comillas, así que una carpeta con esos caracteres podía inyectar comandos elevados. | Se duplican las cuatro variantes. | `terminal.ts` |
+| 9 | Los comandos de administrador fallaban si la ruta temporal tenía un apóstrofo (usuario "O'Brien"). | Ruta escapada antes de ponerla entre comillas. | `system.ts` |
+| 10 | Las imágenes pegadas en el chat (para agentes CLI) iban a una carpeta temporal fija y compartida, y nunca se borraban. | Carpeta privada (o aleatoria si otro usuario la creó primero); se borran las de más de 24 h. | `chatImages.ts` |
+| 11 | El indexador de documentación leía la respuesta completa en memoria cuando no había `content-length`. | Lectura en streaming con tope de `DOC_MAX_BYTES`. | `knowledge.ts` |
+
+## Interfaz (errores)
+
+| # | Problema | Arreglo | Archivos |
+|---|---|---|---|
+| 12 | Renombrar un archivo con cambios sin guardar perdía esos cambios. Renombrar una carpeta cerraba todas sus pestañas menos una. | `renamePath` conserva el texto sin guardar y reabre todas las pestañas. | `renderer/store.ts`, `Explorer.tsx` |
+| 13 | Un doble clic rápido abría el mismo archivo dos veces: pestaña duplicada y doble autoguardado. | `openFile` espera a la carga que ya esté en curso. | `renderer/store.ts` |
+| 14 | Juegos sin conexión: mantener la tecla o el botón del ratón reiniciaba la partida justo al perder. Al perder el foco la tecla quedaba "pegada" y el juego seguía corriendo. | Se ignora la autorrepetición, arrastrar ya no cuenta como pulsación nueva, y al perder el foco se sueltan las teclas y el juego se pausa. | `OfflineGames.tsx` |
+| 15 | Búsqueda: una búsqueda vieja y lenta podía pisar los resultados de una nueva. En "por nombre", la selección no volvía al inicio y Enter no hacía nada. | Respuestas viejas descartadas; el cursor vuelve a 0 y nunca queda en -1. | `Search.tsx` |
+| 16 | Correo: el refresco cada 60 s podía mostrar la carpeta anterior después de cambiar de carpeta. | Mismo control de respuestas viejas que `loadList`. | `MailPanel.tsx` |
+| 17 | Git: al cambiar de rama rápido podía aparecer el PR de la rama anterior. | La consulta se cancela al cambiar. | `GitPanel.tsx` |
+| 18 | Al grabar un atajo en Ajustes, una combinación ya asignada ejecutaba su comando en vez de grabarse. | El atajo global no actúa dentro de `.key-recorder`. | `App.tsx` |
+| 19 | Selector de modelos: con la lista vacía, la flecha abajo dejaba el índice en -1. | Índice mínimo 0. | `ModelPicker.tsx` |
+
+## Lint (los 10 errores)
+
+- `bots.ts`: los `any` de Telegram y Discord se cambiaron por tipos (`TgUpdate`, `DiscordData`).
+- `debug/cdpBackend.ts`: tipo `CdpEventParams` en lugar de `any`.
+- `lsp.ts`: una sola llamada a `spawn` con `shell` como variable (mismo patrón que `mcp.ts`). Se añadió `%` a los caracteres que se entrecomillan.
+- `mcp.ts`: `let init` pasó a `const`.
+- `pairing.ts`, `system-ca.ts`: `console.warn` pasó a `console.error`.
+
+## Revisado y sin problemas
+
+Validación de IPC (origen y Zod), servidor del teléfono (Host, clave del túnel, PIN con bloqueo), bots (solo chats privados y DMs), confianza en la config MCP del proyecto, límite de profundidad de delegación, confinamiento de rutas con symlinks, hashes de la descarga del túnel. En la interfaz no hay `dangerouslySetInnerHTML`, las claves de i18n las comprueba TypeScript en ambos idiomas y los efectos limpian sus listeners.
+
+## Para decidir (no se cambió)
+
+- **Juego sin conexión en el chat** (`Chat.tsx`): el juego desaparece en cuanto vuelve la conexión, a mitad de partida. Quien usa solo modelos locales (Ollama) sin conexión ve "la IA en la nube no puede responder" en vez del chat normal.
+- **Prueba `ipc-contract`**: el canal `video:tools`, del trabajo de video en curso, todavía no tiene `handle()` en `main.ts`. `preload/designPreview.ts` tampoco compila todavía. Las dos cosas son de ese trabajo, no de esta revisión.
+
+---
+
 # Cambios: funciones que tiene Cursor y Zinarix Studio no
 
 Este documento pide crear las funciones que le faltan a Zinarix Studio frente a Cursor. Sale de revisar el código del repositorio y toda la documentación oficial de Cursor (cursor.com/docs y cursor.com/help, 12 de noviembre de 2026). Cada petición dice qué existe hoy, qué hay que crear, en qué archivos y cómo saber que quedó bien.

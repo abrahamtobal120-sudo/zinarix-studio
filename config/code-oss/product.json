@@ -15,6 +15,12 @@
   "win32ShellNameShort": "Zinarix Studio",
   "win32TunnelServiceMutex": "zinarixcode-tunnelservice",
   "win32TunnelMutex": "zinarixcode-tunnel",
+  "win32AppId": "{{C178776A-F1F2-4190-B7D4-662B4C3C36B0}",
+  "win32UserAppId": "{{9F4289C8-8DD4-4C27-B8F4-3065D11182E5}",
+  "win32ContextMenu": {
+    "x64": { "clsid": "7570B143-7F09-4738-B928-89544D3A0880" },
+    "arm64": { "clsid": "29FC82F6-87A0-4EE2-982C-A16A8DD71BCD" }
+  },
   "win32x64AppId": "{{53C2460E-20AB-4B99-B277-B5561CE44BC2}",
   "win32arm64AppId": "{{6608371D-D2FB-4582-B17A-FF38C27080D3}",
   "win32x64UserAppId": "{{DD63FEC9-2CAD-41C0-840E-2D10FCC99F4A}",

@@ -68,7 +68,19 @@ export interface State {
   workspace: WorkspaceInfo | null;
   tabs: Tab[];
   active: string | null;
-  sidebar: 'explorer' | 'search' | 'git' | 'run' | 'vercel' | 'supabase' | 'gcloud' | 'mail' | 'watch' | null;
+  sidebar:
+    | 'explorer'
+    | 'search'
+    | 'git'
+    | 'run'
+    | 'vercel'
+    | 'supabase'
+    | 'gcloud'
+    | 'mail'
+    | 'watch'
+    /** Panel de Edición: takes the whole editor area (the chat stays beside it). */
+    | 'design'
+    | null;
   panelOpen: boolean;
   /** One area takes the whole window: the side panel, the terminal or the editor/browser. */
   maximized: 'side' | 'panel' | 'editor' | null;
