@@ -70,7 +70,7 @@
   color: var(--warn);
 }
 .chat-input .chat-input-bar .rules-count {
-  font-size: 10.5px;
+  font-size: var(--text-xs);
   opacity: 0.85;
 }
 
