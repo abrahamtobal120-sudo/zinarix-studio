@@ -671,6 +671,29 @@ export interface ChatContext {
 
 export type ToolDecision = 'approve' | 'deny' | 'always';
 
+/** One project rule as the "active rules" panel shows it. */
+export interface RuleView {
+  path: string;
+  name: string;
+  kind: 'instructions' | 'zinarix' | 'cursor' | 'copilot' | 'legacy';
+  applies: 'always' | 'glob' | 'manual';
+  globs: string[];
+  description: string;
+}
+
+export interface ActiveRulesView {
+  /** Settings › AI › Project rules is on. */
+  enabled: boolean;
+  /** Rules that enter the prompt: why ("always", "folder", "mention" or the glob) and size. */
+  active: (RuleView & { reason: string; tokens: number })[];
+  /** Rules the agent is told about and may read when the task needs them. */
+  available: RuleView[];
+  /** Rules cut because the total went over the limit. */
+  truncated: string[];
+  /** Estimated tokens of all active rules. */
+  tokens: number;
+}
+
 export interface ToolPreview {
   path?: string;
   before?: string;
@@ -1192,6 +1215,8 @@ export interface OmniApi {
     commitMessage(): Promise<string>;
     /** Project rules file in use (.zinarix/rules.md, AGENTS.md…) or null. */
     rulesFile(folder?: string): Promise<string | null>;
+    /** Project rules that would enter a message with this context ("file:path" sources). */
+    activeRules(sources: string[], prompt?: string, folder?: string): Promise<ActiveRulesView>;
     /** Forget the agent's model-side transcript (regenerate / edit a message); keeps undo data. */
     resetContext(conversationId: string): Promise<void>;
     chat(requestId: string, req: ChatRequestView): Promise<void>;
@@ -1705,6 +1730,7 @@ export const CHANNELS = [
   'ai:complete',
   'ai:commitMessage',
   'ai:rulesFile',
+  'ai:activeRules',
   'ai:resetContext',
   'git:status',
   'git:init',

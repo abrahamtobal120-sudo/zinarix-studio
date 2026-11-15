@@ -1121,6 +1121,15 @@ function registerIpc(): void {
   handle('ai:rulesFile', z.tuple([z.string().min(1).max(4096).optional()]), (w, folder) =>
     ai.rulesFile(scope(w, folder)),
   );
+  handle(
+    'ai:activeRules',
+    z.tuple([
+      z.array(z.string().max(4200)).max(200),
+      z.string().max(200_000).optional(),
+      z.string().min(1).max(4096).optional(),
+    ]),
+    (w, sources, prompt, folder) => ai.activeRules(scope(w, folder), sources, prompt ?? ''),
+  );
   handle('ai:resetContext', z.tuple([conv]), (_w, c) => ai.resetContext(c));
 
   const paths = z.array(rel).max(5000);

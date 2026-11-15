@@ -674,22 +674,45 @@ async function* run(
   });
   const kill = () => {
     if (child.exitCode !== null || child.signalCode !== null) return;
+    // Windows: kill() only ends cmd.exe / node; the CLI's own children keep running and keep
+    // stdout open, so the answer never stops. taskkill /T takes the whole tree.
+    if (process.platform === 'win32' && child.pid) {
+      try {
+        spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+          windowsHide: true,
+          stdio: 'ignore',
+        }).on('error', () => child.kill());
+      } catch {
+        child.kill();
+      }
+      return;
+    }
     child.kill('SIGTERM');
     setTimeout(() => {
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
     }, 3000).unref();
   };
-  signal.addEventListener('abort', kill, { once: true });
+  const onAbort = () => {
+    kill();
+    // Stop reading now: a grandchild may still hold the pipe, and the loop below only checks
+    // the signal when a line arrives.
+    lines.close();
+    child.stdout.destroy();
+    child.stderr.destroy();
+  };
   child.stdin.on('error', () => undefined);
   child.stdin.end(spec.prompt === 'stdin' ? prompt : '');
 
   const parser = new CliStreamParser(spec.output, cliDeniedHint(cfg, req));
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+  signal.addEventListener('abort', onAbort, { once: true });
+  if (signal.aborted) onAbort();
   try {
     for await (const line of lines) {
       if (signal.aborted) break;
       yield* parser.push(line);
     }
+    if (signal.aborted) throw new OmniError('aborted', 'cancelled', { provider: cfg.entry.id });
     const res = await exited;
     if (signal.aborted) throw new OmniError('aborted', 'cancelled', { provider: cfg.entry.id });
     if (res.error) {
@@ -706,7 +729,7 @@ async function* run(
       );
     yield* parser.finish();
   } finally {
-    signal.removeEventListener('abort', kill);
+    signal.removeEventListener('abort', onAbort);
     lines.close();
     kill();
   }

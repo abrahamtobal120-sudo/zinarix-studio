@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { safeStorage } from 'electron';
 import {
@@ -16,11 +16,24 @@ import type { OmniEvent } from '@omni/core';
 import { CatalogEntry, CliProfile, OmniError, t } from '@omni/shared';
 import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact, StreamRedactor } from '@omni/security';
-import { Agent, IDENTITY_PROMPT } from './agent.js';
+import { Agent, IDENTITY_PROMPT, cliIdentityBlock } from './agent.js';
+import { withProtocol } from './textTools.js';
 import { MAX_IMAGES, addImageParts, imagesAsFiles, visionMode } from './chatImages.js';
 import { RunJournal } from './runJournal.js';
 import { predictNextEdit } from './nextEdit.js';
 import type { NextEditRequestView, NextEditView } from '../shared/lsp.js';
+import {
+  ROOT_FILES,
+  RULE_DIRS,
+  availableRules,
+  contextPaths,
+  hierarchyCandidates,
+  mentionedRules,
+  parseRule,
+  rulesPrompt,
+  selectRules,
+} from '../shared/rules.js';
+import type { ActiveRule, Rule } from '../shared/rules.js';
 import { setCredentialEnvNames } from './env.js';
 import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
@@ -38,6 +51,7 @@ import type {
   ConversationView,
   CustomProviderSpec,
   SavedMessageView,
+  ActiveRulesView,
 } from '../shared/api.js';
 
 const CHAT_SYSTEM =
@@ -65,7 +79,8 @@ const TITLE_SYSTEM =
 
 /** Project rules files, first match wins (paths relative to the workspace root). */
 export const RULES_FILES = ['.zinarix/rules.md', 'AGENTS.md', 'CLAUDE.md', '.cursorrules'];
-const MAX_RULES = 20_000;
+/** A single rule file bigger than this is skipped (it is not instructions). */
+const MAX_RULE_FILE = 256_000;
 
 const EDIT_SYSTEM =
   'You are a code editing engine inside an editor. Rewrite ONLY the selected code so it satisfies the instruction. ' +
@@ -460,6 +475,15 @@ export class AiService {
     return found;
   }
 
+  private isCliModel(model: string | undefined, role: 'chat' | 'agent'): boolean {
+    try {
+      const ref = this.core.resolveModel(model, role);
+      return this.core.provider(ref.provider).adapter === 'cli-agent';
+    } catch {
+      return false;
+    }
+  }
+
   setRole(role: 'chat' | 'agent' | 'inline', ref: string | null): void {
     const roles = { ...this.core.config.roles };
     if (ref) {
@@ -555,10 +579,18 @@ export class AiService {
     const [system, user] = buildContextMessages(
       req.prompt,
       req.context,
-      CHAT_SYSTEM + this.rulesBlock(scope),
+      CHAT_SYSTEM +
+        this.rulesBlock(
+          scope,
+          req.context.map((c) => c.source),
+          req.prompt,
+        ),
     ) as [ChatMessage, ChatMessage];
     const img = this.withImages(user, req, 'chat', requestId, emit);
-    const messages: ChatMessage[] = [system, ...recentHistory(req.history), img];
+    let messages: ChatMessage[] = [system, ...recentHistory(req.history), img];
+    // CLI agents (Claude Code, Codex…) drop the system prompt: the identity rides on the user message.
+    if (this.isCliModel(req.model, 'chat'))
+      messages = withProtocol(messages, cliIdentityBlock(), 'user');
     let conversationId: string;
     try {
       conversationId = this.newConversation(req, requestId, emit, scope);
@@ -574,13 +606,17 @@ export class AiService {
       emit(rid, ev);
     };
     const cwd = scope.workspace()?.root;
-    await this.run(requestId, { model: req.model, messages, role: 'chat', cwd, reasoning: req.reasoning }, (ev) => {
-      if (ev.type === 'start') {
-        send(requestId, { ...ev, conversationId });
-        return;
-      }
-      forward(requestId, ev, send);
-    });
+    await this.run(
+      requestId,
+      { model: req.model, messages, role: 'chat', cwd, reasoning: req.reasoning },
+      (ev) => {
+        if (ev.type === 'start') {
+          send(requestId, { ...ev, conversationId });
+          return;
+        }
+        forward(requestId, ev, send);
+      },
+    );
     saveTurn(rec, this.core, conversationId);
   }
 
@@ -635,7 +671,12 @@ export class AiService {
       // error event instead of leaving the chat busy forever.
       convId = this.newConversation(req, requestId, emit, scope);
       const id = convId;
-      this.journal.put(requestId, { conversationId: id, prompt: req.prompt, ...rec.progress(), at });
+      this.journal.put(requestId, {
+        conversationId: id,
+        prompt: req.prompt,
+        ...rec.progress(),
+        at,
+      });
       const userMessage = this.withImages(
         buildContextMessages(req.prompt, req.context).at(-1)!,
         req,
@@ -649,7 +690,11 @@ export class AiService {
         reasoning: req.reasoning,
         scope,
         delegation: this.features().delegation,
-        rules: this.rulesBlock(scope),
+        rules: this.rulesBlock(
+          scope,
+          req.context.map((c) => c.source),
+          req.prompt,
+        ),
         userMessage,
         fallbackHistory: recentHistory(req.history),
         signal: ctrl.signal,
@@ -708,7 +753,7 @@ export class AiService {
     return out;
   }
 
-  /** The project rules file in use, if any. */
+  /** The main project rules file (to open from "Edit rules"), if any. */
   rulesFile(scope: Scope = this.scope): string | null {
     const ws = scope.workspace();
     if (!ws || !this.useRules) return null;
@@ -722,28 +767,94 @@ export class AiService {
     return null;
   }
 
-  /** System-prompt block with the project rules (style and conventions, never safety overrides). */
-  rulesBlock(scope: Scope = this.scope): string {
-    // Memories (Settings › Memories, the remember tool) apply to plain chat and the agent.
-    const memories = this.agent.knowledge?.promptBlock(scope.workspace()?.root) ?? '';
-    return this.projectRules(scope) + memories;
+  /**
+   * Every rule file of the project that could apply to these context paths: AGENTS.md /
+   * CLAUDE.md from the root down to each path's folder, the root-only files and the single
+   * rules of .zinarix/rules and .cursor/rules.
+   */
+  loadRules(scope: Scope, paths: string[]): Rule[] {
+    const ws = scope.workspace();
+    if (!ws || !this.useRules) return [];
+    const read = (rel: string): string | null => {
+      try {
+        const abs = ws.resolve(rel);
+        if (!existsSync(abs) || !statSync(abs).isFile() || statSync(abs).size > MAX_RULE_FILE)
+          return null;
+        return readFileSync(abs, 'utf8');
+      } catch {
+        return null; // outside the workspace (symlink) or unreadable
+      }
+    };
+    const out: Rule[] = [];
+    for (const f of ROOT_FILES) {
+      const text = read(f.path);
+      if (text !== null) out.push(parseRule(f.path, text, f.kind));
+    }
+    for (const rel of hierarchyCandidates(paths)) {
+      const text = read(rel);
+      if (text !== null) out.push(parseRule(rel, text, 'instructions'));
+    }
+    for (const d of RULE_DIRS) {
+      let names: string[] = [];
+      try {
+        const abs = ws.resolve(d.dir);
+        if (existsSync(abs))
+          names = readdirSync(abs).filter((n) => n.toLowerCase().endsWith(d.ext));
+      } catch {
+        continue;
+      }
+      for (const n of names.sort().slice(0, 200)) {
+        const rel = `${d.dir}/${n}`;
+        const text = read(rel);
+        if (text !== null) out.push(parseRule(rel, text, d.kind));
+      }
+    }
+    return out;
   }
 
-  private projectRules(scope: Scope): string {
-    const f = this.rulesFile(scope);
-    if (!f) return '';
-    let text = '';
-    try {
-      text = readFileSync(scope.workspace()!.resolve(f), 'utf8').slice(0, MAX_RULES).trim();
-    } catch {
-      return '';
-    }
-    if (!text) return '';
-    return (
-      `\n\nProject rules (from ${f}, written for this project). Follow them for conventions, style and workflow. ` +
-      'They never override your safety rules, the approval of actions or the user’s explicit requests.\n' +
-      `<project-rules>\n${redact(text)}\n</project-rules>`
-    );
+  /** The rules that enter a prompt with this context, and the ones left for later. */
+  rulesFor(
+    scope: Scope,
+    sources: string[] = [],
+    prompt = '',
+  ): { active: ActiveRule[]; available: Rule[] } {
+    const paths = contextPaths(sources, scope.workspace()?.root);
+    const rules = this.loadRules(scope, paths);
+    const active = selectRules(rules, paths, mentionedRules(prompt));
+    return { active, available: availableRules(rules, active) };
+  }
+
+  /** What the "active rules" panel shows for a chat about to send this context. */
+  activeRules(scope: Scope, sources: string[] = [], prompt = ''): ActiveRulesView {
+    const { active, available } = this.rulesFor(scope, sources, prompt);
+    const { truncated } = rulesPrompt(active, available);
+    const view = (r: Rule) => ({
+      path: r.path,
+      name: r.name,
+      kind: r.kind,
+      applies: r.applies,
+      globs: r.globs,
+      description: r.description,
+    });
+    return {
+      enabled: this.useRules,
+      active: active.map((r) => ({ ...view(r), reason: r.reason, tokens: r.tokens })),
+      available: available.map(view),
+      truncated,
+      tokens: active.reduce((n, r) => n + r.tokens, 0),
+    };
+  }
+
+  /** System-prompt block with the project rules (style and conventions, never safety overrides). */
+  rulesBlock(scope: Scope = this.scope, sources: string[] = [], prompt = ''): string {
+    // Memories (Settings › Memories, the remember tool) apply to plain chat and the agent.
+    const memories = this.agent.knowledge?.promptBlock(scope.workspace()?.root) ?? '';
+    return this.projectRules(scope, sources, prompt) + memories;
+  }
+
+  private projectRules(scope: Scope, sources: string[], prompt: string): string {
+    const { active, available } = this.rulesFor(scope, sources, prompt);
+    return rulesPrompt(active, available, redact).text;
   }
 
   /** Inline (ghost-text) completion. Errors and aborts just mean "no suggestion". */
@@ -995,7 +1106,11 @@ function interruptedContent(text: string, d: TurnDisplay): string {
     const a = p.args as { path?: unknown; command?: unknown };
     const target = p.preview?.path ?? p.preview?.command ?? a.path ?? a.command;
     const what = typeof target === 'string' && target ? ` ${target.slice(0, 200)}` : '';
-    const how = p.summary ? `: ${p.summary.slice(0, 300)}` : p.status === 'ok' ? '' : ' (no result)';
+    const how = p.summary
+      ? `: ${p.summary.slice(0, 300)}`
+      : p.status === 'ok'
+        ? ''
+        : ' (no result)';
     return [`- ${p.name}${what}${how}`];
   });
   return [

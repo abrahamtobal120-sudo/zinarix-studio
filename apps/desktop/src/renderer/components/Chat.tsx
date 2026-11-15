@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
+  ActiveRulesView,
   ChatContext,
   ChatEventView,
   ConversationView,
@@ -41,6 +42,7 @@ import {
   newParallelChat,
   newQuestionChat,
   newRequestId,
+  openFile,
   rememberProject,
   reloadFromDisk,
   refreshSettings,
@@ -173,11 +175,20 @@ function slashCommands(): Slash[] {
     },
     { name: 'commit', en: 'commit', hint: t('slashCommit'), action: 'commit' },
     { name: 'reglas', en: 'rules', hint: t('rulesEdit'), action: 'rules' },
+    { name: 'init', en: 'init', hint: t('slashInit'), prompt: t('slashInitPrompt'), agent: true },
     { name: 'agente', en: 'agent', hint: t('slashAgent'), action: 'agent' },
     { name: 'chat', en: 'chat', hint: t('slashChat'), action: 'chat' },
     { name: 'nuevo', en: 'new', hint: t('newChat'), action: 'new' },
     { name: 'indexar', en: 'index', hint: t('slashIndexDocs'), action: 'docs' },
   ];
+}
+
+/** Why a project rule entered the prompt, for the rules menu. */
+function ruleReason(reason: string): string {
+  if (reason === 'always') return t('rulesWhyAlways');
+  if (reason === 'folder') return t('rulesWhyFolder');
+  if (reason === 'mention') return t('rulesWhyMention');
+  return t('rulesWhyGlob', { glob: reason });
 }
 
 /** Name of a "/" command in the interface language (the other one also works). */
@@ -1034,7 +1045,12 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const runs = useRef(new Map<string, () => void>());
   const [suggest, setSuggest] = useState<Suggest | null>(null);
   const [files, setFiles] = useState<string[]>([]);
-  const [rulesFile, setRulesFile] = useState<string | null>(null);
+  const [rulesView, setRulesView] = useState<ActiveRulesView | null>(null);
+  const [rulesMenu, setRulesMenu] = useState(false);
+  const rulesMenuEl = useRef<HTMLDivElement>(null);
+  const rulesMenuBtn = useRef<HTMLButtonElement>(null);
+  const closeRulesMenu = useCallback(() => setRulesMenu(false), []);
+  useDismiss(rulesMenu, closeRulesMenu, [rulesMenuEl, rulesMenuBtn], rulesMenuBtn);
   const projectRules = useStore((s) => s.prefs.projectRules);
   const fsVersion = useStore((s) => s.fsVersion);
   /** Prompts sent in this session, for ↑ / ↓ in an empty box. */
@@ -1054,7 +1070,6 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     // "@file" suggestions list the window's folder: not offered for a chat working elsewhere.
     if (!root || ownFolder) {
       setFiles([]);
-      setRulesFile(null);
       return;
     }
     void api()
@@ -1062,13 +1077,36 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       .then(setFiles)
       .catch(() => setFiles([]));
   }, [root, ownFolder]);
+  /** Files the next message would carry: the rules that apply depend on them (globs, folders). */
+  const ruleSources = useMemo(() => {
+    const out = new Set<string>();
+    if (includeFile && active && !ownFolder) out.add(`file:${active}`);
+    for (const a of attachments) if (a.source.startsWith('file:')) out.add(a.source);
+    for (const p of mentionedFiles(input, files)) out.add(`file:${p}`);
+    return [...out].slice(0, 200);
+  }, [includeFile, active, ownFolder, attachments, input, files]);
+  /** "@name" mentions only matter for rules: keep the request key small. */
+  const ruleMentions = useMemo(
+    () => [...input.matchAll(/(?:^|\s)(@[\w./-]+)/g)].map((m) => m[1]).join(' '),
+    [input],
+  );
   useEffect(() => {
-    if (!root) return;
-    void api()
-      .ai.rulesFile(ownFolder)
-      .then(setRulesFile)
-      .catch(() => setRulesFile(null));
-  }, [root, ownFolder, fsVersion, projectRules]);
+    if (!root) {
+      setRulesView(null);
+      return;
+    }
+    let live = true;
+    const timer = setTimeout(() => {
+      void api()
+        .ai.activeRules(ruleSources, ruleMentions, ownFolder)
+        .then((v) => live && setRulesView(v))
+        .catch(() => live && setRulesView(null));
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [root, ownFolder, fsVersion, projectRules, ruleSources, ruleMentions]);
 
   /** Aborts the in-flight requests (if any) and stops listening to their events. */
   const cancelCurrent = () => {
@@ -1727,6 +1765,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         void send(t('slashCommitPrompt'), [], true);
         return true;
     }
+    if (cmd.name === 'init' && !root) {
+      toast(t('noFolder'));
+      return true;
+    }
     void send(rest ? `${cmd.prompt}\n\n${rest}` : cmd.prompt!, [], Boolean(cmd.agent));
     return true;
   };
@@ -2188,6 +2230,83 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             ))}
           </div>
         )}
+        {rulesMenu && rulesView && (
+          <div
+            ref={rulesMenuEl}
+            className="term-menu rules-menu"
+            role="menu"
+            aria-label={t('rulesPanel')}
+            onKeyDown={menuArrows}
+          >
+            <div className="term-menu-title">
+              {t('rulesPanel')} · {t('rulesTokens', { tokens: rulesView.tokens.toLocaleString() })}
+            </div>
+            {rulesView.active.length === 0 && <div className="rules-empty">{t('rulesNone')}</div>}
+            {rulesView.active.map((r) => (
+              <button
+                key={r.path}
+                role="menuitem"
+                title={r.description || r.path}
+                disabled={Boolean(ownFolder)}
+                onClick={() => {
+                  setRulesMenu(false);
+                  void openFile(r.path);
+                }}
+              >
+                <Icon name="scroll" size={13} />
+                <span className="rules-path">{r.path}</span>
+                <span className="rules-why">
+                  {ruleReason(r.reason)}
+                  {rulesView.truncated.includes(r.path) ? ` · ${t('rulesCut')}` : ''} ·{' '}
+                  {t('rulesTokens', { tokens: r.tokens.toLocaleString() })}
+                </span>
+              </button>
+            ))}
+            {rulesView.available.length > 0 && (
+              <>
+                <div className="term-menu-head">{t('rulesAvailable')}</div>
+                {rulesView.available.map((r) => (
+                  <button
+                    key={r.path}
+                    role="menuitem"
+                    title={r.description || r.path}
+                    onClick={() => {
+                      setRulesMenu(false);
+                      setInput((v) => `${v}${v && !/\s$/.test(v) ? ' ' : ''}@${r.name} `);
+                      textarea.current?.focus();
+                    }}
+                  >
+                    <Icon name="plus" size={13} />
+                    <span className="rules-path">@{r.name}</span>
+                    <span className="rules-why">
+                      {r.applies === 'glob' ? r.globs.join(', ') : r.description || r.path}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
+            <div className="rules-actions">
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setRulesMenu(false);
+                  void runCommand('ai.rules');
+                }}
+              >
+                <Icon name="edit" size={13} /> {t('rulesEdit')}
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setRulesMenu(false);
+                  void runSlash('/init');
+                }}
+              >
+                <Icon name="sparkle" size={13} /> /init
+              </button>
+            </div>
+          </div>
+        )}
         {termMenu && (
           <div
             ref={termMenuEl}
@@ -2394,13 +2513,23 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               e.target.value = '';
             }}
           />
-          {rulesFile && (
+          {rulesView?.enabled && rulesView.active.length + rulesView.available.length > 0 && (
             <button
-              className="rules-chip"
-              title={t('rulesActive', { file: rulesFile })}
-              onClick={() => void runCommand('ai.rules')}
+              ref={rulesMenuBtn}
+              className={`rules-chip ${rulesMenu ? 'on' : ''}`}
+              title={t('rulesActive', {
+                n: rulesView.active.length,
+                tokens: rulesView.tokens.toLocaleString(),
+              })}
+              aria-label={t('rulesPanel')}
+              aria-haspopup="menu"
+              aria-expanded={rulesMenu}
+              onClick={() => setRulesMenu((v) => !v)}
             >
               <Icon name="scroll" size={15} />
+              {rulesView.active.length > 0 && (
+                <span className="rules-count">{rulesView.active.length}</span>
+              )}
             </button>
           )}
           <button

@@ -74,6 +74,7 @@ const api: OmniApi = {
     nextEdit: call('ai:nextEdit') as OmniApi['ai']['nextEdit'],
     commitMessage: call('ai:commitMessage') as OmniApi['ai']['commitMessage'],
     rulesFile: call('ai:rulesFile') as OmniApi['ai']['rulesFile'],
+    activeRules: call('ai:activeRules') as OmniApi['ai']['activeRules'],
     resetContext: call('ai:resetContext') as OmniApi['ai']['resetContext'],
   },
   git: {
