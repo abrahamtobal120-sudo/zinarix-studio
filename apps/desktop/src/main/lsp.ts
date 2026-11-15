@@ -126,19 +126,13 @@ class LspClient {
     const win = process.platform === 'win32';
     // npm shims (.cmd/.bat) need a shell on Windows; quote the path (it may have spaces).
     const shell = win && /\.(cmd|bat)$/i.test(this.exe);
-    const q = (s: string) => (/[\s"&|<>^]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-    const proc = shell
-      ? spawn(q(this.exe), this.args.map(q), {
-          cwd: this.root,
-          env: childEnv(process.env),
-          shell: true,
-          windowsHide: true,
-        })
-      : spawn(this.exe, this.args, {
-          cwd: this.root,
-          env: childEnv(process.env),
-          windowsHide: true,
-        });
+    const q = (s: string) => (/[\s"&|<>^%]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+    const proc = spawn(shell ? q(this.exe) : this.exe, shell ? this.args.map(q) : this.args, {
+      cwd: this.root,
+      env: childEnv(process.env),
+      shell,
+      windowsHide: true,
+    });
     this.proc = proc;
     let stderr = '';
     proc.stderr?.on('data', (d: Buffer) => {

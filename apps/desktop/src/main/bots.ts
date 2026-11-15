@@ -58,11 +58,55 @@ const sleep = (ms: number, signal: AbortSignal) =>
     signal.addEventListener('abort', () => (clearTimeout(t), ok()), { once: true });
   });
 
+/** The fields read from Telegram updates (getUpdates). */
+interface TgChat {
+  id: number;
+  type?: string;
+}
+interface TgUser {
+  id?: number;
+  username?: string;
+  first_name?: string;
+}
+interface TgUpdate {
+  update_id: number;
+  message?: { chat?: TgChat; from?: TgUser; text?: unknown; message_id?: number };
+  callback_query?: {
+    id: string;
+    from?: TgUser;
+    data?: unknown;
+    message?: { chat: TgChat; message_id: number };
+  };
+}
+
+/** The fields read from Discord gateway payloads (HELLO, READY, MESSAGE_CREATE, INTERACTION_CREATE). */
+interface DiscordUser {
+  id: string;
+  username?: string;
+  global_name?: string;
+  bot?: boolean;
+}
+interface DiscordData {
+  heartbeat_interval?: number;
+  application?: { id?: string };
+  user?: DiscordUser;
+  type?: number;
+  guild_id?: string;
+  channel_id: string;
+  author?: DiscordUser;
+  content?: unknown;
+  id?: string;
+  token?: string;
+  member?: { user?: DiscordUser };
+  data?: { custom_id?: unknown };
+  message?: { content?: unknown };
+}
+
 // ---------------- Telegram (Bot API, long polling: no tunnel, no open ports) ----------------
 
 function telegram(token: string, on: LinkEvents): Link {
   const ctl = new AbortController();
-  const api = async (method: string, body: object, timeoutMs = 20_000): Promise<any> => {
+  const api = async (method: string, body: object, timeoutMs = 20_000): Promise<unknown> => {
     const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,7 +153,7 @@ function telegram(token: string, on: LinkEvents): Link {
           'getUpdates',
           { offset, timeout: 50, allowed_updates: ['message', 'callback_query'] },
           65_000,
-        )) as any[];
+        )) as TgUpdate[];
         for (const u of updates) {
           offset = u.update_id + 1;
           const m = u.message;
@@ -122,17 +166,18 @@ function telegram(token: string, on: LinkEvents): Link {
               text: m.text,
             });
           const q = u.callback_query;
-          if (q?.message?.chat?.type === 'private' && typeof q.data === 'string') {
+          const qm = q?.message;
+          if (q && qm?.chat?.type === 'private' && typeof q.data === 'string') {
             on.message({
-              chat: String(q.message.chat.id),
+              chat: String(qm.chat.id),
               user: String(q.from?.id),
               button: {
                 data: q.data,
                 done: async (note) => {
                   await api('answerCallbackQuery', { callback_query_id: q.id, text: note });
                   await api('editMessageReplyMarkup', {
-                    chat_id: q.message.chat.id,
-                    message_id: q.message.message_id,
+                    chat_id: qm.chat.id,
+                    message_id: qm.message_id,
                     reply_markup: { inline_keyboard: [] },
                   });
                 },
@@ -174,7 +219,7 @@ const INTENTS = 1 << 12;
 
 function discord(token: string, on: LinkEvents): Link {
   const ctl = new AbortController();
-  const rest = async (path: string, body?: object): Promise<any> => {
+  const rest = async (path: string, body?: object): Promise<unknown> => {
     const res = await fetch(`${DISCORD}${path}`, {
       method: body ? 'POST' : 'GET',
       headers: {
@@ -227,7 +272,7 @@ function discord(token: string, on: LinkEvents): Link {
     let seq: number | null = null;
     let acked = true;
     sock.onmessage = (ev) => {
-      const p = JSON.parse(String(ev.data)) as { op: number; d: any; s?: number; t?: string };
+      const p = JSON.parse(String(ev.data)) as { op: number; d: DiscordData; s?: number; t?: string };
       if (typeof p.s === 'number') seq = p.s;
       switch (p.op) {
         case 10: {
@@ -270,18 +315,19 @@ function discord(token: string, on: LinkEvents): Link {
           } else if (p.t === 'MESSAGE_CREATE') {
             const m = p.d;
             // Only DMs (no guild): in a server channel anyone could read the answers.
-            if (!m.guild_id && !m.author?.bot && typeof m.content === 'string' && m.content)
+            const author = m.author;
+            if (!m.guild_id && author && !author.bot && typeof m.content === 'string' && m.content)
               on.message({
                 chat: m.channel_id,
-                user: m.author.id,
-                name: m.author.global_name ?? m.author.username,
+                user: author.id,
+                name: author.global_name ?? author.username,
                 text: m.content,
               });
           } else if (p.t === 'INTERACTION_CREATE' && p.d.type === 3 && !p.d.guild_id) {
             const i = p.d;
             on.message({
               chat: i.channel_id,
-              user: i.user?.id ?? i.member?.user?.id,
+              user: i.user?.id ?? i.member?.user?.id ?? '',
               button: {
                 data: String(i.data?.custom_id ?? ''),
                 done: async (note) => {

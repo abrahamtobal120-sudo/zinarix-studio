@@ -251,12 +251,33 @@ function updateDirty(path: string): void {
   }));
 }
 
+/** Files being read right now: a second open of the same file waits for the first one. */
+const opening = new Map<string, Promise<void>>();
+
 export async function openFile(
   path: string,
   position?: { line: number; column: number },
 ): Promise<void> {
+  const pending = opening.get(path);
+  if (pending) await pending.catch(() => undefined);
+  else if (!docs.has(path) && !state.tabs.some((tab) => tab.path === path)) {
+    const load = loadTab(path).finally(() => opening.delete(path));
+    opening.set(path, load);
+    await load;
+  }
+  activate(path);
+  if (position && editor) {
+    requestAnimationFrame(() => {
+      editor?.setPosition({ lineNumber: position.line, column: position.column });
+      editor?.revealLineInCenter(position.line);
+      editor?.focus();
+    });
+  }
+}
+
+async function loadTab(path: string): Promise<void> {
   const name = path.split('/').pop() ?? path;
-  if (!docs.has(path) && !state.tabs.some((tab) => tab.path === path)) {
+  {
     const file = await api().workspace.readFile(path);
     if (file.binary || file.tooLarge) {
       setState((s) => ({
@@ -284,14 +305,6 @@ export async function openFile(
       }, 1000);
     });
     setState((s) => ({ tabs: [...s.tabs, { path, name, dirty: false }] }));
-  }
-  activate(path);
-  if (position && editor) {
-    requestAnimationFrame(() => {
-      editor?.setPosition({ lineNumber: position.line, column: position.column });
-      editor?.revealLineInCenter(position.line);
-      editor?.focus();
-    });
   }
 }
 
@@ -374,17 +387,31 @@ export async function closeTab(path = state.active): Promise<void> {
 }
 
 /** Keeps open tabs pointing at the right files after a rename in the explorer. */
-export function renamePath(from: string, to: string): void {
+export async function renamePath(from: string, to: string): Promise<void> {
   const moved = state.tabs.filter((x) => x.path === from || x.path.startsWith(`${from}/`));
+  if (!moved.length) return;
+  const wasActive = state.active;
+  // Unsaved edits travel with the tab: keep the text before the old model goes away.
+  const unsaved = new Map<string, string>();
   for (const tab of moved) {
     const d = docs.get(tab.path);
     if (d) {
+      if (tab.dirty) unsaved.set(tab.path, d.model.getValue());
       d.model.dispose();
       docs.delete(tab.path);
     }
   }
   setState((s) => ({ tabs: s.tabs.filter((x) => !moved.includes(x)) }));
-  if (moved.length) void openFile(moved[0]!.path.replace(from, to));
+  const target = (p: string) => to + p.slice(from.length);
+  for (const tab of moved) {
+    const next = target(tab.path);
+    await openFile(next).catch(() => undefined);
+    const text = unsaved.get(tab.path);
+    const d = docs.get(next);
+    if (text !== undefined && d && d.model.getValue() !== text) d.model.setValue(text);
+  }
+  const keep = wasActive && moved.some((x) => x.path === wasActive) ? target(wasActive) : wasActive;
+  if (keep && state.tabs.some((x) => x.path === keep)) activate(keep);
 }
 
 /** Re-reads a file changed outside the editor (e.g. by the agent) into its open tab. */

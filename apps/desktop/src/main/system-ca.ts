@@ -13,5 +13,5 @@ try {
     tls.setDefaultCACertificates([...new Set([...tls.getCACertificates('default'), ...system])]);
 } catch (e) {
   // Older runtime or unreadable store: keep Node's bundled list.
-  console.warn('[system-ca] could not load the system certificate store:', e);
+  console.error('[system-ca] could not load the system certificate store:', e);
 }

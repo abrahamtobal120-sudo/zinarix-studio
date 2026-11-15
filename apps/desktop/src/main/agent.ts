@@ -605,6 +605,7 @@ type Totals = { usd: number | null; inputTokens: number; outputTokens: number; l
 interface LoopOpts {
   conversationId: string;
   model?: string;
+  reasoning?: 'low' | 'medium' | 'high';
   signal: AbortSignal;
   emit: Emit;
   ask: Ask;
@@ -702,6 +703,7 @@ export class Agent {
   async run(opts: {
     conversationId: string;
     model?: string;
+    reasoning?: 'low' | 'medium' | 'high';
     /** Project rules block appended to the system prompt (may change between turns). */
     rules?: string;
     userMessage: ChatMessage;
@@ -844,6 +846,7 @@ export class Agent {
           {
             model: opts.model,
             messages,
+            reasoning: opts.reasoning,
             tools: mode === 'text' ? undefined : tools,
             role: 'agent',
             cwd: this.ws(opts)?.root,

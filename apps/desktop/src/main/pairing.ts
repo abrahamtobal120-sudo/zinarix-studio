@@ -81,7 +81,7 @@ export class PairingGuard {
       writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.state)), 'utf8');
       renameSync(tmp, f);
     } catch (e) {
-      console.warn('[pairing] could not save the PIN counters:', e);
+      console.error('[pairing] could not save the PIN counters:', e);
     }
   }
 

@@ -106,7 +106,7 @@ export function Explorer() {
     const to = join(dir, name);
     try {
       await api().workspace.rename(entry.path, to);
-      renamePath(entry.path, to);
+      void renamePath(entry.path, to);
       refreshDir(dir);
     } catch (e) {
       toast(String((e as Error).message));

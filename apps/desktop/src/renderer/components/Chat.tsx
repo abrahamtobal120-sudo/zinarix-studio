@@ -46,6 +46,7 @@ import {
 import { runCommand } from '../commands';
 import { fileIcon } from './icons';
 import { Icon, TONE, type IconName } from './Icon';
+import { OfflineGames, useOnline } from './OfflineGames';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory, when } from './ChatHistory';
 import { Markdown } from './Markdown';
@@ -700,6 +701,65 @@ interface TurnActions {
  * (the others keep their props), so long conversations do not re-parse all their Markdown
  * for every token.
  */
+type ReasoningLevel = 'low' | 'medium' | 'high';
+const REASONING_KEY = 'zinarix.reasoning';
+const loadReasoning = (): ReasoningLevel | '' => {
+  const v = localStorage.getItem(REASONING_KEY);
+  return v === 'low' || v === 'medium' || v === 'high' ? v : '';
+};
+
+/**
+ * The model's reasoning: open (and following the end) while it thinks, collapsible after,
+ * rendered as Markdown, with a button to see all of it without the height limit.
+ */
+const ReasoningBlock = memo(function ReasoningBlock({
+  text,
+  live,
+}: {
+  text: string;
+  live: boolean;
+}) {
+  const [open, setOpen] = useState(live);
+  const [full, setFull] = useState(false);
+  const body = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  useEffect(() => {
+    if (live) setOpen(true);
+  }, [live]);
+  useEffect(() => {
+    const el = body.current;
+    if (el && live && stick.current) el.scrollTop = el.scrollHeight;
+  }, [text, live, open]);
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  return (
+    <details
+      className={`turn-reasoning ${live ? 'live' : ''}`}
+      open={open}
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary>
+        <Icon name="thinking" size={13} /> {live ? t('thinkingLive') : t('thinking')}
+        <span className="turn-reasoning-count">
+          · {words} {t('reasoningWords')}
+        </span>
+      </summary>
+      <div
+        ref={body}
+        className={`turn-reasoning-body ${full ? 'full' : ''}`}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+        }}
+      >
+        <Markdown text={text} streaming={live} />
+      </div>
+      <button type="button" className="turn-reasoning-more" onClick={() => setFull((f) => !f)}>
+        {full ? t('reasoningLess') : t('reasoningMore')}
+      </button>
+    </details>
+  );
+});
+
 const TurnView = memo(function TurnView({
   turn,
   live,
@@ -761,12 +821,10 @@ const TurnView = memo(function TurnView({
             </div>
           ))}
           {turn.reasoning && (
-            <details className="turn-reasoning">
-              <summary>
-                <Icon name="thinking" size={13} /> {t('thinking')}
-              </summary>
-              {turn.reasoning}
-            </details>
+            <ReasoningBlock
+              text={turn.reasoning}
+              live={live && !turn.parts?.some((p) => p.kind === 'text' && p.text)}
+            />
           )}
           {(turn.parts ?? []).map((p, j) =>
             p.kind === 'text' ? (
@@ -882,6 +940,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     return true;
   };
   const [includeFile, setIncludeFile] = useState(true);
+  const [reasoning, setReasoning] = useState<ReasoningLevel | ''>(loadReasoning);
   const agentMode = meta?.agent ?? true;
   const setAgentMode = (on: boolean) => {
     updateChat(id, { agent: on });
@@ -1348,6 +1407,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         conversationId: conversationNow.current,
         folder: ownFolder,
         noFolder: noFolder || undefined,
+        ...(reasoning ? { reasoning } : {}),
         ...(sentImages.length
           ? { images: sentImages.map(({ mediaType, data }) => ({ mediaType, data })) }
           : {}),
@@ -1808,6 +1868,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
 
   const noProviders = models.length === 0 && !settings.defaultModel;
+  const online = useOnline();
   const lastUser = lastUserIndex();
 
   // The messages get one stable object whose functions call the latest closures: a new
@@ -1898,7 +1959,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                 >
                   {t('connectProvider')}
                 </button>
+                <OfflineGames offline={!online} />
               </>
+            ) : !online ? (
+              <OfflineGames offline />
             ) : (
               <div className="dim chat-hints">
                 <p>{agentMode ? t('agentHint') : t('chatHint')}</p>
@@ -2157,6 +2221,23 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               onChange={(e) => setAgentMode(e.target.checked)}
             />
             <Icon name="prompt" size={14} /> {t('agent')}
+          </label>
+          <label className={`pill reasoning-pick ${reasoning ? 'on' : ''}`} title={t('reasoningTitle')}>
+            <Icon name="thinking" size={14} />
+            <select
+              value={reasoning}
+              onChange={(e) => {
+                const v = e.target.value as ReasoningLevel | '';
+                setReasoning(v);
+                if (v) localStorage.setItem(REASONING_KEY, v);
+                else localStorage.removeItem(REASONING_KEY);
+              }}
+            >
+              <option value="">{t('reasoningAuto')}</option>
+              <option value="low">{t('reasoningLow')}</option>
+              <option value="medium">{t('reasoningMedium')}</option>
+              <option value="high">{t('reasoningHigh')}</option>
+            </select>
           </label>
           <label className={`check pill ${includeFile ? 'on' : ''}`} title={t('includeFile')}>
             <input

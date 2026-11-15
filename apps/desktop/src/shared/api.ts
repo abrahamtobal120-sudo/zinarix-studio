@@ -730,6 +730,8 @@ export interface ChatRequestView {
   noFolder?: boolean;
   /** Images pasted or dropped into the message (base64 without the data: prefix). */
   images?: { mediaType: string; data: string }[];
+  /** How hard the model should think (and show its reasoning); omitted = provider default. */
+  reasoning?: 'low' | 'medium' | 'high';
 }
 
 export interface EditRequestView {

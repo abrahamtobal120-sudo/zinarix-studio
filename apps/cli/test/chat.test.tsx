@@ -65,10 +65,18 @@ describe('omni chat TUI', () => {
     };
     const all = () => ui.frames.join('\n');
     await until(() => (ui.lastFrame() ?? '').includes('mock/m'));
-    // useInput subscribes in an effect after the first frame; give it a moment under load.
+    // useInput subscribes in an effect after the first frame; under load the first
+    // keystrokes can arrive before it is listening and get dropped, so retype if needed.
     await wait(150);
-    ui.stdin.write('hola');
-    await until(() => (ui.lastFrame() ?? '').includes('hola'));
+    for (let i = 0; ; i++) {
+      ui.stdin.write('hola');
+      try {
+        await until(() => (ui.lastFrame() ?? '').includes('hola'), 1500);
+        break;
+      } catch (e) {
+        if (i >= 5) throw e;
+      }
+    }
     ui.stdin.write('\r');
     await until(() => all().includes('Respuesta del modelo') && all().includes('12→5'));
     expect(core.history.list()[0]!.title).toBe('hola');

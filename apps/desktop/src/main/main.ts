@@ -1309,6 +1309,7 @@ function registerIpc(): void {
           )
           .max(MAX_IMAGES)
           .optional(),
+        reasoning: z.enum(['low', 'medium', 'high']).optional(),
       }),
     ]),
     (w, requestId, { folder, noFolder, ...req }) => {

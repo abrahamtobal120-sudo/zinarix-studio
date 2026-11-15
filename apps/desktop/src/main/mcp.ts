@@ -429,8 +429,7 @@ class McpConnection {
         if (this.state === 'off') return;
         this.fail(reason);
       };
-      let init: { protocolVersion?: string; serverInfo?: { name?: string }; capabilities?: unknown };
-      init = (await this.request(
+      const init = (await this.request(
         'initialize',
         {
           protocolVersion: MCP_PROTOCOL,
@@ -438,7 +437,7 @@ class McpConnection {
           clientInfo: { name: 'zinarix-studio', version: '1.0' },
         },
         CONNECT_TIMEOUT,
-      )) as typeof init;
+      )) as { protocolVersion?: string; serverInfo?: { name?: string }; capabilities?: unknown };
       const v = init.protocolVersion;
       if (v && v !== MCP_PROTOCOL && !FALLBACK_PROTOCOLS.includes(v)) {
         // An unknown (newer) version: keep going, most of the protocol is the same.

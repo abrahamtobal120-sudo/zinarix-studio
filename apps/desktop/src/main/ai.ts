@@ -572,7 +572,7 @@ export class AiService {
       emit(rid, ev);
     };
     const cwd = scope.workspace()?.root;
-    await this.run(requestId, { model: req.model, messages, role: 'chat', cwd }, (ev) => {
+    await this.run(requestId, { model: req.model, messages, role: 'chat', cwd, reasoning: req.reasoning }, (ev) => {
       if (ev.type === 'start') {
         send(requestId, { ...ev, conversationId });
         return;
@@ -644,6 +644,7 @@ export class AiService {
       await this.agent.run({
         conversationId: convId,
         model: req.model,
+        reasoning: req.reasoning,
         scope,
         delegation: this.features().delegation,
         rules: this.rulesBlock(scope),
@@ -1097,7 +1098,7 @@ export class TurnRecorder {
         break;
       }
       case 'reasoning':
-        d.reasoning = ((d.reasoning ?? '') + ev.delta).slice(-20000);
+        d.reasoning = ((d.reasoning ?? '') + ev.delta).slice(-200000);
         break;
       case 'notice':
         (d.notices ??= []).push(ev.message);

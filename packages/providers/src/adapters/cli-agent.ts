@@ -303,11 +303,15 @@ function notInstalled(cfg: ProviderConfig, command: string, spec: Profile): Omni
 }
 
 /** Environment for the CLI: the user's own (its login may live there), minus Zinarix's secrets. */
-function cliEnv(): NodeJS.ProcessEnv {
+function cliEnv(thinkingTokens?: number): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' };
   for (const k of Object.keys(env)) if (/^OMNI_/i.test(k)) delete env[k];
+  if (thinkingTokens) env.MAX_THINKING_TOKENS = String(thinkingTokens);
   return env;
 }
+
+/** Claude Code's thinking budget (MAX_THINKING_TOKENS) for each reasoning level. */
+const CLAUDE_THINKING: Record<string, number> = { low: 4000, medium: 16000, high: 31999 };
 
 const VERSION_DIR = /^(\d{4})\.(\d{1,2})\.(\d{1,2})(?:-(\d{2})-(\d{2})-(\d{2}))?-[a-f0-9]+$/;
 
@@ -616,7 +620,7 @@ async function* run(
   req: ChatRequest,
   signal: AbortSignal,
 ): AsyncGenerator<ChatChunk> {
-  const { spec, command } = cli(cfg);
+  const { profile, spec, command } = cli(cfg);
   const file = findExecutable(command);
   if (!file) throw notInstalled(cfg, command, spec);
   const model = req.model && req.model !== 'default' ? req.model : undefined;
@@ -652,7 +656,9 @@ async function* run(
 
   const child = spawn(target.file, target.args, {
     cwd: req.cwd ?? homedir(),
-    env: cliEnv(),
+    env: cliEnv(
+      profile === 'claude' && req.reasoning ? CLAUDE_THINKING[req.reasoning] : undefined,
+    ),
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
     windowsVerbatimArguments: target.verbatim,

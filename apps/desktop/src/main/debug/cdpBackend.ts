@@ -13,6 +13,16 @@ interface RemoteObject {
   objectId?: string;
 }
 
+/** The fields this backend reads from CDP event params (scriptParsed, paused). */
+interface CdpEventParams {
+  scriptId?: string;
+  url?: string;
+  callFrames?: CallFrame[];
+  hitBreakpoints?: string[];
+  reason?: string;
+  data?: unknown;
+}
+
 interface CallFrame {
   callFrameId: string;
   functionName: string;
@@ -156,7 +166,13 @@ export class CdpBackend implements DebugBackend {
   }
 
   private onMessage(raw: string): void {
-    let m: { id?: number; method?: string; params?: any; result?: unknown; error?: any };
+    let m: {
+      id?: number;
+      method?: string;
+      params?: CdpEventParams;
+      result?: unknown;
+      error?: { message?: string };
+    };
     try {
       m = JSON.parse(raw);
     } catch {
@@ -173,14 +189,14 @@ export class CdpBackend implements DebugBackend {
     const params = m.params ?? {};
     switch (m.method) {
       case 'Debugger.scriptParsed':
-        if (params.url) this.scripts.set(params.scriptId, params.url);
+        if (params.url && params.scriptId) this.scripts.set(params.scriptId, params.url);
         break;
       case 'Debugger.paused': {
-        const frames = params.callFrames as CallFrame[];
+        const frames = params.callFrames ?? [];
         // --inspect-brk stops before the first line: go on unless asked to stop on entry.
         if (!this.sawStartPause && this.opts.request === 'launch') {
           this.sawStartPause = true;
-          if (!this.opts.stopOnEntry && !(params.hitBreakpoints?.length > 0)) {
+          if (!this.opts.stopOnEntry && !((params.hitBreakpoints?.length ?? 0) > 0)) {
             void this.send('Debugger.resume');
             return;
           }
@@ -189,7 +205,7 @@ export class CdpBackend implements DebugBackend {
         this.frameIds = new Map();
         frames.forEach((f, i) => this.frameIds.set(i + 1, f));
         const reason =
-          params.hitBreakpoints?.length > 0
+          (params.hitBreakpoints?.length ?? 0) > 0
             ? 'breakpoint'
             : params.reason === 'exception' || params.reason === 'promiseRejection'
               ? 'exception'
