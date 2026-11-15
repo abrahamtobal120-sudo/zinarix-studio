@@ -863,7 +863,7 @@ export type AppEvent =
   | { type: 'bots:status'; status: BotsStatus }
   /** WhatsApp Web changed (unread count, chat open, control, answers waiting). */
   | { type: 'whatsapp:status'; status: WhatsAppStatus }
-  /** The Watcher (Vigía) reviewed a project, started or stopped, or its settings changed. */
+  /** The auto review (Revisión automática) reviewed a project, started or stopped, or its settings changed. */
   | { type: 'watch:status'; status: WatchStatus }
   /** The debug session of this window changed (state, stop, output). */
   | { type: 'debug'; event: DebugEvent }

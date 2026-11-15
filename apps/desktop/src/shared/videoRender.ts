@@ -6,8 +6,9 @@
  * FFmpeg). Video is scaled to fit the canvas, shifted to its timeline time and overlaid on a
  * black base, bottom track first; audio is delayed to its time and mixed.
  */
-import type { Clip, ExportOptions, MediaItem, VideoProject } from './video.js';
+import type { Clip, Ease, ExportOptions, KeyProp, MediaItem, VideoProject } from './video.js';
 import {
+  MAX_KEYS,
   SPEED_MAX,
   SPEED_MIN,
   clipEnd,
@@ -99,10 +100,73 @@ function atempo(speed: number): string[] {
   return out;
 }
 
-/** Video filters of one clip: size, flips, rotation, opacity, fades and timing. */
+/** Allowed range of each animatable value (the same clamps as the static transform). */
+const RANGE: Record<KeyProp, [number, number]> = {
+  x: [-10, 10],
+  y: [-10, 10],
+  scale: [0.01, 20],
+  rotation: [-3600, 3600],
+  opacity: [0, 1],
+};
+
+interface PKey {
+  /** Seconds into the piece (its own timeline time from 0). */
+  t: number;
+  v: number;
+  ease?: Ease;
+}
+
+/** A property's keys in the piece's own seconds, values clamped; null when not animated. */
+function pieceKeys(pc: Piece, prop: KeyProp): PKey[] | null {
+  const keys = pc.clip.keyframes?.[prop];
+  if (!Array.isArray(keys)) return null;
+  const [lo, hi] = RANGE[prop];
+  const out = keys
+    .filter((k) => k && Number.isFinite(k.t) && Number.isFinite(k.v))
+    .slice(0, MAX_KEYS)
+    .map((k) => ({
+      t: (k.t - pc.srcIn) / pc.speed,
+      v: clamp(k.v, lo, hi),
+      ease: k.ease === 'ease' || k.ease === 'hold' ? k.ease : undefined,
+    }))
+    .sort((a, b) => a.t - b.t);
+  return out.length ? out : null;
+}
+
+/**
+ * FFmpeg expression of animated keys over the time variable `T` (e.g. "t" or "(t-2)"): the
+ * same curve as interpKeys. Only numbers from num() go in.
+ */
+export function keyExpr(keys: PKey[], T: string, map: (v: number) => number = (v) => v): string {
+  const n = (x: number) => `(${num(x)})`;
+  const last = keys[keys.length - 1]!;
+  let e = n(map(last.v));
+  for (let i = keys.length - 2; i >= 0; i--) {
+    const a = keys[i]!;
+    const b = keys[i + 1]!;
+    const d = b.t - a.t;
+    let seg: string;
+    if (a.ease === 'hold' || d < 1e-6) seg = n(map(a.v));
+    else {
+      const p = `((${T}-${n(a.t)})/${n(d)})`;
+      const k = a.ease === 'ease' ? `(${p}*${p}*(3-2*${p}))` : p;
+      seg = `${n(map(a.v))}+${n(map(b.v) - map(a.v))}*${k}`;
+    }
+    e = `if(lt(${T},${n(b.t)}),${seg},${e})`;
+  }
+  return `if(lt(${T},${n(keys[0]!.t)}),${n(map(keys[0]!.v))},${e})`;
+}
+
+const RAD = Math.PI / 180;
+
+/** Video filters of one clip: size, flips, timing, opacity, rotation, animated size, fades. */
 function videoChain(pc: Piece, W: number, H: number, fps: number): string {
   const tr = transformOf(pc.clip);
-  const scale = clamp(tr.scale, 0.01, 20);
+  const kScale = pieceKeys(pc, 'scale');
+  const kRot = pieceKeys(pc, 'rotation');
+  const kOp = pieceKeys(pc, 'opacity');
+  // Animated size: scale once to the largest key, then shrink per frame (never upscale twice).
+  const scale = kScale ? Math.max(...kScale.map((k) => k.v)) : clamp(tr.scale, ...RANGE.scale);
   const f: string[] = [];
   if (pc.media.width > 0 && pc.media.height > 0) {
     const k = Math.min(W / pc.media.width, H / pc.media.height) * scale;
@@ -115,15 +179,28 @@ function videoChain(pc: Piece, W: number, H: number, fps: number): string {
   if (tr.flipH === true) f.push('hflip');
   if (tr.flipV === true) f.push('vflip');
   f.push(`fps=${fps}`, 'format=rgba');
-  const deg = clamp(tr.rotation, -3600, 3600) % 360;
-  if (Math.abs(deg) > 1e-3) {
-    const rad = num((deg * Math.PI) / 180);
-    f.push(`rotate=a=${rad}:ow=rotw(${rad}):oh=roth(${rad}):c=none`);
-  }
-  const op = clamp(tr.opacity, 0, 1);
-  if (op < 1) f.push(`colorchannelmixer=aa=${num(op)}`);
-  // Timing first (so the fades below count in the piece's own seconds from 0).
+  // Timing first: from here on t / T count the piece's own seconds from 0.
   f.push(`setpts=(PTS-STARTPTS)/${num(pc.speed)}`);
+  if (kOp)
+    f.push(`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*clip(${keyExpr(kOp, 'T')},0,1)'`);
+  else {
+    const op = clamp(tr.opacity, ...RANGE.opacity);
+    if (op < 1) f.push(`colorchannelmixer=aa=${num(op)}`);
+  }
+  // c=black@0: a transparent fill (c=none leaves leftovers of earlier frames in the corners).
+  if (kRot)
+    f.push(`rotate=a='${keyExpr(kRot, 't', (v) => v * RAD)}':ow='hypot(iw,ih)':oh=ow:c=black@0`);
+  else {
+    const deg = clamp(tr.rotation, ...RANGE.rotation) % 360;
+    if (Math.abs(deg) > 1e-3) {
+      const rad = num(deg * RAD);
+      f.push(`rotate=a=${rad}:ow=rotw(${rad}):oh=roth(${rad}):c=black@0`);
+    }
+  }
+  if (kScale) {
+    const s = `(${keyExpr(kScale, 't')})/${num(scale)}`;
+    f.push(`scale=w='max(2,trunc(iw*${s}/2)*2)':h='max(2,trunc(ih*${s}/2)*2)':eval=frame`);
+  }
   if (pc.fadeIn.d) f.push(`fade=t=in:st=${num(pc.fadeIn.st)}:d=${num(pc.fadeIn.d)}:alpha=1`);
   if (pc.fadeOut.d) f.push(`fade=t=out:st=${num(pc.fadeOut.st)}:d=${num(pc.fadeOut.d)}:alpha=1`);
   f.push(`setpts=PTS+${num(pc.offset)}/TB`);
@@ -133,9 +210,14 @@ function videoChain(pc: Piece, W: number, H: number, fps: number): string {
 /** Overlay position: centred, then shifted by the transform (fractions of the canvas). */
 function overlayXY(pc: Piece): string {
   const tr = transformOf(pc.clip);
-  const dx = clamp(tr.x, -10, 10);
-  const dy = clamp(tr.y, -10, 10);
-  return `x=(W-w)/2+${num(dx)}*W:y=(H-h)/2+${num(dy)}*H`;
+  // The overlay sees the export's time: the piece's own time is t minus its offset.
+  const T = `(t-${num(pc.offset)})`;
+  const axis = (prop: 'x' | 'y', size: string, inner: string) => {
+    const keys = pieceKeys(pc, prop);
+    const v = keys ? `'(${size}-${inner})/2+(${keyExpr(keys, T)})*${size}'` : null;
+    return v ?? `(${size}-${inner})/2+${num(clamp(tr[prop], ...RANGE[prop]))}*${size}`;
+  };
+  return `x=${axis('x', 'W', 'w')}:y=${axis('y', 'H', 'h')}`;
 }
 
 function inputArgs(pc: Piece): string[] {

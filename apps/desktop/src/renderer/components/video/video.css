@@ -1556,3 +1556,68 @@ body.vs-open .toast {
   right: 0;
   background: linear-gradient(to bottom left, rgba(0, 0, 0, 0.55) 50%, transparent 50%);
 }
+
+/* ---- Keyframes ---- */
+.vs-label-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.vs-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.vs-key,
+.vs-key-clear {
+  padding: 0 3px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim, rgba(255, 255, 255, 0.35));
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.vs-key.animated {
+  color: var(--text, #ddd);
+}
+.vs-key.on {
+  color: #e5b33a;
+}
+.vs-key:hover,
+.vs-key-clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.vs-key:focus-visible,
+.vs-key-clear:focus-visible,
+.vs-ease:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.vs-ease {
+  max-width: 76px;
+  padding: 0 2px;
+  font-size: 10px;
+  background: var(--bg-input, rgba(255, 255, 255, 0.06));
+  color: inherit;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 3px;
+}
+.vs-keynav {
+  display: inline-flex;
+  gap: 4px;
+}
+.vs-kf {
+  position: absolute;
+  bottom: 3px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  background: #e5b33a;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  transform: rotate(45deg);
+  pointer-events: none;
+  z-index: 2;
+}

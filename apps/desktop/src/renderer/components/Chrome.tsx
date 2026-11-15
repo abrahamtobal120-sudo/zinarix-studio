@@ -36,9 +36,6 @@ interface BarItem {
   kind: Kind;
 }
 
-/** Side views that live in the "Más" panel instead of having their own button. */
-const MORE_VIEWS = ['vercel', 'supabase', 'gcloud', 'mail'] as const;
-
 /** The activity bar's buttons, shared with the "Más" panel so both open things the same way. */
 function useBarItems() {
   const sidebar = useStore((s) => s.sidebar);
@@ -80,11 +77,11 @@ function useBarItems() {
     search: view('search', t('search'), 'search'),
     git: view('git', t('gitTitle'), 'git', gitChanges),
     run: view('run', t('runTitle'), 'run'),
-    debug: view('debug', td('dbgTitle'), 'bug'),
+    debug: view('debug', td('dbgBarTip'), 'bug'),
     chat: tool('chat', t('chat'), 'agent', 'toggle', chatOpen, () =>
       setState({ chatOpen: !chatOpen }),
     ),
-    watch: view('watch', t('wtTitle'), 'eye', watchNew),
+    watch: view('watch', t('wtBarTip'), 'eye', watchNew),
     design: tool('design', t('dzTitle'), 'palette', 'view', sidebar === 'design', () =>
       setState({ sidebar: sidebar === 'design' ? 'explorer' : 'design', maximized: null }),
     ),
@@ -137,13 +134,14 @@ function useBarItems() {
 }
 
 /**
- * Left bar, in groups: work (files, search, git, run) · AI (chat, watcher) · create (design,
- * video, terminal) · "Más" (integrations and tools). An integration that is open (or WhatsApp
- * with unread messages) gets its own button above "Más", so the open one is always visible.
- * Side views get an accent marker on the left; toggles (chat, terminal...) only light up.
+ * Left bar, in groups: work (files, search, git, run, debug) · AI (chat, watcher) · create
+ * (design, video, terminal) · cloud (Vercel, Supabase, Google Cloud) · messages and web (mail,
+ * WhatsApp, browser) · and, at the bottom, security, usage, providers, palette and settings.
+ * Every tool keeps its own button. Side views get an accent marker on the left; toggles
+ * (chat, terminal...) only light up.
  */
 export function ActivityBar() {
-  const { items, sidebar, browserActive, whatsappActive, whatsappUnread } = useBarItems();
+  const { items, sidebar, browserActive, whatsappActive } = useBarItems();
   const [tip, setTip] = useState<{ text: string; y: number } | null>(null);
   // The browser and WhatsApp are native views drawn above the page: over them the custom
   // tooltip would be hidden, so the system one is used instead.
@@ -181,11 +179,6 @@ export function ActivityBar() {
     );
   };
   const sep = (key: string) => <div key={key} className="activity-sep" aria-hidden="true" />;
-  // Integrations shown outside "Más": the open one, and WhatsApp while it has unread messages.
-  const pinned: BarItem[] = [];
-  for (const v of MORE_VIEWS) if (sidebar === v) pinned.push(items[v]);
-  if (browserActive) pinned.push(items.browser);
-  if (whatsappActive || whatsappUnread > 0) pinned.push(items.whatsapp);
   return (
     <nav className="activity-bar" aria-label={t('appsBar')}>
       {button(items.explorer)}
@@ -201,12 +194,19 @@ export function ActivityBar() {
       {button(items.video)}
       {button(items.terminal)}
       {sep('s3')}
-      {pinned.map(button)}
-      {button(items.more)}
+      {button(items.vercel)}
+      {button(items.supabase)}
+      {button(items.gcloud)}
+      {sep('s4')}
+      {button(items.mail)}
+      {button(items.whatsapp)}
+      {button(items.browser)}
       <div className="spacer" />
       {sidebar && sidebar !== 'design' && button(items.maximize)}
       {button(items.security)}
+      {button(items.usage)}
       {button(items.providers)}
+      {button(items.palette)}
       {button(items.settings)}
       {tip && !nativeOver && (
         <div className="activity-tip" role="tooltip" style={{ top: tip.y }}>

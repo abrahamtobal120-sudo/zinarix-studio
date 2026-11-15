@@ -45,7 +45,30 @@ export interface Clip {
   /** Fade from/to black (video) and silence (audio), in timeline seconds. */
   fadeIn?: number;
   fadeOut?: number;
+  /** Animated transform values. A property with keys ignores its static transform value. */
+  keyframes?: Keyframes;
 }
+
+/** Transform properties that can be animated (the flips are on/off, not animated). */
+export type KeyProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
+export const KEY_PROPS: readonly KeyProp[] = ['x', 'y', 'scale', 'rotation', 'opacity'];
+/** How a key moves to the next one: straight, smooth start and end, or a jump at the next key. */
+export type Ease = 'linear' | 'ease' | 'hold';
+export const EASES: readonly Ease[] = ['linear', 'ease', 'hold'];
+
+export interface Keyframe {
+  /**
+   * Seconds into the source media (not the timeline): keys stay on the same picture when the
+   * clip is moved, trimmed, split or sped up.
+   */
+  t: number;
+  v: number;
+  /** Towards the next key (default linear). */
+  ease?: Ease;
+}
+export type Keyframes = Partial<Record<KeyProp, Keyframe[]>>;
+/** Per property: plenty for hand animation, and it bounds the export expressions. */
+export const MAX_KEYS = 100;
 
 export interface Transform {
   /** Offset of the centre, as a fraction of the canvas width / height (0 = centred). */
@@ -87,6 +110,59 @@ export function fadeAt(c: Clip, t: number): number {
   if (c.fadeIn && c.fadeIn > 0) k = Math.min(k, into / c.fadeIn);
   if (c.fadeOut && c.fadeOut > 0) k = Math.min(k, left / c.fadeOut);
   return Math.max(0, Math.min(1, k));
+}
+
+/** Timeline time of a key of a clip. */
+export const keyTimeline = (c: Clip, k: Keyframe): number => c.start + (k.t - c.in) / speedOf(c);
+
+/** Value of sorted keys at source time `src` (held before the first and after the last). */
+export function interpKeys(keys: readonly Keyframe[], src: number): number {
+  const first = keys[0]!;
+  if (keys.length === 1 || src <= first.t) return first.v;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const a = keys[i]!;
+    const b = keys[i + 1]!;
+    if (src >= b.t) continue;
+    if (a.ease === 'hold' || b.t - a.t < 1e-9) return a.v;
+    let k = (src - a.t) / (b.t - a.t);
+    if (a.ease === 'ease') k = k * k * (3 - 2 * k);
+    return a.v + (b.v - a.v) * k;
+  }
+  return keys[keys.length - 1]!.v;
+}
+
+export const isAnimated = (c: Clip, prop: KeyProp): boolean => !!c.keyframes?.[prop]?.length;
+export const hasKeyframes = (c: Clip): boolean => KEY_PROPS.some((k) => isAnimated(c, k));
+
+/** The clip's transform at timeline time t, with its animated properties evaluated. */
+export function transformAt(c: Clip, t: number): Transform {
+  const tr = transformOf(c);
+  if (!c.keyframes) return tr;
+  const src = sourceAt(c, t);
+  for (const prop of KEY_PROPS) {
+    const keys = c.keyframes[prop];
+    if (keys?.length) tr[prop] = interpKeys(keys, src);
+  }
+  return tr;
+}
+
+/** Timeline times of all the clip's keys inside the clip, sorted, without duplicates. */
+export function keyTimes(c: Clip): number[] {
+  const out: number[] = [];
+  for (const prop of KEY_PROPS)
+    for (const k of c.keyframes?.[prop] ?? []) {
+      const t = keyTimeline(c, k);
+      if (t >= c.start - 1e-6 && t <= clipEnd(c) + 1e-6) out.push(t);
+    }
+  out.sort((a, b) => a - b);
+  return out.filter((t, i) => i === 0 || t - out[i - 1]! > 1e-6);
+}
+
+/** The key of a property at timeline time t (within half a frame), if any. */
+export function keyAt(c: Clip, prop: KeyProp, t: number, fps: number): Keyframe | undefined {
+  const src = sourceAt(c, t);
+  const tol = (0.5 / fps) * speedOf(c);
+  return c.keyframes?.[prop]?.find((k) => Math.abs(k.t - src) < tol);
 }
 
 export interface Track {
@@ -442,7 +518,8 @@ export function trimClip(
     const minStart = Math.max(prevEnd, unlimited ? 0 : c.start - c.in / sp);
     const start = Math.min(Math.max(to, minStart), clipEnd(c) - MIN_CLIP);
     next = { ...c, start, in: sourceAt(c, start) };
-    if (unlimited && next.in < 0) next = { ...next, out: next.out - next.in, in: 0 };
+    if (unlimited && next.in < 0)
+      next = { ...shiftKeys(next, -next.in), out: next.out - next.in, in: 0 };
   } else {
     const nextStart = siblings
       .filter((x) => x.start >= clipEnd(c) - 1e-6)
@@ -455,6 +532,17 @@ export function trimClip(
     next = { ...c, out: sourceAt(c, end) };
   }
   return { ...p, clips: p.clips.map((x) => (x.id === id ? next : x)) };
+}
+
+/** Moves every key by `d` source seconds (when a clip's source timing is renumbered). */
+function shiftKeys(c: Clip, d: number): Clip {
+  if (!c.keyframes) return c;
+  const kf: Keyframes = {};
+  for (const prop of KEY_PROPS) {
+    const keys = c.keyframes[prop];
+    if (keys) kf[prop] = keys.map((k) => ({ ...k, t: k.t + d }));
+  }
+  return { ...c, keyframes: kf };
 }
 
 export function updateClip(
@@ -489,6 +577,98 @@ export function setTransform(p: VideoProject, id: string, patch: Partial<Transfo
   const t = { ...transformOf(c), ...patch };
   const same = (Object.keys(IDENTITY) as (keyof Transform)[]).every((k) => t[k] === IDENTITY[k]);
   return updateClip(p, id, { transform: same ? undefined : t });
+}
+
+function withKeys(c: Clip, prop: KeyProp, keys: Keyframe[]): Clip {
+  const kf: Keyframes = { ...c.keyframes };
+  if (keys.length) kf[prop] = keys;
+  else delete kf[prop];
+  return { ...c, keyframes: KEY_PROPS.some((k) => kf[k]?.length) ? kf : undefined };
+}
+
+function staticValue(c: Clip, prop: KeyProp, v: number): Clip {
+  const t = { ...transformOf(c), [prop]: v };
+  const same = (Object.keys(IDENTITY) as (keyof Transform)[]).every((k) => t[k] === IDENTITY[k]);
+  return { ...c, transform: same ? undefined : t };
+}
+
+const replaceClip = (p: VideoProject, c: Clip): VideoProject => ({
+  ...p,
+  clips: p.clips.map((x) => (x.id === c.id ? c : x)),
+});
+
+/**
+ * Adds a key (or changes the one already there) for a property at timeline time t. Without a
+ * value it takes the current one, so adding a key changes nothing until it is edited.
+ */
+export function setKey(
+  p: VideoProject,
+  id: string,
+  prop: KeyProp,
+  t: number,
+  v?: number,
+  ease?: Ease,
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c || trackOf(p, c.trackId)?.locked) return p;
+  const at = Math.min(Math.max(t, c.start), clipEnd(c));
+  const value = v ?? transformAt(c, at)[prop];
+  if (!Number.isFinite(value)) return p;
+  const old = keyAt(c, prop, at, p.fps);
+  const keys = (c.keyframes?.[prop] ?? []).filter((k) => k !== old);
+  if (!old && keys.length >= MAX_KEYS) return p;
+  const key: Keyframe = { t: old?.t ?? sourceAt(c, at), v: value };
+  const e = ease ?? old?.ease;
+  if (e && e !== 'linear') key.ease = e;
+  keys.push(key);
+  keys.sort((a, b) => a.t - b.t);
+  return replaceClip(p, withKeys(c, prop, keys));
+}
+
+/** Removes a property's key at timeline time t (the last one leaves its value as the static one). */
+export function removeKey(p: VideoProject, id: string, prop: KeyProp, t: number): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  const old = c && keyAt(c, prop, t, p.fps);
+  if (!c || !old || trackOf(p, c.trackId)?.locked) return p;
+  const keys = (c.keyframes?.[prop] ?? []).filter((k) => k !== old);
+  const next = withKeys(c, prop, keys);
+  return replaceClip(p, keys.length ? next : staticValue(next, prop, old.v));
+}
+
+/** Stops animating a property: it keeps the value it has at timeline time t. */
+export function clearKeys(p: VideoProject, id: string, prop: KeyProp, t: number): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c || !isAnimated(c, prop) || trackOf(p, c.trackId)?.locked) return p;
+  return replaceClip(p, staticValue(withKeys(c, prop, []), prop, transformAt(c, t)[prop]));
+}
+
+/**
+ * What the Inspector controls call: animated properties get a key at timeline time t, the rest
+ * change their static value.
+ */
+export function editTransformAt(
+  p: VideoProject,
+  id: string,
+  patch: Partial<Transform>,
+  t: number,
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c) return p;
+  let next = p;
+  const rest: Partial<Transform> = {};
+  for (const k of Object.keys(patch) as (keyof Transform)[]) {
+    const v = patch[k];
+    if (v === undefined) continue;
+    if (k !== 'flipH' && k !== 'flipV' && isAnimated(c, k))
+      next = setKey(next, id, k, t, v as number);
+    else Object.assign(rest, { [k]: v });
+  }
+  return Object.keys(rest).length ? setTransform(next, id, rest) : next;
+}
+
+/** Back to the untouched picture: no transform and no keys. */
+export function resetTransform(p: VideoProject, id: string): VideoProject {
+  return updateClip(p, id, { transform: undefined, keyframes: undefined });
 }
 
 /** Sets fade lengths, kept within the clip (both together at most its length). */
@@ -592,6 +772,27 @@ export function toFrame(t: number, fps: number): number {
   return Math.round(t * fps) / fps;
 }
 
+function validKeyframes(kf: unknown): boolean {
+  if (kf === undefined) return true;
+  if (!kf || typeof kf !== 'object' || Array.isArray(kf)) return false;
+  return Object.entries(kf).every(
+    ([prop, keys]: [string, unknown]) =>
+      (KEY_PROPS as readonly string[]).includes(prop) &&
+      (keys === undefined ||
+        (Array.isArray(keys) &&
+          keys.length <= MAX_KEYS &&
+          keys.every(
+            (k: Keyframe, i: number) =>
+              !!k &&
+              Number.isFinite(k.t) &&
+              Number.isFinite(k.v) &&
+              (k.ease === undefined || EASES.includes(k.ease)) &&
+              // Sorted by time: the evaluation and the export rely on it.
+              (i === 0 || k.t >= (keys[i - 1] as Keyframe).t),
+          ))),
+  );
+}
+
 /** Checks a parsed .zvproj enough to load it safely (wrong files are refused, not half-loaded). */
 export function validProject(x: unknown): x is VideoProject {
   if (!x || typeof x !== 'object') return false;
@@ -612,7 +813,8 @@ export function validProject(x: unknown): x is VideoProject {
         Number.isFinite(c.in) &&
         Number.isFinite(c.out) &&
         (c.speed === undefined ||
-          (Number.isFinite(c.speed) && c.speed >= SPEED_MIN && c.speed <= SPEED_MAX)),
+          (Number.isFinite(c.speed) && c.speed >= SPEED_MIN && c.speed <= SPEED_MAX)) &&
+        validKeyframes(c.keyframes),
     ) &&
     p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string')
   );

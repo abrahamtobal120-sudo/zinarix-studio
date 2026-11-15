@@ -2700,7 +2700,7 @@ app.whenReady().then(async () => {
     found: (report) => {
       if (BrowserWindow.getFocusedWindow() || !Notification.isSupported()) return;
       const n = new Notification({
-        title: `Vigía · ${report.name}`,
+        title: `Revisión automática · ${report.name}`,
         body: `${report.items.length} sugerencia(s): ${report.items[0]!.title}`,
       });
       n.on('click', () => {

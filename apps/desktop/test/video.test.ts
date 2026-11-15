@@ -8,6 +8,14 @@ import { VideoService, findFfmpeg, fromStored, parseProbe, toStored } from '../s
 import type { VideoJob } from '../src/main/video.js';
 import {
   addMarker,
+  clearKeys,
+  editTransformAt,
+  interpKeys,
+  keyTimes,
+  removeKey,
+  resetTransform,
+  setKey,
+  transformAt,
   clipEnd,
   defaultExport,
   fits,
@@ -27,7 +35,7 @@ import {
   validProject,
 } from '../src/shared/video.js';
 import type { MediaItem, VideoProject } from '../src/shared/video.js';
-import { buildRender } from '../src/shared/videoRender.js';
+import { buildRender, keyExpr } from '../src/shared/videoRender.js';
 
 const appRoot = fileURLToPath(new URL('..', import.meta.url));
 const tools = findFfmpeg(appRoot);
@@ -213,6 +221,116 @@ describe('clip speed, transform and fades', () => {
   });
 });
 
+describe('video keyframes', () => {
+  it('interpolates linear, smooth and hold, and holds outside the keys', () => {
+    const keys = [
+      { t: 0, v: 0 },
+      { t: 2, v: 10, ease: 'ease' as const },
+      { t: 4, v: 20, ease: 'hold' as const },
+      { t: 6, v: 0 },
+    ];
+    expect(interpKeys(keys, -1)).toBe(0);
+    expect(interpKeys(keys, 1)).toBeCloseTo(5, 6);
+    expect(interpKeys(keys, 2.5)).toBeCloseTo(10 + 10 * 0.15625, 6); // smoothstep(0.25)
+    expect(interpKeys(keys, 3)).toBeCloseTo(15, 6);
+    expect(interpKeys(keys, 5)).toBe(20);
+    expect(interpKeys(keys, 9)).toBe(0);
+  });
+
+  it('adds, edits and removes keys; sliders key only animated properties', () => {
+    const { p, id } = withClip();
+    let q = setKey(p, id, 'scale', 1); // first key takes the current value
+    q = editTransformAt(q, id, { scale: 2, x: 0.3 }, 3); // scale animated → key; x static
+    const c = q.clips[0]!;
+    expect(c.keyframes?.scale?.map((k) => [k.t, k.v])).toEqual([
+      [1, 1],
+      [3, 2],
+    ]);
+    expect(c.transform?.x).toBe(0.3);
+    expect(transformAt(c, 2).scale).toBeCloseTo(1.5, 6);
+    expect(keyTimes(c)).toEqual([1, 3]);
+    // Editing on an existing key changes it instead of adding another.
+    q = editTransformAt(q, id, { scale: 3 }, 3);
+    expect(q.clips[0]!.keyframes?.scale).toHaveLength(2);
+    // Removing the last key keeps its value as the static one.
+    q = removeKey(removeKey(q, id, 'scale', 1), id, 'scale', 3);
+    expect(q.clips[0]!.keyframes).toBeUndefined();
+    expect(q.clips[0]!.transform?.scale).toBe(3);
+    // Clearing keeps the value at the playhead; reset drops everything.
+    const r = clearKeys(
+      setKey(setKey(p, id, 'opacity', 0, 0), id, 'opacity', 2, 1),
+      id,
+      'opacity',
+      1,
+    );
+    expect(r.clips[0]!.transform?.opacity).toBeCloseTo(0.5, 6);
+    expect(resetTransform(q, id).clips[0]!.transform).toBeUndefined();
+  });
+
+  it('keys stay on the same picture through split, trim and speed', () => {
+    const { p, id } = withClip();
+    let q = setKey(setKey(p, id, 'x', 2, 0), id, 'x', 6, 0.4);
+    q = setClipSpeed(q, id, 2); // source 2 s / 6 s → timeline 1 s / 3 s
+    expect(keyTimes(q.clips[0]!)).toEqual([1, 3]);
+    const { project } = splitAt(q, 2);
+    const [l, r] = [...project.clips].sort((a, b) => a.start - b.start);
+    expect(transformAt(l!, 1.5).x).toBeCloseTo(0.1, 6);
+    expect(transformAt(r!, 2.5).x).toBeCloseTo(0.3, 6);
+    expect(keyTimes(r!)).toEqual([3]);
+  });
+
+  it('validates keys in project files', () => {
+    const { p, id } = withClip();
+    const q = setKey(setKey(p, id, 'rotation', 0, 0), id, 'rotation', 1, 90);
+    expect(validProject(JSON.parse(JSON.stringify(q)))).toBe(true);
+    const bad = (kf: unknown) =>
+      validProject({ ...q, clips: q.clips.map((c) => ({ ...c, keyframes: kf })) });
+    expect(
+      bad({
+        rotation: [
+          { t: 1, v: 0 },
+          { t: 0, v: 1 },
+        ],
+      }),
+    ).toBe(false); // unsorted
+    expect(bad({ evil: [{ t: 0, v: 0 }] })).toBe(false);
+    expect(bad({ x: [{ t: 0, v: 'NaN' }] })).toBe(false);
+    expect(bad({ x: [{ t: 0, v: 0, ease: 'bounce' }] })).toBe(false);
+  });
+
+  it('turns keys into FFmpeg expressions, numbers only', () => {
+    expect(keyExpr([{ t: 0, v: 1 }], 't')).toBe('if(lt(t,(0)),(1),(1))');
+    expect(
+      keyExpr(
+        [
+          { t: 1, v: 0 },
+          { t: 3, v: 2 },
+        ],
+        't',
+      ),
+    ).toBe('if(lt(t,(1)),(0),if(lt(t,(3)),(0)+(2)*((t-(1))/(2)),(2)))');
+    const { p, id } = withClip();
+    let q = setKey(setKey(p, id, 'x', 0, 0), id, 'x', 2, 0.5);
+    q = setKey(setKey(q, id, 'scale', 0, 0.5), id, 'scale', 2, 1.5);
+    q = setKey(setKey(q, id, 'rotation', 0, 0), id, 'rotation', 2, 180);
+    q = setKey(setKey(q, id, 'opacity', 0, 0), id, 'opacity', 2, 1);
+    q = {
+      ...q,
+      clips: q.clips.map((c) => ({
+        ...c,
+        keyframes: { ...c.keyframes, y: [{ t: 0, v: '1)evil' as unknown as number }] },
+      })),
+    };
+    const f = buildRender(q, defaultExport(q), '/out.mp4').filter;
+    expect(f).toContain("geq=r='r(X,Y)'");
+    expect(f).toContain(':eval=frame');
+    expect(f).toContain("ow='hypot(iw,ih)'");
+    expect(f).toContain('c=black@0');
+    expect(f).toContain("x='(W-w)/2+(if(lt((t-0)");
+    expect(f).not.toContain('evil');
+  });
+});
+
 describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video smoke (FFmpeg)', () => {
   it('imports a video, cuts it and exports a 5 s MP4', async () => {
     const src = join(dir, 'source.mp4');
@@ -363,5 +481,75 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video smoke (FFmpeg)', () => {
     expect(check.duration).toBeGreaterThan(2.8);
     expect(check.duration).toBeLessThan(3.2);
     expect(check.hasAudio).toBe(true);
+  }, 120_000);
+
+  it('renders keyframed position, size, rotation and opacity with real FFmpeg', async () => {
+    const src = join(dir, 'kf.mp4');
+    const gen = spawnSync(tools.ffmpeg!, [
+      ...['-hide_banner', '-v', 'error', '-y', '-f', 'lavfi'],
+      ...['-i', 'color=c=white:size=320x180:rate=30:duration=3'],
+      ...['-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', src],
+    ]);
+    expect(gen.status, gen.stderr?.toString()).toBe(0);
+    const svc = new VideoService(appRoot, dir, () => undefined);
+    const { url: _u, ...item } = await svc.probe(src);
+    let p: VideoProject = {
+      ...newProject({ width: 320, height: 180, fps: 30, name: 'kf' }),
+      media: [item],
+    };
+    const ins = insertMedia(p, item);
+    const id = ins.clip!.id;
+    p = ins.project;
+    // A white box moves from the left to the right, grows, turns and fades in.
+    p = setKey(setKey(p, id, 'x', 0, -0.3), id, 'x', 3, 0.3);
+    p = setKey(setKey(p, id, 'scale', 0, 0.2), id, 'scale', 3, 0.4);
+    p = setKey(setKey(p, id, 'rotation', 0, 0), id, 'rotation', 3, 90);
+    p = setKey(setKey(p, id, 'opacity', 0, 0.5, 'ease'), id, 'opacity', 3, 1);
+    const out = join(dir, 'kf-out.mp4');
+    const job = svc.enqueue(
+      p,
+      { ...defaultExport(p), width: 320, height: 180, preset: 'veryfast' },
+      out,
+    );
+    await new Promise<void>((resolve) => {
+      const tick = setInterval(() => {
+        const j = svc.list().find((x) => x.id === job.id)!;
+        if (j.state !== 'queued' && j.state !== 'running') {
+          clearInterval(tick);
+          resolve();
+        }
+      }, 100);
+    });
+    const final = svc.list().find((x) => x.id === job.id)!;
+    expect(final.state, final.error).toBe('done');
+    // Centre and brightness of the box in a grey frame at time t.
+    const look = (t: number) => {
+      const r = spawnSync(
+        tools.ffmpeg!,
+        [
+          ...['-v', 'error', '-ss', String(t), '-i', out, '-frames:v', '1'],
+          ...['-f', 'rawvideo', '-pix_fmt', 'gray', '-'],
+        ],
+        { maxBuffer: 1 << 24 },
+      );
+      const px = r.stdout;
+      let n = 0;
+      let sx = 0;
+      let max = 0;
+      for (let i = 0; i < px.length; i++)
+        if (px[i]! > 40) {
+          n++;
+          sx += i % 320;
+          max = Math.max(max, px[i]!);
+        }
+      return { n, cx: sx / n, max };
+    };
+    const a = look(0.1);
+    const b = look(2.8);
+    expect(a.cx).toBeLessThan(100); // 160 - 0.3 × 320 ≈ 64
+    expect(b.cx).toBeGreaterThan(200); // ≈ 256
+    expect(b.n).toBeGreaterThan(a.n * 2); // bigger
+    expect(a.max).toBeLessThan(170); // half transparent over black
+    expect(b.max).toBeGreaterThan(220);
   }, 120_000);
 });

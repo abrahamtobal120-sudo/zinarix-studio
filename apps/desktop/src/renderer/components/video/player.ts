@@ -13,7 +13,7 @@ import {
   sourceAt,
   speedOf,
   trackOf,
-  transformOf,
+  transformAt,
 } from '../../../shared/video';
 import { getV, setV } from './videoStore';
 
@@ -227,7 +227,7 @@ export class Player {
     for (const l of layers) {
       if (!l.ready || !l.w || !l.h) continue;
       // Fit inside the frame, centred, then the clip's transform (same maths as the export).
-      const tr = transformOf(l.c);
+      const tr = transformAt(l.c, t);
       const alpha = tr.opacity * fadeAt(l.c, t);
       if (alpha <= 0) continue;
       const k = Math.min(W / l.w, H / l.h) * tr.scale;

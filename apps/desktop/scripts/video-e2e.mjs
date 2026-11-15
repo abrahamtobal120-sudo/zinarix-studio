@@ -224,6 +224,32 @@ const w2 = await win
   .first()
   .evaluate((e) => e.getBoundingClientRect().width);
 check('undo restores speed', Math.abs(w2 - w0) < 3, `${w2}`);
+
+// 5c. Keyframes: scale key at 0 (100 %), another 30 frames later at 50 %; the preview follows.
+await win.evaluate(() => document.activeElement?.blur());
+await win.keyboard.press('Home');
+await win.locator('.vs-prop-block:has(#vs-ts) .vs-key').click();
+await win.evaluate(() => document.activeElement?.blur());
+for (let i = 0; i < 30; i++) await win.keyboard.press('ArrowRight');
+await win.locator('.vs-prop-block:has(#vs-ts) .vs-num-input').fill('50');
+await win.waitForTimeout(300);
+check('two keyframes on the clip', (await win.locator('.vs-clip .vs-kf').count()) === 2);
+const cornerKeyEnd = await corner();
+await win.evaluate(() => document.activeElement?.blur());
+await win.keyboard.press('Home');
+await win.waitForTimeout(400);
+const cornerKeyStart = await corner();
+check(
+  'keyframed scale animates the preview',
+  cornerKeyStart > 30 && cornerKeyEnd < 10,
+  `${cornerKeyStart} → ${cornerKeyEnd}`,
+);
+await shot('3c-keyframes');
+await win.evaluate(() => document.activeElement?.blur());
+await win.keyboard.press('Control+z');
+await win.keyboard.press('Control+z');
+await win.waitForTimeout(200);
+check('undo removes the keyframes', (await win.locator('.vs-clip .vs-kf').count()) === 0);
 // Esc with a clip selected only clears the selection.
 await win.keyboard.press('Escape');
 await win.waitForTimeout(150);

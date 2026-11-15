@@ -5,6 +5,7 @@ import {
   addTrack,
   clipDur,
   clipEnd,
+  keyTimes,
   speedOf,
   mediaOf,
   moveClips,
@@ -805,6 +806,15 @@ function ClipView({
       {!!clip.fadeOut && (
         <div className="vs-fade vs-fade-out" style={{ width: clip.fadeOut * zoom }} />
       )}
+      {clip.keyframes &&
+        keyTimes(clip).map((t) => (
+          // Kept inside the clip so keys on its edges are not cut in half.
+          <div
+            key={t}
+            className="vs-kf"
+            style={{ left: Math.min(Math.max((t - clip.start) * zoom, 5), width - 5) }}
+          />
+        ))}
       {wave && media?.hasAudio && (
         <Waveform
           clip={clip}

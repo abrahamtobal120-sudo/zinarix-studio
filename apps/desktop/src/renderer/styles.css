@@ -7803,21 +7803,153 @@ button.wa-add {
   color: var(--danger, #e5534b);
   margin: 4px 0;
 }
+/* State card on top: a dot (green on, grey off, blinking while reviewing) and the button. */
+.watch-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+.watch-status .run-main {
+  margin: 4px 0 0;
+}
+.watch-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.watch-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  flex-shrink: 0;
+}
+.watch-on .watch-dot {
+  background: var(--ok);
+}
+.watch-busy .watch-dot {
+  background: var(--warn);
+  animation: watch-blink 1s ease-in-out infinite;
+}
+@keyframes watch-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+.watch-empty {
+  text-align: center;
+  padding: 16px 8px;
+  line-height: 1.5;
+}
 .watch-report {
-  border-top: 1px solid var(--border);
-  padding-top: 4px;
-  margin-top: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 .watch-head {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.watch-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.watch-head-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.watch-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.watch-chip {
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: var(--bg-3);
+}
+.watch-chip-fix {
+  color: var(--danger);
+}
+.watch-chip-improve {
+  color: var(--accent);
+}
+.watch-summary {
+  margin: 8px 0 4px;
+  line-height: 1.5;
+}
+.watch-ok {
+  display: flex;
   align-items: center;
+  gap: 6px;
+  color: var(--ok);
+  margin: 6px 0;
 }
 .watch-item {
   border-left: 3px solid var(--fg-dim);
-  padding: 4px 8px;
-  margin: 6px 0;
+  padding: 6px 8px;
+  margin: 8px 0;
   border-radius: 2px;
+  background: var(--bg-2);
+}
+.watch-detail {
+  line-height: 1.5;
+}
+.watch-meta {
+  margin-top: 6px;
+  font-size: 10.5px;
+}
+.watch-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Settings folded at the bottom: they are set once, the reviews are what you come for. */
+.watch-settings {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.watch-settings summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  list-style: none;
+}
+.watch-settings summary::-webkit-details-marker {
+  display: none;
+}
+.watch-settings summary:hover {
+  color: var(--fg-strong);
+}
+.watch-settings > p {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.watch-row.watch-check {
+  justify-content: flex-start;
 }
 .watch-fix {
   border-left-color: var(--danger, #e5534b);

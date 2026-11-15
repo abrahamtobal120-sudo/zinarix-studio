@@ -11,7 +11,7 @@ import { isSecretFile } from './guard.js';
 import type { Workspace } from './workspace.js';
 
 /**
- * The Watcher (Vigía): always on, but almost always free. Every few minutes it looks at the
+ * The auto review (Revisión automática): always on, but almost always free. Every few minutes it looks at the
  * open projects with git (no AI, no tokens). Only when a project changed, the changes have
  * settled and enough time passed since the last review, it sends one short request to the
  * AI and keeps what it says should be fixed or improved.
@@ -342,7 +342,7 @@ export class Watcher {
 
   /** Reviews one project now (the "Revisar ahora" button skips the waiting rules). */
   async runNow(ws: Workspace | undefined): Promise<WatchStatus> {
-    if (!ws) throw new Error('Abre una carpeta para que el Vigía la revise.');
+    if (!ws) throw new Error('Abre una carpeta para poder revisarla.');
     if (this.busy) return this.status();
     await this.review(ws, await fingerprint(ws).catch(() => ''));
     return this.status();

@@ -16,7 +16,7 @@ import type { OmniEvent } from '@omni/core';
 import { CatalogEntry, CliProfile, OmniError, t } from '@omni/shared';
 import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact, StreamRedactor } from '@omni/security';
-import { Agent } from './agent.js';
+import { Agent, IDENTITY_PROMPT } from './agent.js';
 import { MAX_IMAGES, addImageParts, imagesAsFiles, visionMode } from './chatImages.js';
 import { RunJournal } from './runJournal.js';
 import { predictNextEdit } from './nextEdit.js';
@@ -41,7 +41,9 @@ import type {
 } from '../shared/api.js';
 
 const CHAT_SYSTEM =
-  'You are Zinarix Studio, an AI assistant embedded in a code editor. Be concise and precise. ' +
+  'You are Zinarix AI, the assistant embedded in the Zinarix Studio code editor. Be concise and precise.\n' +
+  IDENTITY_PROMPT +
+  '\n' +
   'Use fenced code blocks with a language tag for code. Answer in the language the user writes in. ' +
   'In this chat mode you have no tools. Zinarix Studio also has an Agent mode (the "🤖 Agente" checkbox under the message box) ' +
   'that lets you read and edit files, run terminal commands, use a browser, the network and the security tools, with the user approving each action. ' +

@@ -2,7 +2,8 @@ import { lang } from './i18n';
 
 /** Strings of the debugger and the Problems panel (kept apart from i18n.ts, like i18nLsp.ts). */
 const es = {
-  dbgTitle: 'Ejecutar y depurar',
+  dbgTitle: 'Depurador',
+  dbgBarTip: 'Depurador: pausa tu programa en una línea para ver qué valor tiene cada cosa y encontrar errores',
   dbgStart: 'Iniciar depuración',
   dbgStartFile: 'Depurar archivo actual',
   dbgContinue: 'Continuar',
@@ -49,7 +50,8 @@ const es = {
 };
 
 const en: Record<keyof typeof es, string> = {
-  dbgTitle: 'Run and debug',
+  dbgTitle: 'Debugger',
+  dbgBarTip: 'Debugger: pause your program at a line to see each value and find bugs',
   dbgStart: 'Start debugging',
   dbgStartFile: 'Debug current file',
   dbgContinue: 'Continue',

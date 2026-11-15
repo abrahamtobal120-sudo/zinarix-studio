@@ -1,23 +1,33 @@
 import { useEffect, useState } from 'react';
-import type { Clip, MediaItem, Transform } from '../../../shared/video';
+import type { Clip, Ease, KeyProp, MediaItem, Transform } from '../../../shared/video';
 import {
-  IDENTITY,
+  EASES,
   SPEED_MAX,
   SPEED_MIN,
+  clearKeys,
   clipDur,
+  clipEnd,
+  editTransformAt,
+  hasKeyframes,
+  isAnimated,
+  keyAt,
+  keyTimes,
   mediaOf,
   projectDuration,
+  removeKey,
+  resetTransform,
   setClipSpeed,
   setFades,
+  setKey,
   setTransform,
   speedOf,
   timecode,
-  transformOf,
+  transformAt,
   updateClip,
 } from '../../../shared/video';
 import { api, toast } from '../../store';
-import { fmtBytes, fmtDuration, tv } from './strings';
-import { commit, commitMerged, getV, useV } from './videoStore';
+import { type VideoKey, fmtBytes, fmtDuration, tv } from './strings';
+import { commit, commitMerged, getV, seek, useV } from './videoStore';
 
 export function Inspector() {
   const project = useV((s) => s.project);
@@ -160,8 +170,11 @@ function Slider({
   step,
   unit,
   factor = 1,
+  extra,
   onChange,
 }: {
+  /** Shown next to the label (keyframe controls). */
+  extra?: React.ReactNode;
   id: string;
   label: string;
   value: number;
@@ -176,9 +189,12 @@ function Slider({
   return (
     <div className="vs-prop-block">
       <div className="vs-slider-head">
-        <label className="vs-prop-label" htmlFor={id}>
-          {label}
-        </label>
+        <span className="vs-label-keys">
+          <label className="vs-prop-label" htmlFor={id}>
+            {label}
+          </label>
+          {extra}
+        </span>
         <span className="vs-num">
           <input
             type="number"
@@ -208,12 +224,111 @@ function Slider({
   );
 }
 
+/** Where keys go: the playhead, kept inside the clip. */
+function keyTimeFor(clip: Clip, playhead: number): number {
+  return Math.min(Math.max(playhead, clip.start), clipEnd(clip));
+}
+
+/** The diamond (add / remove a key here), the ease of that key, and stop animating. */
+function KeyControls({ clip, prop, t }: { clip: Clip; prop: KeyProp; t: number }) {
+  const fps = useV((s) => s.project.fps);
+  const animated = isAnimated(clip, prop);
+  const key = animated ? keyAt(clip, prop, t, fps) : undefined;
+  const label = key ? tv('keyRemove') : animated ? tv('keyAdd') : tv('keyStart');
+  return (
+    <span className="vs-keys">
+      <button
+        className={`vs-key ${key ? 'on' : animated ? 'animated' : ''}`}
+        title={label}
+        aria-label={`${label} · ${tv(PROP_LABEL[prop])}`}
+        aria-pressed={!!key}
+        onClick={() =>
+          commit(
+            key
+              ? removeKey(getV().project, clip.id, prop, t)
+              : setKey(getV().project, clip.id, prop, t),
+            tv('editKey'),
+          )
+        }
+      >
+        ◆
+      </button>
+      {key && (
+        <select
+          className="vs-ease"
+          title={tv('keyEase')}
+          aria-label={tv('keyEase')}
+          value={key.ease ?? 'linear'}
+          onChange={(e) =>
+            commit(
+              setKey(getV().project, clip.id, prop, t, key.v, e.target.value as Ease),
+              tv('editKey'),
+            )
+          }
+        >
+          {EASES.map((e) => (
+            <option key={e} value={e}>
+              {tv(EASE_LABEL[e])}
+            </option>
+          ))}
+        </select>
+      )}
+      {animated && (
+        <button
+          className="vs-key-clear"
+          title={tv('keyClear')}
+          aria-label={`${tv('keyClear')} · ${tv(PROP_LABEL[prop])}`}
+          onClick={() => commit(clearKeys(getV().project, clip.id, prop, t), tv('editKey'))}
+        >
+          ×
+        </button>
+      )}
+    </span>
+  );
+}
+
+const PROP_LABEL: Record<KeyProp, VideoKey> = {
+  x: 'posX',
+  y: 'posY',
+  scale: 'scale',
+  rotation: 'rotation',
+  opacity: 'opacity',
+};
+const EASE_LABEL: Record<Ease, VideoKey> = {
+  linear: 'easeLinear',
+  ease: 'easeEase',
+  hold: 'easeHold',
+};
+
+const SLIDERS: {
+  prop: KeyProp;
+  id: string;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+  factor?: number;
+}[] = [
+  { prop: 'x', id: 'vs-tx', min: -1, max: 1, step: 0.005, unit: '%', factor: 100 },
+  { prop: 'y', id: 'vs-ty', min: -1, max: 1, step: 0.005, unit: '%', factor: 100 },
+  { prop: 'scale', id: 'vs-ts', min: 0.05, max: 4, step: 0.01, unit: '%', factor: 100 },
+  { prop: 'rotation', id: 'vs-tr', min: -360, max: 360, step: 1, unit: '°' },
+  { prop: 'opacity', id: 'vs-to', min: 0, max: 1, step: 0.01, unit: '%', factor: 100 },
+];
+
 function TransformSection({ clip }: { clip: Clip }) {
-  const tr = transformOf(clip);
+  const playhead = useV((s) => s.playhead);
+  const t = keyTimeFor(clip, playhead);
+  const inside = playhead >= clip.start && playhead <= clipEnd(clip);
+  const tr = transformAt(clip, t);
+  const times = keyTimes(clip);
+  const prev = [...times].reverse().find((k) => k < playhead - 1e-4);
+  const next = times.find((k) => k > playhead + 1e-4);
+  // Slider drags fold into one undo step per property and key time.
   const set = (patch: Partial<Transform>, what: string) =>
     commitMerged(
-      setTransform(getV().project, clip.id, patch),
-      `${tv('editTransform')} ${what} ${clip.id}`,
+      editTransformAt(getV().project, clip.id, patch, t),
+      `${tv('editTransform')} ${what} ${clip.id} ${t.toFixed(3)}`,
     );
   const flip = (patch: Partial<Transform>, label: string) =>
     commit(setTransform(getV().project, clip.id, patch), label);
@@ -221,68 +336,54 @@ function TransformSection({ clip }: { clip: Clip }) {
     <>
       <div className="vs-panel-sub vs-sub-row">
         <span>{tv('secTransform')}</span>
-        <button
-          className="vs-mini"
-          disabled={!clip.transform}
-          onClick={() => flip({ ...IDENTITY }, tv('editTransform'))}
-        >
-          {tv('resetTransform')}
-        </button>
+        <span className="vs-keynav">
+          {times.length > 0 && (
+            <>
+              <button
+                className="vs-mini"
+                disabled={prev === undefined}
+                title={tv('keyPrev')}
+                aria-label={tv('keyPrev')}
+                onClick={() => prev !== undefined && seek(prev)}
+              >
+                ◀◆
+              </button>
+              <button
+                className="vs-mini"
+                disabled={next === undefined}
+                title={tv('keyNext')}
+                aria-label={tv('keyNext')}
+                onClick={() => next !== undefined && seek(next)}
+              >
+                ◆▶
+              </button>
+            </>
+          )}
+          <button
+            className="vs-mini"
+            disabled={!clip.transform && !clip.keyframes}
+            onClick={() => commit(resetTransform(getV().project, clip.id), tv('editTransform'))}
+          >
+            {tv('resetTransform')}
+          </button>
+        </span>
       </div>
-      <Slider
-        id="vs-tx"
-        label={tv('posX')}
-        value={tr.x}
-        min={-1}
-        max={1}
-        step={0.005}
-        unit="%"
-        factor={100}
-        onChange={(x) => set({ x }, 'x')}
-      />
-      <Slider
-        id="vs-ty"
-        label={tv('posY')}
-        value={tr.y}
-        min={-1}
-        max={1}
-        step={0.005}
-        unit="%"
-        factor={100}
-        onChange={(y) => set({ y }, 'y')}
-      />
-      <Slider
-        id="vs-ts"
-        label={tv('scale')}
-        value={tr.scale}
-        min={0.05}
-        max={4}
-        step={0.01}
-        unit="%"
-        factor={100}
-        onChange={(scale) => set({ scale }, 'scale')}
-      />
-      <Slider
-        id="vs-tr"
-        label={tv('rotation')}
-        value={tr.rotation}
-        min={-180}
-        max={180}
-        step={1}
-        unit="°"
-        onChange={(rotation) => set({ rotation }, 'rot')}
-      />
-      <Slider
-        id="vs-to"
-        label={tv('opacity')}
-        value={tr.opacity}
-        min={0}
-        max={1}
-        step={0.01}
-        unit="%"
-        factor={100}
-        onChange={(opacity) => set({ opacity }, 'op')}
-      />
+      {!inside && hasKeyframes(clip) && <p className="vs-dim vs-note">{tv('keyOutside')}</p>}
+      {SLIDERS.map((s) => (
+        <Slider
+          key={s.prop}
+          id={s.id}
+          label={tv(PROP_LABEL[s.prop])}
+          value={tr[s.prop]}
+          min={s.min}
+          max={s.max}
+          step={s.step}
+          unit={s.unit}
+          factor={s.factor}
+          extra={<KeyControls clip={clip} prop={s.prop} t={t} />}
+          onChange={(v) => set({ [s.prop]: v }, s.prop)}
+        />
+      ))}
       <div className="vs-prop-block vs-toggles">
         <label>
           <input
