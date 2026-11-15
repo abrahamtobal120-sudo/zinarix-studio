@@ -4,6 +4,7 @@ import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import { api, openFile, setState, toast, useStore } from '../store';
+import { openLink } from '../links';
 import { monacoTheme } from '../themes';
 import { Icon } from './Icon';
 import { ModalShell } from './ModalShell';
@@ -359,7 +360,7 @@ export function PublishRepo() {
       const url = await api().github.publish(name, vis, desc);
       toast(t('ghPublished', { url }));
       close();
-      if (/^https:\/\//.test(url)) void api().app.openExternal(url);
+      openLink(url);
     } catch (e) {
       toast(errText(e));
     } finally {

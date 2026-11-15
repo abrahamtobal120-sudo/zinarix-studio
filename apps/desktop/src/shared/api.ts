@@ -197,6 +197,10 @@ export interface Prefs {
   lspCommands: Record<string, string>;
   /** Predict the next edit (Tab jumps there); works together with inlineCompletions. */
   nextEdit: boolean;
+  /** The round "Ayuda de Zinarix" button (help assistant) in the corner. */
+  helperBubble: boolean;
+  /** Local Ollama model of the help assistant ("qwen2.5:1.5b"). */
+  helperModel: string;
 }
 
 /** Steps of the interface size (Ver > Acercar / Alejar and Settings). */
@@ -218,6 +222,8 @@ export const DEFAULT_PREFS: Prefs = {
   lsp: true,
   lspCommands: {},
   nextEdit: true,
+  helperBubble: true,
+  helperModel: 'qwen2.5:1.5b',
 };
 
 export interface GitFileView {
@@ -704,6 +710,25 @@ export interface BrowserStateView {
   loading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** The page is in the bookmarks. */
+  bookmarked?: boolean;
+  /** Favicon of the site (data: URL), when known. */
+  icon?: string;
+}
+
+/** A page of the browser history (its latest visit) or a bookmark. */
+export interface BrowserHistoryEntryView {
+  url: string;
+  title: string;
+  at: number;
+  visits: number;
+  bookmark?: boolean;
+}
+
+export interface BrowserHistoryView {
+  entries: BrowserHistoryEntryView[];
+  /** Favicons by host (data: URLs). */
+  icons: Record<string, string>;
 }
 
 /** One tab of the built-in browser: the user's own, or the one of an AI conversation. */
@@ -712,6 +737,7 @@ export interface BrowserTabView {
   title: string;
   url: string;
   loading: boolean;
+  icon?: string;
   /** Conversation that owns the tab (null: the user's own tab). */
   owner: string | null;
   /** "Tú" or the model of the conversation that uses it. */
@@ -797,6 +823,8 @@ export type AppEvent =
   | { type: 'browser:tabs'; view: BrowserTabsView }
   /** An agent started using the browser: the UI should show the browser (that tab). */
   | { type: 'browser:show'; tab?: string }
+  /** A link was opened in the built-in browser: the UI shows the browser (no AI notice). */
+  | { type: 'browser:focus' }
   | { type: 'scan:progress'; requestId: string; done: number; total: number }
   /** Another window changed shared settings (models, keys, theme, preferences, license). */
   | { type: 'settings:changed' }
@@ -832,7 +860,39 @@ export type AppEvent =
   /** A language server asks to change files (WorkspaceEdit); answer with lsp.applyEditResult. */
   | { type: 'lsp:applyEdit'; id: number; edit: unknown }
   /** Memories or indexed docs changed (added, removed, a crawl progressed). */
-  | { type: 'knowledge:changed' };
+  | { type: 'knowledge:changed' }
+  /** The help assistant (Ayuda de Zinarix) streamed part of an answer. */
+  | { type: 'helper'; requestId: string; event: HelperEvent }
+  /** Progress of a local model download for the help assistant. */
+  | { type: 'helper:pull'; event: HelperPullEvent };
+
+/** Whether the help assistant can answer locally (Ollama running and its model downloaded). */
+export interface HelperStatus {
+  ollama: 'running' | 'down';
+  /** Ollama found on disk (when it is down: installed but not open, or not installed). */
+  installed: boolean;
+  model: string;
+  hasModel: boolean;
+  /** Models already downloaded in Ollama. */
+  models: string[];
+  /** Pieces of documentation the assistant knows. */
+  chunks: number;
+}
+
+export type HelperEvent =
+  | { type: 'sources'; sources: string[] }
+  | { type: 'delta'; text: string }
+  | { type: 'done' }
+  | { type: 'error'; message: string };
+
+export interface HelperPullEvent {
+  requestId: string;
+  status: string;
+  completed?: number;
+  total?: number;
+  done?: boolean;
+  error?: string;
+}
 
 /** Something the Watcher thinks should be fixed (a bug, a risk) or improved. */
 export interface WatchItem {
@@ -1332,6 +1392,16 @@ export interface OmniApi {
     back(tabId: string | null): Promise<void>;
     forward(tabId: string | null): Promise<void>;
     reload(tabId: string | null): Promise<void>;
+    stop(tabId: string | null): Promise<void>;
+    /** History of the user's own tabs, newest first; query filters by title or address. */
+    history(query: string, limit?: number): Promise<BrowserHistoryView>;
+    /** Address bar suggestions from the bookmarks and the history. */
+    suggest(query: string): Promise<BrowserHistoryView>;
+    /** Removes one address from the history, or all of it (url null). */
+    forget(url: string | null): Promise<void>;
+    bookmarks(): Promise<BrowserHistoryView>;
+    /** Adds the page to the bookmarks or removes it; returns whether it is bookmarked now. */
+    toggleBookmark(url: string, title: string): Promise<boolean>;
     /** Leaves the current page and shows the start page. */
     home(tabId: string | null): Promise<void>;
     state(): Promise<BrowserStateView>;
@@ -1420,6 +1490,11 @@ export interface OmniApi {
     prefs(): Promise<Prefs>;
     setPrefs(patch: Partial<Prefs>): Promise<Prefs>;
     openExternal(url: string): Promise<void>;
+    /**
+     * Opens an http(s) link in the built-in browser (a tab of the user's own). A few sites
+     * that refuse embedded browsers (Google sign-in, payments) open in the system browser.
+     */
+    openLink(url: string): Promise<void>;
     /** Closes this window (after the unsaved-changes check); the app quits with the last one. */
     quit(): Promise<void>;
     /**
@@ -1704,6 +1779,12 @@ export const CHANNELS = [
   'browser:back',
   'browser:forward',
   'browser:reload',
+  'browser:stop',
+  'browser:history',
+  'browser:suggest',
+  'browser:forget',
+  'browser:bookmarks',
+  'browser:toggleBookmark',
   'browser:state',
   'browser:home',
   'browser:tabs',
@@ -1716,6 +1797,7 @@ export const CHANNELS = [
   'terminal:resize',
   'terminal:kill',
   'app:openExternal',
+  'app:openLink',
   'app:quit',
   'app:resumeOnLogin',
   'app:interruptedRuns',

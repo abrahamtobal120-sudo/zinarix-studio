@@ -13,6 +13,7 @@ import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, setState, toast, useStore } from '../store';
+import { openLink } from '../links';
 import { askAgent } from './Chat';
 import { runInTerminal } from './Terminal';
 
@@ -55,7 +56,7 @@ function ago(ms: number): string {
   return t('vcDays', { n: Math.floor(s / 86400) });
 }
 
-const open = (url: string) => void api().app.openExternal(url);
+const open = (url: string) => openLink(url);
 
 function inTerminal(cli: boolean, args: string) {
   setState({ panelOpen: true });

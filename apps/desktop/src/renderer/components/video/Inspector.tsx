@@ -90,13 +90,21 @@ function ProjectInfo() {
         <code>{fmtDuration(projectDuration(p))}</code>
       </Row>
       <Row label="FFmpeg">
-        <span className={tools?.ffmpeg ? 'vs-ok' : 'vs-warn'}>
-          {tools ? (tools.ffmpeg ? (tools.version ?? '✓') : '—') : '…'}
+        <span
+          className={`vs-ellipsis ${tools?.ffmpeg ? 'vs-ok' : 'vs-warn'}`}
+          title={tools?.version ?? undefined}
+        >
+          {tools
+            ? tools.ffmpeg
+              ? // "6.1.1-essentials_build-www.gyan.dev" → "6.1.1"
+                (tools.version?.split(/[-_]/)[0] ?? '✓')
+              : '—'
+            : '…'}
         </span>
       </Row>
       <Row label={tv('cache')}>
-        <span>
-          {cache == null ? '…' : fmtBytes(cache)}{' '}
+        <span className="vs-cache">
+          <code>{cache == null ? '…' : fmtBytes(cache)}</code>
           <button
             className="vs-mini"
             onClick={async () => {

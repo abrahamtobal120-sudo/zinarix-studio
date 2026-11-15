@@ -1,11 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
-import type { BrowserStateView, BrowserTabsView } from '../../shared/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  BrowserHistoryEntryView,
+  BrowserHistoryView,
+  BrowserStateView,
+  BrowserTabsView,
+} from '../../shared/api';
 import { BROWSER_TAB, api, setState, toast, useStore } from '../store';
 import { tabKeyDown } from '../a11y';
-import { t } from '../i18n';
+import { confirmDialog } from '../confirm';
+import { lang, t } from '../i18n';
 import { askInChat } from './Chat';
 import { Icon as UiIcon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
+import './browser.css';
 
 const EMPTY: BrowserStateView = {
   url: '',
@@ -14,6 +21,8 @@ const EMPTY: BrowserStateView = {
   canGoBack: false,
   canGoForward: false,
 };
+
+const NO_LIST: BrowserHistoryView = { entries: [], icons: {} };
 
 /** Shown for a few seconds after each agent action, so the user sees who is driving. */
 const AI_ACTIVE_MS = 4000;
@@ -69,10 +78,195 @@ function splitUrl(url: string): { secure: boolean; host: string; rest: string } 
   }
 }
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+/** The site's favicon, or a globe when it is not known. */
+function Favicon({ src, size = 14 }: { src?: string; size?: number }) {
+  return src ? (
+    <img className="browser-favicon" src={src} width={size} height={size} alt="" />
+  ) : (
+    <Icon d={ICON.globe} size={size} />
+  );
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+function dayLabel(at: number): string {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  if (at >= start.getTime()) return t('browserToday');
+  if (at >= start.getTime() - DAY) return t('browserYesterday');
+  return new Date(at).toLocaleDateString(lang, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: new Date(at).getFullYear() === start.getFullYear() ? undefined : 'numeric',
+  });
+}
+
+function timeLabel(at: number): string {
+  return new Date(at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
+}
+
+type Panel = 'history' | 'bookmarks' | null;
+
+/**
+ * History or bookmarks, drawn where the page goes (the page is hidden meanwhile: a native
+ * view would cover anything drawn over it).
+ */
+function ListPanel({
+  kind,
+  onOpen,
+  onClose,
+  onChanged,
+}: {
+  kind: 'history' | 'bookmarks';
+  onOpen: (url: string) => void;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [list, setList] = useState<BrowserHistoryView>(NO_LIST);
+  const [loaded, setLoaded] = useState(false);
+  const search = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    const v =
+      kind === 'history'
+        ? await api().browser.history(query, 1000)
+        : await api().browser.bookmarks();
+    if (kind === 'bookmarks' && query.trim()) {
+      const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+      v.entries = v.entries.filter((e) =>
+        words.every((w) => `${e.title} ${e.url}`.toLowerCase().includes(w)),
+      );
+    }
+    setList(v);
+    setLoaded(true);
+  }, [kind, query]);
+
+  useEffect(() => {
+    const id = setTimeout(() => void load(), query ? 120 : 0);
+    return () => clearTimeout(id);
+  }, [load, query]);
+
+  useEffect(() => {
+    search.current?.focus();
+  }, [kind]);
+
+  const remove = async (e: BrowserHistoryEntryView) => {
+    if (kind === 'history') await api().browser.forget(e.url);
+    else await api().browser.toggleBookmark(e.url, e.title);
+    onChanged();
+    void load();
+  };
+
+  const clearAll = async () => {
+    const ok = await confirmDialog(t('browserHistoryClearConfirm'), {
+      danger: true,
+      okLabel: t('browserHistoryClear'),
+    });
+    if (!ok) return;
+    await api().browser.forget(null);
+    onChanged();
+    void load();
+  };
+
+  // Rows grouped by day (history) or a single list (bookmarks).
+  const groups: { label: string; rows: BrowserHistoryEntryView[] }[] = [];
+  for (const e of list.entries) {
+    const label = kind === 'history' ? dayLabel(e.at) : '';
+    const g = groups[groups.length - 1];
+    if (g && g.label === label) g.rows.push(e);
+    else groups.push({ label, rows: [e] });
+  }
+
+  return (
+    <div
+      className="browser-panel"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+    >
+      <div className="browser-panel-head">
+        <h3>
+          <UiIcon name={kind === 'history' ? 'history' : 'starFilled'} size={16} />
+          {kind === 'history' ? t('browserHistory') : t('browserBookmarks')}
+        </h3>
+        <label className="browser-panel-search">
+          <Icon d={ICON.search} size={14} />
+          <input
+            ref={search}
+            value={query}
+            placeholder={t('browserHistorySearch')}
+            spellCheck={false}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+        {kind === 'history' && list.entries.length > 0 && !query && (
+          <button className="browser-panel-clear" onClick={() => void clearAll()}>
+            <UiIcon name="trash" size={13} /> {t('browserHistoryClear')}
+          </button>
+        )}
+        <button
+          className="bicon"
+          title={t('browserClosePanel')}
+          aria-label={t('browserClosePanel')}
+          onClick={onClose}
+        >
+          <Icon d={ICON.stop} size={14} />
+        </button>
+      </div>
+      <div className="browser-panel-body">
+        {loaded && !list.entries.length && (
+          <p className="browser-panel-empty">
+            {query
+              ? t('browserHistoryNoMatch')
+              : kind === 'history'
+                ? t('browserHistoryEmpty')
+                : t('browserBookmarksEmpty')}
+          </p>
+        )}
+        {groups.map((g, gi) => (
+          <section key={`${g.label}-${gi}`}>
+            {g.label && <h4>{g.label}</h4>}
+            {g.rows.map((e) => (
+              <div key={e.url} className="browser-row">
+                <button className="browser-row-main" title={e.url} onClick={() => onOpen(e.url)}>
+                  <span className="browser-row-icon">
+                    <Favicon src={list.icons[hostOf(e.url)]} />
+                  </span>
+                  <span className="browser-row-title">{e.title || hostOf(e.url) || e.url}</span>
+                  <span className="browser-row-url">{e.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  {kind === 'history' && <span className="browser-row-time">{timeLabel(e.at)}</span>}
+                </button>
+                <button
+                  className="bicon browser-row-x"
+                  title={kind === 'history' ? t('browserForget') : t('browserBookmarkRemove')}
+                  aria-label={kind === 'history' ? t('browserForget') : t('browserBookmarkRemove')}
+                  onClick={() => void remove(e)}
+                >
+                  {kind === 'history' ? <Icon d={ICON.stop} size={12} /> : <UiIcon name="trash" size={13} />}
+                </button>
+              </div>
+            ))}
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * The built-in browser tab. The page itself is a native view drawn by the main process over
  * the placeholder below; this component only reports where it goes (and hides it whenever
- * something must be drawn on top, like a dialog).
+ * something must be drawn on top, like a dialog, the suggestions or the history).
  */
 export function BrowserPane({ visible }: { visible: boolean }) {
   const [st, setSt] = useState<BrowserStateView>(EMPTY);
@@ -80,20 +274,33 @@ export function BrowserPane({ visible }: { visible: boolean }) {
   const [editing, setEditing] = useState(false);
   const [aiActive, setAiActive] = useState(false);
   const [tabs, setTabs] = useState<BrowserTabsView>({ tabs: [], active: null });
+  const [panel, setPanel] = useState<Panel>(null);
+  const [suggest, setSuggest] = useState<BrowserHistoryView>(NO_LIST);
+  const [pick, setPick] = useState(-1);
+  const [marks, setMarks] = useState<BrowserHistoryView>(NO_LIST);
   const host = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   /** Tab shown when the user started typing an address (an AI may switch the view meanwhile). */
   const editTab = useRef<string | null>(null);
+  /** What the user typed (the suggestions answer only the latest text). */
+  const typed = useRef('');
   const covered = useStore((s) => Boolean(s.modal || s.inputBox));
-  const show = visible && !covered && Boolean(st.url);
+  const suggesting = editing && suggest.entries.length > 0;
+  const show = visible && !covered && Boolean(st.url) && !panel && !suggesting;
+
+  const loadMarks = useCallback(() => {
+    void api().browser.bookmarks().then(setMarks);
+  }, []);
 
   useEffect(() => {
     void api().browser.state().then(setSt);
     void api().browser.tabs().then(setTabs);
+    loadMarks();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const off = api().on((ev) => {
       if (ev.type === 'browser:state') setSt(ev.state);
       if (ev.type === 'browser:tabs') setTabs(ev.view);
+      if (ev.type === 'browser:focus') setPanel(null);
       if (ev.type === 'browser:show') {
         setAiActive(true);
         clearTimeout(timer);
@@ -104,11 +311,16 @@ export function BrowserPane({ visible }: { visible: boolean }) {
       off();
       clearTimeout(timer);
     };
-  }, []);
+  }, [loadMarks]);
 
   useEffect(() => {
     if (!editing) setUrl(st.url);
   }, [st.url, editing]);
+
+  // The star in another window (or the bookmarks list) changed: the start page follows.
+  useEffect(() => {
+    loadMarks();
+  }, [st.bookmarked, loadMarks]);
 
   // The tab shows the page title, like a real browser.
   useEffect(() => {
@@ -151,6 +363,8 @@ export function BrowserPane({ visible }: { visible: boolean }) {
   const open = async (target: string, tab: string | null = tabs.active) => {
     if (!target.trim()) return;
     setEditing(false);
+    setPanel(null);
+    setSuggest(NO_LIST);
     input.current?.blur();
     try {
       setSt(await api().browser.navigate(target, tab));
@@ -164,7 +378,29 @@ export function BrowserPane({ visible }: { visible: boolean }) {
     }
   };
 
+  const onType = (value: string) => {
+    setUrl(value);
+    setPick(-1);
+    typed.current = value;
+    if (!value.trim()) {
+      setSuggest(NO_LIST);
+      return;
+    }
+    void api()
+      .browser.suggest(value)
+      .then((v) => {
+        if (typed.current === value) setSuggest(v);
+      });
+  };
+
+  const toggleMark = async () => {
+    if (!st.url) return;
+    await api().browser.toggleBookmark(st.url, st.title);
+    loadMarks();
+  };
+
   const parts = splitUrl(st.url);
+  const site = st.url ? parts.host : '';
   // Tabs: one per AI conversation that used the browser (two agents never share a page),
   // plus the user's own. Always shown, so the user can open more tabs with "+".
   return (
@@ -181,7 +417,10 @@ export function BrowserPane({ visible }: { visible: boolean }) {
               tabIndex={x.id === tabs.active || (!tabs.active && x === tabs.tabs[0]) ? 0 : -1}
               className={`browser-tab ${x.id === tabs.active ? 'on' : ''} ${x.ai ? 'ai' : ''}`}
               title={`${title}\n${who}${x.url ? `\n${x.url}` : ''}`}
-              onClick={() => void api().browser.selectTab(x.id)}
+              onClick={() => {
+                setPanel(null);
+                void api().browser.selectTab(x.id);
+              }}
               onKeyDown={(e) =>
                 tabKeyDown(
                   e,
@@ -197,7 +436,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
                 {x.ai ? (
                   <ProviderLogo id={x.label.replace(/^🤝\s*/, '').split('/')[0]!} size={12} />
                 ) : (
-                  <Icon d={ICON.globe} size={12} />
+                  <Favicon src={x.icon} size={12} />
                 )}
               </span>
               <span className="browser-tab-title">{title}</span>
@@ -221,7 +460,10 @@ export function BrowserPane({ visible }: { visible: boolean }) {
           className="bicon browser-tab-new"
           title={t('browserNewTab')}
           aria-label={t('browserNewTab')}
-          onClick={() => void api().browser.newTab()}
+          onClick={() => {
+            setPanel(null);
+            void api().browser.newTab();
+          }}
         >
           <UiIcon name="plus" size={14} />
         </button>
@@ -233,6 +475,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             disabled={!st.canGoBack}
             onClick={() => void api().browser.back(tabs.active)}
             title={t('navBack')}
+            aria-label={t('navBack')}
           >
             <Icon d={ICON.back} />
           </button>
@@ -241,84 +484,200 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             disabled={!st.canGoForward}
             onClick={() => void api().browser.forward(tabs.active)}
             title={t('navForward')}
+            aria-label={t('navForward')}
           >
             <Icon d={ICON.forward} />
           </button>
+          {st.loading ? (
+            <button
+              className="bicon"
+              onClick={() => void api().browser.stop(tabs.active)}
+              title={t('navStop')}
+              aria-label={t('navStop')}
+            >
+              <Icon d={ICON.stop} />
+            </button>
+          ) : (
+            <button
+              className="bicon"
+              disabled={!st.url}
+              onClick={() => void api().browser.reload(tabs.active)}
+              title={t('navReload')}
+              aria-label={t('navReload')}
+            >
+              <Icon d={ICON.reload} />
+            </button>
+          )}
           <button
             className="bicon"
-            disabled={!st.url}
-            onClick={() => void api().browser.reload(tabs.active)}
-            title={t('navReload')}
-            aria-label={t('navReload')}
-          >
-            {/* There is no "stop loading" call in the API: never show a stop icon that reloads. */}
-            <Icon d={ICON.reload} />
-          </button>
-          <button
-            className="bicon"
-            onClick={() => void api().browser.home(tabs.active)}
+            onClick={() => {
+              setPanel(null);
+              void api().browser.home(tabs.active);
+            }}
             title={t('navHome')}
+            aria-label={t('navHome')}
           >
             <Icon d={ICON.home} />
           </button>
         </div>
-        <div
-          className={`browser-omni ${editing ? 'editing' : ''}`}
-          onClick={() => input.current?.focus()}
-        >
-          <span className={`browser-sec ${st.url && !parts.secure ? 'insecure' : ''}`}>
-            <Icon
-              d={!st.url || editing ? ICON.search : parts.secure ? ICON.lock : ICON.warn}
-              size={14}
+        <div className="browser-omni-wrap">
+          <div
+            className={`browser-omni ${editing ? 'editing' : ''} ${suggesting ? 'open' : ''}`}
+            onClick={() => input.current?.focus()}
+          >
+            <span className={`browser-sec ${st.url && !parts.secure ? 'insecure' : ''}`}>
+              <Icon
+                d={!st.url || editing ? ICON.search : parts.secure ? ICON.lock : ICON.warn}
+                size={14}
+              />
+            </span>
+            {!editing && st.url ? (
+              <span className="browser-url-view" title={st.url}>
+                <b>{parts.host}</b>
+                <span>{parts.rest}</span>
+              </span>
+            ) : null}
+            <input
+              ref={input}
+              value={url}
+              placeholder={t('browserUrl')}
+              spellCheck={false}
+              aria-autocomplete="list"
+              aria-expanded={suggesting}
+              style={!editing && st.url ? { position: 'absolute', opacity: 0, width: 1 } : undefined}
+              onFocus={(e) => {
+                editTab.current = tabs.active;
+                setEditing(true);
+                const el = e.currentTarget;
+                setTimeout(() => el.select(), 0);
+              }}
+              onBlur={() => {
+                setEditing(false);
+                setSuggest(NO_LIST);
+                setPick(-1);
+              }}
+              onChange={(e) => onType(e.target.value)}
+              onKeyDown={(e) => {
+                const n = suggest.entries.length;
+                if (e.key === 'ArrowDown' && n) {
+                  e.preventDefault();
+                  setPick((p) => (p + 1) % n);
+                } else if (e.key === 'ArrowUp' && n) {
+                  e.preventDefault();
+                  setPick((p) => (p <= 0 ? n - 1 : p - 1));
+                } else if (e.key === 'Enter') {
+                  const chosen = pick >= 0 ? suggest.entries[pick]?.url : undefined;
+                  void open(chosen ?? url, editTab.current ?? tabs.active);
+                } else if (e.key === 'Escape') {
+                  if (suggesting) setSuggest(NO_LIST);
+                  else {
+                    setUrl(st.url);
+                    e.currentTarget.blur();
+                  }
+                }
+              }}
             />
-          </span>
-          {!editing && st.url ? (
-            <span className="browser-url-view" title={st.url}>
-              <b>{parts.host}</b>
-              <span>{parts.rest}</span>
-            </span>
-          ) : null}
-          <input
-            ref={input}
-            value={url}
-            placeholder={t('browserUrl')}
-            spellCheck={false}
-            style={!editing && st.url ? { position: 'absolute', opacity: 0, width: 1 } : undefined}
-            onFocus={(e) => {
-              editTab.current = tabs.active;
-              setEditing(true);
-              const el = e.currentTarget;
-              setTimeout(() => el.select(), 0);
-            }}
-            onBlur={() => setEditing(false)}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void open(url, editTab.current ?? tabs.active);
-              if (e.key === 'Escape') {
-                setUrl(st.url);
-                e.currentTarget.blur();
-              }
-            }}
-          />
-          {aiActive && (
-            <span className="browser-ai-pill">
-              <span className="dot" /> {t('browserAiDriving')}
-            </span>
+            {aiActive && (
+              <span className="browser-ai-pill">
+                <span className="dot" /> {t('browserAiDriving')}
+              </span>
+            )}
+            {st.url && !editing && (
+              <button
+                className={`browser-star ${st.bookmarked ? 'on' : ''}`}
+                title={st.bookmarked ? t('browserBookmarkRemove') : t('browserBookmarkAdd')}
+                aria-label={st.bookmarked ? t('browserBookmarkRemove') : t('browserBookmarkAdd')}
+                aria-pressed={Boolean(st.bookmarked)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void toggleMark();
+                }}
+              >
+                <UiIcon name={st.bookmarked ? 'starFilled' : 'star'} size={15} />
+              </button>
+            )}
+          </div>
+          {suggesting && (
+            <ul className="browser-suggest" role="listbox">
+              {suggest.entries.map((e, i) => (
+                <li
+                  key={e.url}
+                  role="option"
+                  aria-selected={i === pick}
+                  className={i === pick ? 'on' : ''}
+                  // Before the input loses focus (a blur would close the list first).
+                  onMouseDown={(ev) => {
+                    ev.preventDefault();
+                    void open(e.url, editTab.current ?? tabs.active);
+                  }}
+                  onMouseEnter={() => setPick(i)}
+                >
+                  <span className="browser-row-icon">
+                    <Favicon src={suggest.icons[hostOf(e.url)]} />
+                  </span>
+                  <span className="browser-row-title">{e.title || hostOf(e.url)}</span>
+                  <span className="browser-row-url">{e.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  {e.bookmark && (
+                    <span className="browser-suggest-star">
+                      <UiIcon name="starFilled" size={12} />
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-        <button
-          className="bicon"
-          disabled={!/^https:/.test(st.url)}
-          onClick={() => void api().app.openExternal(st.url)}
-          title={t('browserExternal')}
-        >
-          <Icon d={ICON.external} />
-        </button>
+        <div className="browser-actions">
+          <button
+            className={`bicon ${panel === 'bookmarks' ? 'on' : ''}`}
+            onClick={() => setPanel((p) => (p === 'bookmarks' ? null : 'bookmarks'))}
+            title={t('browserBookmarks')}
+            aria-label={t('browserBookmarks')}
+            aria-pressed={panel === 'bookmarks'}
+          >
+            <UiIcon name="star" size={16} />
+          </button>
+          <button
+            className={`bicon ${panel === 'history' ? 'on' : ''}`}
+            onClick={() => setPanel((p) => (p === 'history' ? null : 'history'))}
+            title={t('browserHistory')}
+            aria-label={t('browserHistory')}
+            aria-pressed={panel === 'history'}
+          >
+            <UiIcon name="history" size={16} />
+          </button>
+          <button
+            className="bicon"
+            disabled={!/^https:/.test(st.url)}
+            onClick={() => void api().app.openExternal(st.url)}
+            title={t('browserExternal')}
+            aria-label={t('browserExternal')}
+          >
+            <Icon d={ICON.external} />
+          </button>
+        </div>
       </div>
       <div className={`browser-progress ${st.loading ? 'on' : ''}`} />
       <div className={`browser-frame ${aiActive ? 'ai' : ''}`}>
         <div className="browser-host" ref={host}>
-          {!st.url && (
+          {panel && (
+            <ListPanel
+              kind={panel}
+              onOpen={(u) => void open(u)}
+              onClose={() => setPanel(null)}
+              onChanged={() => {
+                loadMarks();
+                void api().browser.state().then(setSt);
+              }}
+            />
+          )}
+          {!panel && st.url && suggesting && (
+            <div className="browser-paused" aria-hidden="true">
+              <Favicon src={st.icon} size={28} />
+              <span>{site}</span>
+            </div>
+          )}
+          {!panel && !st.url && (
             <div className="browser-start">
               <img className="browser-start-logo" src="./logo.svg" alt="" />
               <h2>{t('browserEmpty')}</h2>
@@ -333,6 +692,24 @@ export function BrowserPane({ visible }: { visible: boolean }) {
                 <Icon d={ICON.search} size={18} />
                 <input name="q" placeholder={t('browserUrl')} spellCheck={false} />
               </form>
+              {marks.entries.length > 0 && (
+                <div className="browser-quick browser-marks">
+                  {marks.entries.slice(0, 8).map((m) => (
+                    <button
+                      key={m.url}
+                      className="browser-tile"
+                      title={m.url}
+                      onClick={() => void open(m.url)}
+                    >
+                      <span className="browser-tile-icon">
+                        <Favicon src={marks.icons[hostOf(m.url)]} size={18} />
+                      </span>
+                      <span className="browser-tile-label">{m.title || hostOf(m.url)}</span>
+                      <span className="browser-tile-hint">{hostOf(m.url)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="browser-quick">
                 {QUICK.map((q) => (
                   <button key={q.url} className="browser-tile" onClick={() => void open(q.url)}>

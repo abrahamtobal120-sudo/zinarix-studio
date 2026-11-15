@@ -43,7 +43,10 @@ export function MediaLibrary() {
         e.stopPropagation();
         setOver(true);
       }}
-      onDragLeave={() => setOver(false)}
+      onDragLeave={(e) => {
+        // Only when leaving the panel, not when moving over a card inside it.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+      }}
       onDrop={(e) => {
         if (!e.dataTransfer.files.length) return;
         e.preventDefault();
@@ -102,10 +105,12 @@ export function MediaLibrary() {
         </div>
       ))}
       {!media.length && !importing.length ? (
-        <div className="vs-lib-empty">
+        <button className="vs-lib-empty" onClick={() => void pickAndImport()}>
           <Icon name="download" size={28} />
-          <p>{tv('dropHere')}</p>
-        </div>
+          <span>{tv('dropHere')}</span>
+        </button>
+      ) : media.length && !shown.length ? (
+        <p className="vs-lib-none vs-dim">{tv('noResults')}</p>
       ) : (
         <div className={view === 'grid' ? 'vs-grid' : 'vs-list'}>
           {shown.map((m) => (

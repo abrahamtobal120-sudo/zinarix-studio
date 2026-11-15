@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { VideoJobView } from '../../../shared/api';
 import type { ExportOptions } from '../../../shared/video';
 import {
   EXPORT_PRESETS,
   RESOLUTIONS,
+  FPS_CHOICES,
   defaultExport,
   estimateSize,
   projectDuration,
@@ -12,7 +13,7 @@ import {
 import { api, toast } from '../../store';
 import { Icon } from '../Icon';
 import { fmtBytes, fmtDuration, tv } from './strings';
-import { getV, setV, useV } from './videoStore';
+import { getV, holdEscape, setV, useV } from './videoStore';
 
 export function ExportDialog() {
   const project = useV((s) => s.project);
@@ -92,7 +93,12 @@ export function ExportDialog() {
             </select>
           </label>
           <label>
-            <span>{tv('resolution')}</span>
+            <span>
+              {tv('resolution')} ·{' '}
+              <span className="vs-dim">
+                {opts.width}×{opts.height}
+              </span>
+            </span>
             <select
               className="vs-select"
               value={short}
@@ -107,9 +113,6 @@ export function ExportDialog() {
                 <option value={short}>{short}p</option>
               )}
             </select>
-            <span className="vs-dim">
-              {opts.width}×{opts.height}
-            </span>
           </label>
           <label>
             <span>{tv('fps')}</span>
@@ -118,11 +121,13 @@ export function ExportDialog() {
               value={opts.fps}
               onChange={(e) => setOpts({ ...opts, fps: Number(e.target.value) })}
             >
-              {[24, 25, 30, 50, 60].map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
+              {[...new Set([...FPS_CHOICES, opts.fps])]
+                .sort((x, y) => x - y)
+                .map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
             </select>
           </label>
           <label title={tv('qualityHint')}>
@@ -194,7 +199,7 @@ export function ExportDialog() {
             disabled={busy || !(final.end > final.start)}
             onClick={() => void start()}
           >
-            {tv('startExport')}
+            {busy ? tv('preparing') : tv('startExport')}
           </button>
         </div>
       </div>
@@ -210,23 +215,75 @@ const STATE_KEY = {
   canceled: 'canceled',
 } as const;
 
-/** The jobs of this session (shown under the top bar while any is running or just ended). */
+/**
+ * The jobs of this session: a button in the top bar with a drop-down list. It opens by itself when
+ * an export starts, and can be hidden so it never sits on top of the editor for long.
+ */
 export function RenderQueue() {
   const jobs = useV((s) => s.jobs);
-  const [open, setOpen] = useState(true);
-  if (!jobs.length) return null;
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const active = jobs.filter((j) => j.state === 'running' || j.state === 'queued');
+  const running = jobs.find((j) => j.state === 'running');
+  const count = jobs.length;
+  // A new export shows the list.
+  const seen = useRef(count);
+  useEffect(() => {
+    if (count > seen.current) setOpen(true);
+    seen.current = count;
+  }, [count]);
+  useEffect(() => {
+    if (!open) return;
+    const release = holdEscape(() => setOpen(false));
+    const away = (e: MouseEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener('mousedown', away);
+    return () => {
+      release();
+      window.removeEventListener('mousedown', away);
+    };
+  }, [open]);
+  if (!count) return null;
+  const pct = running ? Math.round(running.progress * 100) : null;
   return (
-    <div className="vs-queue" aria-live="polite">
-      <button className="vs-queue-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <Icon name="film" size={14} /> {tv('queue')} ·{' '}
-        {jobs.filter((j) => j.state === 'running' || j.state === 'queued').length}
-        <Icon name="chevronDown" size={12} className={open ? '' : 'vs-rot'} />
+    <div className="vs-queue-wrap" ref={box}>
+      <button
+        className={`vs-ghost vs-queue-btn ${open ? 'on' : ''}`}
+        title={tv('queue')}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(!open)}
+      >
+        {active.length ? <span className="vs-spinner" /> : <Icon name="film" size={14} />}
+        <span className="vs-queue-label">{pct != null ? `${pct} %` : tv('showQueue')}</span>
+        {active.length > 0 && <span className="vs-count">{active.length}</span>}
       </button>
-      {open &&
-        jobs
-          .slice(-6)
-          .reverse()
-          .map((j) => <JobRow key={j.id} job={j} />)}
+      {open && (
+        <div className="vs-queue" role="dialog" aria-label={tv('queue')} aria-live="polite">
+          <div className="vs-queue-head">
+            <Icon name="film" size={14} />
+            <span>{tv('queue')}</span>
+            <div className="spacer" />
+            <button
+              className="vs-icon-btn"
+              title={tv('hideQueue')}
+              aria-label={tv('hideQueue')}
+              onClick={() => setOpen(false)}
+            >
+              <Icon name="x" size={14} />
+            </button>
+          </div>
+          <div className="vs-queue-list">
+            {jobs
+              .slice(-6)
+              .reverse()
+              .map((j) => (
+                <JobRow key={j.id} job={j} />
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

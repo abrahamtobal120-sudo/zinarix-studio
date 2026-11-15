@@ -17,6 +17,7 @@ import { DEFAULT_PREFS } from '../shared/api';
 import type { LicenseStatus, ProFeature, RemoteNotice } from '../shared/plans';
 import { BUY_URL, FREE_FEATURES, PRO_FEATURES } from '../shared/plans';
 import { languageFor, monaco } from './monaco';
+import { lspSaved } from './lsp';
 import { confirmDialog } from './confirm';
 import { t } from './i18n';
 import { applyThemeColors, isDark } from './themes';
@@ -99,10 +100,14 @@ export interface State {
     | 'gcloud'
     | 'mail'
     | 'watch'
+    /** Run and debug (launch configs, call stack, variables, watch, breakpoints). */
+    | 'debug'
     /** Panel de Edición: takes the whole editor area (the chat stays beside it). */
     | 'design'
     | null;
   panelOpen: boolean;
+  /** What the bottom panel shows. */
+  panelView: 'terminal' | 'problems' | 'debug';
   /** One area takes the whole window: the side panel, the terminal or the editor/browser. */
   maximized: 'side' | 'panel' | 'editor' | null;
   chatOpen: boolean;
@@ -182,6 +187,7 @@ let state: State = {
   active: null,
   sidebar: 'explorer',
   panelOpen: false,
+  panelView: 'terminal',
   maximized: null,
   chatOpen: true,
   modal: null,
@@ -432,6 +438,7 @@ export async function save(path = state.active, format = true): Promise<void> {
   await api().workspace.writeFile(path, d.model.getValue());
   d.savedVersion = d.model.getAlternativeVersionId();
   updateDirty(path);
+  lspSaved(path);
 }
 
 export async function saveAll(): Promise<void> {

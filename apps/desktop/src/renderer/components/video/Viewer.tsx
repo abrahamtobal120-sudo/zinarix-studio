@@ -95,7 +95,12 @@ export function Viewer() {
           style={{ width: fit.w, height: fit.h }}
           aria-label={tv('title')}
         />
-        {!hasClips && <div className="vs-viewer-empty">{tv('emptyViewer')}</div>}
+        {!hasClips && (
+          <div className="vs-viewer-empty">
+            <Icon name="film" size={22} />
+            <span>{tv('emptyViewer')}</span>
+          </div>
+        )}
       </div>
       <div className="vs-transport">
         <div className="vs-transport-left">
@@ -147,9 +152,9 @@ export function Viewer() {
           )}
         </div>
         <div className="vs-transport-right">
-          <span className="vs-dim">{`${project.width}×${project.height} · ${project.fps} fps`}</span>
+          <span className="vs-dim vs-res">{`${project.width}×${project.height} · ${project.fps} fps`}</span>
           <select
-            className="vs-select"
+            className="vs-select vs-quality"
             title={tv('quality')}
             aria-label={tv('quality')}
             value={quality}

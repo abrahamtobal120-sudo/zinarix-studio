@@ -2,6 +2,7 @@ import { Fragment, memo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { confirmDialog } from '../confirm';
 import { t } from '../i18n';
+import { openLink } from '../links';
 import { getEditor, setState, toast } from '../store';
 import { fileIcon } from './icons';
 import { Icon } from './Icon';
@@ -10,7 +11,7 @@ import { runInTerminal } from './Terminal';
 /**
  * Minimal, injection-safe Markdown: builds React elements (no innerHTML), so model output
  * can never execute script in the renderer. Supports fences, headings, lists, quotes, tables,
- * inline code, bold, italics and links (opened externally, https only).
+ * inline code, bold, italics and links (http(s), opened in the built-in browser).
  */
 export const Markdown = memo(function Markdown({
   text,
@@ -257,7 +258,8 @@ function cells(row: string): string[] {
 
 function inline(text: string): ReactNode {
   const out: ReactNode[] = [];
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|(\[[^\]]+\]\(https:\/\/[^)\s]+\))/g;
+  const re =
+    /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|(\[[^\]]+\]\(https?:\/\/[^)\s]+\))|(https?:\/\/[^\s<>()[\]"'`]*[^\s<>()[\]"'`.,;:!?])/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
@@ -268,13 +270,15 @@ function inline(text: string): ReactNode {
     else if (m[2]) out.push(<strong key={k++}>{s.slice(2, -2)}</strong>);
     else if (m[3]) out.push(<em key={k++}>{s.slice(1, -1)}</em>);
     else {
-      const [, label, url] = /\[([^\]]+)\]\(([^)]+)\)/.exec(s)!;
+      // A [label](url) link, or a bare address written in the text.
+      const [, label, url] = m[5] ? [s, s, s] : /\[([^\]]+)\]\(([^)]+)\)/.exec(s)!;
       out.push(
         <a
           key={k++}
           href="#"
-          title={url}
-          onClick={(e) => (e.preventDefault(), void window.omni.app.openExternal(url!))}
+          title={`${url}
+${t('linkOpenHint')}`}
+          onClick={(e) => (e.preventDefault(), openLink(url!, e))}
         >
           {label}
         </a>,

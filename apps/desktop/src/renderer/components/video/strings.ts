@@ -192,6 +192,14 @@ const es = {
   kZoom: 'Acercar / alejar la línea de tiempo',
   kToggle: 'Abrir / cerrar Video Studio',
   close: 'Cerrar',
+  fileMenu: 'Archivo: nuevo, abrir, guardar, importar',
+  togglePanel: 'Mostrar u ocultar el panel de medios',
+  toggleInspector: 'Mostrar u ocultar el inspector',
+  soonBadge: 'Próximamente',
+  noResults: 'Ningún medio coincide con la búsqueda.',
+  showQueue: 'Exportaciones',
+  hideQueue: 'Ocultar',
+  preparing: 'Preparando…',
 };
 
 export type VideoKey = keyof typeof es;
@@ -387,6 +395,14 @@ const en: Record<VideoKey, string> = {
   kZoom: 'Zoom the timeline in / out',
   kToggle: 'Open / close Video Studio',
   close: 'Close',
+  fileMenu: 'File: new, open, save, import',
+  togglePanel: 'Show or hide the media panel',
+  toggleInspector: 'Show or hide the inspector',
+  soonBadge: 'Coming soon',
+  noResults: 'No media matches the search.',
+  showQueue: 'Exports',
+  hideQueue: 'Hide',
+  preparing: 'Preparing…',
 };
 
 export function tv(key: VideoKey, vars: Record<string, string | number> = {}): string {

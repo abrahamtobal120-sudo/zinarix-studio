@@ -107,6 +107,23 @@ export function vPrompt(label: string, value = ''): Promise<string | null> {
   return new Promise((resolve) => setV({ prompt: { label, value, resolve } }));
 }
 
+/** Open menus and popovers: Esc closes the newest one before it closes anything else. */
+const escapeStack: (() => void)[] = [];
+export function holdEscape(close: () => void): () => void {
+  escapeStack.push(close);
+  return () => {
+    const i = escapeStack.lastIndexOf(close);
+    if (i >= 0) escapeStack.splice(i, 1);
+  };
+}
+/** Closes the newest open menu; false when there is none. */
+export function closeTopPopover(): boolean {
+  const close = escapeStack.at(-1);
+  if (!close) return false;
+  close();
+  return true;
+}
+
 const HISTORY_MAX = 300;
 
 /** Applies an edit (undoable). */

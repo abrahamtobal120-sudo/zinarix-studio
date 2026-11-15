@@ -23,6 +23,7 @@ import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, askText, setState, toast, useStore } from '../store';
+import { openLink } from '../links';
 import { isWriteSql, sqlExcerpt } from '../sqlSafety';
 import { runInTerminal } from './Terminal';
 
@@ -33,7 +34,7 @@ const errText = (e: unknown) =>
 const PICK_KEY = 'zinarix.supabaseProject:';
 const DASH = 'https://supabase.com/dashboard';
 
-const open = (url: string) => void api().app.openExternal(url);
+const open = (url: string) => openLink(url);
 
 /** Last queries run from the SQL tab (shared by every project). */
 const HISTORY_KEY = 'zinarix.supabaseSqlHistory';

@@ -22,7 +22,17 @@ import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
 import { MEDIA_DRAG } from './MediaLibrary';
 import { tv } from './strings';
-import { addToTimeline, commit, getV, importPaths, seek, setV, useV, vPrompt } from './videoStore';
+import {
+  addToTimeline,
+  commit,
+  getV,
+  holdEscape,
+  importPaths,
+  seek,
+  setV,
+  useV,
+  vPrompt,
+} from './videoStore';
 
 const HEAD_W = 156;
 const RULER_H = 28;
@@ -462,9 +472,11 @@ export function Timeline() {
               </div>
             </div>
           ))}
-          <InOutShade project={project} zoom={zoom} />
-          <Playhead zoom={zoom} />
-          {drag?.kind === 'trim' && <SnapLine x={HEAD_W + drag.to * zoom} />}
+          <InOutShade project={project} zoom={zoom} scrollLeft={view.left} />
+          <Playhead zoom={zoom} scrollLeft={view.left} />
+          {drag?.kind === 'trim' && drag.to * zoom >= view.left && (
+            <SnapLine x={HEAD_W + drag.to * zoom} />
+          )}
         </div>
       </div>
       <MiniMap project={project} zoom={zoom} view={view} scroll={scroll} />
@@ -482,7 +494,7 @@ function Toolbar() {
     icon: IconName,
     title: string,
     onClick: () => void,
-    opts: { on?: boolean; disabled?: boolean; flip?: boolean } = {},
+    opts: { on?: boolean; disabled?: boolean; flip?: boolean; rot?: boolean } = {},
   ) => (
     <button
       className={`vs-icon-btn ${opts.on ? 'on' : ''}`}
@@ -492,7 +504,11 @@ function Toolbar() {
       disabled={opts.disabled}
       onClick={onClick}
     >
-      <Icon name={icon} size={16} className={opts.flip ? 'vs-flip' : undefined} />
+      <Icon
+        name={icon}
+        size={16}
+        className={opts.flip ? 'vs-flip' : opts.rot ? 'vs-rot' : undefined}
+      />
     </button>
   );
   return (
@@ -531,7 +547,7 @@ function Toolbar() {
         onChange={(e) => setV({ zoom: Math.exp(Number(e.target.value)) })}
       />
       {btn('maximize', tv('zoomIn'), () => zoomBy(1.5))}
-      {btn('columns', tv('zoomFit'), zoomToFit)}
+      {btn('arrowsV', tv('zoomFit'), zoomToFit, { rot: true })}
     </div>
   );
 }
@@ -695,20 +711,31 @@ function Ruler({
   );
 }
 
-function InOutShade({ project, zoom }: { project: VideoProject; zoom: number }) {
+/** Overlays are clipped at the track headers' edge (`scrollLeft`), so they never cover them. */
+function InOutShade({
+  project,
+  zoom,
+  scrollLeft,
+}: {
+  project: VideoProject;
+  zoom: number;
+  scrollLeft: number;
+}) {
   if (project.inPoint == null && project.outPoint == null) return null;
-  const a = project.inPoint ?? 0;
-  const b = project.outPoint ?? projectDuration(project);
+  const a = Math.max((project.inPoint ?? 0) * zoom, scrollLeft);
+  const b = (project.outPoint ?? projectDuration(project)) * zoom;
+  if (b <= a) return null;
   return (
     <div
-      className="vs-inout"
-      style={{ left: HEAD_W + a * zoom, width: Math.max(1, (b - a) * zoom) }}
+      className={`vs-inout ${a > (project.inPoint ?? 0) * zoom ? 'vs-inout-cut' : ''}`}
+      style={{ left: HEAD_W + a, width: Math.max(1, b - a) }}
     />
   );
 }
 
-function Playhead({ zoom }: { zoom: number }) {
+function Playhead({ zoom, scrollLeft }: { zoom: number; scrollLeft: number }) {
   const t = useV((s) => s.playhead);
+  if (t * zoom < scrollLeft - 1) return null;
   return (
     <div className="vs-playhead" style={{ transform: `translateX(${HEAD_W + t * zoom}px)` }}>
       <div className="vs-playhead-cap" />
@@ -746,7 +773,7 @@ function ClipView({
   const left = clip.start * zoom;
   const width = Math.max(2, clipDur(clip) * zoom);
   const kind = media?.kind ?? 'video';
-  const showStrip = track.kind === 'video' && thumb;
+  const showStrip = track.kind === 'video' && thumb && !media?.missing;
   const h = ROW_H[track.kind] - 8;
   const waveH = track.kind === 'audio' ? h - 16 : 14;
   return (
@@ -802,6 +829,7 @@ function Filmstrip({
 }) {
   const aspect = media.width && media.height ? media.width / media.height : 16 / 9;
   const tileW = Math.max(16, height * aspect);
+  const still = media.kind === 'image';
   const width = clipDur(clip) * zoom;
   const tiles: { x: number; frame: number }[] = [];
   const firstX = Math.max(0, Math.floor(((view.t0 - clip.start) * zoom) / tileW) * tileW);
@@ -824,8 +852,9 @@ function Filmstrip({
             width: tileW,
             height,
             backgroundImage: `url("${url}")`,
-            backgroundSize: `${tileW * 24}px ${height}px`,
-            backgroundPosition: `${-tl.frame * tileW}px 0`,
+            // A picture is one image; a video thumbnail is a strip of 24 frames.
+            backgroundSize: still ? 'cover' : `${tileW * 24}px ${height}px`,
+            backgroundPosition: still ? 'center' : `${-tl.frame * tileW}px 0`,
           }}
         />
       ))}
@@ -945,6 +974,29 @@ function MiniMap({
 }
 
 function ClipMenu({ x, y, onClose }: { x: number; y: number; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x, y });
+  // Right-clicking near the bottom or the right edge: open upwards / leftwards.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({
+      x: Math.max(4, Math.min(x, window.innerWidth - r.width - 4)),
+      y: Math.max(4, y + r.height > window.innerHeight - 4 ? y - r.height : y),
+    });
+  }, [x, y]);
+  useEffect(() => {
+    const release = holdEscape(onClose);
+    const away = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    window.addEventListener('mousedown', away);
+    return () => {
+      release();
+      window.removeEventListener('mousedown', away);
+    };
+  }, [onClose]);
   const item = (label: string, run: () => void) => (
     <button
       className="vs-menu-item"
@@ -959,8 +1011,9 @@ function ClipMenu({ x, y, onClose }: { x: number; y: number; onClose: () => void
   );
   return (
     <div
+      ref={ref}
       className="vs-menu"
-      style={{ left: x, top: y }}
+      style={{ left: pos.x, top: pos.y }}
       role="menu"
       onMouseDown={(e) => e.stopPropagation()}
     >

@@ -1,5 +1,6 @@
-import { WebContentsView, session } from 'electron';
+import { WebContentsView, app, session } from 'electron';
 import type { BrowserWindow, Rectangle, Session } from 'electron';
+import { BrowserData, rememberable } from './browserData.js';
 
 export interface BrowserState {
   url: string;
@@ -7,6 +8,10 @@ export interface BrowserState {
   loading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** The page is in the bookmarks. */
+  bookmarked?: boolean;
+  /** Favicon of the site (data: URL), when known. */
+  icon?: string;
 }
 
 export interface PageElement {
@@ -30,6 +35,57 @@ const PARTITION = 'persist:zinarix-browser';
 /** Sessions already given the permission/download handlers. */
 const configured = new WeakSet<Session>();
 const NAV_TIMEOUT = 25_000;
+/** Favicons bigger than this are not kept (a data: URL per site in the history file). */
+const ICON_MAX_BYTES = 48 * 1024;
+
+let store: BrowserData | null = null;
+/**
+ * History, bookmarks and favicons of the built-in browser (one file for every window), and
+ * on quit: pending history and the cookie store written to disk, so logins survive.
+ */
+export function browserData(): BrowserData {
+  if (store) return store;
+  store = BrowserData.inDir(app.getPath('userData'));
+  app.once('before-quit', () => {
+    store?.flush();
+    void session
+      .fromPartition(PARTITION)
+      .cookies.flushStore()
+      .catch(() => {});
+  });
+  return store;
+}
+
+/**
+ * The user agent without the "Electron/x" and app tokens: several sites (Google sign-in
+ * among them) refuse or degrade pages for an app that says it is not a regular browser.
+ */
+export function browserUserAgent(ua: string): string {
+  return ua.replace(/ (?!(?:AppleWebKit|Chrome|Safari)\/)[^\s()]+\/[^\s()]+/g, '');
+}
+
+/** Fetches the favicon of a page once per site (through the page's own session). */
+async function fetchIcon(ses: Session, pageUrl: string, iconUrl: string): Promise<boolean> {
+  const data = browserData();
+  if (data.hasIcon(pageUrl) || !/^https?:|^data:image\//i.test(iconUrl)) return false;
+  try {
+    if (iconUrl.startsWith('data:')) {
+      if (iconUrl.length > ICON_MAX_BYTES * 1.4) return false;
+      data.setIcon(pageUrl, iconUrl);
+      return true;
+    }
+    const res = await ses.fetch(iconUrl, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return false;
+    const type = (res.headers.get('content-type') ?? '').split(';')[0]!.trim() || 'image/x-icon';
+    if (!type.startsWith('image/')) return false;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.length || buf.length > ICON_MAX_BYTES) return false;
+    data.setIcon(pageUrl, `data:${type};base64,${buf.toString('base64')}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Runs inside the page (isolated world): tags visible interactive elements with
@@ -226,6 +282,7 @@ export class BrowserTab {
       ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
       ses.setPermissionCheckHandler(() => false);
       ses.on('will-download', (e) => e.preventDefault());
+      ses.setUserAgent(browserUserAgent(ses.getUserAgent()));
     }
     const view = new WebContentsView({
       webPreferences: {
@@ -265,6 +322,22 @@ export class BrowserTab {
     ] as const) {
       wc.on(ev as 'did-start-loading', emit);
     }
+    // The user's own tabs fill the history (an AI's pages are its work, not the user's
+    // browsing, and would bury what the user visited).
+    if (this.owner === null) {
+      const data = browserData();
+      wc.on('did-navigate', (_e, url) => data.visit(url, wc.getTitle()));
+      wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
+        if (isMainFrame) data.visit(url, wc.getTitle());
+      });
+      wc.on('page-title-updated', (_e, title) => data.retitle(wc.getURL(), title));
+    }
+    wc.on('page-favicon-updated', (_e, icons) => {
+      const page = wc.getURL();
+      const first = icons.find((u) => /\.(png|ico|svg)(\?|$)/i.test(u)) ?? icons[0];
+      if (first && rememberable(page))
+        void fetchIcon(wc.session, page, first).then((got) => got && emit());
+    });
     // A real size even while hidden, so pages lay out and the agent can work in the background.
     view.setBounds({ x: 0, y: 0, width: 1280, height: 800 });
     view.setVisible(false);
@@ -279,12 +352,15 @@ export class BrowserTab {
     if (!wc || wc.isDestroyed())
       return { url: '', title: '', loading: false, canGoBack: false, canGoForward: false };
     const url = wc.getURL();
+    const data = browserData();
     return {
       url: url === 'about:blank' ? '' : url,
       title: wc.getTitle(),
       loading: wc.isLoading(),
       canGoBack: wc.navigationHistory.canGoBack(),
       canGoForward: wc.navigationHistory.canGoForward(),
+      bookmarked: data.isBookmarked(url),
+      icon: data.icon(url),
     };
   }
 
@@ -326,6 +402,11 @@ export class BrowserTab {
 
   reload(): void {
     this.ensure().webContents.reload();
+  }
+
+  stop(): void {
+    const wc = this.view?.webContents;
+    if (wc && !wc.isDestroyed()) wc.stop();
   }
 
   private async settle(ms = 600): Promise<void> {
@@ -441,6 +522,7 @@ export class BrowserTab {
       title: st.title,
       url: st.url,
       loading: st.loading,
+      icon: st.icon,
       owner: this.owner,
       label: this.label,
       ai: this.owner !== null,
@@ -462,6 +544,7 @@ export interface BrowserTabView {
   title: string;
   url: string;
   loading: boolean;
+  icon?: string;
   /** Conversation that owns the tab (null: the user's own tab). */
   owner: string | null;
   /** Who uses it: "Tú" or the AI model of that conversation. */
@@ -622,9 +705,14 @@ export class BrowserController {
     return tab.id;
   }
 
-  /** A link of a user tab asked for a new window: it opens in a new user tab. */
+  /**
+   * A link of a user tab asked for a new window, or a link clicked elsewhere in the app
+   * (chat, panels): it opens in a new user tab, or in the visible user tab if that one has
+   * no page yet.
+   */
   openTab(url: string): void {
-    const tab = this.create(null, 'Tú');
+    const cur = this.activeId ? this.tabs.get(this.activeId) : undefined;
+    const tab = cur && cur.owner === null && !cur.state().url ? cur : this.create(null, 'Tú');
     this.select(tab.id);
     tab.navigate(url).catch(() => {});
   }
@@ -691,6 +779,16 @@ export class BrowserController {
 
   reload(tabId: string | null = null): void {
     this.userTarget(tabId).reload();
+  }
+
+  stop(tabId: string | null = null): void {
+    this.userTarget(tabId).stop();
+  }
+
+  /** The bookmark star or the history panel changed something shown in the address bar. */
+  refresh(): void {
+    this.onState(this.state());
+    this.emitTabs();
   }
 
   isVisible(): boolean {

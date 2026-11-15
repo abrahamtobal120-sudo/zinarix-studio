@@ -24,6 +24,8 @@ export class Player {
   private canvas: HTMLCanvasElement | null = null;
   private lastDrawKey = '';
   private stopped = false;
+  /** Since when a layer has been waiting for its frame (seek / load), 0 when none is. */
+  private waitingSince = 0;
 
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
@@ -96,7 +98,8 @@ export class Player {
     const end = projectDuration(p);
     if (s.playing) {
       t = this.clockFrom + ((performance.now() - this.clockStart) / 1000) * s.rate;
-      if (t >= end || t <= 0) {
+      // Stop at the end going forwards, at 0 going backwards (not at 0 on the first frame of play).
+      if ((s.rate > 0 && t >= end) || (s.rate < 0 && t <= 0) || end <= 0) {
         t = Math.min(Math.max(0, t), end);
         setV({ playing: false, playhead: t, rate: 1 });
       } else setV({ playhead: t });
@@ -155,10 +158,12 @@ export class Player {
     const s = getV();
     const W = Math.max(2, Math.round(p.width * s.quality));
     const H = Math.max(2, Math.round(p.height * s.quality));
+    let resized = false;
     if (cv.width !== W || cv.height !== H) {
       cv.width = W;
       cv.height = H;
       this.lastDrawKey = '';
+      resized = true;
     }
     const ctx = cv.getContext('2d');
     if (!ctx) return;
@@ -195,7 +200,15 @@ export class Player {
     }
     const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}`).join(',')}`;
     if (!s.playing && key === this.lastDrawKey) return;
-    this.lastDrawKey = layers.every((l) => l.ready) ? key : '';
+    const allReady = layers.every((l) => l.ready);
+    this.lastDrawKey = allReady ? key : '';
+    // While a video is seeking (scrubbing, stepping frames) keep the last picture instead of
+    // flashing black; give up after a moment so a file that never loads does not freeze the view.
+    if (!allReady) {
+      const now = performance.now();
+      if (!this.waitingSince) this.waitingSince = now;
+      if (now - this.waitingSince < 400 && !resized) return;
+    } else this.waitingSince = 0;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
     for (const l of layers) {

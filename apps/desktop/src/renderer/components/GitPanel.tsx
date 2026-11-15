@@ -14,6 +14,7 @@ import { pressable } from '../a11y';
 import { t, type Key } from '../i18n';
 import { errText } from '../errText';
 import { api, askText, openFile, setState, toast, useStore } from '../store';
+import { openLink } from '../links';
 import { runInTerminal } from './Terminal';
 import { fileIcon } from './icons';
 
@@ -329,7 +330,7 @@ export function GitPanel() {
             <Icon name="stash" size={15} />
           </button>
           {st?.webUrl && (
-            <button title={t('gitOpenWeb')} onClick={() => void api().app.openExternal(st.webUrl!)}>
+            <button title={t('gitOpenWeb')} onClick={() => openLink(st.webUrl!)}>
               <Icon name="external" size={15} />
             </button>
           )}
@@ -354,7 +355,7 @@ export function GitPanel() {
           <button
             className={`git-pr ${pr.checks}`}
             title={`#${pr.number} ${pr.title}\n${prState(pr)}`}
-            onClick={() => void api().app.openExternal(pr.url)}
+            onClick={() => openLink(pr.url)}
           >
             <Icon name="github" size={12} /> #{pr.number}{' '}
             {pr.checks === 'pass'
@@ -644,7 +645,7 @@ export function GitPanel() {
                   {st?.webUrl && (
                     <button
                       title={t('gitOpenWeb')}
-                      onClick={() => void api().app.openExternal(`${st.webUrl}/commit/${c.hash}`)}
+                      onClick={() => openLink(`${st.webUrl}/commit/${c.hash}`)}
                     >
                       <Icon name="external" size={14} />
                     </button>

@@ -411,7 +411,7 @@ export function App() {
         }));
       if (ev.type === 'notice' && !noticeSeen(ev.id))
         setState({ notice: { id: ev.id, text: ev.text, url: ev.url } });
-      if (ev.type === 'browser:show') openBrowserTab();
+      if (ev.type === 'browser:show' || ev.type === 'browser:focus') openBrowserTab();
       if (ev.type === 'whatsapp:status') setState({ whatsapp: ev.status });
       if (ev.type === 'watch:status') setState({ watch: ev.status });
       if (ev.type === 'chat:title')

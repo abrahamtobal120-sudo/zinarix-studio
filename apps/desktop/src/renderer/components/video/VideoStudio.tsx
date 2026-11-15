@@ -27,7 +27,9 @@ import './video.css';
 import {
   closeStudio,
   commit,
+  closeTopPopover,
   getV,
+  holdEscape,
   importPaths,
   loadLayout,
   minimizeStudio,
@@ -58,6 +60,21 @@ const TABS: { id: StudioTab; key: VideoKey; icon: IconName; phase?: number; soon
   { id: 'filters', key: 'tabFilters', icon: 'palette', phase: 3, soon: 'soonFilters' },
   { id: 'ai', key: 'tabAi', icon: 'cpu', phase: 4, soon: 'soonAi' },
 ];
+
+/** Top bar + tabs + sash, in px (the rest is viewer and timeline). */
+const CHROME_H = 104;
+const MIN_VIEWER_H = 240;
+const MIN_VIEWER_W = 380;
+
+function useWindowSize(): { w: number; h: number } {
+  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    const on = () => setSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  return size;
+}
 
 /** Mounted from the first time the studio opens, so closing it keeps everything as it was. */
 export function VideoStudioHost() {
@@ -127,8 +144,13 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
         const d = (now - last) * sign;
         last = now;
         setLayout((l) => {
-          const lim = key === 'timeline' ? [150, window.innerHeight - 260] : [200, 560];
-          return { ...l, [key]: Math.min(lim[1]!, Math.max(lim[0]!, l[key] + d)) };
+          const lim =
+            key === 'timeline'
+              ? [150, window.innerHeight - CHROME_H - MIN_VIEWER_H]
+              : [200, Math.min(560, window.innerWidth - MIN_VIEWER_W)];
+          // Start from what is on screen (the saved size may be larger than the window allows).
+          const from = key === 'timeline' ? Math.min(l.timeline, lim[1]!) : l[key];
+          return { ...l, [key]: Math.max(lim[0]!, Math.min(lim[1]!, from + d)) };
         });
       };
       const up = () => {
@@ -140,6 +162,20 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
       window.addEventListener('mousemove', move);
       window.addEventListener('mouseup', up);
     };
+
+  // Small windows: panels shrink so the viewer always keeps room; the inspector steps aside.
+  const win = useWindowSize();
+  const narrow = win.w < 900;
+  const showLeft = layout.showLeft;
+  const showRight = layout.showRight && !narrow;
+  const sideRoom = Math.max(0, win.w - MIN_VIEWER_W);
+  const wantLeft = showLeft ? layout.left : 0;
+  const wantRight = showRight ? layout.right : 0;
+  const k = wantLeft + wantRight > sideRoom ? sideRoom / (wantLeft + wantRight) : 1;
+  const leftW = Math.max(180, Math.round(wantLeft * k));
+  const rightW = Math.max(180, Math.round(wantRight * k));
+  // The timeline never pushes the viewer below a usable height.
+  const timelineH = Math.max(150, Math.min(layout.timeline, win.h - CHROME_H - MIN_VIEWER_H));
 
   const current = TABS.find((x) => x.id === tab)!;
   return (
@@ -167,59 +203,69 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
     >
       <TopBar />
       {tools && !tools.ffmpeg && <div className="vs-banner">{tv('noFfmpeg')}</div>}
-      <nav className="vs-tabs" role="tablist">
-        {TABS.map((x) => (
-          <button
-            key={x.id}
-            role="tab"
-            aria-selected={tab === x.id}
-            className={tab === x.id ? 'on' : ''}
-            onClick={() => setV({ tab: x.id })}
-          >
-            <Icon name={x.icon} size={15} />
-            <span>{tv(x.key)}</span>
-          </button>
-        ))}
-        <div className="spacer" />
-        <button
-          className="vs-icon-btn"
-          title={tv('shortcuts')}
-          aria-label={tv('shortcuts')}
-          onClick={() => setV({ dialog: 'shortcuts' })}
-        >
-          <Icon name="keyboard" size={15} />
-        </button>
-        <button
-          className={`vs-icon-btn ${layout.showLeft ? 'on' : ''}`}
-          aria-label={tv('tabMedia')}
-          title={tv('tabMedia')}
-          onClick={() => setLayout((l) => ({ ...l, showLeft: !l.showLeft }))}
-        >
-          <Icon name="columns" size={15} />
-        </button>
-        <button
-          className={`vs-icon-btn ${layout.showRight ? 'on' : ''}`}
-          aria-label={tv('inspector')}
-          title={tv('inspector')}
-          onClick={() => setLayout((l) => ({ ...l, showRight: !l.showRight }))}
-        >
-          <Icon name="settings" size={15} />
-        </button>
-      </nav>
-      <div className="vs-main" style={{ height: `calc(100% - ${layout.timeline}px)` }}>
-        {layout.showLeft && (
-          <>
-            <section
-              className="vs-left"
-              style={{ width: layout.left }}
-              aria-label={tv(current.key)}
+      <nav className="vs-tabs">
+        <div className="vs-tabs-scroll" role="tablist" aria-label={tv('title')}>
+          {TABS.map((x) => (
+            <button
+              key={x.id}
+              role="tab"
+              aria-selected={tab === x.id}
+              className={tab === x.id ? 'on' : ''}
+              onClick={() => {
+                setV({ tab: x.id });
+                if (!layout.showLeft) setLayout((l) => ({ ...l, showLeft: true }));
+              }}
             >
+              <Icon name={x.icon} size={15} />
+              <span>{tv(x.key)}</span>
+              {x.phase && <i className="vs-tab-soon" aria-hidden="true" />}
+            </button>
+          ))}
+        </div>
+        <div className="vs-tabs-tools">
+          <button
+            className="vs-icon-btn"
+            title={tv('shortcuts')}
+            aria-label={tv('shortcuts')}
+            onClick={() => setV({ dialog: 'shortcuts' })}
+          >
+            <Icon name="keyboard" size={15} />
+          </button>
+          <button
+            className={`vs-icon-btn ${layout.showLeft ? 'on' : ''}`}
+            aria-label={tv('togglePanel')}
+            aria-pressed={layout.showLeft}
+            title={tv('togglePanel')}
+            onClick={() => setLayout((l) => ({ ...l, showLeft: !l.showLeft }))}
+          >
+            <Icon name="columns" size={15} />
+          </button>
+          {!narrow && (
+            <button
+              className={`vs-icon-btn ${layout.showRight ? 'on' : ''}`}
+              aria-label={tv('toggleInspector')}
+              aria-pressed={layout.showRight}
+              title={tv('toggleInspector')}
+              onClick={() => setLayout((l) => ({ ...l, showRight: !l.showRight }))}
+            >
+              <Icon name="settings" size={15} />
+            </button>
+          )}
+        </div>
+      </nav>
+      <div className="vs-main">
+        {showLeft && (
+          <>
+            <section className="vs-left" style={{ width: leftW }} aria-label={tv(current.key)}>
               {tab === 'media' ? (
                 <MediaLibrary />
               ) : (
                 <div className="vs-soon">
-                  <Icon name={current.icon} size={30} />
+                  <span className="vs-soon-icon">
+                    <Icon name={current.icon} size={26} />
+                  </span>
                   <h3>{tv(current.key)}</h3>
+                  <span className="vs-soon-badge">{tv('soonBadge')}</span>
                   <p>{tv('comingPhase', { n: current.phase ?? 2 })}</p>
                   {current.soon && (
                     <p className="vs-dim">{tv('comingList', { what: tv(current.soon) })}</p>
@@ -227,26 +273,40 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
                 </div>
               )}
             </section>
-            <div className="vs-sash vs-sash-x" onMouseDown={drag('left', 1, 'x')} />
+            <div
+              className="vs-sash vs-sash-x"
+              role="separator"
+              aria-orientation="vertical"
+              onMouseDown={drag('left', 1, 'x')}
+            />
           </>
         )}
         <section className="vs-center">
           <Viewer />
         </section>
-        {layout.showRight && (
+        {showRight && (
           <>
-            <div className="vs-sash vs-sash-x" onMouseDown={drag('right', -1, 'x')} />
-            <section className="vs-right" style={{ width: layout.right }}>
+            <div
+              className="vs-sash vs-sash-x"
+              role="separator"
+              aria-orientation="vertical"
+              onMouseDown={drag('right', -1, 'x')}
+            />
+            <section className="vs-right" style={{ width: rightW }}>
               <Inspector />
             </section>
           </>
         )}
       </div>
-      <div className="vs-sash vs-sash-y" onMouseDown={drag('timeline', -1, 'y')} />
-      <section className="vs-bottom" style={{ height: layout.timeline }}>
+      <div
+        className="vs-sash vs-sash-y"
+        role="separator"
+        aria-orientation="horizontal"
+        onMouseDown={drag('timeline', -1, 'y')}
+      />
+      <section className="vs-bottom" style={{ height: timelineH }}>
         <Timeline />
       </section>
-      <RenderQueue />
       {dialog === 'export' && <ExportDialog />}
       {dialog === 'new' && <NewProjectDialog />}
       {dialog === 'shortcuts' && <ShortcutsDialog />}
@@ -264,6 +324,19 @@ function TopBar() {
   const canRedo = useV((s) => s.future.length > 0);
   const undoLabel = useV((s) => s.past.at(-1)?.label);
   const [menu, setMenu] = useState(false);
+  const menuBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const away = (e: MouseEvent) => {
+      if (!menuBox.current?.contains(e.target as Node)) setMenu(false);
+    };
+    const release = holdEscape(() => setMenu(false));
+    window.addEventListener('mousedown', away);
+    return () => {
+      release();
+      window.removeEventListener('mousedown', away);
+    };
+  }, [menu]);
   const status = dirty
     ? autosavedAt
       ? tv('autosaved', {
@@ -284,17 +357,20 @@ function TopBar() {
         <Icon name="film" size={18} />
       </div>
       <span className="vs-brand">Video Studio</span>
-      <div className="vs-filemenu">
+      <span className="vs-top-sep" aria-hidden="true" />
+      <div className="vs-filemenu" ref={menuBox}>
         <button
           className="vs-icon-btn"
-          aria-label={tv('openProject')}
+          title={tv('fileMenu')}
+          aria-label={tv('fileMenu')}
+          aria-haspopup="menu"
           aria-expanded={menu}
           onClick={() => setMenu(!menu)}
         >
           <Icon name="menu" size={16} />
         </button>
         {menu && (
-          <div className="vs-menu vs-menu-down" role="menu" onMouseLeave={() => setMenu(false)}>
+          <div className="vs-menu vs-menu-down" role="menu">
             {(
               [
                 [tv('newProject'), () => setV({ dialog: 'new' })],
@@ -331,8 +407,9 @@ function TopBar() {
           if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();
         }}
       />
-      <span className={`vs-save-state ${dirty ? 'dirty' : ''}`}>
-        <span className="vs-dot" /> {status}
+      <span className={`vs-save-state ${dirty ? 'dirty' : ''}`} title={status}>
+        <span className="vs-dot" />
+        <span className="vs-save-text">{status}</span>
       </span>
       <div className="vs-top-mid">
         <button
@@ -363,8 +440,15 @@ function TopBar() {
         </button>
       </div>
       <div className="spacer" />
-      <button className="vs-ghost" onClick={() => void closeStudio(true)}>
-        <Icon name="agent" size={15} /> {tv('backToChat')}
+      <RenderQueue />
+      <button
+        className="vs-ghost vs-back"
+        title={tv('backToChat')}
+        aria-label={tv('backToChat')}
+        onClick={() => void closeStudio(true)}
+      >
+        <Icon name="agent" size={15} />
+        <span className="vs-back-label">{tv('backToChat')}</span>
       </button>
       <button
         className="vs-icon-btn"
@@ -381,7 +465,8 @@ function TopBar() {
           setV({ dialog: 'export' });
         }}
       >
-        <Icon name="push" size={15} /> {tv('exportBtn')}
+        <Icon name="push" size={15} />
+        <span>{tv('exportBtn')}</span>
       </button>
     </header>
   );
@@ -412,7 +497,10 @@ function NewProjectDialog() {
   const [aspect, setAspect] = useState(FORMAT_PRESETS[0]!.id);
   const [short, setShort] = useState(1080);
   const [fps, setFps] = useState(30);
-  const [custom, setCustom] = useState({ width: 1920, height: 1080 });
+  // Typed as text and rounded on create (rounding each keystroke made typing impossible).
+  const [customText, setCustomText] = useState({ width: '1920', height: '1080' });
+  const even = (v: string) => Math.min(8192, Math.max(16, Math.round((Number(v) || 0) / 2) * 2));
+  const custom = { width: even(customText.width), height: even(customText.height) };
   const preset = FORMAT_PRESETS.find((p) => p.id === aspect);
   const size = preset ? sizeFor(preset.width, preset.height, short) : custom;
   return (
@@ -439,7 +527,7 @@ function NewProjectDialog() {
             ...FORMAT_PRESETS,
             { id: 'custom', label: tv('custom'), width: custom.width, height: custom.height },
           ].map((f) => {
-            const k = Math.min(46 / f.width, 46 / f.height);
+            const k = Math.min(40 / f.width, 40 / f.height);
             return (
               <button
                 key={f.id}
@@ -448,10 +536,12 @@ function NewProjectDialog() {
                 className={aspect === f.id ? 'on' : ''}
                 onClick={() => setAspect(f.id)}
               >
-                <span
-                  className="vs-format-box"
-                  style={{ width: f.width * k, height: f.height * k }}
-                />
+                <span className="vs-format-art">
+                  <span
+                    className="vs-format-box"
+                    style={{ width: f.width * k, height: f.height * k }}
+                  />
+                </span>
                 <span>{f.label}</span>
               </button>
             );
@@ -477,29 +567,35 @@ function NewProjectDialog() {
               </span>
             </label>
           ) : (
-            <label>
+            <div className="vs-form-field">
               <span>
                 {tv('width')} × {tv('height')}
               </span>
-              <input
-                type="number"
-                min={16}
-                max={8192}
-                value={custom.width}
-                onChange={(e) =>
-                  setCustom({ ...custom, width: Math.round(Number(e.target.value) / 2) * 2 })
-                }
-              />
-              <input
-                type="number"
-                min={16}
-                max={8192}
-                value={custom.height}
-                onChange={(e) =>
-                  setCustom({ ...custom, height: Math.round(Number(e.target.value) / 2) * 2 })
-                }
-              />
-            </label>
+              <span className="vs-size-inputs">
+                <input
+                  type="number"
+                  min={16}
+                  max={8192}
+                  step={2}
+                  aria-label={tv('width')}
+                  value={customText.width}
+                  onChange={(e) => setCustomText({ ...customText, width: e.target.value })}
+                />
+                <span className="vs-dim">×</span>
+                <input
+                  type="number"
+                  min={16}
+                  max={8192}
+                  step={2}
+                  aria-label={tv('height')}
+                  value={customText.height}
+                  onChange={(e) => setCustomText({ ...customText, height: e.target.value })}
+                />
+              </span>
+              <span className="vs-dim">
+                {custom.width}×{custom.height}
+              </span>
+            </div>
           )}
           <label>
             <span>{tv('fps')}</span>
@@ -655,6 +751,7 @@ function useStudioKeys(active: boolean): void {
       if (e.key === 'Escape') {
         e.preventDefault();
         if (s.prompt) return;
+        if (closeTopPopover()) return;
         if (s.dialog) return setV({ dialog: null });
         if (s.selection.length) return setV({ selection: [] });
         return void closeStudio(true);

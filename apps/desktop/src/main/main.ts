@@ -39,7 +39,7 @@ import {
   repoName,
   runUntrustedGit,
 } from './git.js';
-import { BrowserController } from './browser.js';
+import { BrowserController, browserData } from './browser.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
 import { Vercel, linkedProject } from './vercel.js';
@@ -1810,6 +1810,36 @@ function registerIpc(): void {
   handle('browser:back', z.tuple([tabId]), (w, t) => w.browser.back(t));
   handle('browser:forward', z.tuple([tabId]), (w, t) => w.browser.forward(t));
   handle('browser:reload', z.tuple([tabId]), (w, t) => w.browser.reload(t));
+  handle('browser:stop', z.tuple([tabId]), (w, t) => w.browser.stop(t));
+  // History and bookmarks are shared by every window (one file in userData).
+  const withIcons = (entries: { url: string }[]) => ({
+    entries,
+    icons: browserData().iconsFor(entries.map((e) => e.url)),
+  });
+  handle(
+    'browser:history',
+    z.tuple([z.string().max(500), z.number().int().min(1).max(5000).optional()]),
+    (_w, q, limit) => withIcons(browserData().history(q, limit ?? 300)),
+  );
+  handle('browser:suggest', z.tuple([z.string().max(500)]), (_w, q) =>
+    withIcons(browserData().suggest(q)),
+  );
+  handle('browser:forget', z.tuple([z.string().max(4096).nullable()]), (_w, url) => {
+    if (url === null) browserData().clearHistory();
+    else browserData().forget(url);
+  });
+  handle('browser:bookmarks', z.tuple([]), () =>
+    withIcons(browserData().bookmarks().map((b) => ({ ...b, visits: 0, bookmark: true }))),
+  );
+  handle(
+    'browser:toggleBookmark',
+    z.tuple([z.string().max(4096), z.string().max(500)]),
+    (_w, url, title) => {
+      const on = browserData().toggleBookmark(url, title);
+      for (const x of wins.values()) x.browser.refresh();
+      return on;
+    },
+  );
   handle('browser:state', z.tuple([]), (w) => w.browser.state());
   handle('browser:home', z.tuple([tabId]), (w, t) => w.browser.home(t));
   handle('browser:tabs', z.tuple([]), (w) => w.browser.view());
@@ -1844,6 +1874,7 @@ function registerIpc(): void {
     termOwner.delete(i);
   });
 
+  handle('app:openLink', z.tuple([z.string().url().max(8192)]), (w, url) => openLink(w, url));
   handle('app:openExternal', z.tuple([z.string().url()]), (_w, url) => {
     if (/^https:\/\//.test(url)) return shell.openExternal(url);
     return undefined;
@@ -2347,6 +2378,33 @@ function iconPath(): string | undefined {
   return existsSync(p) ? p : undefined;
 }
 
+/**
+ * Sites that refuse embedded browsers (Google sign-in: "disallowed_useragent") or where the
+ * user expects their usual browser (payments): they open outside.
+ */
+const EXTERNAL_ONLY =
+  /^(accounts\.google\.com|mail\.google\.com|console\.cloud\.google\.com|(www\.)?paypal\.com|checkout\.stripe\.com|buy\.stripe\.com|[\w-]+\.lemonsqueezy\.com)$/i;
+
+/**
+ * A link clicked in the app (chat, panels, window.open): an http(s) page opens in a tab of
+ * the built-in browser of that window, which comes to the front.
+ */
+function openLink(w: Win, url: string): void {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return;
+  if (EXTERNAL_ONLY.test(u.hostname)) {
+    if (u.protocol === 'https:') void shell.openExternal(u.toString());
+    return;
+  }
+  w.browser.openTab(u.toString());
+  send(w, { type: 'browser:focus' });
+}
+
 async function createWindow(
   opts: {
     folder?: string;
@@ -2399,7 +2457,7 @@ async function createWindow(
   // Electron forgets the zoom on each load; the saved interface size is set again.
   win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(prefs().uiZoom / 100));
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https:\/\//.test(url)) void shell.openExternal(url);
+    openLink(w, url);
     return { action: 'deny' };
   });
   win.webContents.on('will-navigate', (e, url) => {

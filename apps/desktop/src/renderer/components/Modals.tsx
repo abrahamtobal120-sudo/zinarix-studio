@@ -3,6 +3,7 @@ import type { CustomProviderSpec, OmniApi, ProviderView } from '../../shared/api
 import { commands, runCommand } from '../commands';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
+import { openLink } from '../links';
 import { confirmDialog } from '../confirm';
 import { monaco } from '../monaco';
 import { monacoTheme } from '../themes';
@@ -649,12 +650,12 @@ function Providers({ focus }: { focus?: string }) {
                 {t('saveAndTest')}
               </button>
               {p.keyUrl && (
-                <button onClick={() => void api().app.openExternal(p.keyUrl!)}>
+                <button onClick={() => openLink(p.keyUrl!)}>
                   <Icon name="key" size={13} /> {t('getKey')}
                 </button>
               )}
               {p.docsUrl && (
-                <button onClick={() => void api().app.openExternal(p.docsUrl!)}>
+                <button onClick={() => openLink(p.docsUrl!)}>
                   <Icon name="books" size={13} /> {t('provDocs')}
                 </button>
               )}
