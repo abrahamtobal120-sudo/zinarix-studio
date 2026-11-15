@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -239,6 +240,15 @@ describe('hooks', () => {
 
 type Call = { name: string; args: Record<string, unknown> };
 
+/** The repo's prettier CLI, if installed (the real-formatter hook test needs it). */
+const prettierBin = ((): string | null => {
+  try {
+    return createRequire(import.meta.url).resolve('prettier/bin/prettier.cjs');
+  } catch {
+    return null;
+  }
+})();
+
 function fakeCore(turns: Call[][], offered: string[][]): OmniCore {
   let step = 0;
   let n = 0;
@@ -376,6 +386,27 @@ describe('hooks in the agent loop', () => {
     // hooks approved once, then each write as usual
     expect(r.asked.filter((n) => n === 'project_hooks')).toHaveLength(1);
   }, 30_000);
+
+  it.skipIf(!prettierBin)('a PostToolUse hook that runs the real prettier formats every edit', async () => {
+    // The hook reads the tool input from stdin and runs `prettier --write <file>`.
+    const fmt = nodeHook(
+      'prettier-hook.cjs',
+      `let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const f=JSON.parse(s).tool_input.file_path;require('child_process').execFileSync(process.execPath,[${JSON.stringify(prettierBin)},'--write','--no-config',f],{stdio:'ignore'});});`,
+    );
+    writeFileSync(
+      join(ws, '.zinarix', 'settings.json'),
+      JSON.stringify({
+        hooks: { PostToolUse: [{ matcher: 'Edit|Write', hooks: [{ command: fmt }] }] },
+      }),
+    );
+    await run([
+      [{ name: 'write_file', args: { path: 'a.ts', content: "const  a = {x:1,y:'b'}" } }],
+      [{ name: 'edit_file', args: { path: 'a.ts', old_string: 'x: 1', new_string: 'x:   2' } }],
+      [],
+    ]);
+    // Formatted after the write (so the edit could match "x: 1") and again after the edit.
+    expect(readFileSync(join(ws, 'a.ts'), 'utf8')).toBe('const a = { x: 2, y: "b" };\n');
+  }, 60_000);
 
   it('PreToolUse exit 2 blocks the action and the message reaches the model', async () => {
     const deny = nodeHook(
