@@ -10,6 +10,7 @@ import type { ToolDefinition } from '@omni/shared';
 import { redact } from '@omni/security';
 import { assertNotMetadata, deniedPath, execFile, expandPath, readCapped } from './system.js';
 import type { Workspace } from './workspace.js';
+import { bin } from './bin.js';
 
 /**
  * Defensive security tools: audit the user's own project, dependencies, computer, local
@@ -443,7 +444,7 @@ export async function scanProject(ws: Workspace, checks: string[]): Promise<SecR
   }
   if (doSecrets) {
     // .env files tracked by git are a leak even if their values look harmless.
-    const tracked = await execFile('git', [
+    const tracked = await execFile(bin('git'), [
       '-C',
       ws.root,
       'ls-files',
@@ -463,7 +464,7 @@ export async function scanProject(ws: Workspace, checks: string[]): Promise<SecR
           fix: `Ejecuta "git rm --cached ${f}", agrégalo a .gitignore y rota los secretos que contenga.`,
         });
     if (existsSync(join(ws.root, '.env'))) {
-      const ign = await execFile('git', ['-C', ws.root, 'check-ignore', '-q', '.env']);
+      const ign = await execFile(bin('git'), ['-C', ws.root, 'check-ignore', '-q', '.env']);
       if (ign.code === 1)
         findings.push({
           severity: 'alto',

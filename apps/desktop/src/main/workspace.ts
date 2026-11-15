@@ -4,6 +4,7 @@ import type { FSWatcher } from 'node:fs';
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { DirEntry, FileContent, SearchHit, WorkspaceInfo } from '../shared/api.js';
+import { bin } from './bin.js';
 
 const MAX_FILE = 10 * 1024 * 1024;
 const IGNORED_DIRS = new Set([
@@ -208,7 +209,7 @@ function isLink(p: string): boolean {
 
 function gitBranch(cwd: string): Promise<string | null> {
   return new Promise((res) =>
-    execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, timeout: 2000 }, (err, stdout) =>
+    execFile(bin('git'), ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, timeout: 2000 }, (err, stdout) =>
       res(err ? null : stdout.trim() || null),
     ),
   );
@@ -216,7 +217,7 @@ function gitBranch(cwd: string): Promise<string | null> {
 
 function rgFiles(cwd: string, limit: number): Promise<string[]> {
   return new Promise((res, rej) => {
-    const child = spawn('rg', ['--files', '--hidden', '--glob', '!.git'], { cwd });
+    const child = spawn(bin('rg'), ['--files', '--hidden', '--glob', '!.git'], { cwd });
     const files: string[] = [];
     let buf = '';
     child.on('error', rej);
@@ -250,7 +251,7 @@ function ripgrep(
     ];
     if (!regex) args.push('--fixed-strings');
     args.push('--', query, '.');
-    const child = spawn('rg', args, { cwd });
+    const child = spawn(bin('rg'), args, { cwd });
     const hits: SearchHit[] = [];
     let buf = '';
     child.on('error', rej);

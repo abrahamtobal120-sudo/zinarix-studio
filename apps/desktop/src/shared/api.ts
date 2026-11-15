@@ -15,6 +15,7 @@ import type {
   InstalledExtension,
 } from './devtools.js';
 import type { LspStatus, NextEditRequestView, NextEditView } from './lsp.js';
+import type { ExportOptions, MediaItem, VideoProject } from './video.js';
 export type { LicenseStatus } from './plans.js';
 
 export interface WorkspaceInfo {
@@ -801,6 +802,8 @@ export type AppEvent =
   | { type: 'update'; state: 'available' | 'ready'; version: string; url?: string }
   /** A message from the app's owner (app-config.json), shown once. */
   | { type: 'notice'; id: string; text: string; url?: string }
+  /** A Video Studio export changed state or progressed. */
+  | { type: 'video:job'; job: VideoJobView }
   /** The paired phone asked for something (see PhoneAction). */
   | { type: 'phone'; action: PhoneAction }
   /** The phone remote changed (started, stopped, a phone paired, new PIN). */
@@ -1471,7 +1474,44 @@ export interface OmniApi {
     statuses(): Promise<LspStatus[]>;
     restart(): Promise<void>;
   };
+  video: {
+    tools(): Promise<{ ffmpeg: boolean; version: string | null }>;
+    /** File dialog for media to import (absolute paths). */
+    pickMedia(): Promise<string[]>;
+    probe(path: string): Promise<MediaItem & { url: string }>;
+    /** Absolute path of a file of the open folder (the explorer gives relative ones). */
+    workspacePath(rel: string): Promise<string | null>;
+    mediaUrl(path: string): Promise<string | null>;
+    thumbnails(path: string, duration: number, count: number): Promise<string>;
+    waveform(path: string): Promise<{ peaksPerSecond: number; peaks: number[] }>;
+    /** Saves (asking where when there is no path or saveAs); null when canceled. */
+    saveProject(project: VideoProject, path: string | null, saveAs: boolean): Promise<string | null>;
+    /** Opens a .zvproj (asking which when no path); media paths come back absolute. */
+    openProject(path: string | null): Promise<{ path: string; project: VideoProject } | null>;
+    /** Crash recovery copy (null clears it). */
+    autosave(project: VideoProject | null, path: string | null): Promise<void>;
+    recover(): Promise<{ project: VideoProject; path: string | null; savedAt: number } | null>;
+    /** Picks a new file for a missing media item. */
+    relink(name: string): Promise<string | null>;
+    exportPath(name: string): Promise<string | null>;
+    export(project: VideoProject, options: ExportOptions, out: string): Promise<VideoJobView>;
+    jobs(): Promise<VideoJobView[]>;
+    cancel(id: string): Promise<void>;
+    reveal(path: string): Promise<void>;
+    cacheSize(): Promise<number>;
+    clearCache(): Promise<void>;
+  };
   on(listener: (ev: AppEvent) => void): () => void;
+}
+
+export interface VideoJobView {
+  id: string;
+  name: string;
+  out: string;
+  state: 'queued' | 'running' | 'done' | 'error' | 'canceled';
+  progress: number;
+  eta: number | null;
+  error?: string;
 }
 
 export const CHANNELS = [
@@ -1727,6 +1767,25 @@ export const CHANNELS = [
   'mcp:restart',
   'mcp:setEnabled',
   'mcp:trustProject',
+  'video:tools',
+  'video:pickMedia',
+  'video:probe',
+  'video:workspacePath',
+  'video:mediaUrl',
+  'video:thumbnails',
+  'video:waveform',
+  'video:saveProject',
+  'video:openProject',
+  'video:autosave',
+  'video:recover',
+  'video:relink',
+  'video:exportPath',
+  'video:export',
+  'video:jobs',
+  'video:cancel',
+  'video:reveal',
+  'video:cacheSize',
+  'video:clearCache',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

@@ -47,6 +47,8 @@ El script descarga la última versión desde GitHub Releases y comprueba su SHA-
 
 ## Desarrollo
 
+Base experimental de VS Code: `pnpm code:prepare` incorpora el ZIP descargado y aplica la identidad de Zinarix; `pnpm code:status` muestra los requisitos. Consulta [la preparacion y el estado de la migracion](docs/es/code-oss.md).
+
 ```bash
 pnpm install
 pnpm build

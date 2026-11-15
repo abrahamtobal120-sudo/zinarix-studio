@@ -91,22 +91,42 @@ function loop(
   canvas: HTMLCanvasElement,
   step: (dt: number) => void,
   onKey: (key: string, down: boolean) => void,
-  onPointer: (y: number, down: boolean) => void,
+  /** `move` is true for a drag with the button held (not a new press). */
+  onPointer: (y: number, down: boolean, move: boolean) => void,
 ): () => void {
   let raf = 0;
   let last = performance.now();
+  let paused = false;
+  const held = new Set<string>();
   const frame = (now: number) => {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    step(dt);
+    if (!paused) step(dt);
     raf = requestAnimationFrame(frame);
   };
   raf = requestAnimationFrame(frame);
   const kd = (e: KeyboardEvent) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+    // Auto-repeat is not a new press (it would restart the game the instant you lose).
+    if (e.repeat) return;
+    held.add(e.key);
     onKey(e.key, true);
   };
-  const ku = (e: KeyboardEvent) => onKey(e.key, false);
+  const ku = (e: KeyboardEvent) => {
+    held.delete(e.key);
+    onKey(e.key, false);
+  };
+  // Focus elsewhere: keyup never arrives, so release everything and pause.
+  const blur = () => {
+    paused = true;
+    for (const k of held) onKey(k, false);
+    held.clear();
+    onPointer(0, false, false);
+  };
+  const focus = () => {
+    paused = false;
+    last = performance.now();
+  };
   const y = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
     return ((e.clientY - r.top) / r.height) * H;
@@ -114,17 +134,19 @@ function loop(
   const pd = (e: PointerEvent) => {
     canvas.focus();
     canvas.setPointerCapture(e.pointerId);
-    onPointer(y(e), true);
+    onPointer(y(e), true, false);
   };
   const pm = (e: PointerEvent) => {
-    if (e.buttons) onPointer(y(e), true);
+    if (e.buttons) onPointer(y(e), true, true);
   };
-  const pu = (e: PointerEvent) => onPointer(y(e), false);
+  const pu = (e: PointerEvent) => onPointer(y(e), false, false);
   canvas.addEventListener('keydown', kd);
   canvas.addEventListener('keyup', ku);
   canvas.addEventListener('pointerdown', pd);
   canvas.addEventListener('pointermove', pm);
   canvas.addEventListener('pointerup', pu);
+  canvas.addEventListener('blur', blur);
+  canvas.addEventListener('focus', focus);
   return () => {
     cancelAnimationFrame(raf);
     canvas.removeEventListener('keydown', kd);
@@ -132,6 +154,8 @@ function loop(
     canvas.removeEventListener('pointerdown', pd);
     canvas.removeEventListener('pointermove', pm);
     canvas.removeEventListener('pointerup', pu);
+    canvas.removeEventListener('blur', blur);
+    canvas.removeEventListener('focus', focus);
   };
 }
 
@@ -335,8 +359,8 @@ function dinoGame(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): () 
         if (down && y > 0) vy = Math.min(vy, -700);
       }
     },
-    (_y, down) => {
-      if (down) jump();
+    (_y, down, move) => {
+      if (down && !move) jump();
     },
   );
 }
@@ -514,8 +538,8 @@ function boardGame(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): ()
       if (isDown && key === ' ' && state !== 'run') reset();
       if (isDown && (key === 'ArrowUp' || key === 'ArrowDown') && state === 'ready') reset();
     },
-    (y, isDown) => {
-      if (isDown && state !== 'run') return reset();
+    (y, isDown, move) => {
+      if (isDown && !move && state !== 'run') return reset();
       target = isDown ? y : null;
     },
   );

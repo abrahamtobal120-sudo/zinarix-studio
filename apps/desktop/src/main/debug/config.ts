@@ -1,5 +1,6 @@
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 import type { DebugConfig, DebugKind } from '../../shared/devtools.js';
+import { isCredentialEnv } from '../env.js';
 
 /** Removes // and /* *\/ comments and trailing commas (JSONC → JSON), respecting strings. */
 export function stripJsonc(text: string): string {
@@ -103,7 +104,8 @@ export function substitute(value: string, root: string, file?: string): string {
     pathSeparator: process.platform === 'win32' ? '\\' : '/',
   };
   return value.replace(/\$\{(env:)?([\w]+)\}/g, (all, env: string | undefined, k: string) =>
-    env ? (process.env[k] ?? '') : (vars[k] ?? all),
+    // Provider keys stay out of the debugged program even under another name.
+    env ? (isCredentialEnv(k) ? '' : (process.env[k] ?? '')) : (vars[k] ?? all),
   );
 }
 

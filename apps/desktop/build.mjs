@@ -65,6 +65,17 @@ await build({
   logLevel: 'warning',
 });
 
+// The editing script of the visual editor, served only inside its sandboxed preview frame.
+await build({
+  entryPoints: [join(root, 'src/preload/designPreview.ts')],
+  outfile: join(root, 'dist/preload/designPreview.js'),
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  target: 'chrome140',
+  logLevel: 'warning',
+});
+
 const catalogDir = dirname(require.resolve('@omni/catalog/providers.json'));
 mkdirSync(join(root, 'dist/catalog/keys'), { recursive: true });
 for (const f of ['providers.json', 'providers.json.sig', 'keys/catalog.pub']) {

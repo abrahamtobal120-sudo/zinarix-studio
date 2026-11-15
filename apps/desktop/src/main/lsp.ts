@@ -15,6 +15,7 @@ import {
   toServerUris,
   uriToRel,
 } from './lspProtocol.js';
+import { NO_CWD_EXE_SEARCH } from './bin.js';
 
 const REQUEST_TIMEOUT = 20_000;
 const INIT_TIMEOUT = 60_000;
@@ -129,7 +130,8 @@ class LspClient {
     const q = (s: string) => (/[\s"&|<>^%]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
     const proc = spawn(shell ? q(this.exe) : this.exe, shell ? this.args.map(q) : this.args, {
       cwd: this.root,
-      env: childEnv(process.env),
+      // The shim calls `node` by bare name: cmd.exe must not pick one from the project.
+      env: shell ? { ...childEnv(process.env), ...NO_CWD_EXE_SEARCH } : childEnv(process.env),
       shell,
       windowsHide: true,
     });

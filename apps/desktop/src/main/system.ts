@@ -430,14 +430,16 @@ export function adminCommand(command: string): { file: string; args: string[] } 
   if (platform() === 'win32') {
     // UAC prompt; output is written to a temp file and printed afterwards.
     const tmp = join(process.env.TEMP ?? 'C:\\Windows\\Temp', `zinarix-admin-${Date.now()}.log`);
-    const inner = `${command} *>&1 | Out-File -Encoding utf8 '${tmp}'`;
+    // Inside '…' for PowerShell (a user named O'Brien): straight and curly quotes doubled.
+    const q = tmp.replace(/['‘’‚‛]/g, "''");
+    const inner = `${command} *>&1 | Out-File -Encoding utf8 '${q}'`;
     const encoded = Buffer.from(inner, 'utf16le').toString('base64');
     return {
       file: 'powershell.exe',
       args: [
         '-NoProfile',
         '-Command',
-        `$p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','${encoded}'; if (Test-Path '${tmp}') { Get-Content '${tmp}'; Remove-Item '${tmp}' }; exit $p.ExitCode`,
+        `$p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','${encoded}'; if (Test-Path '${q}') { Get-Content '${q}'; Remove-Item '${q}' }; exit $p.ExitCode`,
       ],
     };
   }

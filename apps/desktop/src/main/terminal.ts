@@ -126,7 +126,8 @@ function adminShell(base: Shell): Shell | undefined {
  * elevated PowerShell window (UAC prompt) in `cwd`.
  */
 function openElevatedWindow(cwd: string): void {
-  const dir = cwd.replace(/'/g, "''");
+  // PowerShell also treats the curly quotes ‘ ’ ‚ ‛ as single quotes: double them all.
+  const dir = cwd.replace(/['‘’‚‛]/g, "''");
   const child = spawn(
     'powershell.exe',
     [

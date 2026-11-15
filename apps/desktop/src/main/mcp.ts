@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import type { ToolDefinition } from '@omni/shared';
 import { registerSecret } from '@omni/security';
 import { childEnv } from './env.js';
+import { NO_CWD_EXE_SEARCH } from './bin.js';
 
 export const MCP_PROTOCOL = '2025-06-18';
 const FALLBACK_PROTOCOLS = ['2025-03-26', '2024-11-05'];
@@ -270,7 +271,12 @@ class StdioTransport implements Transport {
   private stderr = '';
 
   constructor(cfg: McpStdioConfig, cwd: string | undefined) {
-    const env = { ...childEnv(process.env), ...(cfg.env ?? {}) };
+    const env = {
+      ...childEnv(process.env),
+      ...(cfg.env ?? {}),
+      // A .cmd shim calls `node`/`python` by bare name: never one from the working folder.
+      ...(process.platform === 'win32' ? NO_CWD_EXE_SEARCH : {}),
+    };
     // On Windows, npx / uvx / node scripts are .cmd files: they need a shell to start. A
     // real .exe (node.exe, python.exe…) runs directly, with its arguments passed as-is.
     const shell = process.platform === 'win32' && !/\.(exe|com)$/i.test(cfg.command);

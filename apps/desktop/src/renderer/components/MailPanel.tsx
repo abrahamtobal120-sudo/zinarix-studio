@@ -209,9 +209,13 @@ function MailBody({ reset }: { reset: () => void }) {
   useEffect(() => {
     if (!st?.connected || msg || draft || page > 0) return;
     const id = setInterval(() => {
+      // Same stale-answer guard as loadList: a folder change meanwhile wins.
+      const req = ++listRequest.current;
       void api()
         .mail.list(folder, 0, search)
-        .then(setList)
+        .then((r) => {
+          if (req === listRequest.current) setList(r);
+        })
         .catch(() => {});
       loadFolders();
     }, 60_000);

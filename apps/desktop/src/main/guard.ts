@@ -25,22 +25,23 @@ export function isSecretFile(rel: string): boolean {
   return SECRET_FILE.some((re) => re.test(p));
 }
 
+// Case-insensitive: NTFS and APFS treat .GIT/hooks and Package.json as the same files.
 const EXECUTES: RegExp[] = [
-  /(^|\/)\.git(\/|$)/,
-  /(^|\/)\.husky\//,
-  /(^|\/)\.githooks\//,
-  /(^|\/)\.(vscode|idea|devcontainer|zed|fleet|cursor|claude)\//,
-  /(^|\/)\.github\/workflows\//,
-  /(^|\/)\.gitlab-ci\.ya?ml$/,
-  /(^|\/)package\.json$/,
-  /(^|\/)\.(yarnrc(\.yml)?|pnpmfile\.c?js)$/,
-  /(^|\/)(pnpm-workspace\.yaml|bunfig\.toml|\.mise\.toml|\.tool-versions)$/,
-  /(^|\/)(Makefile|justfile|Taskfile\.ya?ml)$/,
-  /(^|\/)\.(pre-commit-config\.yaml|lintstagedrc[^/]*)$/,
+  /(^|\/)\.git(\/|$)/i,
+  /(^|\/)\.husky\//i,
+  /(^|\/)\.githooks\//i,
+  /(^|\/)\.(vscode|idea|devcontainer|zed|fleet|cursor|claude)\//i,
+  /(^|\/)\.github\/workflows\//i,
+  /(^|\/)\.gitlab-ci\.ya?ml$/i,
+  /(^|\/)package\.json$/i,
+  /(^|\/)\.(yarnrc(\.yml)?|pnpmfile\.c?js)$/i,
+  /(^|\/)(pnpm-workspace\.yaml|bunfig\.toml|\.mise\.toml|\.tool-versions)$/i,
+  /(^|\/)(Makefile|justfile|Taskfile\.ya?ml)$/i,
+  /(^|\/)\.(pre-commit-config\.yaml|lintstagedrc[^/]*)$/i,
   // A workspace opened at the home folder: shell startup files and this app's own data.
-  /^\.(bashrc|bash_profile|bash_login|profile|zshrc|zprofile|zshenv|zlogin|xprofile|xinitrc)$/,
-  /^\.config\/(fish|autostart|systemd)\//,
-  /^\.(omni|local\/bin)\//,
+  /^\.(bashrc|bash_profile|bash_login|profile|zshrc|zprofile|zshenv|zlogin|xprofile|xinitrc)$/i,
+  /^\.config\/(fish|autostart|systemd)\//i,
+  /^\.(omni|local\/bin)\//i,
 ];
 
 /** Why a write to this path must be approved one at a time; null = an ordinary project file. */

@@ -90,10 +90,17 @@ export function GitPanel() {
   useEffect(() => {
     setPr(null);
     if (!gh?.loggedIn || !st?.upstream) return;
+    // Switching branches quickly: an older answer must not show the previous branch's PR.
+    let cancelled = false;
     void api()
       .github.pr()
-      .then(setPr)
+      .then((r) => {
+        if (!cancelled) setPr(r);
+      })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [gh?.loggedIn, st?.branch, st?.upstream, st?.ahead]);
 
   const act = async (label: string, fn: () => Promise<unknown>, done?: string) => {

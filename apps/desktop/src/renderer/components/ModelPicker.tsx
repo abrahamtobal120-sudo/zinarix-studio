@@ -377,7 +377,7 @@ export function ModelPicker({
                 else close();
               } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
                 e.preventDefault();
-                setIndex((i) => Math.min(i + 1, max));
+                setIndex((i) => Math.max(0, Math.min(i + 1, max)));
               } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
                 e.preventDefault();
                 setIndex((i) => Math.max(i - 1, 0));

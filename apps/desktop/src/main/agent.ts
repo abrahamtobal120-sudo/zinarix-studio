@@ -1984,6 +1984,13 @@ export function runCommand(
     const signalGroup = (sig: NodeJS.Signals): boolean => {
       try {
         if (!isWin && child.pid) process.kill(-child.pid, sig);
+        // Windows: kill() only ends powershell.exe; taskkill /T takes its children too
+        // (a dev server left running would keep its port and the pipes open).
+        else if (isWin && child.pid)
+          spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+            windowsHide: true,
+            stdio: 'ignore',
+          }).on('error', () => child.kill(sig));
         else child.kill(sig);
         return true;
       } catch (e) {

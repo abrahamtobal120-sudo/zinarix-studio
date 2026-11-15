@@ -307,6 +307,27 @@ const api: OmniApi = {
     statuses: call('lsp:statuses') as OmniApi['lsp']['statuses'],
     restart: call('lsp:restart') as OmniApi['lsp']['restart'],
   },
+  video: {
+    tools: call('video:tools') as OmniApi['video']['tools'],
+    pickMedia: call('video:pickMedia') as OmniApi['video']['pickMedia'],
+    probe: call('video:probe') as OmniApi['video']['probe'],
+    workspacePath: call('video:workspacePath') as OmniApi['video']['workspacePath'],
+    mediaUrl: call('video:mediaUrl') as OmniApi['video']['mediaUrl'],
+    thumbnails: call('video:thumbnails') as OmniApi['video']['thumbnails'],
+    waveform: call('video:waveform') as OmniApi['video']['waveform'],
+    saveProject: call('video:saveProject') as OmniApi['video']['saveProject'],
+    openProject: call('video:openProject') as OmniApi['video']['openProject'],
+    autosave: call('video:autosave') as OmniApi['video']['autosave'],
+    recover: call('video:recover') as OmniApi['video']['recover'],
+    relink: call('video:relink') as OmniApi['video']['relink'],
+    exportPath: call('video:exportPath') as OmniApi['video']['exportPath'],
+    export: call('video:export') as OmniApi['video']['export'],
+    jobs: call('video:jobs') as OmniApi['video']['jobs'],
+    cancel: call('video:cancel') as OmniApi['video']['cancel'],
+    reveal: call('video:reveal') as OmniApi['video']['reveal'],
+    cacheSize: call('video:cacheSize') as OmniApi['video']['cacheSize'],
+    clearCache: call('video:clearCache') as OmniApi['video']['clearCache'],
+  },
   on(listener) {
     const handler = (_e: unknown, ev: AppEvent) => listener(ev);
     ipcRenderer.on(EVENT_CHANNEL, handler);

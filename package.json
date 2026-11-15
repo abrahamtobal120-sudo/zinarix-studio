@@ -10,6 +10,11 @@
     "node": ">=24.7"
   },
   "scripts": {
+    "code:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/code-oss.ps1 prepare",
+    "code:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/code-oss.ps1 status",
+    "code:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/code-oss.ps1 install",
+    "code:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/code-oss.ps1 build",
+    "code:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/code-oss.ps1 start",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "tsc -b && vitest run",

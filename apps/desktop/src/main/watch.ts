@@ -7,6 +7,7 @@ import { redact } from '@omni/security';
 import type { WatchItem, WatchReport, WatchSettings, WatchStatus } from '../shared/api.js';
 import { renderTree } from './agent.js';
 import { runUntrustedGit } from './git.js';
+import { isSecretFile } from './guard.js';
 import type { Workspace } from './workspace.js';
 
 /**
@@ -141,9 +142,16 @@ async function material(ws: Workspace, p: ProjectState | undefined): Promise<str
     ).catch(() => '');
     if (log.trim()) parts.push(`<recent-commits>\n${log.trim()}\n</recent-commits>`);
     const args = ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--stat', '--patch'];
-    let diff = await git(ws, known ? [...args, since!] : [...args, 'HEAD']).catch(() => '');
+    // Secret files (.env, keys…) never go to the provider: exclude them from the diff.
+    const diffOf = async (base: string) => {
+      const names = await git(ws, ['diff', '--name-only', '-z', base]).catch(() => '');
+      const secrets = names.split('\0').filter((f) => f && isSecretFile(f));
+      const skip = secrets.length ? ['--', '.', ...secrets.map((f) => `:(exclude,literal)${f}`)] : [];
+      return git(ws, [...args, base, ...skip]).catch(() => '');
+    };
+    let diff = await diffOf(known ? since! : 'HEAD');
     // First look at a clean project: the last few commits show what is being worked on.
-    if (!diff.trim() && !known) diff = await git(ws, [...args, 'HEAD~3']).catch(() => '');
+    if (!diff.trim() && !known) diff = await diffOf('HEAD~3');
     if (diff.trim())
       parts.push(`<changes since="${known ? 'last review' : 'recent'}">\n${diff}\n</changes>`);
     const untracked = (
@@ -167,6 +175,7 @@ async function material(ws: Workspace, p: ProjectState | undefined): Promise<str
       .sort((a, b) => b.t - a.t)
       .slice(0, 8);
     for (const { f } of recent) {
+      if (isSecretFile(f)) continue;
       const r = await ws.readFile(f).catch(() => undefined);
       if (r && !r.binary && !r.tooLarge)
         parts.push(`<file path="${f}">\n${clip(r.content, 6000)}\n</file>`);

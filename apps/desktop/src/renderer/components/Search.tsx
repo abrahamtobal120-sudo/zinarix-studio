@@ -155,6 +155,8 @@ export function SearchView() {
       setMs(null);
       return;
     }
+    // A slower, older search must not overwrite the results of a newer one.
+    let stale = false;
     const timer = setTimeout(async () => {
       setBusy(true);
       const t0 = performance.now();
@@ -162,17 +164,27 @@ export function SearchView() {
         const q = word
           ? `\\b(?:${regex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`
           : query;
-        setHits(await api().workspace.search(q, regex || word, matchCase));
+        const found = await api().workspace.search(q, regex || word, matchCase);
+        if (!stale) setHits(found);
       } catch {
-        setHits([]);
+        if (!stale) setHits([]);
       } finally {
-        setMs(Math.round(performance.now() - t0));
-        setBusy(false);
-        setCursor(0);
+        if (!stale) {
+          setMs(Math.round(performance.now() - t0));
+          setBusy(false);
+          setCursor(0);
+        }
       }
     }, 220);
-    return () => clearTimeout(timer);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+      setBusy(false);
+    };
   }, [mode, query, regex, matchCase, word, workspace, reError, nonce, fsVersion]);
+
+  // A new query or mode starts again at the first row.
+  useEffect(() => setCursor(0), [mode, query, include, exclude]);
 
   // File list for "by name" mode.
   useEffect(() => {
@@ -350,7 +362,7 @@ export function SearchView() {
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') {
                   e.preventDefault();
-                  setCursor((c) => Math.min(c + 1, rows.length - 1));
+                  setCursor((c) => Math.max(0, Math.min(c + 1, rows.length - 1)));
                 } else if (e.key === 'ArrowUp') {
                   e.preventDefault();
                   setCursor((c) => Math.max(c - 1, 0));

@@ -203,6 +203,8 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       const custom = getState().prefs.keybindings;
       if (!Object.keys(custom).length) return;
+      // The Settings recorder is capturing a new shortcut: let it see the keys.
+      if ((e.target as Element | null)?.closest?.('.key-recorder')) return;
       const combo = comboFromEvent(e);
       if (!combo) return;
       const id = Object.keys(custom).find((k) => custom[k] === combo);

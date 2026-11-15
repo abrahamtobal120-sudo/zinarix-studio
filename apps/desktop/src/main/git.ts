@@ -12,6 +12,8 @@ import type {
   GitStatusView,
 } from '../shared/api.js';
 import type { Workspace } from './workspace.js';
+import { bin } from './bin.js';
+import { childEnv } from './env.js';
 
 const MAX_BUFFER = 64 * 1024 * 1024;
 
@@ -45,22 +47,24 @@ export function runUntrustedGit(args: string[], cwd: string, timeout?: number): 
  * missing credential fails fast instead of hanging; the user signs in from the terminal.
  */
 export function run(
-  bin: 'git' | 'gh',
+  tool: 'git' | 'gh',
   args: string[],
   cwd: string,
   timeout = 120_000,
 ): Promise<string> {
   return new Promise((res, rej) =>
     execFile(
-      bin,
-      bin === 'git' ? [...GIT_ALWAYS, ...args] : args,
+      bin(tool),
+      tool === 'git' ? [...GIT_ALWAYS, ...args] : args,
       {
         cwd,
         timeout,
         maxBuffer: MAX_BUFFER,
         windowsHide: true,
         env: {
-          ...process.env,
+          // git runs repo hooks and helpers: they get no provider keys. gh keeps the full
+          // environment (it may sign in with GH_TOKEN).
+          ...(tool === 'git' ? childEnv(process.env) : process.env),
           GIT_TERMINAL_PROMPT: '0',
           GCM_INTERACTIVE: 'never',
           GH_PROMPT_DISABLED: '1',
@@ -72,7 +76,7 @@ export function run(
         if (!err) return res(stdout);
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'ENOENT')
-          return rej(new Error(bin === 'git' ? 'Git no está instalado.' : 'gh no está instalado.'));
+          return rej(new Error(tool === 'git' ? 'Git no está instalado.' : 'gh no está instalado.'));
         rej(new Error((stderr || err.message).trim().split('\n').slice(-6).join('\n')));
       },
     ),
@@ -203,7 +207,7 @@ export class Git {
 
   /** Patch text for the AI commit message (staged changes, or everything if nothing is staged). */
   async patch(staged: boolean, max = 60_000): Promise<string> {
-    const args = ['diff', '--no-color', '--no-ext-diff', '--stat', '--patch'];
+    const args = ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--stat', '--patch'];
     const text = await this.git(staged ? [...args, '--cached'] : args);
     return text.length > max ? `${text.slice(0, max)}\n… [diff truncado]` : text;
   }
@@ -243,7 +247,7 @@ export class Git {
 
   async show(hash: string): Promise<string> {
     if (!/^[0-9a-f]{4,64}$/i.test(hash)) throw new Error('commit no válido');
-    const out = await this.git(['show', '--stat', '--patch', '--no-color', hash]);
+    const out = await this.git(['show', '--stat', '--patch', '--no-color', '--no-ext-diff', '--no-textconv', hash]);
     return out.length > 200_000 ? `${out.slice(0, 200_000)}\n…` : out;
   }
 
