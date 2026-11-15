@@ -5,7 +5,6 @@ import {
   addWatch,
   children,
   cont,
-  getDebug,
   loadConfigs,
   pause,
   refreshWatches,
@@ -26,7 +25,7 @@ import {
   useWatchValues,
 } from '../debug';
 import { td } from '../i18nDebug';
-import { api, askText, getState, openFile, toast, useStore } from '../store';
+import { api, askText, openFile, toast, useStore } from '../store';
 import { Icon, type IconName } from './Icon';
 
 /** The toolbar shown while a session runs (also used at the top of the editor). */
@@ -424,9 +423,3 @@ export function DebugPanel() {
     </div>
   );
 }
-
-/** For the command palette when the panel is not shown. */
-export function debugBusy(): boolean {
-  return getDebug().state !== 'idle';
-}
-export { getState as _unusedGetState };

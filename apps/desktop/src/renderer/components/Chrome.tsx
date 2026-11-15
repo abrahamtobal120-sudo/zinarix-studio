@@ -21,7 +21,23 @@ import {
   useStore,
 } from '../store';
 
-export function ActivityBar() {
+type Kind = 'view' | 'toggle' | 'action';
+interface BarItem {
+  key: string;
+  title: string;
+  icon: IconName;
+  on: boolean;
+  run: () => void;
+  badge?: number;
+  /** view: picks the side panel (accent marker); toggle: shows/hides something; action: opens a window. */
+  kind: Kind;
+}
+
+/** Side views that live in the "Más" panel instead of having their own button. */
+const MORE_VIEWS = ['vercel', 'supabase', 'gcloud', 'mail'] as const;
+
+/** The activity bar's buttons, shared with the "Más" panel so both open things the same way. */
+function useBarItems() {
   const sidebar = useStore((s) => s.sidebar);
   const panelOpen = useStore((s) => s.panelOpen);
   const chatOpen = useStore((s) => s.chatOpen);
@@ -33,107 +49,207 @@ export function ActivityBar() {
   const sideMax = useStore((s) => s.maximized === 'side');
   const watchNew = useStore((s) => s.watch?.reports.filter((r) => !r.seen).length ?? 0);
   const videoOn = useV((s) => s.open && !s.minimized);
-  const item = (
-    active: boolean,
+  type View = Exclude<typeof sidebar, null>;
+  const view = (key: View, title: string, icon: IconName, badge?: number): BarItem => ({
+    key,
+    title,
+    icon,
+    badge,
+    kind: 'view',
+    on: sidebar === key,
+    run: () => setState({ sidebar: sidebar === key ? null : key }),
+  });
+  const leaveTab = () => {
+    const other = getState().tabs.find((x) => x.path !== BROWSER_TAB && x.path !== WHATSAPP_TAB);
+    activate(other?.path ?? null);
+  };
+  const tool = (
+    key: string,
     title: string,
     icon: IconName,
-    onClick: () => void,
+    kind: Kind,
+    on: boolean,
+    run: () => void,
     badge?: number,
-    /** false for buttons that only open a dialog (no on/off state to announce). */
-    toggle = true,
-  ) => (
+  ): BarItem => ({ key, title, icon, kind, on, run, badge });
+  const items = {
+    explorer: view('explorer', t('explorer'), 'files'),
+    search: view('search', t('search'), 'search'),
+    git: view('git', t('gitTitle'), 'git', gitChanges),
+    run: view('run', t('runTitle'), 'run'),
+    chat: tool('chat', t('chat'), 'agent', 'toggle', chatOpen, () =>
+      setState({ chatOpen: !chatOpen }),
+    ),
+    watch: view('watch', t('wtTitle'), 'eye', watchNew),
+    design: tool('design', t('dzTitle'), 'palette', 'view', sidebar === 'design', () =>
+      setState({ sidebar: sidebar === 'design' ? 'explorer' : 'design', maximized: null }),
+    ),
+    video: tool('video', tv('openStudioHint'), 'film', 'toggle', videoOn, toggleStudio),
+    terminal: tool('terminal', t('terminal'), 'terminal', 'toggle', panelOpen, () =>
+      setState({ panelOpen: !panelOpen }),
+    ),
+    vercel: view('vercel', 'Vercel', 'vercel'),
+    supabase: view('supabase', 'Supabase', 'supabase'),
+    gcloud: view('gcloud', 'Google Cloud', 'cloud'),
+    mail: view('mail', t('mlTitle'), 'mail'),
+    browser: tool('browser', t('browser'), 'globe', 'toggle', browserActive, () =>
+      browserActive ? leaveTab() : openBrowserTab(),
+    ),
+    whatsapp: tool(
+      'whatsapp',
+      'WhatsApp',
+      'whatsapp',
+      'toggle',
+      whatsappActive,
+      () => (whatsappActive ? leaveTab() : openWhatsAppTab()),
+      whatsappUnread,
+    ),
+    more: view('apps', t('appsTitle'), 'layers'),
+    maximize: tool(
+      'maximize',
+      sideMax ? t('restoreSize') : t('maximizeSide'),
+      sideMax ? 'minimize' : 'maximize',
+      'toggle',
+      sideMax,
+      () => toggleMaximized('side'),
+    ),
+    security: tool('security', t('securityTitle'), 'shield', 'toggle', active === '::security', () =>
+      openSecurityTab(),
+    ),
+    usage: tool('usage', t('usageTitle'), 'chart', 'action', false, () =>
+      setState({ modal: { kind: 'usage' } }),
+    ),
+    providers: tool('providers', t('providers'), 'key', 'action', false, () =>
+      setState({ modal: { kind: 'providers' } }),
+    ),
+    palette: tool('palette', t('cmdPalette'), 'menu', 'action', false, () =>
+      setState({ modal: { kind: 'palette' } }),
+    ),
+    settings: tool('settings', t('settings'), 'settings', 'action', false, () =>
+      setState({ modal: { kind: 'settings' } }),
+    ),
+  };
+  return { items, sidebar, browserActive, whatsappActive, whatsappUnread };
+}
+
+/**
+ * Left bar, in groups: work (files, search, git, run) · AI (chat, watcher) · create (design,
+ * video, terminal) · "Más" (integrations and tools). An integration that is open (or WhatsApp
+ * with unread messages) gets its own button above "Más", so the open one is always visible.
+ * Side views get an accent marker on the left; toggles (chat, terminal...) only light up.
+ */
+export function ActivityBar() {
+  const { items, sidebar, browserActive, whatsappActive, whatsappUnread } = useBarItems();
+  const [tip, setTip] = useState<{ text: string; y: number } | null>(null);
+  // The browser and WhatsApp are native views drawn above the page: over them the custom
+  // tooltip would be hidden, so the system one is used instead.
+  const nativeOver = (browserActive || whatsappActive) && !sidebar;
+  const showTip = (el: HTMLElement, text: string) => {
+    const r = el.getBoundingClientRect();
+    setTip({ text, y: r.top + r.height / 2 });
+  };
+  const button = (it: BarItem) => {
+    const n = it.badge ?? 0;
+    const label = n ? t('badgeCount', { title: it.title, n: n > 99 ? '99+' : n }) : it.title;
+    return (
+      <button
+        key={it.key}
+        className={`activity${it.on ? ' active' : ''}${it.kind === 'view' ? ' is-view' : ''}`}
+        title={nativeOver ? it.title : undefined}
+        aria-label={label}
+        aria-pressed={it.kind === 'action' ? undefined : it.on}
+        onClick={() => {
+          setTip(null);
+          it.run();
+        }}
+        onMouseEnter={(e) => showTip(e.currentTarget, it.title)}
+        onFocus={(e) => showTip(e.currentTarget, it.title)}
+        onMouseLeave={() => setTip(null)}
+        onBlur={() => setTip(null)}
+      >
+        <Icon name={it.icon} size={20} />
+        {n ? (
+          <span className="activity-badge" aria-hidden="true">
+            {n > 99 ? '99+' : n}
+          </span>
+        ) : null}
+      </button>
+    );
+  };
+  const sep = (key: string) => <div key={key} className="activity-sep" aria-hidden="true" />;
+  // Integrations shown outside "Más": the open one, and WhatsApp while it has unread messages.
+  const pinned: BarItem[] = [];
+  for (const v of MORE_VIEWS) if (sidebar === v) pinned.push(items[v]);
+  if (browserActive) pinned.push(items.browser);
+  if (whatsappActive || whatsappUnread > 0) pinned.push(items.whatsapp);
+  return (
+    <nav className="activity-bar" aria-label={t('appsBar')}>
+      {button(items.explorer)}
+      {button(items.search)}
+      {button(items.git)}
+      {button(items.run)}
+      {sep('s1')}
+      {button(items.chat)}
+      {button(items.watch)}
+      {sep('s2')}
+      {button(items.design)}
+      {button(items.video)}
+      {button(items.terminal)}
+      {sep('s3')}
+      {pinned.map(button)}
+      {button(items.more)}
+      <div className="spacer" />
+      {sidebar && sidebar !== 'design' && button(items.maximize)}
+      {button(items.security)}
+      {button(items.providers)}
+      {button(items.settings)}
+      {tip && !nativeOver && (
+        <div className="activity-tip" role="tooltip" style={{ top: tip.y }}>
+          {tip.text}
+        </div>
+      )}
+    </nav>
+  );
+}
+
+/** "Más": the integrations and tools that do not have their own button in the bar. */
+export function AppsPanel() {
+  const { items } = useBarItems();
+  const row = (it: BarItem, desc: string) => (
     <button
-      className={`activity ${active ? 'active' : ''}`}
-      style={{ '--tone': TONE[icon] ?? 'var(--fg)' } as CSSProperties}
-      title={title}
-      aria-label={badge ? t('badgeCount', { title, n: badge > 99 ? '99+' : badge }) : title}
-      aria-pressed={toggle ? active : undefined}
-      onClick={onClick}
+      key={it.key}
+      className={`apps-item${it.on ? ' on' : ''}`}
+      aria-pressed={it.kind === 'action' ? undefined : it.on}
+      onClick={it.run}
     >
-      <Icon name={icon} size={21} />
-      {badge ? (
-        <span className="activity-badge" aria-hidden="true">
-          {badge > 99 ? '99+' : badge}
-        </span>
-      ) : null}
+      <span className="apps-icon">
+        <Icon name={it.icon} size={18} />
+      </span>
+      <span className="apps-text">
+        <span className="apps-name">{it.title}</span>
+        <span className="apps-desc">{desc}</span>
+      </span>
+      {it.badge ? <span className="apps-badge">{it.badge > 99 ? '99+' : it.badge}</span> : null}
     </button>
   );
   return (
-    <nav className="activity-bar">
-      {item(sidebar === 'explorer', t('explorer'), 'files', () =>
-        setState({ sidebar: sidebar === 'explorer' ? null : 'explorer' }),
-      )}
-      {item(sidebar === 'search', t('search'), 'search', () =>
-        setState({ sidebar: sidebar === 'search' ? null : 'search' }),
-      )}
-      {item(
-        sidebar === 'git',
-        t('gitTitle'),
-        'git',
-        () => setState({ sidebar: sidebar === 'git' ? null : 'git' }),
-        gitChanges,
-      )}
-      {item(sidebar === 'design', t('dzTitle'), 'palette', () =>
-        setState({ sidebar: sidebar === 'design' ? 'explorer' : 'design', maximized: null }),
-      )}
-      {item(sidebar === 'run', t('runTitle'), 'run', () =>
-        setState({ sidebar: sidebar === 'run' ? null : 'run' }),
-      )}
-      {item(sidebar === 'vercel', 'Vercel', 'vercel', () =>
-        setState({ sidebar: sidebar === 'vercel' ? null : 'vercel' }),
-      )}
-      {item(sidebar === 'supabase', 'Supabase', 'supabase', () =>
-        setState({ sidebar: sidebar === 'supabase' ? null : 'supabase' }),
-      )}
-      {item(sidebar === 'gcloud', 'Google Cloud', 'cloud', () =>
-        setState({ sidebar: sidebar === 'gcloud' ? null : 'gcloud' }),
-      )}
-      {item(sidebar === 'mail', t('mlTitle'), 'mail', () =>
-        setState({ sidebar: sidebar === 'mail' ? null : 'mail' }),
-      )}
-      {item(
-        sidebar === 'watch',
-        t('wtTitle'),
-        'eye',
-        () => setState({ sidebar: sidebar === 'watch' ? null : 'watch' }),
-        watchNew,
-      )}
-      {item(chatOpen, t('chat'), 'agent', () => setState({ chatOpen: !chatOpen }))}
-      {item(videoOn, tv('openStudioHint'), 'film', toggleStudio)}
-      {item(panelOpen, t('terminal'), 'terminal', () => setState({ panelOpen: !panelOpen }))}
-      {item(browserActive, t('browser'), 'globe', () => {
-        if (browserActive) {
-          const other = getState().tabs.find((x) => x.path !== BROWSER_TAB);
-          activate(other?.path ?? null);
-        } else openBrowserTab();
-      })}
-      {item(
-        whatsappActive,
-        'WhatsApp',
-        'whatsapp',
-        () => {
-          if (whatsappActive) {
-            const other = getState().tabs.find((x) => x.path !== WHATSAPP_TAB);
-            activate(other?.path ?? null);
-          } else openWhatsAppTab();
-        },
-        whatsappUnread,
-      )}
-      <div className="spacer" />
-      {sidebar &&
-        sidebar !== 'design' &&
-        item(
-          sideMax,
-          sideMax ? t('restoreSize') : t('maximizeSide'),
-          sideMax ? 'minimize' : 'maximize',
-          () => toggleMaximized('side'),
-        )}
-      {item(active === '::security', t('securityTitle'), 'shield', () => openSecurityTab())}
-      {item(false, t('usageTitle'), 'chart', () => setState({ modal: { kind: 'usage' } }), 0, false)}
-      {item(false, t('providers'), 'key', () => setState({ modal: { kind: 'providers' } }), 0, false)}
-      {item(false, t('cmdPalette'), 'menu', () => setState({ modal: { kind: 'palette' } }), 0, false)}
-      {item(false, t('settings'), 'settings', () => setState({ modal: { kind: 'settings' } }), 0, false)}
-    </nav>
+    <div className="explorer apps-panel">
+      <div className="sidebar-title">
+        <span className="panel-title">{t('appsTitle').toUpperCase()}</span>
+      </div>
+      <div className="apps-body">
+        <div className="apps-section">{t('appsIntegrations')}</div>
+        {row(items.vercel, t('appsVercel'))}
+        {row(items.supabase, t('appsSupabase'))}
+        {row(items.gcloud, t('appsGcloud'))}
+        {row(items.mail, t('appsMail'))}
+        {row(items.whatsapp, t('appsWhatsapp'))}
+        {row(items.browser, t('appsBrowser'))}
+        <div className="apps-section">{t('appsTools')}</div>
+        {row(items.usage, t('appsUsage'))}
+        {row(items.palette, t('appsPalette'))}
+      </div>
+    </div>
   );
 }
 

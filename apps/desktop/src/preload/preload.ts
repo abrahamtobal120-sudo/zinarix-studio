@@ -344,6 +344,12 @@ const api: OmniApi = {
     cacheSize: call('video:cacheSize') as OmniApi['video']['cacheSize'],
     clearCache: call('video:clearCache') as OmniApi['video']['clearCache'],
   },
+  helper: {
+    status: call('helper:status') as OmniApi['helper']['status'],
+    ask: call('helper:ask') as OmniApi['helper']['ask'],
+    pull: call('helper:pull') as OmniApi['helper']['pull'],
+    abort: call('helper:abort') as OmniApi['helper']['abort'],
+  },
   on(listener) {
     const handler = (_e: unknown, ev: AppEvent) => listener(ev);
     ipcRenderer.on(EVENT_CHANNEL, handler);

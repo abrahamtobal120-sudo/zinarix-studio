@@ -1598,6 +1598,22 @@ export interface OmniApi {
     cacheSize(): Promise<number>;
     clearCache(): Promise<void>;
   };
+  /** Ayuda de Zinarix: the help assistant (a small local model that knows the app). */
+  helper: {
+    status(): Promise<HelperStatus>;
+    /** Streams the answer as 'helper' events; `cloud` uses the selected cloud model instead. */
+    ask(
+      requestId: string,
+      req: {
+        question: string;
+        history: { role: 'user' | 'assistant'; content: string }[];
+        cloud?: boolean;
+      },
+    ): Promise<void>;
+    /** Downloads the model in Ollama ('helper:pull' events); resolves when it ends. */
+    pull(requestId: string, model: string): Promise<void>;
+    abort(requestId: string): Promise<void>;
+  };
   on(listener: (ev: AppEvent) => void): () => void;
 }
 
@@ -1897,6 +1913,10 @@ export const CHANNELS = [
   'video:reveal',
   'video:cacheSize',
   'video:clearCache',
+  'helper:status',
+  'helper:ask',
+  'helper:pull',
+  'helper:abort',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 
