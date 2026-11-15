@@ -3,10 +3,12 @@ import { existsSync, lstatSync, realpathSync, watch } from 'node:fs';
 import type { FSWatcher } from 'node:fs';
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import type { DirEntry, FileContent, SearchHit, WorkspaceInfo } from '../shared/api.js';
+import type { DirEntry, FileBytes, FileContent, SearchHit, WorkspaceInfo } from '../shared/api.js';
 import { bin } from './bin.js';
 
 const MAX_FILE = 10 * 1024 * 1024;
+/** Largest slice readBytes hands back in one call (images are read in several). */
+const MAX_CHUNK = 8 * 1024 * 1024;
 const IGNORED_DIRS = new Set([
   '.git',
   'node_modules',
@@ -69,6 +71,27 @@ export class Workspace {
     const probe = buf.subarray(0, 8000);
     if (probe.includes(0)) return { content: '', binary: true, tooLarge: false };
     return { content: buf.toString('utf8'), binary: false, tooLarge: false };
+  }
+
+  /** A slice of any file (binary or huge), for the image, hex and large-file viewers. */
+  async readBytes(rel: string, offset: number, length: number): Promise<FileBytes> {
+    const abs = this.resolve(rel);
+    const fh = await open(abs, 'r');
+    try {
+      const { size } = await fh.stat();
+      const start = Math.min(offset, size);
+      const n = Math.max(0, Math.min(length, MAX_CHUNK, size - start));
+      const bytes = new Uint8Array(n);
+      let done = 0;
+      while (done < n) {
+        const { bytesRead } = await fh.read(bytes, done, n - done, start + done);
+        if (bytesRead === 0) break;
+        done += bytesRead;
+      }
+      return { bytes: done === n ? bytes : bytes.subarray(0, done), size };
+    } finally {
+      await fh.close();
+    }
   }
 
   async writeFile(rel: string, content: string): Promise<void> {

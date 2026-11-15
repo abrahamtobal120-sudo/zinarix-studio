@@ -7,7 +7,8 @@ import { commitMerged, getV, useV } from './videoStore';
 export function Inspector() {
   const project = useV((s) => s.project);
   const selection = useV((s) => s.selection);
-  const clip = selection.length === 1 ? project.clips.find((c) => c.id === selection[0]) : undefined;
+  const clip =
+    selection.length === 1 ? project.clips.find((c) => c.id === selection[0]) : undefined;
   const media = clip ? mediaOf(project, clip.mediaId) : undefined;
 
   return (
@@ -44,7 +45,10 @@ export function Inspector() {
                 step={0.01}
                 value={clip.volume}
                 onChange={(e) =>
-                  commitMerged(updateClip(getV().project, clip.id, { volume: Number(e.target.value) }), `${tv('volume')} ${clip.id}`)
+                  commitMerged(
+                    updateClip(getV().project, clip.id, { volume: Number(e.target.value) }),
+                    `${tv('volume')} ${clip.id}`,
+                  )
                 }
               />
             </div>
@@ -86,7 +90,9 @@ function ProjectInfo() {
         <code>{fmtDuration(projectDuration(p))}</code>
       </Row>
       <Row label="FFmpeg">
-        <span className={tools?.ffmpeg ? 'vs-ok' : 'vs-warn'}>{tools ? (tools.ffmpeg ? (tools.version ?? '✓') : '—') : '…'}</span>
+        <span className={tools?.ffmpeg ? 'vs-ok' : 'vs-warn'}>
+          {tools ? (tools.ffmpeg ? (tools.version ?? '✓') : '—') : '…'}
+        </span>
       </Row>
       <Row label={tv('cache')}>
         <span>

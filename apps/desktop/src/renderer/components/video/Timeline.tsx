@@ -33,7 +33,15 @@ const MAX_ZOOM = 1200;
 const SNAP_PX = 8;
 
 type Drag =
-  | { kind: 'move'; ids: Set<string>; x0: number; grabTrack: string; delta: number; shift: number; valid: boolean }
+  | {
+      kind: 'move';
+      ids: Set<string>;
+      x0: number;
+      grabTrack: string;
+      delta: number;
+      shift: number;
+      valid: boolean;
+    }
   | { kind: 'trim'; id: string; edge: 'left' | 'right'; to: number }
   | { kind: 'scrub' };
 
@@ -64,8 +72,24 @@ export function addMarkerAtPlayhead(): void {
 export function setInOut(which: 'in' | 'out'): void {
   const s = getV();
   const p = s.project;
-  if (which === 'in') commit({ ...p, inPoint: s.playhead, outPoint: p.outPoint != null && p.outPoint <= s.playhead ? null : p.outPoint }, tv('setIn'));
-  else commit({ ...p, outPoint: s.playhead, inPoint: p.inPoint != null && p.inPoint >= s.playhead ? null : p.inPoint }, tv('setOut'));
+  if (which === 'in')
+    commit(
+      {
+        ...p,
+        inPoint: s.playhead,
+        outPoint: p.outPoint != null && p.outPoint <= s.playhead ? null : p.outPoint,
+      },
+      tv('setIn'),
+    );
+  else
+    commit(
+      {
+        ...p,
+        outPoint: s.playhead,
+        inPoint: p.inPoint != null && p.inPoint >= s.playhead ? null : p.inPoint,
+      },
+      tv('setOut'),
+    );
 }
 
 export function zoomBy(factor: number): void {
@@ -81,7 +105,25 @@ export function zoomToFit(): void {
 
 /** Ruler step (seconds) so labels are at least ~90 px apart. */
 function rulerStep(zoom: number, fps: number): number {
-  const steps = [1 / fps, 2 / fps, 5 / fps, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+  const steps = [
+    1 / fps,
+    2 / fps,
+    5 / fps,
+    0.5,
+    1,
+    2,
+    5,
+    10,
+    15,
+    30,
+    60,
+    120,
+    300,
+    600,
+    900,
+    1800,
+    3600,
+  ];
   return steps.find((s) => s * zoom >= 90) ?? 3600;
 }
 
@@ -118,7 +160,8 @@ export function Timeline() {
   // What the timeline shows: the project, or the edit being dragged.
   const preview = useMemo<VideoProject>(() => {
     if (!drag) return project;
-    if (drag.kind === 'move') return moveClips(project, drag.ids, drag.delta, drag.shift) ?? project;
+    if (drag.kind === 'move')
+      return moveClips(project, drag.ids, drag.delta, drag.shift) ?? project;
     if (drag.kind === 'trim') return trimClip(project, drag.id, drag.edge, drag.to);
     return project;
   }, [project, drag]);
@@ -183,7 +226,8 @@ export function Timeline() {
       if (el && s.playing) {
         const x = s.playhead * s.zoom;
         const w = el.clientWidth - HEAD_W;
-        if (x < el.scrollLeft || x > el.scrollLeft + w - 40) el.scrollLeft = Math.max(0, x - w * 0.1);
+        if (x < el.scrollLeft || x > el.scrollLeft + w - 40)
+          el.scrollLeft = Math.max(0, x - w * 0.1);
       }
       raf = requestAnimationFrame(follow);
     };
@@ -197,10 +241,16 @@ export function Timeline() {
     const r = el.getBoundingClientRect();
     return Math.max(0, (clientX - r.left - HEAD_W + el.scrollLeft) / getV().zoom);
   };
-  const snapTime = (t: number, ignore: ReadonlySet<string> = new Set(), withPlayhead = true): number => {
+  const snapTime = (
+    t: number,
+    ignore: ReadonlySet<string> = new Set(),
+    withPlayhead = true,
+  ): number => {
     const s = getV();
     if (!s.snap) return toFrame(t, s.project.fps);
-    const pts = snapPoints(s.project, s.playhead, ignore).filter((x) => withPlayhead || x !== s.playhead);
+    const pts = snapPoints(s.project, s.playhead, ignore).filter(
+      (x) => withPlayhead || x !== s.playhead,
+    );
     return snap(t, pts, SNAP_PX / s.zoom) ?? toFrame(t, s.project.fps);
   };
 
@@ -266,12 +316,15 @@ export function Timeline() {
           if (!k) continue;
           for (const edgeT of [k.start + raw, clipEnd(k) + raw]) {
             const sn = snap(edgeT, pts, reach);
-            if (sn != null && (best == null || Math.abs(sn - edgeT) < Math.abs(best))) best = sn - edgeT;
+            if (sn != null && (best == null || Math.abs(sn - edgeT) < Math.abs(best)))
+              best = sn - edgeT;
           }
         }
         if (best != null) delta = raw + best;
       }
-      const minStart = Math.min(...[...ids].map((id) => p.clips.find((x) => x.id === id)?.start ?? 0));
+      const minStart = Math.min(
+        ...[...ids].map((id) => p.clips.find((x) => x.id === id)?.start ?? 0),
+      );
       delta = Math.max(-minStart, delta);
       const kinds = sameKind(p, c.trackId);
       const under = trackUnder(ev.clientX, ev.clientY);
@@ -349,10 +402,21 @@ export function Timeline() {
             <div className="vs-tl-corner" style={{ width: HEAD_W }}>
               <TrackAdders />
             </div>
-            <Ruler project={project} zoom={zoom} width={contentW} from={t0} to={t1} onMouseDown={startScrub} />
+            <Ruler
+              project={project}
+              zoom={zoom}
+              width={contentW}
+              from={t0}
+              to={t1}
+              onMouseDown={startScrub}
+            />
           </div>
           {preview.tracks.map((track) => (
-            <div key={track.id} className={`vs-tl-row vs-${track.kind}`} style={{ height: ROW_H[track.kind] }}>
+            <div
+              key={track.id}
+              className={`vs-tl-row vs-${track.kind}`}
+              style={{ height: ROW_H[track.kind] }}
+            >
               <TrackHead track={track} project={project} />
               <div
                 className={`vs-lane ${track.locked ? 'vs-locked' : ''} ${track.hidden ? 'vs-hidden' : ''}`}
@@ -364,7 +428,10 @@ export function Timeline() {
                   startScrub(e);
                 }}
                 onDragOver={(e) => {
-                  if (e.dataTransfer.types.includes(MEDIA_DRAG) || e.dataTransfer.types.includes('Files')) {
+                  if (
+                    e.dataTransfer.types.includes(MEDIA_DRAG) ||
+                    e.dataTransfer.types.includes('Files')
+                  ) {
                     e.preventDefault();
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = 'copy';
@@ -411,7 +478,12 @@ function Toolbar() {
   const zoom = useV((s) => s.zoom);
   const hasSel = useV((s) => s.selection.length > 0);
   const p = useV((s) => s.project);
-  const btn = (icon: IconName, title: string, onClick: () => void, opts: { on?: boolean; disabled?: boolean; flip?: boolean } = {}) => (
+  const btn = (
+    icon: IconName,
+    title: string,
+    onClick: () => void,
+    opts: { on?: boolean; disabled?: boolean; flip?: boolean } = {},
+  ) => (
     <button
       className={`vs-icon-btn ${opts.on ? 'on' : ''}`}
       title={title}
@@ -429,7 +501,12 @@ function Toolbar() {
       {btn('trash', tv('delete'), () => deleteSelection(false), { disabled: !hasSel })}
       {btn('columns', tv('rippleDelete'), () => deleteSelection(true), { disabled: !hasSel })}
       <span className="vs-sep" />
-      {btn('magnet', snapOn ? tv('snapOn') : tv('snapOff'), () => setV((s) => ({ snap: !s.snap })), { on: snapOn })}
+      {btn(
+        'magnet',
+        snapOn ? tv('snapOn') : tv('snapOff'),
+        () => setV((s) => ({ snap: !s.snap })),
+        { on: snapOn },
+      )}
       {btn('flag', tv('marker'), addMarkerAtPlayhead)}
       <button className="vs-text-btn" title={tv('setIn')} onClick={() => setInOut('in')}>
         I
@@ -438,7 +515,9 @@ function Toolbar() {
         O
       </button>
       {(p.inPoint != null || p.outPoint != null) &&
-        btn('x', tv('clearInOut'), () => commit({ ...getV().project, inPoint: null, outPoint: null }, tv('clearInOut')))}
+        btn('x', tv('clearInOut'), () =>
+          commit({ ...getV().project, inPoint: null, outPoint: null }, tv('clearInOut')),
+        )}
       <div className="spacer" />
       {btn('minimize', tv('zoomOut'), () => zoomBy(1 / 1.5))}
       <input
@@ -479,7 +558,8 @@ function TrackAdders() {
 }
 
 function TrackHead({ track, project }: { track: Track; project: VideoProject }) {
-  const set = (patch: Partial<Track>, label: string) => commit(updateTrack(getV().project, track.id, patch), label);
+  const set = (patch: Partial<Track>, label: string) =>
+    commit(updateTrack(getV().project, track.id, patch), label);
   const n = project.clips.filter((c) => c.trackId === track.id).length;
   return (
     <div className="vs-head" style={{ width: HEAD_W }}>
@@ -502,7 +582,9 @@ function TrackHead({ track, project }: { track: Track; project: VideoProject }) 
             className={`vs-icon-btn ${track.hidden ? 'on-warn' : ''}`}
             title={track.hidden ? tv('trackShow') : tv('trackHide')}
             aria-label={track.hidden ? tv('trackShow') : tv('trackHide')}
-            onClick={() => set({ hidden: !track.hidden }, track.hidden ? tv('trackShow') : tv('trackHide'))}
+            onClick={() =>
+              set({ hidden: !track.hidden }, track.hidden ? tv('trackShow') : tv('trackHide'))
+            }
           >
             <Icon name={track.hidden ? 'eyeOff' : 'eye'} size={13} />
           </button>
@@ -511,7 +593,9 @@ function TrackHead({ track, project }: { track: Track; project: VideoProject }) 
           className={`vs-icon-btn ${track.muted ? 'on-warn' : ''}`}
           title={track.muted ? tv('trackUnmute') : tv('trackMute')}
           aria-label={track.muted ? tv('trackUnmute') : tv('trackMute')}
-          onClick={() => set({ muted: !track.muted }, track.muted ? tv('trackUnmute') : tv('trackMute'))}
+          onClick={() =>
+            set({ muted: !track.muted }, track.muted ? tv('trackUnmute') : tv('trackMute'))
+          }
         >
           <Icon name={track.muted ? 'volumeOff' : 'volume'} size={13} />
         </button>
@@ -519,17 +603,25 @@ function TrackHead({ track, project }: { track: Track; project: VideoProject }) 
           className={`vs-icon-btn ${track.locked ? 'on-warn' : ''}`}
           title={track.locked ? tv('trackUnlock') : tv('trackLock')}
           aria-label={track.locked ? tv('trackUnlock') : tv('trackLock')}
-          onClick={() => set({ locked: !track.locked }, track.locked ? tv('trackUnlock') : tv('trackLock'))}
+          onClick={() =>
+            set({ locked: !track.locked }, track.locked ? tv('trackUnlock') : tv('trackLock'))
+          }
         >
           <Icon name={track.locked ? 'lock' : 'unlock'} size={13} />
         </button>
         <button
-          className="vs-icon-btn"
+          className="vs-icon-btn vs-head-del"
           title={tv('trackRemove')}
           aria-label={tv('trackRemove')}
           disabled={project.tracks.filter((t) => t.kind === track.kind).length <= 1}
           onClick={async () => {
-            if (n && !(await confirmDialog(tv('trackRemoveAsk', { name: track.name, n }), { danger: true }))) return;
+            if (
+              n &&
+              !(await confirmDialog(tv('trackRemoveAsk', { name: track.name, n }), {
+                danger: true,
+              }))
+            )
+              return;
             commit(removeTrack(getV().project, track.id), tv('trackRemove'));
           }}
         >
@@ -557,7 +649,8 @@ function Ruler({
 }) {
   const step = rulerStep(zoom, project.fps);
   const ticks: number[] = [];
-  for (let t = Math.floor(from / step) * step; t <= to; t += step) ticks.push(Math.round(t * 1e6) / 1e6);
+  for (let t = Math.floor(from / step) * step; t <= to; t += step)
+    ticks.push(Math.round(t * 1e6) / 1e6);
   return (
     <div className="vs-ruler" style={{ width }} onMouseDown={onMouseDown}>
       {ticks.map((t) => (
@@ -583,7 +676,10 @@ function Ruler({
             const name = (await vPrompt(tv('markerName'), m.name))?.trim();
             if (name == null) return;
             const p = getV().project;
-            commit({ ...p, markers: p.markers.map((x) => (x.id === m.id ? { ...x, name } : x)) }, tv('markerName'));
+            commit(
+              { ...p, markers: p.markers.map((x) => (x.id === m.id ? { ...x, name } : x)) },
+              tv('markerName'),
+            );
           }}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -603,7 +699,12 @@ function InOutShade({ project, zoom }: { project: VideoProject; zoom: number }) 
   if (project.inPoint == null && project.outPoint == null) return null;
   const a = project.inPoint ?? 0;
   const b = project.outPoint ?? projectDuration(project);
-  return <div className="vs-inout" style={{ left: HEAD_W + a * zoom, width: Math.max(1, (b - a) * zoom) }} />;
+  return (
+    <div
+      className="vs-inout"
+      style={{ left: HEAD_W + a * zoom, width: Math.max(1, (b - a) * zoom) }}
+    />
+  );
 }
 
 function Playhead({ zoom }: { zoom: number }) {
@@ -656,10 +757,26 @@ function ClipView({
       onContextMenu={onMenu}
       title={media ? `${media.name} · ${clipDur(clip).toFixed(2)} s` : ''}
     >
-      {showStrip && media && <Filmstrip clip={clip} media={media} url={thumb} zoom={zoom} height={h - (media.hasAudio ? waveH : 0)} view={view} />}
+      {showStrip && media && (
+        <Filmstrip
+          clip={clip}
+          media={media}
+          url={thumb}
+          zoom={zoom}
+          height={h - (media.hasAudio ? waveH : 0)}
+          view={view}
+        />
+      )}
       <div className="vs-clip-label">{media?.name ?? '?'}</div>
       {wave && media?.hasAudio && (
-        <Waveform clip={clip} wave={wave} zoom={zoom} height={waveH} view={view} muted={track.muted || clip.volume <= 0} />
+        <Waveform
+          clip={clip}
+          wave={wave}
+          zoom={zoom}
+          height={waveH}
+          view={view}
+          muted={track.muted || clip.volume <= 0}
+        />
       )}
       <div className="vs-trim vs-trim-l" onMouseDown={(e) => onDown(e, clip, 'left')} />
       <div className="vs-trim vs-trim-r" onMouseDown={(e) => onDown(e, clip, 'right')} />
@@ -691,7 +808,10 @@ function Filmstrip({
   const lastX = Math.min(width, (view.t1 - clip.start) * zoom);
   for (let x = firstX; x < lastX && tiles.length < 200; x += tileW) {
     const src = clip.in + (x + tileW / 2) / zoom;
-    tiles.push({ x, frame: Math.min(23, Math.max(0, Math.floor((src / Math.max(0.001, media.duration)) * 24))) });
+    tiles.push({
+      x,
+      frame: Math.min(23, Math.max(0, Math.floor((src / Math.max(0.001, media.duration)) * 24))),
+    });
   }
   return (
     <div className="vs-strip" style={{ height }}>
@@ -751,7 +871,8 @@ function Waveform({
       const t0 = clip.in + (a - clip.start) + x / zoom;
       const t1 = t0 + 1 / zoom;
       let peak = 0;
-      for (let i = Math.floor(t0 * wave.pps); i <= Math.floor(t1 * wave.pps); i++) peak = Math.max(peak, wave.peaks[i] ?? 0);
+      for (let i = Math.floor(t0 * wave.pps); i <= Math.floor(t1 * wave.pps); i++)
+        peak = Math.max(peak, wave.peaks[i] ?? 0);
       const hh = Math.max(0.5, (peak / 255) * mid * scaleV);
       ctx.fillRect(x, mid - hh, 1, hh * 2);
     }
@@ -787,7 +908,8 @@ function MiniMap({
       onMouseDown={(e) => {
         go(e);
         const el = e.currentTarget;
-        const move = (ev: MouseEvent) => go({ ...ev, currentTarget: el } as unknown as React.MouseEvent<HTMLDivElement>);
+        const move = (ev: MouseEvent) =>
+          go({ ...ev, currentTarget: el } as unknown as React.MouseEvent<HTMLDivElement>);
         const up = () => {
           window.removeEventListener('mousemove', move);
           window.removeEventListener('mouseup', up);
@@ -802,11 +924,22 @@ function MiniMap({
           <div
             key={c.id}
             className={`vs-mm-clip vs-mm-${rows[row]?.kind}`}
-            style={{ left: `${(c.start / span) * 100}%`, width: `${(clipDur(c) / span) * 100}%`, top: `${(row / rows.length) * 100}%`, height: `${100 / rows.length}%` }}
+            style={{
+              left: `${(c.start / span) * 100}%`,
+              width: `${(clipDur(c) / span) * 100}%`,
+              top: `${(row / rows.length) * 100}%`,
+              height: `${100 / rows.length}%`,
+            }}
           />
         );
       })}
-      <div className="vs-mm-view" style={{ left: `${(view.left / zoom / span) * 100}%`, width: `${Math.min(100, (visible / span) * 100)}%` }} />
+      <div
+        className="vs-mm-view"
+        style={{
+          left: `${(view.left / zoom / span) * 100}%`,
+          width: `${Math.min(100, (visible / span) * 100)}%`,
+        }}
+      />
     </div>
   );
 }
@@ -825,7 +958,12 @@ function ClipMenu({ x, y, onClose }: { x: number; y: number; onClose: () => void
     </button>
   );
   return (
-    <div className="vs-menu" style={{ left: x, top: y }} role="menu" onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="vs-menu"
+      style={{ left: x, top: y }}
+      role="menu"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       {item(tv('split'), splitAtPlayhead)}
       {item(tv('delete'), () => deleteSelection(false))}
       {item(tv('rippleDelete'), () => deleteSelection(true))}

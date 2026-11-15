@@ -9,7 +9,8 @@ const es = {
   cmdNew: 'Nuevo proyecto de video',
   cmdOpenProject: 'Abrir proyecto de video…',
   backToChat: 'Volver al chat',
-  backConfirm: 'Hay cambios sin guardar en el proyecto de video. ¿Volver al chat? (el proyecto sigue abierto)',
+  backConfirm:
+    'Hay cambios sin guardar en el proyecto de video. ¿Volver al chat? (el proyecto sigue abierto)',
   minimize: 'Minimizar (seguir usando la app)',
   restore: 'Abrir Video Studio',
   rendering: 'Renderizando {pct} %',
@@ -32,7 +33,8 @@ const es = {
   recover: 'Recuperar',
   discard: 'Descartar',
   discardChanges: 'Hay cambios sin guardar. ¿Descartarlos?',
-  noFfmpeg: 'FFmpeg no está disponible: no se pueden importar ni exportar videos. Reinstala Zinarix Studio o instala FFmpeg en el sistema.',
+  noFfmpeg:
+    'FFmpeg no está disponible: no se pueden importar ni exportar videos. Reinstala Zinarix Studio o instala FFmpeg en el sistema.',
   ffmpegReady: 'FFmpeg {v}',
 
   tabMedia: 'Medios',
@@ -202,7 +204,8 @@ const en: Record<VideoKey, string> = {
   cmdNew: 'New video project',
   cmdOpenProject: 'Open video project…',
   backToChat: 'Back to chat',
-  backConfirm: 'The video project has unsaved changes. Go back to the chat? (the project stays open)',
+  backConfirm:
+    'The video project has unsaved changes. Go back to the chat? (the project stays open)',
   minimize: 'Minimize (keep using the app)',
   restore: 'Open Video Studio',
   rendering: 'Rendering {pct} %',
@@ -225,7 +228,8 @@ const en: Record<VideoKey, string> = {
   recover: 'Recover',
   discard: 'Discard',
   discardChanges: 'There are unsaved changes. Discard them?',
-  noFfmpeg: 'FFmpeg is not available: videos cannot be imported or exported. Reinstall Zinarix Studio or install FFmpeg on the system.',
+  noFfmpeg:
+    'FFmpeg is not available: videos cannot be imported or exported. Reinstall Zinarix Studio or install FFmpeg on the system.',
   ffmpegReady: 'FFmpeg {v}',
 
   tabMedia: 'Media',
@@ -406,5 +410,7 @@ export function fmtDuration(s: number): string {
   const h = Math.floor(s / 3600);
   const m = Math.floor(s / 60) % 60;
   const sec = s % 60;
-  return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+  return h
+    ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+    : `${m}:${String(sec).padStart(2, '0')}`;
 }

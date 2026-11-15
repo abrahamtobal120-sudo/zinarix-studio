@@ -30,7 +30,8 @@ export function MediaLibrary() {
   const [over, setOver] = useState(false);
 
   const shown = media.filter(
-    (m) => (kind === 'all' || m.kind === kind) && (!q || m.name.toLowerCase().includes(q.toLowerCase())),
+    (m) =>
+      (kind === 'all' || m.kind === kind) && (!q || m.name.toLowerCase().includes(q.toLowerCase())),
   );
 
   return (
@@ -48,19 +49,35 @@ export function MediaLibrary() {
         e.preventDefault();
         e.stopPropagation();
         setOver(false);
-        const paths = [...e.dataTransfer.files].map((f) => api().app.pathForFile(f)).filter(Boolean);
+        const paths = [...e.dataTransfer.files]
+          .map((f) => api().app.pathForFile(f))
+          .filter(Boolean);
         void importPaths(paths);
       }}
     >
       <div className="vs-lib-head">
-        <button className="primary vs-import" title={tv('importHint')} onClick={() => void pickAndImport()}>
+        <button
+          className="primary vs-import"
+          title={tv('importHint')}
+          onClick={() => void pickAndImport()}
+        >
           <Icon name="plus" size={14} /> {tv('import')}
         </button>
         <div className="vs-seg" role="group" aria-label={tv('list')}>
-          <button className={view === 'grid' ? 'on' : ''} title={tv('grid')} aria-label={tv('grid')} onClick={() => setView('grid')}>
+          <button
+            className={view === 'grid' ? 'on' : ''}
+            title={tv('grid')}
+            aria-label={tv('grid')}
+            onClick={() => setView('grid')}
+          >
             <Icon name="columns" size={14} />
           </button>
-          <button className={view === 'list' ? 'on' : ''} title={tv('list')} aria-label={tv('list')} onClick={() => setView('list')}>
+          <button
+            className={view === 'list' ? 'on' : ''}
+            title={tv('list')}
+            aria-label={tv('list')}
+            onClick={() => setView('list')}
+          >
             <Icon name="menu" size={14} />
           </button>
         </div>
@@ -130,9 +147,17 @@ function MediaCard({ m, thumb, used }: { m: MediaItem; thumb?: string; used: num
         onMouseLeave={() => setHoverX(null)}
         style={
           strip
-            ? { backgroundImage: `url("${thumb}")`, backgroundSize: '2400% 100%', backgroundPosition: `${(frame / 23) * 100}% 0` }
+            ? {
+                backgroundImage: `url("${thumb}")`,
+                backgroundSize: '2400% 100%',
+                backgroundPosition: `${(frame / 23) * 100}% 0`,
+              }
             : thumb
-              ? { backgroundImage: `url("${thumb}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+              ? {
+                  backgroundImage: `url("${thumb}")`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }
               : undefined
         }
       >
@@ -157,11 +182,21 @@ function MediaCard({ m, thumb, used }: { m: MediaItem; thumb?: string; used: num
         {m.missing ? (
           <button onClick={() => void relinkMedia(m)}>{tv('relink')}</button>
         ) : (
-          <button className="vs-icon-btn" title={tv('addToTimeline')} aria-label={tv('addToTimeline')} onClick={() => addToTimeline(m)}>
+          <button
+            className="vs-icon-btn"
+            title={tv('addToTimeline')}
+            aria-label={tv('addToTimeline')}
+            onClick={() => addToTimeline(m)}
+          >
             <Icon name="plus" size={14} />
           </button>
         )}
-        <button className="vs-icon-btn" title={tv('removeMedia')} aria-label={tv('removeMedia')} onClick={() => void removeMedia(m)}>
+        <button
+          className="vs-icon-btn"
+          title={tv('removeMedia')}
+          aria-label={tv('removeMedia')}
+          onClick={() => void removeMedia(m)}
+        >
           <Icon name="trash" size={14} />
         </button>
       </div>

@@ -781,7 +781,11 @@ body.vs-open .toast {
   flex: none;
 }
 .vs-lane.vs-locked {
-  background: repeating-linear-gradient(135deg, transparent 0 8px, color-mix(in srgb, var(--fg-dim) 8%, transparent) 8px 16px);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 8px,
+    color-mix(in srgb, var(--fg-dim) 8%, transparent) 8px 16px
+  );
 }
 .vs-lane.vs-hidden .vs-clip {
   opacity: 0.4;
@@ -1175,4 +1179,16 @@ body.vs-open .toast {
   display: block;
   height: 100%;
   background: var(--brand-grad);
+}
+
+/* Track headers: the delete button only on hover, so the name keeps its room. */
+.vs-head-btns .vs-head-del {
+  display: none;
+}
+.vs-head:hover .vs-head-btns .vs-head-del,
+.vs-head:focus-within .vs-head-btns .vs-head-del {
+  display: inline-grid;
+}
+.vs-head-name {
+  min-width: 24px;
 }

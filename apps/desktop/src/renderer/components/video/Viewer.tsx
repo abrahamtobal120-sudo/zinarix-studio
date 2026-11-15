@@ -58,7 +58,10 @@ export function Viewer() {
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
       const k = Math.min(r.width / project.width, r.height / project.height);
-      setFit({ w: Math.max(0, Math.floor(project.width * k)), h: Math.max(0, Math.floor(project.height * k)) });
+      setFit({
+        w: Math.max(0, Math.floor(project.width * k)),
+        h: Math.max(0, Math.floor(project.height * k)),
+      });
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -71,7 +74,9 @@ export function Viewer() {
     if (!blob) return;
     try {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      toast(tv('snapshotSaved', { name: `${project.name} ${timecode(getV().playhead, project.fps)}` }));
+      toast(
+        tv('snapshotSaved', { name: `${project.name} ${timecode(getV().playhead, project.fps)}` }),
+      );
     } catch (e) {
       toast((e as Error).message);
     }
@@ -79,8 +84,17 @@ export function Viewer() {
 
   return (
     <div className="vs-viewer">
-      <div className="vs-viewer-stage" ref={box} onDoubleClick={() => void box.current?.requestFullscreen()}>
-        <canvas ref={canvas} className="vs-canvas" style={{ width: fit.w, height: fit.h }} aria-label={tv('title')} />
+      <div
+        className="vs-viewer-stage"
+        ref={box}
+        onDoubleClick={() => void box.current?.requestFullscreen()}
+      >
+        <canvas
+          ref={canvas}
+          className="vs-canvas"
+          style={{ width: fit.w, height: fit.h }}
+          aria-label={tv('title')}
+        />
         {!hasClips && <div className="vs-viewer-empty">{tv('emptyViewer')}</div>}
       </div>
       <div className="vs-transport">
@@ -88,10 +102,20 @@ export function Viewer() {
           <Timecode />
         </div>
         <div className="vs-transport-mid">
-          <button className="vs-icon-btn" title={tv('toStart')} aria-label={tv('toStart')} onClick={() => seek(0)}>
+          <button
+            className="vs-icon-btn"
+            title={tv('toStart')}
+            aria-label={tv('toStart')}
+            onClick={() => seek(0)}
+          >
             <Icon name="back" size={16} />
           </button>
-          <button className="vs-icon-btn" title={tv('prevFrame')} aria-label={tv('prevFrame')} onClick={() => stepFrame(-1)}>
+          <button
+            className="vs-icon-btn"
+            title={tv('prevFrame')}
+            aria-label={tv('prevFrame')}
+            onClick={() => stepFrame(-1)}
+          >
             <Icon name="chevron" size={16} className="vs-flip" />
           </button>
           <button
@@ -102,7 +126,12 @@ export function Viewer() {
           >
             <Icon name={playing ? 'pause' : 'play'} size={18} />
           </button>
-          <button className="vs-icon-btn" title={tv('nextFrame')} aria-label={tv('nextFrame')} onClick={() => stepFrame(1)}>
+          <button
+            className="vs-icon-btn"
+            title={tv('nextFrame')}
+            aria-label={tv('nextFrame')}
+            onClick={() => stepFrame(1)}
+          >
             <Icon name="chevron" size={16} />
           </button>
           <button
@@ -113,7 +142,9 @@ export function Viewer() {
           >
             <Icon name="back" size={16} className="vs-flip" />
           </button>
-          {playing && rate !== 1 && <span className="vs-rate">{rate > 0 ? `${rate}×` : `◀ ${-rate}×`}</span>}
+          {playing && rate !== 1 && (
+            <span className="vs-rate">{rate > 0 ? `${rate}×` : `◀ ${-rate}×`}</span>
+          )}
         </div>
         <div className="vs-transport-right">
           <span className="vs-dim">{`${project.width}×${project.height} · ${project.fps} fps`}</span>
@@ -128,7 +159,12 @@ export function Viewer() {
             <option value={0.5}>{tv('half')}</option>
             <option value={0.25}>{tv('quarter')}</option>
           </select>
-          <button className="vs-icon-btn" title={tv('snapshot')} aria-label={tv('snapshot')} onClick={() => void snapshot()}>
+          <button
+            className="vs-icon-btn"
+            title={tv('snapshot')}
+            aria-label={tv('snapshot')}
+            onClick={() => void snapshot()}
+          >
             <Icon name="image" size={16} />
           </button>
           <button

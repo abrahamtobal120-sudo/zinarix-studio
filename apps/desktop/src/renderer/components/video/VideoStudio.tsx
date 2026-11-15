@@ -1,12 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { FORMAT_PRESETS, FPS_CHOICES, RESOLUTIONS, pasteClips, sizeFor } from '../../../shared/video';
+import {
+  FORMAT_PRESETS,
+  FPS_CHOICES,
+  RESOLUTIONS,
+  pasteClips,
+  sizeFor,
+} from '../../../shared/video';
 import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
 import { ExportDialog, RenderQueue } from './ExportDialog';
 import { Inspector } from './Inspector';
 import { MediaLibrary, pickAndImport } from './MediaLibrary';
 import { tv, type VideoKey } from './strings';
-import { addMarkerAtPlayhead, deleteSelection, setInOut, splitAtPlayhead, Timeline, zoomBy, zoomToFit } from './Timeline';
+import {
+  addMarkerAtPlayhead,
+  deleteSelection,
+  setInOut,
+  splitAtPlayhead,
+  Timeline,
+  zoomBy,
+  zoomToFit,
+} from './Timeline';
 import { shuttle, stepFrame, togglePlay } from './Viewer';
 import { Viewer } from './Viewer';
 import './video.css';
@@ -25,6 +39,7 @@ import {
   saveProject,
   seek,
   setV,
+  toggleStudio,
   undo,
   useV,
   wireJobs,
@@ -47,6 +62,18 @@ const TABS: { id: StudioTab; key: VideoKey; icon: IconName; phase?: number; soon
 /** Mounted from the first time the studio opens, so closing it keeps everything as it was. */
 export function VideoStudioHost() {
   const open = useV((s) => s.open);
+  // Ctrl+Shift+V anywhere in the app (the menu has it too; toggleStudio ignores the double).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyV') {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleStudio();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   const minimized = useV((s) => s.minimized);
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState(false);
@@ -90,27 +117,29 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
   useEffect(() => saveLayout(layout), [layout]);
   useStudioKeys(visible);
 
-  const drag = (key: 'left' | 'right' | 'timeline', sign: 1 | -1, axis: 'x' | 'y') => (e: React.MouseEvent) => {
-    e.preventDefault();
-    let last = axis === 'x' ? e.clientX : e.clientY;
-    const move = (ev: MouseEvent) => {
-      const now = axis === 'x' ? ev.clientX : ev.clientY;
-      const d = (now - last) * sign;
-      last = now;
-      setLayout((l) => {
-        const lim = key === 'timeline' ? [150, window.innerHeight - 260] : [200, 560];
-        return { ...l, [key]: Math.min(lim[1]!, Math.max(lim[0]!, l[key] + d)) };
-      });
+  const drag =
+    (key: 'left' | 'right' | 'timeline', sign: 1 | -1, axis: 'x' | 'y') =>
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      let last = axis === 'x' ? e.clientX : e.clientY;
+      const move = (ev: MouseEvent) => {
+        const now = axis === 'x' ? ev.clientX : ev.clientY;
+        const d = (now - last) * sign;
+        last = now;
+        setLayout((l) => {
+          const lim = key === 'timeline' ? [150, window.innerHeight - 260] : [200, 560];
+          return { ...l, [key]: Math.min(lim[1]!, Math.max(lim[0]!, l[key] + d)) };
+        });
+      };
+      const up = () => {
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        document.body.classList.remove('dragging');
+      };
+      document.body.classList.add('dragging');
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', up);
     };
-    const up = () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-      document.body.classList.remove('dragging');
-    };
-    document.body.classList.add('dragging');
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  };
 
   const current = TABS.find((x) => x.id === tab)!;
   return (
@@ -130,7 +159,9 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
         // Anywhere else in the studio: the files go to the media library.
         if (!e.dataTransfer.files.length) return;
         e.preventDefault();
-        const paths = [...e.dataTransfer.files].map((f) => api().app.pathForFile(f)).filter(Boolean);
+        const paths = [...e.dataTransfer.files]
+          .map((f) => api().app.pathForFile(f))
+          .filter(Boolean);
         void importPaths(paths);
       }}
     >
@@ -178,7 +209,11 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
       <div className="vs-main" style={{ height: `calc(100% - ${layout.timeline}px)` }}>
         {layout.showLeft && (
           <>
-            <section className="vs-left" style={{ width: layout.left }} aria-label={tv(current.key)}>
+            <section
+              className="vs-left"
+              style={{ width: layout.left }}
+              aria-label={tv(current.key)}
+            >
               {tab === 'media' ? (
                 <MediaLibrary />
               ) : (
@@ -186,7 +221,9 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
                   <Icon name={current.icon} size={30} />
                   <h3>{tv(current.key)}</h3>
                   <p>{tv('comingPhase', { n: current.phase ?? 2 })}</p>
-                  {current.soon && <p className="vs-dim">{tv('comingList', { what: tv(current.soon) })}</p>}
+                  {current.soon && (
+                    <p className="vs-dim">{tv('comingList', { what: tv(current.soon) })}</p>
+                  )}
                 </div>
               )}
             </section>
@@ -229,10 +266,17 @@ function TopBar() {
   const [menu, setMenu] = useState(false);
   const status = dirty
     ? autosavedAt
-      ? tv('autosaved', { time: new Date(autosavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })
+      ? tv('autosaved', {
+          time: new Date(autosavedAt).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        })
       : tv('unsaved')
     : savedAt
-      ? tv('savedAt', { time: new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })
+      ? tv('savedAt', {
+          time: new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        })
       : '';
   return (
     <header className="vs-top">
@@ -241,7 +285,12 @@ function TopBar() {
       </div>
       <span className="vs-brand">Video Studio</span>
       <div className="vs-filemenu">
-        <button className="vs-icon-btn" aria-label={tv('openProject')} aria-expanded={menu} onClick={() => setMenu(!menu)}>
+        <button
+          className="vs-icon-btn"
+          aria-label={tv('openProject')}
+          aria-expanded={menu}
+          onClick={() => setMenu(!menu)}
+        >
           <Icon name="menu" size={16} />
         </button>
         {menu && (
@@ -275,7 +324,9 @@ function TopBar() {
         aria-label={tv('projectName')}
         value={name}
         maxLength={120}
-        onChange={(e) => setV((s) => ({ project: { ...s.project, name: e.target.value }, dirty: true }))}
+        onChange={(e) =>
+          setV((s) => ({ project: { ...s.project, name: e.target.value }, dirty: true }))
+        }
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();
         }}
@@ -284,13 +335,30 @@ function TopBar() {
         <span className="vs-dot" /> {status}
       </span>
       <div className="vs-top-mid">
-        <button className="vs-icon-btn" title={undoLabel ? `${tv('undo')} · ${undoLabel}` : tv('undo')} aria-label={tv('undo')} disabled={!canUndo} onClick={undo}>
+        <button
+          className="vs-icon-btn"
+          title={undoLabel ? `${tv('undo')} · ${undoLabel}` : tv('undo')}
+          aria-label={tv('undo')}
+          disabled={!canUndo}
+          onClick={undo}
+        >
           <Icon name="undo" size={16} />
         </button>
-        <button className="vs-icon-btn" title={tv('redo')} aria-label={tv('redo')} disabled={!canRedo} onClick={redo}>
+        <button
+          className="vs-icon-btn"
+          title={tv('redo')}
+          aria-label={tv('redo')}
+          disabled={!canRedo}
+          onClick={redo}
+        >
           <Icon name="undo" size={16} className="vs-flip" />
         </button>
-        <button className="vs-icon-btn" title={tv('save')} aria-label={tv('save')} onClick={() => void saveProject()}>
+        <button
+          className="vs-icon-btn"
+          title={tv('save')}
+          aria-label={tv('save')}
+          onClick={() => void saveProject()}
+        >
           <Icon name="download" size={16} />
         </button>
       </div>
@@ -298,7 +366,12 @@ function TopBar() {
       <button className="vs-ghost" onClick={() => void closeStudio(true)}>
         <Icon name="agent" size={15} /> {tv('backToChat')}
       </button>
-      <button className="vs-icon-btn" title={tv('minimize')} aria-label={tv('minimize')} onClick={minimizeStudio}>
+      <button
+        className="vs-icon-btn"
+        title={tv('minimize')}
+        aria-label={tv('minimize')}
+        onClick={minimizeStudio}
+      >
         <Icon name="minimize" size={16} />
       </button>
       <button
@@ -344,19 +417,41 @@ function NewProjectDialog() {
   const size = preset ? sizeFor(preset.width, preset.height, short) : custom;
   return (
     <div className="vs-dialog-bg" onMouseDown={() => setV({ dialog: null })}>
-      <div className="vs-dialog" role="dialog" aria-modal="true" aria-label={tv('newTitle')} onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="vs-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={tv('newTitle')}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="vs-dialog-head">
           <h2>{tv('newTitle')}</h2>
-          <button className="vs-icon-btn" aria-label={tv('close')} onClick={() => setV({ dialog: null })}>
+          <button
+            className="vs-icon-btn"
+            aria-label={tv('close')}
+            onClick={() => setV({ dialog: null })}
+          >
             <Icon name="x" size={16} />
           </button>
         </div>
         <div className="vs-formats" role="radiogroup" aria-label={tv('format')}>
-          {[...FORMAT_PRESETS, { id: 'custom', label: tv('custom'), width: custom.width, height: custom.height }].map((f) => {
+          {[
+            ...FORMAT_PRESETS,
+            { id: 'custom', label: tv('custom'), width: custom.width, height: custom.height },
+          ].map((f) => {
             const k = Math.min(46 / f.width, 46 / f.height);
             return (
-              <button key={f.id} role="radio" aria-checked={aspect === f.id} className={aspect === f.id ? 'on' : ''} onClick={() => setAspect(f.id)}>
-                <span className="vs-format-box" style={{ width: f.width * k, height: f.height * k }} />
+              <button
+                key={f.id}
+                role="radio"
+                aria-checked={aspect === f.id}
+                className={aspect === f.id ? 'on' : ''}
+                onClick={() => setAspect(f.id)}
+              >
+                <span
+                  className="vs-format-box"
+                  style={{ width: f.width * k, height: f.height * k }}
+                />
                 <span>{f.label}</span>
               </button>
             );
@@ -366,7 +461,11 @@ function NewProjectDialog() {
           {preset ? (
             <label>
               <span>{tv('resolution')}</span>
-              <select className="vs-select" value={short} onChange={(e) => setShort(Number(e.target.value))}>
+              <select
+                className="vs-select"
+                value={short}
+                onChange={(e) => setShort(Number(e.target.value))}
+              >
                 {RESOLUTIONS.map((r) => (
                   <option key={r.id} value={r.short}>
                     {r.id}
@@ -387,20 +486,28 @@ function NewProjectDialog() {
                 min={16}
                 max={8192}
                 value={custom.width}
-                onChange={(e) => setCustom({ ...custom, width: Math.round(Number(e.target.value) / 2) * 2 })}
+                onChange={(e) =>
+                  setCustom({ ...custom, width: Math.round(Number(e.target.value) / 2) * 2 })
+                }
               />
               <input
                 type="number"
                 min={16}
                 max={8192}
                 value={custom.height}
-                onChange={(e) => setCustom({ ...custom, height: Math.round(Number(e.target.value) / 2) * 2 })}
+                onChange={(e) =>
+                  setCustom({ ...custom, height: Math.round(Number(e.target.value) / 2) * 2 })
+                }
               />
             </label>
           )}
           <label>
             <span>{tv('fps')}</span>
-            <select className="vs-select" value={fps} onChange={(e) => setFps(Number(e.target.value))}>
+            <select
+              className="vs-select"
+              value={fps}
+              onChange={(e) => setFps(Number(e.target.value))}
+            >
               {FPS_CHOICES.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -449,10 +556,20 @@ const SHORTCUTS: [VideoKey, string][] = [
 function ShortcutsDialog() {
   return (
     <div className="vs-dialog-bg" onMouseDown={() => setV({ dialog: null })}>
-      <div className="vs-dialog vs-dialog-sm" role="dialog" aria-modal="true" aria-label={tv('shortcuts')} onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="vs-dialog vs-dialog-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label={tv('shortcuts')}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="vs-dialog-head">
           <h2>{tv('shortcuts')}</h2>
-          <button className="vs-icon-btn" aria-label={tv('close')} onClick={() => setV({ dialog: null })}>
+          <button
+            className="vs-icon-btn"
+            aria-label={tv('close')}
+            onClick={() => setV({ dialog: null })}
+          >
             <Icon name="x" size={16} />
           </button>
         </div>
@@ -524,7 +641,8 @@ function typing(e: KeyboardEvent): boolean {
   if (!el) return false;
   if (el.isContentEditable) return true;
   if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
-  if (el.tagName === 'INPUT') return !['range', 'checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type);
+  if (el.tagName === 'INPUT')
+    return !['range', 'checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type);
   return false;
 }
 
@@ -549,12 +667,16 @@ function useStudioKeys(active: boolean): void {
         e.stopPropagation();
         fn();
       };
-      // Ctrl+S / Ctrl+Shift+V come through the app menu (see videoCommands.ts).
+      // Ctrl+S also comes through the app menu (videoCommands.ts): saving twice at once is ignored.
       if (mod && !e.altKey) {
+        if (k === 's') return run(() => void saveProject(e.shiftKey));
         if (k === 'z' && !e.shiftKey) return run(undo);
         if ((k === 'z' && e.shiftKey) || k === 'y') return run(redo);
         if (k === 'b') return run(splitAtPlayhead);
-        if (k === 'e') return run(() => (projectDuration(s.project) ? setV({ dialog: 'export' }) : toast(tv('exportEmpty'))));
+        if (k === 'e')
+          return run(() =>
+            projectDuration(s.project) ? setV({ dialog: 'export' }) : toast(tv('exportEmpty')),
+          );
         if (k === 'a') return run(() => setV({ selection: s.project.clips.map((c) => c.id) }));
         if (k === 'c') return run(() => copySelection());
         if (k === 'v' && !e.shiftKey) return run(() => paste(s.playhead));

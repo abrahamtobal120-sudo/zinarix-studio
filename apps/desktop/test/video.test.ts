@@ -83,7 +83,11 @@ describe('video model', () => {
     const { project } = splitAt(p, 4);
     const left = project.clips.find((c) => c.start === 0)!;
     expect(moveClips(project, new Set([left.id]), 2)).toBeNull();
-    const moved = moveClips(removeClips(project, new Set([project.clips.find((c) => c.start === 4)!.id])), new Set([left.id]), 3)!;
+    const moved = moveClips(
+      removeClips(project, new Set([project.clips.find((c) => c.start === 4)!.id])),
+      new Set([left.id]),
+      3,
+    )!;
     expect(moved.clips[0]!.start).toBe(3);
     // V1 → V2 (one track up in display order is index -1).
     expect(moveClips(project, new Set([left.id]), 0, -1)).not.toBeNull();
@@ -118,10 +122,17 @@ describe('video model', () => {
   });
 
   it('reads ffprobe output (audio-only, cover art ignored)', () => {
-    const m = parseProbe('/a/song.mp3', {
-      format: { duration: '12.5' },
-      streams: [{ codec_type: 'audio' }, { codec_type: 'video', width: 500, height: 500, disposition: { attached_pic: 1 } }],
-    }, 10);
+    const m = parseProbe(
+      '/a/song.mp3',
+      {
+        format: { duration: '12.5' },
+        streams: [
+          { codec_type: 'audio' },
+          { codec_type: 'video', width: 500, height: 500, disposition: { attached_pic: 1 } },
+        ],
+      },
+      10,
+    );
     expect([m.kind, m.hasVideo, m.hasAudio, m.duration]).toEqual(['audio', false, true, 12.5]);
   });
 
@@ -141,10 +152,28 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video smoke (FFmpeg)', () => {
   it('imports a video, cuts it and exports a 5 s MP4', async () => {
     const src = join(dir, 'source.mp4');
     const gen = spawnSync(tools.ffmpeg!, [
-      '-hide_banner', '-v', 'error', '-y',
-      '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=30:duration=8',
-      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=8',
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', src,
+      '-hide_banner',
+      '-v',
+      'error',
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc2=size=640x360:rate=30:duration=8',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=440:duration=8',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-pix_fmt',
+      'yuv420p',
+      '-c:a',
+      'aac',
+      '-shortest',
+      src,
     ]);
     expect(gen.status, gen.stderr?.toString()).toBe(0);
 
@@ -168,7 +197,10 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video smoke (FFmpeg)', () => {
 
     // Edit: drop it on the timeline, cut out 2–3 s with ripple delete → 7 s; export 0–5 s.
     const { url: _u, ...item } = probed;
-    let p: VideoProject = { ...newProject({ width: 640, height: 360, fps: 30, name: 'smoke' }), media: [item] };
+    let p: VideoProject = {
+      ...newProject({ width: 640, height: 360, fps: 30, name: 'smoke' }),
+      media: [item],
+    };
     p = insertMedia(p, item).project;
     p = splitAt(p, 2).project;
     p = splitAt(p, 3).project;
@@ -177,7 +209,11 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video smoke (FFmpeg)', () => {
     expect(projectDuration(p)).toBeCloseTo(probed.duration - 1, 2);
 
     const out = join(dir, 'smoke.mp4');
-    const job = svc.enqueue(p, { ...defaultExport(p), width: 640, height: 360, start: 0, end: 5, preset: 'veryfast' }, out);
+    const job = svc.enqueue(
+      p,
+      { ...defaultExport(p), width: 640, height: 360, start: 0, end: 5, preset: 'veryfast' },
+      out,
+    );
     await new Promise<void>((resolve) => {
       const tick = setInterval(() => {
         const j = svc.list().find((x) => x.id === job.id)!;

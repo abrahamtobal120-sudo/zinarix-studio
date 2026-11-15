@@ -663,6 +663,11 @@ function registerIpc(): void {
   );
   handle('workspace:readDir', z.tuple([rel]), (w, p) => ws(w).readDir(p));
   handle('workspace:readFile', z.tuple([rel]), (w, p) => ws(w).readFile(p));
+  handle(
+    'workspace:readBytes',
+    z.tuple([rel, z.number().int().min(0), z.number().int().min(0).max(8 * 1024 * 1024)]),
+    (w, p, offset, length) => ws(w).readBytes(p, offset, length),
+  );
   handle('workspace:writeFile', z.tuple([rel, big]), (w, p, c) => ws(w).writeFile(p, c));
   handle('workspace:createFile', z.tuple([rel]), (w, p) => ws(w).createFile(p));
   handle('workspace:createDir', z.tuple([rel]), (w, p) => ws(w).createDir(p));

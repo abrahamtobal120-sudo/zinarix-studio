@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import type { VideoJobView } from '../../../shared/api';
 import type { ExportOptions } from '../../../shared/video';
-import { EXPORT_PRESETS, RESOLUTIONS, defaultExport, estimateSize, projectDuration, sizeFor } from '../../../shared/video';
+import {
+  EXPORT_PRESETS,
+  RESOLUTIONS,
+  defaultExport,
+  estimateSize,
+  projectDuration,
+  sizeFor,
+} from '../../../shared/video';
 import { api, toast } from '../../store';
 import { Icon } from '../Icon';
 import { fmtBytes, fmtDuration, tv } from './strings';
@@ -47,16 +54,32 @@ export function ExportDialog() {
 
   return (
     <div className="vs-dialog-bg" onMouseDown={() => setV({ dialog: null })}>
-      <div className="vs-dialog" role="dialog" aria-modal="true" aria-label={tv('exportTitle')} onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="vs-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={tv('exportTitle')}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="vs-dialog-head">
           <h2>{tv('exportTitle')}</h2>
-          <button className="vs-icon-btn" aria-label={tv('close')} onClick={() => setV({ dialog: null })}>
+          <button
+            className="vs-icon-btn"
+            aria-label={tv('close')}
+            onClick={() => setV({ dialog: null })}
+          >
             <Icon name="x" size={16} />
           </button>
         </div>
         <div className="vs-presets" role="radiogroup" aria-label={tv('preset')}>
           {EXPORT_PRESETS.map((pr) => (
-            <button key={pr.id} role="radio" aria-checked={presetId === pr.id} className={presetId === pr.id ? 'on' : ''} onClick={() => pickPreset(pr.id)}>
+            <button
+              key={pr.id}
+              role="radio"
+              aria-checked={presetId === pr.id}
+              className={presetId === pr.id ? 'on' : ''}
+              onClick={() => pickPreset(pr.id)}
+            >
               {pr.label}
             </button>
           ))}
@@ -70,13 +93,19 @@ export function ExportDialog() {
           </label>
           <label>
             <span>{tv('resolution')}</span>
-            <select className="vs-select" value={short} onChange={(e) => setShort(Number(e.target.value))}>
+            <select
+              className="vs-select"
+              value={short}
+              onChange={(e) => setShort(Number(e.target.value))}
+            >
               {RESOLUTIONS.map((r) => (
                 <option key={r.id} value={r.short}>
                   {r.id}
                 </option>
               ))}
-              {!RESOLUTIONS.some((r) => r.short === short) && <option value={short}>{short}p</option>}
+              {!RESOLUTIONS.some((r) => r.short === short) && (
+                <option value={short}>{short}p</option>
+              )}
             </select>
             <span className="vs-dim">
               {opts.width}×{opts.height}
@@ -84,7 +113,11 @@ export function ExportDialog() {
           </label>
           <label>
             <span>{tv('fps')}</span>
-            <select className="vs-select" value={opts.fps} onChange={(e) => setOpts({ ...opts, fps: Number(e.target.value) })}>
+            <select
+              className="vs-select"
+              value={opts.fps}
+              onChange={(e) => setOpts({ ...opts, fps: Number(e.target.value) })}
+            >
               {[24, 25, 30, 50, 60].map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -96,11 +129,23 @@ export function ExportDialog() {
             <span>
               {tv('quality2')} · {opts.crf}
             </span>
-            <input type="range" min={14} max={32} value={opts.crf} onChange={(e) => setOpts({ ...opts, crf: Number(e.target.value) })} />
+            <input
+              type="range"
+              min={14}
+              max={32}
+              value={opts.crf}
+              onChange={(e) => setOpts({ ...opts, crf: Number(e.target.value) })}
+            />
           </label>
           <label>
             <span>{tv('speed')}</span>
-            <select className="vs-select" value={opts.preset} onChange={(e) => setOpts({ ...opts, preset: e.target.value as ExportOptions['preset'] })}>
+            <select
+              className="vs-select"
+              value={opts.preset}
+              onChange={(e) =>
+                setOpts({ ...opts, preset: e.target.value as ExportOptions['preset'] })
+              }
+            >
               <option value="veryfast">{tv('speedVeryfast')}</option>
               <option value="fast">{tv('speedFast')}</option>
               <option value="medium">{tv('speedMedium')}</option>
@@ -109,7 +154,11 @@ export function ExportDialog() {
           </label>
           <label>
             <span>{tv('audioBitrate')}</span>
-            <select className="vs-select" value={opts.audioKbps} onChange={(e) => setOpts({ ...opts, audioKbps: Number(e.target.value) })}>
+            <select
+              className="vs-select"
+              value={opts.audioKbps}
+              onChange={(e) => setOpts({ ...opts, audioKbps: Number(e.target.value) })}
+            >
               {[96, 128, 192, 256, 320].map((k) => (
                 <option key={k} value={k}>
                   AAC {k} kbps
@@ -119,7 +168,11 @@ export function ExportDialog() {
           </label>
           <label>
             <span>{tv('range')}</span>
-            <select className="vs-select" value={range} onChange={(e) => setRange(e.target.value as 'all' | 'io')}>
+            <select
+              className="vs-select"
+              value={range}
+              onChange={(e) => setRange(e.target.value as 'all' | 'io')}
+            >
               <option value="all">{tv('rangeAll')}</option>
               <option value="io" disabled={!hasRange}>
                 {tv('rangeInOut')}
@@ -128,10 +181,19 @@ export function ExportDialog() {
           </label>
         </div>
         <div className="vs-dialog-foot">
-          <span className="vs-dim">{tv('estimate', { size: `~${fmtBytes(estimateSize(final))}`, dur: fmtDuration(final.end - final.start) })}</span>
+          <span className="vs-dim">
+            {tv('estimate', {
+              size: `~${fmtBytes(estimateSize(final))}`,
+              dur: fmtDuration(final.end - final.start),
+            })}
+          </span>
           <div className="spacer" />
           <button onClick={() => setV({ dialog: null })}>{tv('cancel')}</button>
-          <button className="primary" disabled={busy || !(final.end > final.start)} onClick={() => void start()}>
+          <button
+            className="primary"
+            disabled={busy || !(final.end > final.start)}
+            onClick={() => void start()}
+          >
             {tv('startExport')}
           </button>
         </div>
@@ -140,7 +202,13 @@ export function ExportDialog() {
   );
 }
 
-const STATE_KEY = { queued: 'queued', running: 'running', done: 'done', error: 'error', canceled: 'canceled' } as const;
+const STATE_KEY = {
+  queued: 'queued',
+  running: 'running',
+  done: 'done',
+  error: 'error',
+  canceled: 'canceled',
+} as const;
 
 /** The jobs of this session (shown under the top bar while any is running or just ended). */
 export function RenderQueue() {
@@ -150,10 +218,15 @@ export function RenderQueue() {
   return (
     <div className="vs-queue" aria-live="polite">
       <button className="vs-queue-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <Icon name="film" size={14} /> {tv('queue')} · {jobs.filter((j) => j.state === 'running' || j.state === 'queued').length}
+        <Icon name="film" size={14} /> {tv('queue')} ·{' '}
+        {jobs.filter((j) => j.state === 'running' || j.state === 'queued').length}
         <Icon name="chevronDown" size={12} className={open ? '' : 'vs-rot'} />
       </button>
-      {open && jobs.slice(-6).reverse().map((j) => <JobRow key={j.id} job={j} />)}
+      {open &&
+        jobs
+          .slice(-6)
+          .reverse()
+          .map((j) => <JobRow key={j.id} job={j} />)}
     </div>
   );
 }
@@ -169,11 +242,18 @@ function JobRow({ job }: { job: VideoJobView }) {
         </span>
         <span className="vs-dim">
           {tv(STATE_KEY[job.state])}
-          {job.state === 'running' && ` · ${pct} %${job.eta != null ? ` · ${tv('eta', { t: fmtDuration(job.eta) })}` : ''}`}
+          {job.state === 'running' &&
+            ` · ${pct} %${job.eta != null ? ` · ${tv('eta', { t: fmtDuration(job.eta) })}` : ''}`}
         </span>
       </div>
       {(job.state === 'running' || job.state === 'queued') && (
-        <div className="vs-progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div
+          className="vs-progress"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
           <div style={{ width: `${pct}%` }} />
         </div>
       )}
@@ -190,7 +270,11 @@ function JobRow({ job }: { job: VideoJobView }) {
           </button>
         )}
         {job.state !== 'running' && job.state !== 'queued' && (
-          <button className="vs-mini" onClick={() => setV((s) => ({ jobs: s.jobs.filter((x) => x.id !== job.id) }))} aria-label={tv('close')}>
+          <button
+            className="vs-mini"
+            onClick={() => setV((s) => ({ jobs: s.jobs.filter((x) => x.id !== job.id) }))}
+            aria-label={tv('close')}
+          >
             <Icon name="x" size={11} />
           </button>
         )}

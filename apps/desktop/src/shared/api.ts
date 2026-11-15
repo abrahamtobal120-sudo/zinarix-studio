@@ -38,6 +38,12 @@ export interface FileContent {
   tooLarge: boolean;
 }
 
+/** Raw slice of a file: `bytes` starts at the requested offset; `size` is the whole file. */
+export interface FileBytes {
+  bytes: Uint8Array;
+  size: number;
+}
+
 export interface SearchHit {
   path: string;
   line: number;
@@ -1046,6 +1052,7 @@ export interface OmniApi {
     pickChatFolder(): Promise<{ path: string; name: string } | null>;
     readDir(path: string): Promise<DirEntry[]>;
     readFile(path: string): Promise<FileContent>;
+    readBytes(path: string, offset: number, length: number): Promise<FileBytes>;
     writeFile(path: string, content: string): Promise<void>;
     createFile(path: string): Promise<void>;
     createDir(path: string): Promise<void>;
@@ -1534,6 +1541,7 @@ export const CHANNELS = [
   'workspace:recent',
   'workspace:readDir',
   'workspace:readFile',
+  'workspace:readBytes',
   'workspace:writeFile',
   'workspace:createFile',
   'workspace:createDir',

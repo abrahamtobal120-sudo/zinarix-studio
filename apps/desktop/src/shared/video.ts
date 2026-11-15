@@ -112,7 +112,11 @@ export const RESOLUTIONS = [
 ];
 
 /** Scales an aspect so its short side is `short` (even numbers, as encoders need). */
-export function sizeFor(aspectW: number, aspectH: number, short: number): { width: number; height: number } {
+export function sizeFor(
+  aspectW: number,
+  aspectH: number,
+  short: number,
+): { width: number; height: number } {
   const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
   return aspectW >= aspectH
     ? { width: even((aspectW / aspectH) * short), height: even(short) }
@@ -125,7 +129,9 @@ export function uid(prefix: string): string {
   return `${prefix}${Date.now().toString(36)}${seq.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export function newProject(opts: Partial<Pick<VideoProject, 'name' | 'width' | 'height' | 'fps'>> = {}): VideoProject {
+export function newProject(
+  opts: Partial<Pick<VideoProject, 'name' | 'width' | 'height' | 'fps'>> = {},
+): VideoProject {
   const track = (kind: TrackKind, name: string): Track => ({
     id: uid('t'),
     kind,
@@ -140,7 +146,12 @@ export function newProject(opts: Partial<Pick<VideoProject, 'name' | 'width' | '
     width: opts.width ?? 1920,
     height: opts.height ?? 1080,
     fps: opts.fps ?? 30,
-    tracks: [track('video', 'V2'), track('video', 'V1'), track('audio', 'A1'), track('audio', 'A2')],
+    tracks: [
+      track('video', 'V2'),
+      track('video', 'V1'),
+      track('audio', 'A1'),
+      track('audio', 'A2'),
+    ],
     clips: [],
     media: [],
     markers: [],
@@ -174,11 +185,18 @@ export function trackClips(p: VideoProject, trackId: string): Clip[] {
 }
 
 /** Whether [start, end) is free on a track (ignoring some clips, e.g. the ones being moved). */
-export function fits(p: VideoProject, trackId: string, start: number, end: number, ignore: ReadonlySet<string> = new Set()): boolean {
+export function fits(
+  p: VideoProject,
+  trackId: string,
+  start: number,
+  end: number,
+  ignore: ReadonlySet<string> = new Set(),
+): boolean {
   if (start < -1e-6) return false;
   const eps = 1e-6;
   return !p.clips.some(
-    (c) => c.trackId === trackId && !ignore.has(c.id) && start < clipEnd(c) - eps && end > c.start + eps,
+    (c) =>
+      c.trackId === trackId && !ignore.has(c.id) && start < clipEnd(c) - eps && end > c.start + eps,
   );
 }
 
@@ -190,17 +208,32 @@ export function trackKindFor(m: MediaItem): TrackKind {
 /** Adds a new track of a kind (video tracks go on top, audio tracks at the bottom). */
 export function addTrack(p: VideoProject, kind: TrackKind): VideoProject {
   const n = p.tracks.filter((t) => t.kind === kind).length + 1;
-  const t: Track = { id: uid('t'), kind, name: `${kind === 'video' ? 'V' : 'A'}${n}`, muted: false, locked: false, hidden: false };
+  const t: Track = {
+    id: uid('t'),
+    kind,
+    name: `${kind === 'video' ? 'V' : 'A'}${n}`,
+    muted: false,
+    locked: false,
+    hidden: false,
+  };
   return { ...p, tracks: kind === 'video' ? [t, ...p.tracks] : [...p.tracks, t] };
 }
 
 export function removeTrack(p: VideoProject, trackId: string): VideoProject {
   const t = trackOf(p, trackId);
   if (!t || p.tracks.filter((x) => x.kind === t.kind).length <= 1) return p;
-  return { ...p, tracks: p.tracks.filter((x) => x.id !== trackId), clips: p.clips.filter((c) => c.trackId !== trackId) };
+  return {
+    ...p,
+    tracks: p.tracks.filter((x) => x.id !== trackId),
+    clips: p.clips.filter((c) => c.trackId !== trackId),
+  };
 }
 
-export function updateTrack(p: VideoProject, trackId: string, patch: Partial<Omit<Track, 'id' | 'kind'>>): VideoProject {
+export function updateTrack(
+  p: VideoProject,
+  trackId: string,
+  patch: Partial<Omit<Track, 'id' | 'kind'>>,
+): VideoProject {
   return { ...p, tracks: p.tracks.map((t) => (t.id === trackId ? { ...t, ...patch } : t)) };
 }
 
@@ -222,7 +255,8 @@ export function insertMedia(
     ...(at?.trackId ? project.tracks.filter((t) => t.id === at.trackId && t.kind === kind) : []),
     ...compositeOrderOrAudio(project, kind).filter((t) => t.id !== at?.trackId),
   ].filter((t) => !t.locked);
-  const startFor = (t: Track) => at?.start ?? trackClips(project, t.id).reduce((m, c) => Math.max(m, clipEnd(c)), 0);
+  const startFor = (t: Track) =>
+    at?.start ?? trackClips(project, t.id).reduce((m, c) => Math.max(m, clipEnd(c)), 0);
   let track = candidates.find((t) => fits(project, t.id, startFor(t), startFor(t) + dur));
   if (!track) {
     project = addTrack(project, kind);
@@ -248,7 +282,11 @@ function compositeOrderOrAudio(p: VideoProject, kind: TrackKind): Track[] {
  * Splits clips at `time`. With ids, only those; otherwise every clip under the playhead on an
  * unlocked track. Returns the ids of the right-hand halves too.
  */
-export function splitAt(p: VideoProject, time: number, ids?: ReadonlySet<string>): { project: VideoProject; created: string[] } {
+export function splitAt(
+  p: VideoProject,
+  time: number,
+  ids?: ReadonlySet<string>,
+): { project: VideoProject; created: string[] } {
   const created: string[] = [];
   const clips: Clip[] = [];
   for (const c of p.clips) {
@@ -270,7 +308,11 @@ export function splitAt(p: VideoProject, time: number, ids?: ReadonlySet<string>
  * Deletes clips. Ripple closes the gap each one leaves on its own track (later clips on that
  * track move left by its length when nothing blocks them).
  */
-export function removeClips(p: VideoProject, ids: ReadonlySet<string>, ripple = false): VideoProject {
+export function removeClips(
+  p: VideoProject,
+  ids: ReadonlySet<string>,
+  ripple = false,
+): VideoProject {
   const gone = p.clips.filter((c) => ids.has(c.id) && !trackOf(p, c.trackId)?.locked);
   if (!gone.length) return p;
   const goneIds = new Set(gone.map((c) => c.id));
@@ -279,7 +321,11 @@ export function removeClips(p: VideoProject, ids: ReadonlySet<string>, ripple = 
     // Latest first, so the shifts of earlier gaps add up correctly.
     for (const g of [...gone].sort((a, b) => b.start - a.start)) {
       const len = clipDur(g);
-      clips = clips.map((c) => (c.trackId === g.trackId && c.start >= clipEnd(g) - 1e-6 ? { ...c, start: Math.max(0, c.start - len) } : c));
+      clips = clips.map((c) =>
+        c.trackId === g.trackId && c.start >= clipEnd(g) - 1e-6
+          ? { ...c, start: Math.max(0, c.start - len) }
+          : c,
+      );
     }
   }
   return { ...p, clips };
@@ -289,7 +335,12 @@ export function removeClips(p: VideoProject, ids: ReadonlySet<string>, ripple = 
  * Moves clips by `delta` seconds and `trackShift` tracks (of the same kind). Refused (returns
  * null) when any clip would overlap another, leave its kind of track or start before 0.
  */
-export function moveClips(p: VideoProject, ids: ReadonlySet<string>, delta: number, trackShift = 0): VideoProject | null {
+export function moveClips(
+  p: VideoProject,
+  ids: ReadonlySet<string>,
+  delta: number,
+  trackShift = 0,
+): VideoProject | null {
   const moving = p.clips.filter((c) => ids.has(c.id));
   if (!moving.length) return p;
   const next = new Map<string, Clip>();
@@ -302,14 +353,16 @@ export function moveClips(p: VideoProject, ids: ReadonlySet<string>, delta: numb
     next.set(c.id, { ...c, start: c.start + delta, trackId: target.id });
   }
   const moved = { ...p, clips: p.clips.map((c) => next.get(c.id) ?? c) };
-  for (const c of next.values()) if (!fits(moved, c.trackId, c.start, clipEnd(c), new Set([c.id]))) return null;
+  for (const c of next.values())
+    if (!fits(moved, c.trackId, c.start, clipEnd(c), new Set([c.id]))) return null;
   // Moved clips must not overlap each other either.
   const list = [...next.values()];
   for (let i = 0; i < list.length; i++)
     for (let j = i + 1; j < list.length; j++) {
       const a = list[i]!;
       const b = list[j]!;
-      if (a.trackId === b.trackId && a.start < clipEnd(b) - 1e-6 && clipEnd(a) > b.start + 1e-6) return null;
+      if (a.trackId === b.trackId && a.start < clipEnd(b) - 1e-6 && clipEnd(a) > b.start + 1e-6)
+        return null;
     }
   return moved;
 }
@@ -318,7 +371,12 @@ export function moveClips(p: VideoProject, ids: ReadonlySet<string>, delta: numb
  * Trims a clip's left or right edge to timeline time `to`, within the media and the free room
  * next to it. Images and still media have no source limit.
  */
-export function trimClip(p: VideoProject, id: string, edge: 'left' | 'right', to: number): VideoProject {
+export function trimClip(
+  p: VideoProject,
+  id: string,
+  edge: 'left' | 'right',
+  to: number,
+): VideoProject {
   const c = p.clips.find((x) => x.id === id);
   if (!c || trackOf(p, c.trackId)?.locked) return p;
   const m = mediaOf(p, c.mediaId);
@@ -326,26 +384,41 @@ export function trimClip(p: VideoProject, id: string, edge: 'left' | 'right', to
   const siblings = trackClips(p, c.trackId).filter((x) => x.id !== id);
   let next: Clip;
   if (edge === 'left') {
-    const prevEnd = siblings.filter((x) => clipEnd(x) <= c.start + 1e-6).reduce((mx, x) => Math.max(mx, clipEnd(x)), 0);
+    const prevEnd = siblings
+      .filter((x) => clipEnd(x) <= c.start + 1e-6)
+      .reduce((mx, x) => Math.max(mx, clipEnd(x)), 0);
     const minStart = Math.max(prevEnd, unlimited ? 0 : c.start - c.in);
     const start = Math.min(Math.max(to, minStart), clipEnd(c) - MIN_CLIP);
     next = { ...c, start, in: c.in + (start - c.start) };
     if (unlimited && next.in < 0) next = { ...next, out: next.out - next.in, in: 0 };
   } else {
-    const nextStart = siblings.filter((x) => x.start >= clipEnd(c) - 1e-6).reduce((mn, x) => Math.min(mn, x.start), Infinity);
-    const maxEnd = Math.min(nextStart, unlimited ? Infinity : c.start + ((m?.duration ?? c.out) - c.in));
+    const nextStart = siblings
+      .filter((x) => x.start >= clipEnd(c) - 1e-6)
+      .reduce((mn, x) => Math.min(mn, x.start), Infinity);
+    const maxEnd = Math.min(
+      nextStart,
+      unlimited ? Infinity : c.start + ((m?.duration ?? c.out) - c.in),
+    );
     const end = Math.max(Math.min(to, maxEnd), c.start + MIN_CLIP);
     next = { ...c, out: c.in + (end - c.start) };
   }
   return { ...p, clips: p.clips.map((x) => (x.id === id ? next : x)) };
 }
 
-export function updateClip(p: VideoProject, id: string, patch: Partial<Omit<Clip, 'id'>>): VideoProject {
+export function updateClip(
+  p: VideoProject,
+  id: string,
+  patch: Partial<Omit<Clip, 'id'>>,
+): VideoProject {
   return { ...p, clips: p.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) };
 }
 
 /** Copies clips (with new ids) so the earliest starts at `at`, on the same tracks when free. */
-export function pasteClips(p: VideoProject, copied: Clip[], at: number): { project: VideoProject; ids: string[] } {
+export function pasteClips(
+  p: VideoProject,
+  copied: Clip[],
+  at: number,
+): { project: VideoProject; ids: string[] } {
   if (!copied.length) return { project: p, ids: [] };
   const first = Math.min(...copied.map((c) => c.start));
   const fresh = copied
@@ -364,7 +437,11 @@ export function pasteClips(p: VideoProject, copied: Clip[], at: number): { proje
 }
 
 /** Edit points the playhead, a dragged clip or a trim can snap to. */
-export function snapPoints(p: VideoProject, playhead: number, ignore: ReadonlySet<string> = new Set()): number[] {
+export function snapPoints(
+  p: VideoProject,
+  playhead: number,
+  ignore: ReadonlySet<string> = new Set(),
+): number[] {
   const pts = [0, playhead];
   for (const c of p.clips) if (!ignore.has(c.id)) pts.push(c.start, clipEnd(c));
   for (const m of p.markers) pts.push(m.time);
@@ -387,8 +464,16 @@ export function snap(value: number, points: number[], threshold: number): number
   return best;
 }
 
-export function addMarker(p: VideoProject, time: number, name = '', color = '#e5b33a'): VideoProject {
-  return { ...p, markers: [...p.markers, { id: uid('m'), time, name, color }].sort((a, b) => a.time - b.time) };
+export function addMarker(
+  p: VideoProject,
+  time: number,
+  name = '',
+  color = '#e5b33a',
+): VideoProject {
+  return {
+    ...p,
+    markers: [...p.markers, { id: uid('m'), time, name, color }].sort((a, b) => a.time - b.time),
+  };
 }
 
 /** Clip of a track under time t (half-open: a clip ending at t is not under it). */
@@ -423,7 +508,13 @@ export function validProject(x: unknown): x is VideoProject {
     Array.isArray(p.tracks) &&
     Array.isArray(p.clips) &&
     Array.isArray(p.media) &&
-    p.clips.every((c) => typeof c.id === 'string' && Number.isFinite(c.start) && Number.isFinite(c.in) && Number.isFinite(c.out)) &&
+    p.clips.every(
+      (c) =>
+        typeof c.id === 'string' &&
+        Number.isFinite(c.start) &&
+        Number.isFinite(c.in) &&
+        Number.isFinite(c.out),
+    ) &&
     p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string')
   );
 }
@@ -445,7 +536,15 @@ export interface ExportPreset {
 export const EXPORT_PRESETS: ExportPreset[] = [
   { id: 'yt1080', label: 'YouTube 1080p', short: 1080, crf: 20, preset: 'medium', audioKbps: 192 },
   { id: 'yt4k', label: 'YouTube 4K', short: 2160, crf: 20, preset: 'medium', audioKbps: 256 },
-  { id: 'vertical', label: 'TikTok / Reels / Shorts', short: 1080, crf: 21, preset: 'medium', audioKbps: 192, aspect: [9, 16] },
+  {
+    id: 'vertical',
+    label: 'TikTok / Reels / Shorts',
+    short: 1080,
+    crf: 21,
+    preset: 'medium',
+    audioKbps: 192,
+    aspect: [9, 16],
+  },
   { id: 'web', label: 'Web ligero (720p)', short: 720, crf: 26, preset: 'fast', audioKbps: 128 },
   { id: 'max', label: 'Máxima calidad', short: null, crf: 16, preset: 'slow', audioKbps: 320 },
 ];
@@ -463,10 +562,14 @@ export interface ExportOptions {
   end: number;
 }
 
-export function defaultExport(p: VideoProject, preset: ExportPreset = EXPORT_PRESETS[0]!): ExportOptions {
+export function defaultExport(
+  p: VideoProject,
+  preset: ExportPreset = EXPORT_PRESETS[0]!,
+): ExportOptions {
   const [aw, ah] = preset.aspect ?? [p.width, p.height];
   const short = preset.short ?? Math.min(p.width, p.height);
-  const size = preset.aspect || preset.short ? sizeFor(aw, ah, short) : { width: p.width, height: p.height };
+  const size =
+    preset.aspect || preset.short ? sizeFor(aw, ah, short) : { width: p.width, height: p.height };
   return {
     ...size,
     fps: p.fps,

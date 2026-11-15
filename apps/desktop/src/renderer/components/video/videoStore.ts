@@ -6,12 +6,19 @@
 import { useSyncExternalStore } from 'react';
 import type { VideoJobView } from '../../../shared/api';
 import type { Clip, MediaItem, VideoProject } from '../../../shared/video';
-import { insertMedia, mediaKindOf, newProject, projectDuration, toFrame } from '../../../shared/video';
+import {
+  insertMedia,
+  mediaKindOf,
+  newProject,
+  projectDuration,
+  toFrame,
+} from '../../../shared/video';
 import { confirmDialog } from '../../confirm';
 import { api, toast } from '../../store';
 import { tv } from './strings';
 
-export type StudioTab = 'media' | 'audio' | 'text' | 'stickers' | 'effects' | 'transitions' | 'filters' | 'ai';
+export type StudioTab =
+  'media' | 'audio' | 'text' | 'stickers' | 'effects' | 'transitions' | 'filters' | 'ai';
 
 export interface VState {
   open: boolean;
@@ -117,7 +124,8 @@ export function commit(next: VideoProject, label: string): void {
 
 /** Commits, or folds into the last history step when it has the same label (slider drags). */
 export function commitMerged(next: VideoProject, label: string): void {
-  if (state.past.at(-1)?.label === label && !state.future.length) setV({ project: next, dirty: true });
+  if (state.past.at(-1)?.label === label && !state.future.length)
+    setV({ project: next, dirty: true });
   else commit(next, label);
 }
 
@@ -157,13 +165,23 @@ let recoveryChecked = false;
 export async function openStudio(file?: string): Promise<void> {
   setV({ open: true, minimized: false });
   document.body.classList.add('vs-open');
-  if (!state.tools) void api().video.tools().then((tools) => setV({ tools }));
+  if (!state.tools)
+    void api()
+      .video.tools()
+      .then((tools) => setV({ tools }));
   if (!recoveryChecked) {
     recoveryChecked = true;
-    const rec = await api().video.recover().catch(() => null);
+    const rec = await api()
+      .video.recover()
+      .catch(() => null);
     if (rec && !state.dirty && !state.project.clips.length) {
       const when = new Date(rec.savedAt).toLocaleString();
-      if (await confirmDialog(tv('recoverAsk', { name: rec.project.name, time: when }), { okLabel: tv('recover'), cancelLabel: tv('discard') })) {
+      if (
+        await confirmDialog(tv('recoverAsk', { name: rec.project.name, time: when }), {
+          okLabel: tv('recover'),
+          cancelLabel: tv('discard'),
+        })
+      ) {
         await loadProject(rec.project, rec.path);
         setV({ dirty: true });
       } else void api().video.autosave(null, null);
@@ -179,7 +197,12 @@ export async function closeStudio(ask = false): Promise<void> {
   document.body.classList.remove('vs-open');
 }
 
+let lastToggle = 0;
 export function toggleStudio(): void {
+  // The shortcut can arrive twice (page key handler + app menu): one toggle per press.
+  const now = Date.now();
+  if (now - lastToggle < 400) return;
+  lastToggle = now;
   if (state.open && !state.minimized) void closeStudio();
   else void openStudio();
 }
@@ -203,7 +226,12 @@ export async function importPaths(paths: string[]): Promise<MediaItem[]> {
   const added: MediaItem[] = [];
   for (const path of paths) {
     if (!mediaKindOf(path)) {
-      toast(tv('importFailed', { name: path.split(/[\\/]/).pop() ?? path, err: 'formato no compatible' }));
+      toast(
+        tv('importFailed', {
+          name: path.split(/[\\/]/).pop() ?? path,
+          err: 'formato no compatible',
+        }),
+      );
       continue;
     }
     const existing = state.project.media.find((m) => m.path === path && !m.missing);
@@ -220,7 +248,15 @@ export async function importPaths(paths: string[]): Promise<MediaItem[]> {
       void loadDerived(item);
       added.push(item);
     } catch (e) {
-      toast(tv('importFailed', { name, err: (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') }));
+      toast(
+        tv('importFailed', {
+          name,
+          err: (e as Error).message.replace(
+            /^Error invoking remote method '[^']+': (Error: )?/,
+            '',
+          ),
+        }),
+      );
     } finally {
       setV((s) => ({ importing: s.importing.filter((x) => x !== name) }));
     }
@@ -236,11 +272,14 @@ async function loadDerived(m: MediaItem): Promise<void> {
       .video.thumbnails(m.path, m.duration, 24)
       .then((url) => setV((s) => ({ thumbs: { ...s.thumbs, [m.id]: url } })))
       .catch(() => undefined);
-  if (m.kind === 'image' && state.urls[m.id]) setV((s) => ({ thumbs: { ...s.thumbs, [m.id]: s.urls[m.id]! } }));
+  if (m.kind === 'image' && state.urls[m.id])
+    setV((s) => ({ thumbs: { ...s.thumbs, [m.id]: s.urls[m.id]! } }));
   if (m.hasAudio)
     void api()
       .video.waveform(m.path)
-      .then((w) => setV((s) => ({ waves: { ...s.waves, [m.id]: { pps: w.peaksPerSecond, peaks: w.peaks } } })))
+      .then((w) =>
+        setV((s) => ({ waves: { ...s.waves, [m.id]: { pps: w.peaksPerSecond, peaks: w.peaks } } })),
+      )
       .catch(() => undefined);
 }
 
@@ -253,9 +292,17 @@ export function addToTimeline(m: MediaItem, at?: { trackId?: string; start?: num
 
 export async function removeMedia(m: MediaItem): Promise<void> {
   const used = state.project.clips.filter((c) => c.mediaId === m.id).length;
-  if (used && !(await confirmDialog(tv('removeMediaUsed', { name: m.name, n: used }), { danger: true }))) return;
+  if (
+    used &&
+    !(await confirmDialog(tv('removeMediaUsed', { name: m.name, n: used }), { danger: true }))
+  )
+    return;
   commit(
-    { ...state.project, media: state.project.media.filter((x) => x.id !== m.id), clips: state.project.clips.filter((c) => c.mediaId !== m.id) },
+    {
+      ...state.project,
+      media: state.project.media.filter((x) => x.id !== m.id),
+      clips: state.project.clips.filter((c) => c.mediaId !== m.id),
+    },
     tv('removeMedia'),
   );
 }
@@ -266,7 +313,10 @@ export async function relinkMedia(m: MediaItem): Promise<void> {
   try {
     const { url, id: _id, ...probed } = await api().video.probe(path);
     const item: MediaItem = { ...m, ...probed, id: m.id, missing: false };
-    commit({ ...state.project, media: state.project.media.map((x) => (x.id === m.id ? item : x)) }, tv('relink'));
+    commit(
+      { ...state.project, media: state.project.media.map((x) => (x.id === m.id ? item : x)) },
+      tv('relink'),
+    );
     setV((s) => ({ urls: { ...s.urls, [m.id]: url } }));
     void loadDerived(item);
     toast(tv('relinked'));
@@ -281,7 +331,9 @@ async function loadProject(project: VideoProject, path: string | null): Promise<
   const urls: Record<string, string> = {};
   for (const m of project.media) {
     if (m.missing) continue;
-    const u = await api().video.mediaUrl(m.path).catch(() => null);
+    const u = await api()
+      .video.mediaUrl(m.path)
+      .catch(() => null);
     if (u) urls[m.id] = u;
   }
   setV({
@@ -301,7 +353,12 @@ async function loadProject(project: VideoProject, path: string | null): Promise<
   for (const m of project.media) void loadDerived(m);
 }
 
-export async function newProjectWith(opts: { width: number; height: number; fps: number; name?: string }): Promise<void> {
+export async function newProjectWith(opts: {
+  width: number;
+  height: number;
+  fps: number;
+  name?: string;
+}): Promise<void> {
   if (state.dirty && !(await confirmDialog(tv('discardChanges'), { danger: true }))) return;
   await loadProject(newProject({ ...opts, name: opts.name ?? tv('untitled') }), null);
   void api().video.autosave(null, null);
@@ -338,7 +395,7 @@ export async function saveProject(saveAs = false): Promise<boolean> {
 
 // Crash copy every 30 s while there are unsaved changes.
 setInterval(() => {
-  if (!state.dirty || !state.project.clips.length && !state.project.media.length) return;
+  if (!state.dirty || (!state.project.clips.length && !state.project.media.length)) return;
   void api()
     .video.autosave(state.project, state.path)
     .then(() => setV({ autosavedAt: Date.now() }))
@@ -357,7 +414,13 @@ export interface Layout {
 export function loadLayout(): Layout {
   try {
     const j = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}') as Partial<Layout>;
-    return { left: j.left ?? 300, right: j.right ?? 280, timeline: j.timeline ?? 300, showLeft: j.showLeft ?? true, showRight: j.showRight ?? true };
+    return {
+      left: j.left ?? 300,
+      right: j.right ?? 280,
+      timeline: j.timeline ?? 300,
+      showLeft: j.showLeft ?? true,
+      showRight: j.showRight ?? true,
+    };
   } catch {
     return { left: 300, right: 280, timeline: 300, showLeft: true, showRight: true };
   }
@@ -376,9 +439,12 @@ export function wireJobs(): void {
     if (ev.type !== 'video:job') return;
     const job = ev.job;
     const prev = state.jobs.find((j) => j.id === job.id);
-    setV((s) => ({ jobs: prev ? s.jobs.map((j) => (j.id === job.id ? job : j)) : [...s.jobs, job] }));
+    setV((s) => ({
+      jobs: prev ? s.jobs.map((j) => (j.id === job.id ? job : j)) : [...s.jobs, job],
+    }));
     if (prev?.state !== job.state) {
-      if (job.state === 'done') toast(tv('exportDone', { name: job.out.split(/[\\/]/).pop() ?? job.out }));
+      if (job.state === 'done')
+        toast(tv('exportDone', { name: job.out.split(/[\\/]/).pop() ?? job.out }));
       if (job.state === 'error') toast(tv('exportFailed', { err: job.error ?? '' }));
     }
   });

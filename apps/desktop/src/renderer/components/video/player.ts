@@ -138,7 +138,9 @@ export class Player {
     }
     // Recycle the oldest idle elements.
     if (this.els.size > MAX_ELEMENTS) {
-      const idle = [...this.els.entries()].filter(([id]) => !live.has(id)).sort((a, b) => a[1].used - b[1].used);
+      const idle = [...this.els.entries()]
+        .filter(([id]) => !live.has(id))
+        .sort((a, b) => a[1].used - b[1].used);
       for (const [id, e] of idle.slice(0, this.els.size - MAX_ELEMENTS)) {
         e.el.removeAttribute('src');
         e.el.load();
@@ -168,15 +170,27 @@ export class Player {
       if (!c) continue;
       const m = mediaOf(p, c.mediaId);
       const url = s.urls[c.mediaId];
-      if (!m || !url || !m.hasVideo && m.kind !== 'image') continue;
+      if (!m || !url || (!m.hasVideo && m.kind !== 'image')) continue;
       if (m.kind === 'image') {
         const img = this.image(m.id, url);
-        layers.push({ c, src: img, w: img.naturalWidth, h: img.naturalHeight, ready: img.complete && img.naturalWidth > 0 });
+        layers.push({
+          c,
+          src: img,
+          w: img.naturalWidth,
+          h: img.naturalHeight,
+          ready: img.complete && img.naturalWidth > 0,
+        });
       } else {
         const e = this.els.get(c.id);
         if (!e || !(e.el instanceof HTMLVideoElement)) continue;
         const v = e.el;
-        layers.push({ c, src: v, w: v.videoWidth, h: v.videoHeight, ready: v.readyState >= 2 && !v.seeking });
+        layers.push({
+          c,
+          src: v,
+          w: v.videoWidth,
+          h: v.videoHeight,
+          ready: v.readyState >= 2 && !v.seeking,
+        });
       }
     }
     const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}`).join(',')}`;

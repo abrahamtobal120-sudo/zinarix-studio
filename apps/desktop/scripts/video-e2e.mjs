@@ -9,32 +9,90 @@ const out = process.argv[2] ?? join(tmpdir(), 'zvs-shots');
 mkdirSync(out, { recursive: true });
 const ff = join(process.cwd(), 'node_modules/ffmpeg-static/ffmpeg.exe');
 const ws = mkdtempSync(join(tmpdir(), 'zvs-ws-'));
-execFileSync(ff, ['-hide_banner', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=8', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=8', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', join(ws, 'sample.mp4')]);
-execFileSync(ff, ['-hide_banner', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=6', '-c:a', 'libmp3lame', join(ws, 'music.mp3')]);
+execFileSync(ff, [
+  '-hide_banner',
+  '-v',
+  'error',
+  '-y',
+  '-f',
+  'lavfi',
+  '-i',
+  'testsrc2=size=1280x720:rate=30:duration=8',
+  '-f',
+  'lavfi',
+  '-i',
+  'sine=frequency=330:duration=8',
+  '-c:v',
+  'libx264',
+  '-preset',
+  'ultrafast',
+  '-pix_fmt',
+  'yuv420p',
+  '-c:a',
+  'aac',
+  '-shortest',
+  join(ws, 'sample.mp4'),
+]);
+execFileSync(ff, [
+  '-hide_banner',
+  '-v',
+  'error',
+  '-y',
+  '-f',
+  'lavfi',
+  '-i',
+  'sine=frequency=220:duration=6',
+  '-c:a',
+  'libmp3lame',
+  join(ws, 'music.mp3'),
+]);
 
 const app = await electron.launch({
   executablePath: join(process.cwd(), 'node_modules/electron/dist/electron.exe'),
   args: ['.', ws],
-  env: { ...process.env, OMNI_HOME: mkdtempSync(join(tmpdir(), 'omni-e2e-')), OMNI_NO_KEYCHAIN: '1' },
+  env: {
+    ...process.env,
+    OMNI_HOME: mkdtempSync(join(tmpdir(), 'omni-e2e-')),
+    OMNI_NO_KEYCHAIN: '1',
+  },
 });
 const logs = [];
 app.process().stderr.on('data', (d) => logs.push('MAIN: ' + d));
 const win = await app.firstWindow();
-win.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && logs.push(`${m.type()}: ${m.text()}`));
+win.on(
+  'console',
+  (m) => (m.type() === 'error' || m.type() === 'warning') && logs.push(`${m.type()}: ${m.text()}`),
+);
 win.on('pageerror', (e) => logs.push('PAGEERROR: ' + e.message));
 await win.setViewportSize?.({ width: 1440, height: 900 });
 await win.waitForTimeout(2500);
 const shot = (n) => win.screenshot({ path: join(out, `${n}.png`) });
 const check = (name, ok, extra = '') => console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${extra}`);
-const clips = () => win.$$eval('.vs-clip', (els) => els.map((e) => `${e.style.left}/${e.style.width} ${e.title} ${e.className.includes('selected') ? '*' : ''}`).join(' | '));
-const dbg = async (label) => process.env.DBG && console.log('  ', label, await clips(), await win.locator('.vs-timecode b').textContent());
+const clips = () =>
+  win.$$eval('.vs-clip', (els) =>
+    els
+      .map(
+        (e) =>
+          `${e.style.left}/${e.style.width} ${e.title} ${e.className.includes('selected') ? '*' : ''}`,
+      )
+      .join(' | '),
+  );
+const dbg = async (label) =>
+  process.env.DBG &&
+  console.log('  ', label, await clips(), await win.locator('.vs-timecode b').textContent());
 
 // Mock the save dialogs in main.
 const exportPath = join(ws, 'export.mp4');
 const projPath = join(ws, 'demo.zvproj');
-await app.evaluate(({ dialog }, paths) => {
-  dialog.showSaveDialog = async (_w, o) => ({ canceled: false, filePath: (o ?? _w).title?.includes('proyecto') ? paths.proj : paths.exp });
-}, { exp: exportPath, proj: projPath });
+await app.evaluate(
+  ({ dialog }, paths) => {
+    dialog.showSaveDialog = async (_w, o) => ({
+      canceled: false,
+      filePath: (o ?? _w).title?.includes('proyecto') ? paths.proj : paths.exp,
+    });
+  },
+  { exp: exportPath, proj: projPath },
+);
 
 // A fresh profile may greet with the onboarding: close it.
 if (await win.locator('.onboarding-backdrop').count()) await win.keyboard.press('Escape');
@@ -71,7 +129,9 @@ await win.keyboard.press('Home');
 for (let i = 0; i < 60; i++) await win.keyboard.press('ArrowRight');
 check('arrows step frames', (await win.locator('.vs-timecode b').textContent()) === '00:00:02:00');
 // Nothing selected: S splits every clip under the playhead.
-await win.evaluate(() => document.querySelector('.vs-lane')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+await win.evaluate(() =>
+  document.querySelector('.vs-lane')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })),
+);
 await win.keyboard.press('Home');
 for (let i = 0; i < 60; i++) await win.keyboard.press('ArrowRight');
 await dbg('before split');
@@ -79,14 +139,24 @@ await win.keyboard.press('s');
 await win.waitForTimeout(300);
 await dbg('after split');
 check('split makes 2 clips', (await win.locator('.vs-clip').count()) === 2);
-await win.locator('.vs-clip').first().click({ position: { x: 20, y: 30 } });
+await win
+  .locator('.vs-clip')
+  .first()
+  .click({ position: { x: 20, y: 30 } });
 await dbg('after select');
 await win.keyboard.press('Shift+Delete');
 await win.waitForTimeout(100);
 await dbg('after ripple');
 await win.waitForTimeout(300);
-const left = await win.locator('.vs-clip').first().evaluate((e) => e.style.left);
-check('ripple delete leaves 1 clip at 0', (await win.locator('.vs-clip').count()) === 1 && left === '0px', left);
+const left = await win
+  .locator('.vs-clip')
+  .first()
+  .evaluate((e) => e.style.left);
+check(
+  'ripple delete leaves 1 clip at 0',
+  (await win.locator('.vs-clip').count()) === 1 && left === '0px',
+  left,
+);
 
 // 4. Undo / redo.
 await win.keyboard.press('Control+z');
@@ -113,19 +183,30 @@ await shot('5-rendering');
 await win.waitForSelector('.vs-job-done', { timeout: 60000 }).catch(() => undefined);
 const ok = existsSync(exportPath);
 let dur = '';
-if (ok) dur = execFileSync(join(process.cwd(), 'node_modules/ffprobe-static/bin/win32/x64/ffprobe.exe'), ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', exportPath]).toString().trim();
-check('export produced MP4', ok && Math.abs(Number(dur) - 6) < 0.2, `${dur}s ${ok ? statSync(exportPath).size : 0} bytes`);
+if (ok)
+  dur = execFileSync(join(process.cwd(), 'node_modules/ffprobe-static/bin/win32/x64/ffprobe.exe'), [
+    '-v',
+    'error',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'csv=p=0',
+    exportPath,
+  ])
+    .toString()
+    .trim();
+check(
+  'export produced MP4',
+  ok && Math.abs(Number(dur) - 6) < 0.2,
+  `${dur}s ${ok ? statSync(exportPath).size : 0} bytes`,
+);
 await shot('6-exported');
 
 // 7. Save with Ctrl+S (goes through the app menu → studio).
 await win.keyboard.press('Control+s');
 await win.waitForTimeout(1200);
-if (process.env.DBG) console.log('   toast after ctrl+s:', await win.locator('.toast').allTextContents());
-if (!existsSync(projPath)) {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('omni:event', { type: 'command', command: 'file.save' }));
-  await win.waitForTimeout(1200);
-  if (process.env.DBG) console.log('   via command event:', existsSync(projPath), await win.locator('.toast').allTextContents());
-}
+if (process.env.DBG)
+  console.log('   toast after ctrl+s:', await win.locator('.toast').allTextContents());
 check('project saved', existsSync(projPath));
 
 // 8. Esc closes the studio; Ctrl+Shift+V reopens.

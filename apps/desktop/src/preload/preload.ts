@@ -33,6 +33,7 @@ const api: OmniApi = {
     recent: call('workspace:recent') as OmniApi['workspace']['recent'],
     readDir: call('workspace:readDir') as OmniApi['workspace']['readDir'],
     readFile: call('workspace:readFile') as OmniApi['workspace']['readFile'],
+    readBytes: call('workspace:readBytes') as OmniApi['workspace']['readBytes'],
     writeFile: call('workspace:writeFile') as OmniApi['workspace']['writeFile'],
     createFile: call('workspace:createFile') as OmniApi['workspace']['createFile'],
     createDir: call('workspace:createDir') as OmniApi['workspace']['createDir'],

@@ -45,12 +45,23 @@ function piece(p: VideoProject, c: Clip, start: number, end: number): Piece | nu
 function inputArgs(pc: Piece): string[] {
   if (pc.media.kind === 'image') {
     const gif = pc.media.path.toLowerCase().endsWith('.gif');
-    return [...(gif ? ['-ignore_loop', '0'] : ['-loop', '1']), '-t', num(pc.dur), '-i', pc.media.path];
+    return [
+      ...(gif ? ['-ignore_loop', '0'] : ['-loop', '1']),
+      '-t',
+      num(pc.dur),
+      '-i',
+      pc.media.path,
+    ];
   }
   return ['-ss', num(pc.srcIn), '-t', num(pc.dur), '-i', pc.media.path];
 }
 
-export function buildRender(p: VideoProject, o: ExportOptions, outPath: string, encoder: string[] = x264(o)): RenderPlan {
+export function buildRender(
+  p: VideoProject,
+  o: ExportOptions,
+  outPath: string,
+  encoder: string[] = x264(o),
+): RenderPlan {
   const D = Math.max(0.04, o.end - o.start);
   const W = o.width;
   const H = o.height;
@@ -76,11 +87,14 @@ export function buildRender(p: VideoProject, o: ExportOptions, outPath: string, 
 
   // Video tracks, bottom (V1) to top; their clips bring their own sound unless muted.
   for (const track of compositeOrder(p)) {
-    for (const c of p.clips.filter((x) => x.trackId === track.id).sort((a, b) => a.start - b.start)) {
+    for (const c of p.clips
+      .filter((x) => x.trackId === track.id)
+      .sort((a, b) => a.start - b.start)) {
       const pc = piece(p, c, o.start, o.end);
       if (!pc) continue;
       const wantVideo = !track.hidden && pc.media.hasVideo;
-      const wantAudio = !track.muted && pc.media.hasAudio && pc.clip.volume > 0 && pc.media.kind === 'video';
+      const wantAudio =
+        !track.muted && pc.media.hasAudio && pc.clip.volume > 0 && pc.media.kind === 'video';
       if (!wantVideo && !wantAudio) continue;
       inputs.push(...inputArgs(pc));
       const i = n++;

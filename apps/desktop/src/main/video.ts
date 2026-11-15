@@ -64,7 +64,11 @@ export function findFfmpeg(appRoot: string, resourcesPath?: string): FfmpegInfo 
   const ffprobe = pick(candidates.ffprobe, 'ffprobe');
   let version: string | null = null;
   if (ffmpeg) {
-    const r = spawnSync(ffmpeg, ['-hide_banner', '-version'], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+    const r = spawnSync(ffmpeg, ['-hide_banner', '-version'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 5000,
+    });
     version = /ffmpeg version (\S+)/.exec(r.stdout ?? '')?.[1] ?? null;
   }
   return { ffmpeg, ffprobe, version };
@@ -177,7 +181,13 @@ export class VideoService {
     let j: ProbeJson = {};
     try {
       j = JSON.parse(
-        (await run(this.need('ffprobe'), ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', path], 30_000)).toString(),
+        (
+          await run(
+            this.need('ffprobe'),
+            ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', path],
+            30_000,
+          )
+        ).toString(),
       ) as ProbeJson;
     } catch (e) {
       // SVG (and other images FFmpeg may not read) are still usable as pictures.
@@ -205,8 +215,26 @@ export class VideoService {
       const strip = (keyframesOnly: boolean) =>
         run(
           this.need('ffmpeg'),
-          ['-hide_banner', '-v', 'error', ...(keyframesOnly ? ['-skip_frame', 'nokey'] : []), '-i', path,
-            '-an', '-sn', '-vf', `fps=${rateArg},scale=-2:72,tile=${count}x1`, '-frames:v', '1', '-update', '1', '-q:v', '5', '-y', tmp],
+          [
+            '-hide_banner',
+            '-v',
+            'error',
+            ...(keyframesOnly ? ['-skip_frame', 'nokey'] : []),
+            '-i',
+            path,
+            '-an',
+            '-sn',
+            '-vf',
+            `fps=${rateArg},scale=-2:72,tile=${count}x1`,
+            '-frames:v',
+            '1',
+            '-update',
+            '1',
+            '-q:v',
+            '5',
+            '-y',
+            tmp,
+          ],
           300_000,
         );
       // Long files: decode keyframes only (fast). Short ones may have a single keyframe.
@@ -231,13 +259,32 @@ export class VideoService {
       return { peaksPerSecond: PPS, peaks };
     }
     const SR = 4000;
-    const raw = await run(this.need('ffmpeg'), ['-hide_banner', '-v', 'error', '-i', path, '-vn', '-ac', '1', '-ar', String(SR), '-f', 's16le', '-'], 300_000);
+    const raw = await run(
+      this.need('ffmpeg'),
+      [
+        '-hide_banner',
+        '-v',
+        'error',
+        '-i',
+        path,
+        '-vn',
+        '-ac',
+        '1',
+        '-ar',
+        String(SR),
+        '-f',
+        's16le',
+        '-',
+      ],
+      300_000,
+    );
     const per = SR / PPS;
     const samples = Math.floor(raw.length / 2);
     const peaks: number[] = [];
     for (let i = 0; i < samples; i += per) {
       let max = 0;
-      for (let k = i; k < Math.min(samples, i + per); k++) max = Math.max(max, Math.abs(raw.readInt16LE(k * 2)));
+      for (let k = i; k < Math.min(samples, i + per); k++)
+        max = Math.max(max, Math.abs(raw.readInt16LE(k * 2)));
       peaks.push(Math.min(255, Math.round(Math.sqrt(max / 32768) * 255)));
     }
     this.waveCache.set(key, peaks);
@@ -269,15 +316,26 @@ export class VideoService {
       let end = m[1] && m[2] ? Number(m[2]) : size - 1;
       start = Math.max(0, start);
       end = Math.min(size - 1, end);
-      if (start > end) return new Response('range', { status: 416, headers: { 'content-range': `bytes */${size}` } });
+      if (start > end)
+        return new Response('range', {
+          status: 416,
+          headers: { 'content-range': `bytes */${size}` },
+        });
       const body = Readable.toWeb(createReadStream(path, { start, end })) as ReadableStream;
       return new Response(body, {
         status: 206,
-        headers: { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': String(end - start + 1) },
+        headers: {
+          ...headers,
+          'content-range': `bytes ${start}-${end}/${size}`,
+          'content-length': String(end - start + 1),
+        },
       });
     }
     const body = Readable.toWeb(createReadStream(path)) as ReadableStream;
-    return new Response(body, { status: 200, headers: { ...headers, 'content-length': String(size) } });
+    return new Response(body, {
+      status: 200,
+      headers: { ...headers, 'content-length': String(size) },
+    });
   }
 
   // ---------------- export queue ----------------
@@ -288,8 +346,23 @@ export class VideoService {
 
   /** Queues an export; jobs run one after another. */
   enqueue(project: VideoProject, opts: ExportOptions, out: string): VideoJob {
-    const job: VideoJob = { id: uid('job'), name: project.name, out, state: 'queued', progress: 0, eta: null };
-    this.jobs = [...this.jobs.filter((j) => j.state === 'running' || j.state === 'queued' || Date.now() - (j.startedAt ?? 0) < 3600_000), job];
+    const job: VideoJob = {
+      id: uid('job'),
+      name: project.name,
+      out,
+      state: 'queued',
+      progress: 0,
+      eta: null,
+    };
+    this.jobs = [
+      ...this.jobs.filter(
+        (j) =>
+          j.state === 'running' ||
+          j.state === 'queued' ||
+          Date.now() - (j.startedAt ?? 0) < 3600_000,
+      ),
+      job,
+    ];
     this.pending.set(job.id, () => this.render(job, project, opts));
     this.onJob({ ...job });
     void this.pump();
@@ -340,7 +413,20 @@ export class VideoService {
     // Long graphs go in a file: Windows caps a command line at 32 K characters.
     const script = join(tmpdir(), `zinarix-${job.id}.ffgraph`);
     await writeFile(script, plan.filter, 'utf8');
-    const args = ['-hide_banner', '-v', 'error', '-y', ...plan.inputs, '-filter_complex_script', script, ...plan.output.slice(0, -1), '-progress', 'pipe:1', '-nostats', plan.output.at(-1)!];
+    const args = [
+      '-hide_banner',
+      '-v',
+      'error',
+      '-y',
+      ...plan.inputs,
+      '-filter_complex_script',
+      script,
+      ...plan.output.slice(0, -1),
+      '-progress',
+      'pipe:1',
+      '-nostats',
+      plan.output.at(-1)!,
+    ];
     this.update(job, { state: 'running', startedAt: Date.now(), progress: 0 });
     const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
       const p = spawn(ffmpeg, args, { windowsHide: true });
@@ -360,7 +446,10 @@ export class VideoService {
           if (now - lastSent < 250 && done < 1) continue;
           lastSent = now;
           const elapsed = (now - (job.startedAt ?? now)) / 1000;
-          this.update(job, { progress: done, eta: done > 0.02 ? Math.max(0, (elapsed / done) * (1 - done)) : null });
+          this.update(job, {
+            progress: done,
+            eta: done > 0.02 ? Math.max(0, (elapsed / done) * (1 - done)) : null,
+          });
         }
       });
       p.stderr.on('data', (d: Buffer) => (err = (err + d.toString()).slice(-4000)));
@@ -368,7 +457,12 @@ export class VideoService {
       p.on('close', (code, signal) => {
         this.procs.delete(job.id);
         if (signal) resolve({ ok: false, error: 'canceled' });
-        else resolve(code === 0 ? { ok: true } : { ok: false, error: err.trim().split('\n').slice(-4).join('\n') || `exit ${code}` });
+        else
+          resolve(
+            code === 0
+              ? { ok: true }
+              : { ok: false, error: err.trim().split('\n').slice(-4).join('\n') || `exit ${code}` },
+          );
       });
     });
     await unlink(script).catch(() => undefined);
@@ -382,7 +476,12 @@ export class VideoService {
       }
     } else {
       await unlink(tmpOut).catch(() => undefined);
-      this.update(job, result.error === 'canceled' ? { state: 'canceled' } : { state: 'error', error: result.error });
+      this.update(
+        job,
+        result.error === 'canceled'
+          ? { state: 'canceled' }
+          : { state: 'error', error: result.error },
+      );
     }
   }
 
