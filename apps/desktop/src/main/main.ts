@@ -75,6 +75,7 @@ import { DesignSession, EDITOR_SCRIPT_PATH } from './design/session.js';
 import { EditError } from './design/htmlSource.js';
 import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
 import { McpManager } from './mcp.js';
+import { HookTrust } from './hooks.js';
 import { DebugManager } from './debug/manager.js';
 import { ExtensionStore } from './extensions/store.js';
 import { HelperService, MODEL_NAME } from './helper.js';
@@ -1130,6 +1131,9 @@ function registerIpc(): void {
     ]),
     (w, sources, prompt, folder) => ai.activeRules(scope(w, folder), sources, prompt ?? ''),
   );
+  handle('ai:agentKit', z.tuple([z.string().min(1).max(4096).optional()]), (w, folder) =>
+    ai.agentKit(scope(w, folder)),
+  );
   handle('ai:resetContext', z.tuple([conv]), (_w, c) => ai.resetContext(c));
 
   const paths = z.array(rel).max(5000);
@@ -1251,6 +1255,7 @@ function registerIpc(): void {
   // MCP servers for the agent: the global ones start now, a project's once it is trusted.
   mcp = new McpManager(app.getPath('userData'));
   ai.agent.mcp = mcp;
+  ai.agent.hookTrust = new HookTrust(app.getPath('userData'));
   const mcpMgr = mcp;
   mcpMgr.sync();
   handle('mcp:status', z.tuple([]), (w) => {

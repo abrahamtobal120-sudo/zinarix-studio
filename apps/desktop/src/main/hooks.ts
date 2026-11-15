@@ -218,11 +218,15 @@ export function runHook(
       CLAUDE_PROJECT_DIR: cwd,
       ZINARIX_HOOK_EVENT: hook.event,
     };
+    // PowerShell -Command exits 0/1, not the program's code: pass the real one on (exit 2 blocks).
+    const script = isWin
+      ? `${hook.command}\n$zxOk = $?; if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }; if (-not $zxOk) { exit 1 }`
+      : hook.command;
     let child;
     try {
       child = spawn(
         isWin ? 'powershell.exe' : process.env.SHELL || '/bin/sh',
-        isWin ? ['-NoProfile', '-NonInteractive', '-Command', hook.command] : ['-c', hook.command],
+        isWin ? ['-NoProfile', '-NonInteractive', '-Command', script] : ['-c', script],
         { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: !isWin },
       );
     } catch (e) {

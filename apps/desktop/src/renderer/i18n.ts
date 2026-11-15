@@ -673,6 +673,7 @@ const es = {
   rulesWhyMention: 'mencionada',
   rulesWhyGlob: 'coincide con {glob}',
   slashInit: 'Generar AGENTS.md a partir del proyecto',
+  slashCustom: 'Comando del proyecto',
   slashInitPrompt:
     'Analiza este proyecto (estructura, package.json o equivalente, scripts, lenguajes, frameworks, pruebas, linters y convenciones de estilo que veas en el código) y crea un archivo AGENTS.md en la raíz con instrucciones para agentes de IA: qué es el proyecto, cómo instalar, compilar, probar y hacer lint (los comandos exactos), la estructura de carpetas, las convenciones de código y las cosas que no se deben hacer. Sé conciso y concreto, sin inventar comandos que no existan. Si ya hay un AGENTS.md, CLAUDE.md o .cursorrules, léelo primero y mejóralo en vez de repetirlo. Pídeme aprobación antes de escribir.',
   rulesDisabled: 'Las reglas del proyecto están desactivadas en Ajustes › IA.',
@@ -704,7 +705,7 @@ const es = {
   setInlineModel: 'Modelo',
   setRules: 'Reglas del proyecto',
   setRulesHint:
-    'Envía .zinarix/rules.md (o AGENTS.md / CLAUDE.md) al chat y al agente como instrucciones del proyecto.',
+    'Envía al chat y al agente las instrucciones del proyecto: AGENTS.md y CLAUDE.md (de la raíz hasta la carpeta del archivo), .zinarix/rules/*.md, .cursor/rules/*.mdc y .github/copilot-instructions.md.',
   setLocalOnly: 'Modo 100 % local',
   setLocalOnlyHint: 'Solo usa modelos que corren en tu equipo.',
   setKeysHint: 'Haz clic en un atajo y presiona la nueva combinación. Esc cancela.',
@@ -2524,6 +2525,7 @@ const en: Record<Key, string> = {
   rulesWhyMention: 'mentioned',
   rulesWhyGlob: 'matches {glob}',
   slashInit: 'Generate AGENTS.md from the project',
+  slashCustom: 'Project command',
   slashInitPrompt:
     'Analyze this project (structure, package.json or equivalent, scripts, languages, frameworks, tests, linters and the style conventions you see in the code) and create an AGENTS.md file at the root with instructions for AI agents: what the project is, how to install, build, test and lint (the exact commands), the folder layout, the code conventions and the things not to do. Be concise and concrete, and do not invent commands that do not exist. If there is already an AGENTS.md, CLAUDE.md or .cursorrules, read it first and improve it instead of repeating it. Ask for my approval before writing.',
   rulesDisabled: 'Project rules are turned off in Settings › AI.',
@@ -2555,7 +2557,7 @@ const en: Record<Key, string> = {
   setInlineModel: 'Model',
   setRules: 'Project rules',
   setRulesHint:
-    'Sends .zinarix/rules.md (or AGENTS.md / CLAUDE.md) to the chat and the agent as project instructions.',
+    'Sends the project instructions to the chat and the agent: AGENTS.md and CLAUDE.md (from the root down to the file\'s folder), .zinarix/rules/*.md, .cursor/rules/*.mdc and .github/copilot-instructions.md.',
   setLocalOnly: '100% local mode',
   setLocalOnlyHint: 'Only use models running on your computer.',
   setKeysHint: 'Click a shortcut and press the new combination. Esc cancels.',

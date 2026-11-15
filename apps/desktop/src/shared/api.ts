@@ -694,6 +694,22 @@ export interface ActiveRulesView {
   tokens: number;
 }
 
+/** Fase 4: what the project (and ~/.zinarix) adds to the agent, as the chat shows it. */
+export interface AgentKitView {
+  /** "/" commands of .zinarix/commands (and .claude/commands). */
+  commands: {
+    name: string;
+    description: string;
+    argumentHint?: string;
+    agent?: boolean;
+    body: string;
+    path: string;
+  }[];
+  agents: { name: string; description: string; model?: string; tools?: string[]; path: string }[];
+  skills: { name: string; description: string; dir: string }[];
+  hooks: { event: string; matcher: string; command: string; source: string }[];
+}
+
 export interface ToolPreview {
   path?: string;
   before?: string;
@@ -1217,6 +1233,8 @@ export interface OmniApi {
     rulesFile(folder?: string): Promise<string | null>;
     /** Project rules that would enter a message with this context ("file:path" sources). */
     activeRules(sources: string[], prompt?: string, folder?: string): Promise<ActiveRulesView>;
+    /** Subagents, skills, "/" commands and hooks of the project and the user. */
+    agentKit(folder?: string): Promise<AgentKitView>;
     /** Forget the agent's model-side transcript (regenerate / edit a message); keeps undo data. */
     resetContext(conversationId: string): Promise<void>;
     chat(requestId: string, req: ChatRequestView): Promise<void>;
@@ -1731,6 +1749,7 @@ export const CHANNELS = [
   'ai:commitMessage',
   'ai:rulesFile',
   'ai:activeRules',
+  'ai:agentKit',
   'ai:resetContext',
   'git:status',
   'git:init',

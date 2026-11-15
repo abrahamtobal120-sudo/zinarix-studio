@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import type { OmniCore } from '@omni/core';
@@ -103,7 +103,6 @@ import {
   type HookEvent,
 } from '../shared/agentKit.js';
 import { loadKit, runHook, skillFiles, type HookTrust } from './hooks.js';
-import { homedir } from 'node:os';
 
 const MAX_STEPS = 60;
 /** read_many_files: per-file and total character budgets. */
@@ -969,8 +968,7 @@ When you finish, answer with a complete report: it is all the agent that launche
         preview: {
           risk: 'high',
           action: `ejecutar ${kit.hooks.length === 1 ? 'el hook' : `los ${kit.hooks.length} hooks`} del proyecto en cada acción del agente`,
-          command: redact(list.join('
-')).slice(0, 4000),
+          command: redact(list.join('\n')).slice(0, 4000),
           warning:
             'Los hooks son comandos escritos en .zinarix/settings.json (del proyecto o de tu usuario). Se ejecutarán en tu computadora antes o después de las acciones del agente, sin volver a preguntarte. Apruébalos solo si confías en este proyecto. "Siempre" los recuerda para esta carpeta hasta que cambie algún comando.',
         },
@@ -1024,8 +1022,7 @@ When you finish, answer with a complete report: it is all the agent that launche
         });
       else if (r.message) context.push(r.message);
     }
-    return { block: false, message: '', context: redact(context.join('
-')).slice(0, 8000) };
+    return { block: false, message: '', context: redact(context.join('\n')).slice(0, 8000) };
   }
 
   /**
@@ -1199,12 +1196,8 @@ ${r.message}
 </hook-feedback>
 A project hook did not let you finish yet. Address it, then answer.`,
             });
-            finalText += '
-
-';
-            opts.emit({ type: 'text', delta: '
-
-' });
+            finalText += '\n\n';
+            opts.emit({ type: 'text', delta: '\n\n' });
             continue;
           }
         }
@@ -1467,7 +1460,179 @@ A project hook did not let you finish yet. Address it, then answer.`,
     });
   }
 
+  /**
+   * task: launches a project subagent. Approved like a delegation ("always" per subagent);
+   * it gets a fresh context, its own model and only the tools its definition allows, and
+   * every action it takes is approved in this chat like the main agent's.
+   */
+  private async runTask(
+    s: Session,
+    call: ToolCall,
+    a: Record<string, unknown>,
+    opts: LoopOpts,
+    finish: (ok: boolean, content: string, summary: string) => { ok: boolean; content: string },
+  ): Promise<{ ok: boolean; content: string }> {
+    if (opts.depth > 0)
+      return finish(
+        false,
+        'A subagent cannot launch other subagents. Do the task yourself.',
+        'no permitido',
+      );
+    const name = str(a.subagent ?? a.subagent_type, 'subagent').trim().toLowerCase();
+    const def = opts.kit?.agents.find((d) => d.name === name);
+    if (!def)
+      return finish(
+        false,
+        `Unknown subagent "${name}". Available: ${opts.kit?.agents.map((d) => d.name).join(', ') || 'none'}.`,
+        'subagente desconocido',
+      );
+    const prompt = str(a.prompt, 'prompt');
+    let model = opts.model;
+    if (def.model)
+      try {
+        const ref = this.core.resolveModel(def.model);
+        model = `${ref.provider}/${ref.model}`;
+      } catch (e) {
+        return finish(
+          false,
+          `Subagent "${def.name}" asks for model "${def.model}", which is not available: ${e instanceof Error ? e.message : String(e)}.`,
+          'modelo no disponible',
+        );
+      }
+    const key = `task:${def.name}`;
+    if (!s.alwaysAllow.has(key)) {
+      opts.emit({
+        type: 'tool_approval',
+        id: call.id,
+        name: call.name,
+        args: viewArgs(call.name, a),
+        preview: {
+          risk: 'medium',
+          action: `lanzar el subagente "${def.name}"${def.model ? ` (${def.model})` : ''}`,
+          command: redact(prompt).slice(0, 4000),
+          warning: `El subagente trabaja con su propio contexto y gasta tokens de su modelo. Herramientas: ${def.tools?.join(', ') ?? 'todas'}. Cada acción que haga (editar, comandos…) también te pedirá permiso aquí.`,
+        },
+      });
+      const decision = await opts.ask(call.id);
+      if (decision === 'deny')
+        return finish(
+          false,
+          'The user did not allow this subagent. Do not retry it; continue yourself or ask the user.',
+          'rechazado',
+        );
+      if (decision === 'always') s.alwaysAllow.add(key);
+    }
+    const mcp = this.mcp
+      ? (await this.mcp.tools(this.ws(opts)?.root).catch(() => [])).map((t) => t.name)
+      : [];
+    const allowed = allowedTools(def.tools, [
+      ...[...TOOLS, ...KIT_TOOLS].map((t) => t.name),
+      ...mcp,
+    ]);
+    const helperId = `${opts.conversationId}${HELPER_SEP}task-${def.name}-${Math.random().toString(36).slice(2, 7)}`;
+    const red = new StreamRedactor();
+    const out = (chunk: string) => {
+      const safe = red.push(chunk);
+      if (safe) opts.emit({ type: 'tool_output', id: call.id, chunk: safe });
+    };
+    let answer: string;
+    try {
+      answer = await this.run({
+        conversationId: helperId,
+        model,
+        reasoning: opts.reasoning,
+        rules: opts.rules,
+        role: def.prompt || def.description,
+        allowed,
+        userMessage: { role: 'user', content: prompt },
+        fallbackHistory: [],
+        signal: opts.signal,
+        scope: opts.scope,
+        depth: 1,
+        addCost: opts.addCost,
+        ask: (id) => opts.ask(`${call.id}>${id}`),
+        emit: (ev) => {
+          switch (ev.type) {
+            case 'text':
+              out(ev.delta);
+              break;
+            case 'tool_call':
+              opts.emit({ ...ev, id: `${call.id}>${ev.id}`, agent: `🧩 ${def.name}` });
+              break;
+            case 'tool_approval':
+            case 'tool_output':
+            case 'tool_result':
+              opts.emit({ ...ev, id: `${call.id}>${ev.id}` });
+              break;
+            case 'file_changed':
+            case 'notice':
+              opts.emit(ev);
+              break;
+          }
+        },
+      });
+    } finally {
+      const rest = red.flush();
+      if (rest) opts.emit({ type: 'tool_output', id: call.id, chunk: rest });
+      // Fresh context every time: only its checkpoints are kept (for "revert").
+      const sub = this.sessions.get(helperId);
+      if (sub) sub.messages = [];
+    }
+    if (opts.signal.aborted) return finish(false, 'Cancelled by the user.', 'cancelado');
+    return finish(
+      true,
+      `Report from subagent ${def.name}:\n\n${truncate(answer || '(no answer)', MAX_HELPER_ANSWER)}`,
+      `${def.name} terminó`,
+    );
+  }
+
+  /**
+   * One tool call with the project's hooks around it: PreToolUse may block it (exit 2, the
+   * message goes to the model), PostToolUse may send feedback after it ran.
+   */
   private async execute(
+    s: Session,
+    call: ToolCall,
+    opts: LoopOpts,
+  ): Promise<{ ok: boolean; content: string }> {
+    const a = args(call);
+    const refuse = (content: string, summary: string) => {
+      opts.emit({ type: 'tool_call', id: call.id, name: call.name, args: viewArgs(call.name, a) });
+      opts.emit({ type: 'tool_result', id: call.id, ok: false, summary });
+      return { ok: false, content };
+    };
+    if (opts.allowed && !opts.allowed.has(call.name))
+      return refuse(
+        `Tool ${call.name} is not allowed for this subagent. Use only the tools you were given, or say in your answer what is missing.`,
+        'no permitida para este subagente',
+      );
+    const ws = this.ws(opts);
+    let absPath: string | undefined;
+    if (ws && typeof a.path === 'string')
+      try {
+        absPath = ws.resolve(a.path);
+      } catch {
+        absPath = undefined;
+      }
+    const hookFields = { tool: call.name, input: a, absPath };
+    const pre = await this.runHooks(s, 'PreToolUse', opts, hookFields);
+    if (pre.block)
+      return refuse(
+        `Blocked by a project hook (PreToolUse): ${pre.message}`,
+        `bloqueado por hook: ${pre.message.split('\n')[0]!.slice(0, 120)}`,
+      );
+    const result = await this.executeTool(s, call, opts);
+    if (!result.ok || opts.signal.aborted) return result;
+    const post = await this.runHooks(s, 'PostToolUse', opts, { ...hookFields, response: result });
+    if (post.block)
+      return {
+        ...result,
+        content: `${result.content}\n\n<hook-feedback event="PostToolUse">\n${post.message}\n</hook-feedback>`,
+      };
+    return result;
+  }
+
+  private async executeTool(
     s: Session,
     call: ToolCall,
     opts: LoopOpts,
@@ -1723,6 +1888,27 @@ A project hook did not let you finish yet. Address it, then answer.`,
           `${target} respondió`,
         );
       }
+
+      if (call.name === 'use_skill') {
+        const name = str(a.name, 'name').trim().toLowerCase();
+        const skill = opts.kit?.skills.find((k) => k.name === name);
+        if (!skill)
+          return finish(
+            false,
+            `Unknown skill "${name}". Available: ${opts.kit?.skills.map((k) => k.name).join(', ') || 'none'}.`,
+            'skill desconocida',
+          );
+        const files = skillFiles(ws, skill.dir);
+        const extra = files.length
+          ? `\n\nFiles of this skill:\n${files.map((f) => `- ${f}`).join('\n')}`
+          : '';
+        return finish(
+          true,
+          `Skill "${skill.name}" (folder ${skill.dir}):\n\n${truncate(skill.body, MAX_READ)}${extra}`,
+          `skill ${skill.name}`,
+        );
+      }
+      if (call.name === 'task') return await this.runTask(s, call, a, opts, finish);
 
       // file_hash inside the project is free; outside it, it is an equality oracle on any
       // file of the user (does ~/.ssh/id_ed25519 match this hash?), so it is approved.

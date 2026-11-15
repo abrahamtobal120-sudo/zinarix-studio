@@ -11,6 +11,7 @@ import {
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ActiveRulesView,
+  AgentKitView,
   ChatContext,
   ChatEventView,
   ConversationView,
@@ -20,6 +21,7 @@ import type {
   ToolDecision,
   ToolPreview,
 } from '../../shared/api';
+import { expandCommand } from '../../shared/agentKit';
 import { pressable } from '../a11y';
 import { confirmDialog } from '../confirm';
 import { errText } from '../errText';
@@ -1107,6 +1109,18 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       clearTimeout(timer);
     };
   }, [root, ownFolder, fsVersion, projectRules, ruleSources, ruleMentions]);
+  /** The project's own "/" commands (.zinarix/commands/*.md) and the user's (~/.zinarix). */
+  const [kitCommands, setKitCommands] = useState<AgentKitView['commands']>([]);
+  useEffect(() => {
+    let live = true;
+    void api()
+      .ai.agentKit(noFolder ? undefined : ownFolder)
+      .then((v) => live && setKitCommands(v.commands))
+      .catch(() => live && setKitCommands([]));
+    return () => {
+      live = false;
+    };
+  }, [root, ownFolder, noFolder, fsVersion]);
 
   /** Aborts the in-flight requests (if any) and stops listening to their events. */
   const cancelCurrent = () => {
@@ -1712,7 +1726,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     const m = /^\/(\S+)\s*([\s\S]*)$/.exec(text.trim());
     if (!m) return false;
     const cmd = findSlash(m[1]!);
-    if (!cmd) return false;
+    if (!cmd) {
+      // A "/" command of the project (or the user): its file is the prompt.
+      const own = kitCommands.find((c) => c.name === m[1]!.toLowerCase());
+      if (!own) return false;
+      setInput('');
+      setSuggest(null);
+      void send(expandCommand(own.body, m[2]!), [], own.agent === true);
+      return true;
+    }
     const rest = m[2]!.trim();
     setInput('');
     setSuggest(null);
@@ -1790,6 +1812,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               : c.en;
           return { id: name, label: `/${name}`, hint: c.hint };
         });
+      for (const c of kitCommands)
+        if (c.name.startsWith(q) && !findSlash(c.name))
+          items.push({
+            id: c.name,
+            label: `/${c.name}`,
+            hint: `${c.argumentHint ? `${c.argumentHint} · ` : ''}${c.description || t('slashCustom')}`,
+          });
       return setSuggest(
         items.length ? { kind: 'slash', from: 0, to: caret, items, index: 0 } : null,
       );

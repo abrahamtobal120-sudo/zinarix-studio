@@ -75,6 +75,7 @@ const api: OmniApi = {
     commitMessage: call('ai:commitMessage') as OmniApi['ai']['commitMessage'],
     rulesFile: call('ai:rulesFile') as OmniApi['ai']['rulesFile'],
     activeRules: call('ai:activeRules') as OmniApi['ai']['activeRules'],
+    agentKit: call('ai:agentKit') as OmniApi['ai']['agentKit'],
     resetContext: call('ai:resetContext') as OmniApi['ai']['resetContext'],
   },
   git: {

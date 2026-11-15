@@ -34,6 +34,7 @@ import {
   selectRules,
 } from '../shared/rules.js';
 import type { ActiveRule, Rule } from '../shared/rules.js';
+import { loadKit } from './hooks.js';
 import { setCredentialEnvNames } from './env.js';
 import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
@@ -52,6 +53,7 @@ import type {
   CustomProviderSpec,
   SavedMessageView,
   ActiveRulesView,
+  AgentKitView,
 } from '../shared/api.js';
 
 const CHAT_SYSTEM =
@@ -842,6 +844,35 @@ export class AiService {
       available: available.map(view),
       truncated,
       tokens: active.reduce((n, r) => n + r.tokens, 0),
+    };
+  }
+
+  /** Subagents, skills, "/" commands and hooks for the chat (Fase 4). */
+  agentKit(scope: Scope): AgentKitView {
+    const kit = loadKit(scope.workspace(), this.agent.userKitRoot);
+    return {
+      commands: kit.commands.map((c) => ({
+        name: c.name,
+        description: c.description,
+        ...(c.argumentHint ? { argumentHint: c.argumentHint } : {}),
+        ...(c.agent !== undefined ? { agent: c.agent } : {}),
+        body: c.body,
+        path: c.path,
+      })),
+      agents: kit.agents.map((a) => ({
+        name: a.name,
+        description: a.description,
+        ...(a.model ? { model: a.model } : {}),
+        ...(a.tools ? { tools: a.tools } : {}),
+        path: a.path,
+      })),
+      skills: kit.skills.map((k) => ({ name: k.name, description: k.description, dir: k.dir })),
+      hooks: kit.hooks.map((h) => ({
+        event: h.event,
+        matcher: h.matcher,
+        command: h.command,
+        source: h.source,
+      })),
     };
   }
 
