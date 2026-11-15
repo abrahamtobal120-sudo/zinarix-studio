@@ -75,7 +75,7 @@ function configFor(id) {
 }
 
 /**
- * Code signing, only when the release workflow provides the secrets (docs/release-signing.md);
+ * Code signing, only when the release workflow provides the secrets (.md/release-signing.md);
  * without them the build stays unsigned, as before.
  * - macOS: CSC_LINK (+ CSC_KEY_PASSWORD) = Developer ID Application certificate; with
  *   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID the app is also notarized.

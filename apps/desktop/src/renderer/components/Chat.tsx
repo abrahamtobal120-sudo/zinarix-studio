@@ -1,4 +1,13 @@
-import { memo, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ChatContext,
@@ -142,10 +151,26 @@ function slashCommands(): Slash[] {
     { name: 'explicar', en: 'explain', hint: t('slashExplain'), prompt: t('slashExplainPrompt') },
     { name: 'revisar', en: 'review', hint: t('slashReview'), prompt: t('slashReviewPrompt') },
     { name: 'arreglar', en: 'fix', hint: t('slashFix'), prompt: t('slashFixPrompt'), agent: true },
-    { name: 'pruebas', en: 'tests', hint: t('slashTests'), prompt: t('slashTestsPrompt'), agent: true },
+    {
+      name: 'pruebas',
+      en: 'tests',
+      hint: t('slashTests'),
+      prompt: t('slashTestsPrompt'),
+      agent: true,
+    },
     { name: 'docs', en: 'docs', hint: t('slashDocs'), prompt: t('slashDocsPrompt') },
-    { name: 'optimizar', en: 'optimize', hint: t('slashOptimize'), prompt: t('slashOptimizePrompt') },
-    { name: 'seguridad', en: 'security', hint: t('slashSecurity'), prompt: t('slashSecurityPrompt') },
+    {
+      name: 'optimizar',
+      en: 'optimize',
+      hint: t('slashOptimize'),
+      prompt: t('slashOptimizePrompt'),
+    },
+    {
+      name: 'seguridad',
+      en: 'security',
+      hint: t('slashSecurity'),
+      prompt: t('slashSecurityPrompt'),
+    },
     { name: 'commit', en: 'commit', hint: t('slashCommit'), action: 'commit' },
     { name: 'reglas', en: 'rules', hint: t('rulesEdit'), action: 'rules' },
     { name: 'agente', en: 'agent', hint: t('slashAgent'), action: 'agent' },
@@ -1716,7 +1741,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         .filter((c) => c.name.startsWith(q) || c.en.startsWith(q))
         .map((c) => {
           // Typed in the other language: keep suggesting the name being typed.
-          const name = slashName(c).startsWith(q) ? slashName(c) : c.name.startsWith(q) ? c.name : c.en;
+          const name = slashName(c).startsWith(q)
+            ? slashName(c)
+            : c.name.startsWith(q)
+              ? c.name
+              : c.en;
           return { id: name, label: `/${name}`, hint: c.hint };
         });
       return setSuggest(
@@ -2299,7 +2328,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             />
             <Icon name="prompt" size={14} /> {t('agent')}
           </label>
-          <label className={`pill reasoning-pick ${reasoning ? 'on' : ''}`} title={t('reasoningTitle')}>
+          <label
+            className={`pill reasoning-pick ${reasoning ? 'on' : ''}`}
+            title={t('reasoningTitle')}
+          >
             <Icon name="thinking" size={14} />
             <select
               value={reasoning}
@@ -2668,7 +2700,7 @@ function ChatProject({
                 >
                   <span className="chat-tab-label">{label}</span>
                   <span className="chat-list-meta">
-                    {status ||(c.model ? c.model.split('/').pop() : t('chatNoModel'))}
+                    {status || (c.model ? c.model.split('/').pop() : t('chatNoModel'))}
                   </span>
                 </span>
                 {c.queued.length > 0 && (
@@ -2922,7 +2954,10 @@ export function ChatPanel() {
           >
             <Icon name="menu" size={15} />
           </button>
-          <button title={`${t('chatNewTab')} (${shortcutOf('chat.new')})`} onClick={() => newChat()}>
+          <button
+            title={`${t('chatNewTab')} (${shortcutOf('chat.new')})`}
+            onClick={() => newChat()}
+          >
             <Icon name="plus" size={15} />
           </button>
           <button title={t('chatNewQuestion')} onClick={() => newQuestionChat()}>

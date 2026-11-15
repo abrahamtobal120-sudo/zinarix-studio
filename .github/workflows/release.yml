@@ -75,7 +75,7 @@ jobs:
       - run: pnpm build
       # Code signing is optional and only happens when the secrets exist (otherwise the
       # build is unsigned, as before). scripts/build-editions.mjs turns it on from these
-      # variables; see docs/release-signing.md. Each secret only reaches its own runner.
+      # variables; see .md/release-signing.md. Each secret only reaches its own runner.
       - name: Build installers
         working-directory: apps/desktop
         shell: bash
@@ -129,7 +129,7 @@ jobs:
           # One "<sha256>  <file name>" line per asset (sha256sum text format).
           sha256sum -- * > ../SHA256SUMS
           cat ../SHA256SUMS
-      # H-13: SHA256SUMS is signed with the project's minisign key (docs/release-signing.md);
+      # H-13: SHA256SUMS is signed with the project's minisign key (.md/release-signing.md);
       # install.sh / install.ps1 verify it with the public key embedded in them. The
       # trusted comment names the tag, so an older signed SHA256SUMS cannot be replayed into
       # a newer release. Legacy (-l, non-prehashed) signatures: SHA256SUMS is tiny and
@@ -146,7 +146,7 @@ jobs:
             case "$PUB" in
               RW*) echo "::error::website/install.sh has a minisign public key but the MINISIGN_SECRET_KEY secret is not set"; exit 1 ;;
             esac
-            echo "::warning::MINISIGN_SECRET_KEY is not set: SHA256SUMS is published unsigned (see docs/release-signing.md)"
+            echo "::warning::MINISIGN_SECRET_KEY is not set: SHA256SUMS is published unsigned (see .md/release-signing.md)"
             exit 0
           fi
           sudo apt-get update -qq && sudo apt-get install -y -qq minisign

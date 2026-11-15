@@ -30,8 +30,8 @@ El script descarga la última versión desde GitHub Releases y comprueba su SHA-
 
 - **Cualquier modelo, un clic** — selector por proveedor con precio, contexto y capacidades; un modelo distinto para chat, agente y edición (Ctrl+K).
 - **Modo agente** — lee muchos archivos a la vez (`tree`, `glob`, `read_many_files`, en paralelo), busca, edita con vista de diferencias y ejecuta comandos. Las escrituras y los comandos piden aprobación ("Siempre" en un comando aprueba solo ese mismo comando); las ediciones de archivos se pueden revertir durante la sesión, pero lo que hace un comando (`run_command`) no.
-- **Varias IAs a la vez** — chats en pestañas que trabajan en paralelo (abrir otro chat o cambiar de pestaña nunca pausa al que está trabajando), dos chats a la par, cada chat con su propio modelo, y varias ventanas (Ctrl+Shift+N), cada una con su carpeta, navegador, terminales y chats. Ver [docs/es/varias-ias.md](docs/es/varias-ias.md).
-- **Gratis hoy, listo para vender** — el dueño enciende el cobro desde `website/app-config.json` (también llega a las apps ya instaladas), licencias Pro firmadas que se revisan sin internet, avisos a todas las apps y actualizaciones automáticas. Los agentes son gratis en todos los planes. Ver [docs/es/vender.md](docs/es/vender.md).
+- **Varias IAs a la vez** — chats en pestañas que trabajan en paralelo (abrir otro chat o cambiar de pestaña nunca pausa al que está trabajando), dos chats a la par, cada chat con su propio modelo, y varias ventanas (Ctrl+Shift+N), cada una con su carpeta, navegador, terminales y chats. Ver [.md/es/varias-ias.md](.md/es/varias-ias.md).
+- **Gratis hoy, listo para vender** — el dueño enciende el cobro desde `website/app-config.json` (también llega a las apps ya instaladas), licencias Pro firmadas que se revisan sin internet, avisos a todas las apps y actualizaciones automáticas. Los agentes son gratis en todos los planes. Ver [.md/es/vender.md](.md/es/vender.md).
 - **Una IA trabaja para otra, con tu permiso** — en modo agente, una IA puede pedirle a otra que haga una tarea (`delegate_to_ai`): tú apruebas la delegación y cada acción de la IA ayudante. También puedes pasar cualquier respuesta a otra IA con un clic.
 - **Navegador que controla la IA** — pestaña 🌐 con un navegador aislado, con una pestaña por conversación para que dos agentes no se estorben; todas las IAs pueden usarlo (también las que no tienen _function calling_ y los agentes de terminal como Claude Code, Codex o Gemini CLI, mediante un protocolo de herramientas por texto): el agente abre páginas, las lee, hace clic y escribe (permiso por sitio; evita escribir en campos de contraseña o de pago, pero esa detección es heurística, no una garantía: no inicies sesión con cuentas sensibles en ese navegador).
 - **Centro de seguridad (defensivo)** — auditoría del proyecto (secretos filtrados, código inseguro, .env en git), dependencias vulnerables (osv.dev), revisión de tu equipo (puertos, firewall, actualizaciones, SSH, cifrado), escaneo de puertos de tu red local, revisión de sitios web (certificado, TLS, encabezados, cookies) y verificación de archivos por hash. Solo sistemas propios o con autorización.
@@ -47,7 +47,7 @@ El script descarga la última versión desde GitHub Releases y comprueba su SHA-
 
 ## Desarrollo
 
-Base experimental de VS Code: `pnpm code:prepare` incorpora el ZIP descargado y aplica la identidad de Zinarix; `pnpm code:status` muestra los requisitos. Consulta [la preparacion y el estado de la migracion](docs/es/code-oss.md).
+Base experimental de VS Code: `pnpm code:prepare` incorpora el ZIP descargado y aplica la identidad de Zinarix; `pnpm code:status` muestra los requisitos. Consulta [la preparacion y el estado de la migracion](.md/es/code-oss.md).
 
 ```bash
 pnpm install
@@ -139,10 +139,10 @@ packages/providers  Cliente HTTP (retry/backoff/Retry-After/timeout/abort), SSE,
 packages/core       Config, catálogo firmado, bóveda, descubrimiento de modelos, router,
                     fallback, presupuestos, costos, historial, auditoría (SQLite)
 catalog/            providers.json (62 proveedores, catálogo del 2026-10-07) + firma Ed25519
-docs/               Arquitectura, cómo agregar proveedores, entrega de Fase 1
+.md/                Arquitectura, cómo agregar proveedores, entrega de Fase 1
 ```
 
-Más: [docs/es/arquitectura.md](docs/es/arquitectura.md) · [docs/es/agregar-proveedor.md](docs/es/agregar-proveedor.md) · [docs/es/fase-1-entrega.md](docs/es/fase-1-entrega.md)
+Más: [.md/es/arquitectura.md](.md/es/arquitectura.md) · [.md/es/agregar-proveedor.md](.md/es/agregar-proveedor.md) · [.md/es/fase-1-entrega.md](.md/es/fase-1-entrega.md)
 
 ---
 
@@ -152,7 +152,7 @@ Zinarix Studio is a VS Code–style, multi-AI IDE: bring your own API keys for 6
 **Status: Phase 1 complete** — editor-independent AI core, provider adapters (OpenAI-compatible, OpenAI Responses, Anthropic, Gemini), a verified 62-provider catalog with signed hot updates, an OS-keychain key vault, and the `omni` CLI (`auth`, `providers`, `models`, `use`, `ask`, `chat`, `compare`, `usage`, `history`, `catalog`, `config`, `completion`, `wipe`).
 
 Requires Node ≥ 24.7 and pnpm. `pnpm install && pnpm build && pnpm test`. Set `OMNI_LANG=en` or pass `--lang en` for English UI strings.
-See [docs/en/architecture.md](docs/en/architecture.md) and [docs/en/adding-a-provider.md](docs/en/adding-a-provider.md).
+See [.md/en/architecture.md](.md/en/architecture.md) and [.md/en/adding-a-provider.md](.md/en/adding-a-provider.md).
 
 License: MIT.
 
