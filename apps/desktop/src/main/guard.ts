@@ -44,6 +44,21 @@ const EXECUTES: RegExp[] = [
   /^\.(omni|local\/bin)\//i,
 ];
 
+// Project rules (Fase 1): they enter every later agent run, so a change (e.g. /init writing
+// AGENTS.md, or a prompt injection planting instructions) is always approved by the user.
+const RULE_FILE: RegExp[] = [
+  /(^|\/)(AGENTS|CLAUDE)\.md$/i,
+  /(^|\/)\.cursorrules$/i,
+  /(^|\/)\.github\/copilot-instructions\.md$/i,
+  /(^|\/)\.github\/instructions\//i,
+  /(^|\/)\.zinarix\/rules(\.md$|\/)/i,
+];
+
+export function isRuleFile(rel: string): boolean {
+  const p = rel.replace(/\\/g, '/').replace(/^\.\//, '');
+  return RULE_FILE.some((re) => re.test(p));
+}
+
 /** Why a write to this path must be approved one at a time; null = an ordinary project file. */
 export function protectedWrite(rel: string): string | null {
   const p = rel.replace(/\\/g, '/').replace(/^\.\//, '');
@@ -51,5 +66,7 @@ export function protectedWrite(rel: string): string | null {
     return '⚠️ Este archivo guarda secretos o credenciales. Revisa el cambio con cuidado.';
   if (EXECUTES.some((re) => re.test(p)))
     return '⚠️ Este archivo hace que otros programas ejecuten código (git, npm, el editor o CI). Un cambio aquí puede ejecutar comandos más tarde sin preguntarte: revísalo con cuidado.';
+  if (isRuleFile(p))
+    return '⚠️ Este archivo tiene reglas del proyecto: el agente las seguirá en las próximas conversaciones. Revisa el cambio con cuidado.';
   return null;
 }
