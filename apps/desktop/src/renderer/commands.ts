@@ -18,6 +18,7 @@ import { tp } from './i18nPlayground';
 import { rerunFailed, runAll as runAllTests, runAtCursor } from './testExplorer';
 import { studioCommand, videoCommands } from './components/video/videoCommands';
 import { lang, setLang, t } from './i18n';
+import { layoutCommands } from './layout/layoutCommands';
 import { comboFromEvent } from './keys';
 import {
   api,
@@ -398,6 +399,7 @@ function baseCommands(): Command[] {
       label: `${t('lightTheme')} / ${t('darkTheme')}`,
       run: () => toggleTheme(),
     },
+    ...layoutCommands(),
     {
       id: 'ai.edit',
       label: `${t('aiEdit')} (${t('cmdSelection')})`,

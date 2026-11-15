@@ -23,6 +23,7 @@ import {
 } from '../../../shared/video';
 import type { Look } from '../../../shared/videoFx';
 import { cssFilter } from '../../../shared/videoFx';
+import { duckGainAt } from '../../../shared/videoEasy';
 import { textCanvas } from './textDraw';
 import { getV, setV } from './videoStore';
 
@@ -152,7 +153,10 @@ export class Player {
       el.muted = !trackAudible(p, track) || !m.hasAudio || c.volume <= 0;
       el.volume = Math.min(
         1,
-        Math.max(0, c.volume * trackVolume(track) * (inside ? fadeAt(c, t) : 0)),
+        Math.max(
+          0,
+          c.volume * trackVolume(track) * duckGainAt(p, track, t) * (inside ? fadeAt(c, t) : 0),
+        ),
       );
       if (active && rate > 0) {
         // HTML media plays forward only, up to 16×.

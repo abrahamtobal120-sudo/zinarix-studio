@@ -41,6 +41,32 @@ export const NEEDED_APIS = [
 /** Google refused the token (as opposed to a network or server failure). */
 class AuthError extends Error {}
 
+/**
+ * An API is off in the project Google bills the call to. With "Sign in with Google" that is
+ * usually the project of the OAuth client itself, not one of the user's projects.
+ */
+class ServiceDisabledError extends Error {
+  constructor(
+    message: string,
+    readonly service: string,
+    /** Project number or id ("151420956067"), without the "projects/" prefix. */
+    readonly consumer: string,
+  ) {
+    super(message);
+  }
+}
+
+type GoogleErrorBody = {
+  error?:
+    | {
+        message?: string;
+        details?: { reason?: string; metadata?: { service?: string; consumer?: string } }[];
+      }
+    | string;
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 function checkProject(id: string): string {
   if (!/^[\w.:-]{1,100}$/.test(id)) throw new Error('Id de proyecto de Google Cloud no válido.');
   return id;
@@ -85,7 +111,55 @@ export class GCloud {
     return acc ? this.accounts.token(acc.id) : null;
   }
 
+  /** Consumer projects where we already tried to turn an API on this session ("project|api"). */
+  private readonly enableTried = new Set<string>();
+
+  /**
+   * Every Google call goes through here. If Google answers that the API is off in the project
+   * it bills to (often the OAuth client's own project, not one of the user's), it tries once
+   * per session to turn that API on there and retries while the change spreads. Works for any
+   * API (BigQuery, Storage, SQL, Logging, Resource Manager…). If it can't, a clear message.
+   */
   private async req<T>(url: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+    try {
+      return await this.send<T>(url, init);
+    } catch (e) {
+      if (!(e instanceof ServiceDisabledError)) throw e;
+      const key = `${e.consumer}|${e.service}`;
+      if (!this.enableTried.has(key)) {
+        this.enableTried.add(key);
+        let enabled = false;
+        try {
+          await this.send(
+            `https://serviceusage.googleapis.com/v1/projects/${enc(e.consumer)}/services/${enc(e.service)}:enable`,
+            { method: 'POST', body: {} },
+          );
+          enabled = true;
+        } catch {
+          /* no permission on that project: fall through to the clear message */
+        }
+        // Google says it may take a few minutes to apply; retry for about half a minute.
+        if (enabled)
+          for (let i = 0; i < 6; i++) {
+            await sleep(5_000);
+            try {
+              return await this.send<T>(url, init);
+            } catch (again) {
+              if (!(again instanceof ServiceDisabledError)) throw again;
+            }
+          }
+      }
+      throw new ServiceDisabledError(
+        `La API "${e.service}" está desactivada en el proyecto ${e.consumer}. ` +
+          `Actívala en https://console.cloud.google.com/apis/library/${e.service}?project=${e.consumer}, ` +
+          `espera un par de minutos y vuelve a intentar. (Google: ${e.message})`,
+        e.service,
+        e.consumer,
+      );
+    }
+  }
+
+  private async send<T>(url: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
     const refresh = this.refresh();
     if (!refresh) throw new Error('Inicia sesión con Google en el panel de Google Cloud primero.');
     let token: string;
@@ -106,14 +180,24 @@ export class GCloud {
     const text = await r.text();
     if (!r.ok) {
       let msg = `${r.status} ${r.statusText}`;
+      let disabled: { service?: string; consumer?: string } | undefined;
       try {
-        const e = JSON.parse(text) as { error?: { message?: string } | string };
+        const e = JSON.parse(text) as GoogleErrorBody;
         if (typeof e.error === 'string') msg = e.error;
-        else if (e.error?.message) msg = e.error.message;
+        else if (e.error) {
+          if (e.error.message) msg = e.error.message;
+          disabled = e.error.details?.find((d) => d.reason === 'SERVICE_DISABLED')?.metadata;
+        }
       } catch {
         /* not JSON */
       }
       if (r.status === 401) throw new AuthError(`Google rechazó la sesión (${msg}).`);
+      if (disabled?.service && disabled.consumer)
+        throw new ServiceDisabledError(
+          msg,
+          disabled.service,
+          disabled.consumer.replace(/^projects\//, ''),
+        );
       throw new Error(msg);
     }
     return (text ? JSON.parse(text) : null) as T;
@@ -183,6 +267,43 @@ export class GCloud {
   // ---- Projects and APIs ----
 
   async projects(): Promise<GCloudProject[]> {
+    try {
+      return await this.projectsFromResourceManager();
+    } catch (e) {
+      if (!(e instanceof ServiceDisabledError)) throw e;
+      // Cloud Resource Manager is off and could not be turned on: BigQuery also lists projects.
+      try {
+        return await this.projectsFromBigQuery();
+      } catch {
+        throw e; // already the clear message with the link
+      }
+    }
+  }
+
+  private async projectsFromBigQuery(): Promise<GCloudProject[]> {
+    const out: GCloudProject[] = [];
+    let page = '';
+    do {
+      const j = await this.req<{
+        projects?: {
+          projectReference?: { projectId?: string };
+          friendlyName?: string;
+          numericId?: string;
+        }[];
+        nextPageToken?: string;
+      }>(
+        `https://bigquery.googleapis.com/bigquery/v2/projects?maxResults=1000${page ? `&pageToken=${enc(page)}` : ''}`,
+      );
+      for (const p of j.projects ?? []) {
+        const id = p.projectReference?.projectId;
+        if (id) out.push({ id, name: p.friendlyName || id, number: p.numericId ?? '' });
+      }
+      page = j.nextPageToken ?? '';
+    } while (page && out.length < 1000);
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private async projectsFromResourceManager(): Promise<GCloudProject[]> {
     const out: GCloudProject[] = [];
     let page = '';
     do {

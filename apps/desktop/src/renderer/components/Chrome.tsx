@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { commands, runCommand } from '../commands';
 import { pressable } from '../a11y';
+import { SpaceSwitcher } from '../layout/SpaceSwitcher';
 import { t } from '../i18n';
 import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
@@ -322,6 +323,7 @@ export function StatusBar() {
       <span className="status-item" {...pressable(() => void api().workspace.openDialog())}>
         <Icon name="folder" size={13} /> {workspace?.name ?? t('openFolder')}
       </span>
+      <SpaceSwitcher />
       {workspace?.branch && (
         <span
           className="status-item"

@@ -11,6 +11,7 @@ import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
 import { ExportDialog, RenderQueue } from './ExportDialog';
 import { Inspector } from './Inspector';
+import { EasyPanel } from './EasyPanel';
 import { EffectsPanel, MixerPanel, TextPanel, TransitionsPanel } from './FxPanels';
 import { MediaLibrary, pickAndImport } from './MediaLibrary';
 import { tv, type VideoKey } from './strings';
@@ -54,6 +55,7 @@ import { projectDuration } from '../../../shared/video';
 
 const TABS: { id: StudioTab; key: VideoKey; icon: IconName; phase?: number; soon?: VideoKey }[] = [
   { id: 'media', key: 'tabMedia', icon: 'folder' },
+  { id: 'easy', key: 'tabEasy', icon: 'star' },
   { id: 'audio', key: 'tabAudio', icon: 'music' },
   { id: 'text', key: 'tabText', icon: 'type' },
   { id: 'stickers', key: 'tabStickers', icon: 'smile', phase: 3, soon: 'soonStickers' },
@@ -261,6 +263,8 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
             <section className="vs-left" style={{ width: leftW }} aria-label={tv(current.key)}>
               {tab === 'media' ? (
                 <MediaLibrary />
+              ) : tab === 'easy' ? (
+                <EasyPanel />
               ) : tab === 'text' ? (
                 <TextPanel />
               ) : tab === 'effects' ? (

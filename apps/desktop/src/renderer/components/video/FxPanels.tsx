@@ -22,6 +22,7 @@ import {
   cssFilter,
 } from '../../../shared/videoFx';
 import { toast } from '../../store';
+import { DuckControl } from './EasyPanel';
 import { FONT_FAMILY } from './textDraw';
 import { type VideoKey, tv } from './strings';
 import { commit, commitMerged, getV, setV, useV } from './videoStore';
@@ -227,6 +228,7 @@ function MixerStrip({ track, dimmed }: { track: Track; dimmed: boolean }) {
             : `${pan < 0 ? tv('panL') : tv('panR')}${Math.round(Math.abs(pan) * 100)}`}
         </code>
       </label>
+      {track.kind === 'audio' && <DuckControl track={track} />}
     </div>
   );
 }

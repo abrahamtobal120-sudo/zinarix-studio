@@ -43,6 +43,18 @@ import {
   useStore,
 } from './store';
 import { t } from './i18n';
+import { panelSideWidth } from '../shared/layout';
+import {
+  captureNow,
+  exitZen,
+  getLayout,
+  presetsChanged,
+  setLayoutSize,
+  useLayout,
+} from './layout/layoutStore';
+import { tl } from './layout/i18nLayout';
+import { useV } from './components/video/videoStore';
+import './layout/layout.css';
 
 /** Pixels a separator moves per arrow key press. */
 const SASH_STEP = 16;
@@ -116,9 +128,6 @@ function Sash({
   );
 }
 
-const CHAT_W_KEY = 'zs.chatWidth';
-const SIDE_W_KEY = 'zs.sideWidth';
-const PANEL_H_KEY = 'zs.panelHeight';
 /** Room the editor keeps between the side bar and the chat, so neither squeezes it flat. */
 const CENTER_MIN = 360;
 /** Height kept for the editor (and the status bar) above the bottom panel. */
@@ -127,8 +136,7 @@ const PANEL_MIN = 100;
 
 /** The height the user last dragged the bottom panel to. */
 function initialPanelHeight(): number {
-  const saved = Number(localStorage.getItem(PANEL_H_KEY));
-  return saved >= PANEL_MIN ? saved : 260;
+  return getLayout().sizes.panel ?? 260;
 }
 
 /** Notifications: their own component so a toast does not re-render the whole app. The live
@@ -156,15 +164,15 @@ function GitBadgeWatcher() {
 
 /** The width the user last dragged the side bar to; otherwise a fifth of the window. */
 function initialSideWidth(): number {
-  const saved = Number(localStorage.getItem(SIDE_W_KEY));
-  if (saved >= 160) return saved;
+  const saved = getLayout().sizes.side;
+  if (saved) return saved;
   return Math.round(Math.min(280, Math.max(200, window.innerWidth * 0.18)));
 }
 
 /** The width the user last dragged the chat to; otherwise about a third of the window. */
 function initialChatWidth(): number {
-  const saved = Number(localStorage.getItem(CHAT_W_KEY));
-  if (saved >= 280) return Math.min(saved, window.innerWidth - 200);
+  const saved = getLayout().sizes.chat;
+  if (saved) return Math.min(saved, window.innerWidth - 200);
   return Math.round(Math.min(640, Math.max(400, window.innerWidth * 0.36)));
 }
 
@@ -242,6 +250,48 @@ function DropOverlay() {
   );
 }
 
+/**
+ * Fase 17: every change of the areas on screen is kept as the arrangement of the current
+ * workspace, so it comes back after switching workspaces or restarting. Own component, so it
+ * re-renders alone. Also: Esc twice leaves Zen mode.
+ */
+function LayoutSync() {
+  const sidebar = useStore((s) => s.sidebar);
+  const panelOpen = useStore((s) => s.panelOpen);
+  const chatOpen = useStore((s) => s.chatOpen);
+  const studio = useV((v) => v.open && !v.minimized);
+  const zen = useLayout((l) => l.zen);
+  // Opening or closing an area while in Zen leaves Zen, so the change is visible.
+  const prev = useRef({ sidebar, panelOpen, chatOpen, studio });
+  useEffect(() => {
+    captureNow();
+    const p = prev.current;
+    const changed =
+      p.sidebar !== sidebar ||
+      p.panelOpen !== panelOpen ||
+      p.chatOpen !== chatOpen ||
+      p.studio !== studio;
+    prev.current = { sidebar, panelOpen, chatOpen, studio };
+    if (changed) exitZen();
+  }, [sidebar, panelOpen, chatOpen, studio]);
+  useEffect(() => {
+    if (presetsChanged) showToast(tl('lyPresetsChanged'));
+  }, []);
+  useEffect(() => {
+    if (!zen) return;
+    let last = 0;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.repeat) return;
+      const now = Date.now();
+      if (now - last < 600) exitZen();
+      last = now;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zen]);
+  return null;
+}
+
 export function App() {
   const sidebar = useStore((s) => s.sidebar);
   const panelOpen = useStore((s) => s.panelOpen);
@@ -256,6 +306,9 @@ export function App() {
   const [panelH, setPanelH] = useState(initialPanelHeight);
   const [terminalMounted, setTerminalMounted] = useState(false);
   const maxWanted = useStore((s) => s.maximized);
+  const zen = useLayout((l) => l.zen);
+  const panelRight = useLayout((l) => l.spaces[l.space].panelPosition === 'right');
+  const [panelSideW, setPanelSideW] = useState(() => getLayout().sizes.panelSide);
   // Only an area that is showing can fill the window.
   const max =
     (maxWanted === 'side' && sidebar) ||
@@ -265,11 +318,15 @@ export function App() {
       : null;
   // The Panel de Edición takes the editor's place (and the side bar's): the chat stays.
   const design = sidebar === 'design';
-  const chatWide = chatOpen && noTabs && !panelOpen && !max && !design;
+  // Zen: only the editor (or, with no file open, the chat) stays.
+  const sideOn = sidebar && !zen;
+  const panelOn = panelOpen && !zen;
+  const chatWide = chatOpen && noTabs && !panelOn && !max && !design;
+  const chatOn = chatOpen && (!zen || chatWide);
   // On a narrow window the side bar gives way first, then the chat, so the editor keeps
   // CENTER_MIN. The dragged widths are kept and come back when the window grows.
   const room = winW - 48 - CENTER_MIN;
-  const chatShown = chatOpen && !chatWide;
+  const chatShown = chatOn && !chatWide;
   // Two chats side by side (and the list of chats) need their own room: below this
   // each pane gets squeezed and its contents spill out.
   // The list of chats is 230px wide (styles.css .chat-list).
@@ -278,7 +335,7 @@ export function App() {
     160,
     Math.min(900, room - (chatShown ? Math.min(chatW, chatMin + 120) : 0)),
   );
-  const sideShown = sidebar && !design ? Math.max(160, Math.min(sideW, sideHi)) : 0;
+  const sideShown = sideOn && !design ? Math.max(160, Math.min(sideW, sideHi)) : 0;
   // The chat goes from its minimum up to leaving the editor 160px: the size the user drags
   // to is the size shown (before, it was clamped again to keep the editor at 360px, so on
   // 1366-1440px screens with the list or the split view the chat did not move at all).
@@ -286,8 +343,8 @@ export function App() {
   const chatLo = Math.min(chatMin, chatHi);
   const chatShownW = Math.min(chatHi, Math.max(chatLo, chatW));
   // Read by the drag handlers, which keep the closure of the render where the drag began.
-  const limits = useRef({ sideHi, chatLo, chatHi });
-  limits.current = { sideHi, chatLo, chatHi };
+  const limits = useRef({ sideHi, chatLo, chatHi, center: 0 });
+  limits.current = { sideHi, chatLo, chatHi, center: 0 };
   // The bottom panel never takes the whole window: the editor keeps PANEL_ROOM px.
   const panelMax = Math.max(PANEL_MIN, winH - PANEL_ROOM);
   const panelShownH = Math.max(PANEL_MIN, Math.min(panelH, panelMax));
@@ -296,8 +353,11 @@ export function App() {
   // of chats closes (the conversation stays). Only on resize: opening the list on a narrow
   // window is the user's choice.
   const layout = useRef({ center: 0, chatList: false, chatShown: false });
+  const centerW = winW - (zen ? 0 : 48) - sideShown - (chatShown ? chatShownW : 0);
+  const panelSideShown = panelSideWidth(panelSideW, centerW);
+  limits.current.center = centerW;
   layout.current = {
-    center: winW - 48 - sideShown - (chatShown ? chatShownW : 0),
+    center: centerW,
     chatList: Boolean(chatList),
     chatShown,
   };
@@ -328,8 +388,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (panelOpen) setTerminalMounted(true);
-  }, [panelOpen]);
+    if (panelOn) setTerminalMounted(true);
+  }, [panelOn]);
 
   // The maximized area was closed: the next time it opens it comes back at its usual size.
   useEffect(() => {
@@ -372,20 +432,27 @@ export function App() {
   const dragSide = (d: number) =>
     setSideW((w) => {
       const next = Math.min(limits.current.sideHi, Math.max(160, w + d));
-      localStorage.setItem(SIDE_W_KEY, String(Math.round(next)));
+      setLayoutSize('side', next);
       return next;
     });
   const dragChat = (d: number) =>
     setChatW((w) => {
       const { chatLo, chatHi } = limits.current;
       const next = Math.min(chatHi, Math.max(chatLo, w - d));
-      localStorage.setItem(CHAT_W_KEY, String(Math.round(next)));
+      setLayoutSize('chat', next);
       return next;
     });
   const dragPanel = (d: number) =>
     setPanelH((h) => {
       const next = Math.min(panelMax, Math.max(PANEL_MIN, h - d));
-      localStorage.setItem(PANEL_H_KEY, String(Math.round(next)));
+      setLayoutSize('panel', next);
+      return next;
+    });
+  // The panel at the right of the editor grows when its separator moves left.
+  const dragPanelSide = (d: number) =>
+    setPanelSideW((w) => {
+      const next = panelSideWidth((w ?? panelSideShown) - d, limits.current.center);
+      setLayoutSize('panelSide', next);
       return next;
     });
 
@@ -450,15 +517,15 @@ export function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className={zen ? 'app zen' : 'app'}>
       <div className="main-row">
-        <ActivityBar />
+        {!zen && <ActivityBar />}
         {design && (
           <div className="design-host">
             <DesignPanel />
           </div>
         )}
-        {sidebar && !design && (!max || max === 'side') && (
+        {sideOn && !design && (!max || max === 'side') && (
           <>
             <aside
               className="sidebar"
@@ -502,28 +569,47 @@ export function App() {
         )}
         {/* With no file open the chat takes the whole center, like a chat app. */}
         <div
-          className={max === 'panel' ? 'center center-max-panel' : 'center'}
+          className={
+            'center' +
+            (max === 'panel' ? ' center-max-panel' : '') +
+            (panelRight ? ' center-right' : '')
+          }
           style={chatWide || max === 'side' || design ? { display: 'none' } : undefined}
         >
           <EditorArea />
           {terminalMounted && (
             <div
               style={{
-                display: panelOpen && max !== 'editor' ? 'flex' : 'none',
-                flexDirection: 'column',
-                ...(max === 'panel' ? { flex: 1, minHeight: 0 } : {}),
+                display: panelOn && max !== 'editor' ? 'flex' : 'none',
+                flexDirection: panelRight ? 'row' : 'column',
+                ...(max === 'panel' ? { flex: 1, minHeight: 0, minWidth: 0 } : {}),
+                ...(panelRight && max !== 'panel' ? { flexShrink: 0 } : {}),
               }}
             >
-              {!max && (
-                <Sash
-                  dir="y"
-                  label={t('resizePanel')}
-                  onStart={() => setPanelH(panelShownH)}
-                  onDrag={dragPanel}
-                />
-              )}
+              {!max &&
+                (panelRight ? (
+                  <Sash
+                    dir="x"
+                    label={tl('lyResizePanelSide')}
+                    onStart={() => setPanelSideW(panelSideShown)}
+                    onDrag={dragPanelSide}
+                  />
+                ) : (
+                  <Sash
+                    dir="y"
+                    label={t('resizePanel')}
+                    onStart={() => setPanelH(panelShownH)}
+                    onDrag={dragPanel}
+                  />
+                ))}
               <div
-                style={max === 'panel' ? { flex: 1, minHeight: 0 } : { height: panelShownH }}
+                style={
+                  max === 'panel'
+                    ? { flex: 1, minHeight: 0, minWidth: 0 }
+                    : panelRight
+                      ? { width: panelSideShown }
+                      : { height: panelShownH }
+                }
                 className="panel-wrap"
               >
                 <TerminalPanel />
@@ -532,7 +618,7 @@ export function App() {
           )}
         </div>
         {/* Kept mounted while hidden so the conversation survives toggling the panel. */}
-        {chatOpen && !chatWide && !max && (
+        {chatOn && !chatWide && !max && (
           <Sash
             dir="x"
             label={t('resizeChat')}
@@ -544,13 +630,13 @@ export function App() {
           className={chatWide ? 'chat-wrap chat-wide' : 'chat-wrap'}
           style={{
             width: chatWide ? undefined : chatShownW,
-            display: chatOpen && !max ? 'flex' : 'none',
+            display: chatOn && !max ? 'flex' : 'none',
           }}
         >
           <ChatPanel />
         </aside>
       </div>
-      <StatusBar />
+      {!zen && <StatusBar />}
       <Modals />
       <VideoStudioHost />
       <HelperBubble />
@@ -562,6 +648,7 @@ export function App() {
       <Toast />
       <DropOverlay />
       <GitBadgeWatcher />
+      <LayoutSync />
     </div>
   );
 }

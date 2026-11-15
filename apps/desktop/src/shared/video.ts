@@ -201,6 +201,8 @@ export interface Track {
   volume?: number;
   pan?: number;
   solo?: boolean;
+  /** Ducking: 0–1, the level this track drops to while a voice plays elsewhere (missing = off). */
+  duck?: number;
 }
 
 export interface Marker {
@@ -869,7 +871,8 @@ export function validProject(x: unknown): x is VideoProject {
         typeof t.id === 'string' &&
         (t.kind === 'video' || t.kind === 'audio') &&
         (t.volume === undefined || (Number.isFinite(t.volume) && t.volume >= 0 && t.volume <= 2)) &&
-        (t.pan === undefined || (Number.isFinite(t.pan) && t.pan >= -1 && t.pan <= 1)),
+        (t.pan === undefined || (Number.isFinite(t.pan) && t.pan >= -1 && t.pan <= 1)) &&
+        (t.duck === undefined || (Number.isFinite(t.duck) && t.duck >= 0 && t.duck <= 1)),
     ) &&
     p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string')
   );
@@ -1110,6 +1113,15 @@ export const EXPORT_PRESETS: ExportPreset[] = [
     preset: 'medium',
     audioKbps: 192,
     aspect: [9, 16],
+  },
+  {
+    id: 'square',
+    label: 'Instagram (1:1)',
+    short: 1080,
+    crf: 21,
+    preset: 'medium',
+    audioKbps: 192,
+    aspect: [1, 1],
   },
   { id: 'web', label: 'Web ligero (720p)', short: 720, crf: 26, preset: 'fast', audioKbps: 128 },
   { id: 'max', label: 'Máxima calidad', short: null, crf: 16, preset: 'slow', audioKbps: 320 },

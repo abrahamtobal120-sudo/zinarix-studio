@@ -32,7 +32,7 @@ function ruleLines(file: string): [string, string][] {
 const files = cssFiles(ROOT).filter((f) => f !== TOKENS);
 const lines = files.flatMap(ruleLines);
 const tokens = readFileSync(TOKENS, 'utf8');
-const defined = new Set([...tokens.matchAll(/^\s*(--[\w-]+):/gm)].map((m) => m[1]));
+const defined = new Set([...tokens.matchAll(/^\s*(--[\w-]+):/gm)].map((m) => m[1]!));
 
 describe('ui tokens', () => {
   it('no hex colors outside tokens.css and the theme blocks', () => {

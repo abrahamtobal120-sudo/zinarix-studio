@@ -39,6 +39,7 @@ const es = {
 
   tabMedia: 'Medios',
   tabAudio: 'Audio',
+  tabEasy: 'Fácil',
   tabText: 'Texto',
   tabStickers: 'Stickers',
   tabEffects: 'Efectos',
@@ -365,6 +366,7 @@ const en: Record<VideoKey, string> = {
 
   tabMedia: 'Media',
   tabAudio: 'Audio',
+  tabEasy: 'Easy',
   tabText: 'Text',
   tabStickers: 'Stickers',
   tabEffects: 'Effects',

@@ -38,6 +38,12 @@ import {
 } from './video.js';
 import type { LookExpr } from './videoFx.js';
 import { animLengths, combineExpr, ffmpegEffects, windowExpr } from './videoFx.js';
+import { duckExpr } from './videoEasy.js';
+
+const duckFilter = (p: VideoProject, track: Track, offset: number): string[] => {
+  const e = duckExpr(p, track, offset);
+  return e ? [`volume='${e}':eval=frame`] : [];
+};
 
 export interface RenderPlan {
   /** FFmpeg arguments before the filter (inputs) — the runner adds the filter and the output. */
@@ -399,6 +405,8 @@ export function buildRender(
       ...(pc.fadeIn.d ? [`afade=t=in:st=${num(pc.fadeIn.st)}:d=${num(pc.fadeIn.d)}`] : []),
       ...(pc.fadeOut.d ? [`afade=t=out:st=${num(pc.fadeOut.st)}:d=${num(pc.fadeOut.d)}`] : []),
       `adelay=${ms}:all=1`,
+      // Ducking: after the delay, so the filter's t is the export time.
+      ...duckFilter(p, track, o.start),
     ];
     graph.push(`[${input}:a]${f.join(',')}[${label}]`);
     audio.push(label);
