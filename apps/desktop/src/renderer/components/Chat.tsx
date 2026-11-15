@@ -47,6 +47,8 @@ import { runCommand } from '../commands';
 import { fileIcon } from './icons';
 import { Icon, TONE, type IconName } from './Icon';
 import { OfflineGames, useOnline } from './OfflineGames';
+import { tv } from './video/strings';
+import { openStudio } from './video/videoStore';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory, when } from './ChatHistory';
 import { Markdown } from './Markdown';
@@ -2265,6 +2267,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             onClick={() => imagePicker.current?.click()}
           >
             <Icon name="image" size={15} />
+          </button>
+          <button
+            className="term-pick"
+            title={tv('openStudioHint')}
+            aria-label={tv('openStudio')}
+            onClick={() => void openStudio()}
+          >
+            <Icon name="film" size={15} />
           </button>
           <input
             ref={imagePicker}

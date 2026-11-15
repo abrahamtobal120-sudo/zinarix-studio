@@ -16,6 +16,7 @@ import { askInChat } from './Chat';
 import { Icon, type IconName } from './Icon';
 import { Properties } from './design/Properties';
 import { tagName } from './design/names';
+import './design/design.css';
 
 type Device = 'desktop' | 'tablet' | 'phone';
 const DEVICE_W: Record<Device, number> = { desktop: 0, tablet: 820, phone: 390 };
@@ -250,11 +251,11 @@ export function DesignPanel() {
           for (const h of hidden) send({ type: 'setHidden', src: h, hidden: true });
           const r = restore.current;
           restore.current = null;
+          // After a reload: same scroll, same element selected (its number did not change).
           if (r) {
             send({ type: 'scrollTo', y: r.scroll });
             if (r.src) send({ type: 'select', src: r.src });
-            else setSel(null);
-          } else setSel(null);
+          }
           break;
         }
         case 'scroll':

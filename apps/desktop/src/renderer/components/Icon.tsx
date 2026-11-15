@@ -604,6 +604,65 @@ const ICONS = {
     ],
     ['path', { d: 'M9 18c-4.51 2-5-2-7-2' }],
   ],
+  // Video Studio.
+  volume: [
+    ['path', { d: 'M11 5 6 9H2v6h4l5 4z' }],
+    ['path', { d: 'M15.5 8.5a5 5 0 0 1 0 7' }],
+    ['path', { d: 'M18.5 5.5a9 9 0 0 1 0 13' }],
+  ],
+  volumeOff: [
+    ['path', { d: 'M11 5 6 9H2v6h4l5 4z' }],
+    ['path', { d: 'm16 9 6 6' }],
+    ['path', { d: 'm22 9-6 6' }],
+  ],
+  magnet: [
+    ['path', { d: 'M5 3h4v8a3 3 0 0 0 6 0V3h4v8a7 7 0 0 1-14 0z' }],
+    ['path', { d: 'M5 7h4' }],
+    ['path', { d: 'M15 7h4' }],
+  ],
+  flag: [
+    ['path', { d: 'M5 21V4' }],
+    ['path', { d: 'M5 4h12l-2.5 4L17 12H5' }],
+  ],
+  film: [
+    ['rect', { x: '3', y: '10', width: '18', height: '11', rx: '1' }],
+    ['path', { d: 'm3 10-.6-3 17-3.5.6 3-17 3.5' }],
+    ['path', { d: 'm7.5 5.6 2.5 3.4' }],
+    ['path', { d: 'm13 4.5 2.5 3.4' }],
+  ],
+  music: [
+    ['path', { d: 'M9 18V5l12-2v13' }],
+    ['circle', { cx: '6', cy: '18', r: '3' }],
+    ['circle', { cx: '18', cy: '16', r: '3' }],
+  ],
+  unlock: [
+    ['rect', { width: '18', height: '11', x: '3', y: '11', rx: '2', ry: '2' }],
+    ['path', { d: 'M7 11V7a5 5 0 0 1 9.9-1' }],
+  ],
+  eyeOff: [
+    [
+      'path',
+      {
+        d: 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0',
+      },
+    ],
+    ['path', { d: 'm3 3 18 18' }],
+  ],
+  type: [
+    ['path', { d: 'M4 7V4h16v3' }],
+    ['path', { d: 'M9 20h6' }],
+    ['path', { d: 'M12 4v16' }],
+  ],
+  smile: [
+    ['circle', { cx: '12', cy: '12', r: '10' }],
+    ['path', { d: 'M8 14s1.5 2 4 2 4-2 4-2' }],
+    ['path', { d: 'M9 9h.01' }],
+    ['path', { d: 'M15 9h.01' }],
+  ],
+  layers: [
+    ['rect', { x: '3', y: '3', width: '12', height: '12', rx: '1' }],
+    ['rect', { x: '9', y: '9', width: '12', height: '12', rx: '1' }],
+  ],
   vercel: [['path', { d: 'M12 4l9 16H3z' }]],
   supabase: [['path', { d: 'M13 2.5 4 14h8l-1 7.5L20 10h-8z' }]],
 } as const satisfies Record<string, IconNode>;

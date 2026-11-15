@@ -5,6 +5,8 @@ import { confirmDialog } from '../confirm';
 import { api, askText, closeTab, getState, openFile, renamePath, toast, useStore } from '../store';
 import { fileIcon, folderIcon } from './icons';
 import { Icon } from './Icon';
+import { isStudioFile } from './video/videoCommands';
+import { openStudio } from './video/videoStore';
 
 interface Menu {
   x: number;
@@ -138,6 +140,13 @@ export function Explorer() {
             setSelected(e.path);
             if (e.dir) toggle(e.path);
             else void openFile(e.path);
+          }}
+          onDoubleClick={() => {
+            // Video, audio and .zvproj files open in Video Studio.
+            if (e.dir || !isStudioFile(e.path)) return;
+            void api()
+              .video.workspacePath(e.path)
+              .then((abs) => (abs ? openStudio(abs) : undefined));
           }}
           onKeyDown={(k) => {
             if (k.key === 'F2') void rename(e);

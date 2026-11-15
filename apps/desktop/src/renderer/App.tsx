@@ -19,6 +19,9 @@ import { GCloudPanel } from './components/GCloudPanel';
 import { DesignPanel } from './components/DesignPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
+import { VideoStudioHost } from './components/video/VideoStudio';
+import { isStudioFile } from './components/video/videoCommands';
+import { getV as getVideo, openStudio } from './components/video/videoStore';
 import {
   api,
   applyTheme,
@@ -135,8 +138,13 @@ export function App() {
       [...(e.dataTransfer?.items ?? [])].some(
         (i) => i.kind === 'file' && i.type.startsWith('image/'),
       );
+    // Video Studio takes its own drops (media library, timeline).
+    const onStudio = () => {
+      const v = getVideo();
+      return v.open && !v.minimized;
+    };
     const hasFiles = (e: DragEvent) =>
-      Boolean(e.dataTransfer?.types.includes('Files')) && !onChatBox(e);
+      Boolean(e.dataTransfer?.types.includes('Files')) && !onChatBox(e) && !onStudio();
     const enter = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       depth++;
@@ -162,7 +170,9 @@ export function App() {
       const file = e.dataTransfer?.files[0];
       if (!file) return;
       const path = api().app.pathForFile(file);
-      if (path) void openDropped(path);
+      // A video, an audio file or a video project opens Video Studio.
+      if (path && isStudioFile(path)) void openStudio(path);
+      else if (path) void openDropped(path);
     };
     window.addEventListener('dragenter', enter, true);
     window.addEventListener('dragleave', leave, true);
@@ -391,6 +401,7 @@ export function App() {
       </div>
       <StatusBar />
       <Modals />
+      <VideoStudioHost />
       <ConfirmDialog />
       <div className="app-banners">
         <NoticeBanner />

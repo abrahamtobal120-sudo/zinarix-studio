@@ -1,6 +1,7 @@
 import { askInChat } from './components/Chat';
 import { sendTerminalToChat, terminalFocused } from './components/Terminal';
 import { confirmDialog } from './confirm';
+import { studioCommand, videoCommands } from './components/video/videoCommands';
 import { lang, setLang, t } from './i18n';
 import {
   api,
@@ -410,6 +411,7 @@ function baseCommands(): Command[] {
         void api().app.quit();
       },
     },
+    ...videoCommands(mod),
   ];
 }
 
@@ -423,6 +425,8 @@ export async function runCommand(id: string): Promise<void> {
   // From main: a Pro feature was asked for (menu, second launch) on a plan without it.
   const up = /^license\.upgrade:(chats|split|windows)$/.exec(id);
   if (up) return setState({ modal: { kind: 'upgrade', feature: up[1] as 'chats' } });
+  // While Video Studio is on screen it answers some app shortcuts itself (Ctrl+S…).
+  if (studioCommand(id)) return;
   const c = commands().find((x) => x.id === id);
   try {
     await c?.run();

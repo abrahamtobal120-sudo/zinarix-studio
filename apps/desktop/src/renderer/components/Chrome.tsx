@@ -4,6 +4,8 @@ import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
+import { tv } from './video/strings';
+import { toggleStudio, useV } from './video/videoStore';
 import {
   BROWSER_TAB,
   activate,
@@ -30,6 +32,7 @@ export function ActivityBar() {
   const gitChanges = useStore((s) => s.gitChanges);
   const sideMax = useStore((s) => s.maximized === 'side');
   const watchNew = useStore((s) => s.watch?.reports.filter((r) => !r.seen).length ?? 0);
+  const videoOn = useV((s) => s.open && !s.minimized);
   const item = (
     active: boolean,
     title: string,
@@ -89,6 +92,7 @@ export function ActivityBar() {
         watchNew,
       )}
       {item(chatOpen, t('chat'), 'agent', () => setState({ chatOpen: !chatOpen }))}
+      {item(videoOn, tv('openStudioHint'), 'film', toggleStudio)}
       {item(panelOpen, t('terminal'), 'terminal', () => setState({ panelOpen: !panelOpen }))}
       {item(browserActive, t('browser'), 'globe', () => {
         if (browserActive) {

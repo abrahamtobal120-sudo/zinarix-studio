@@ -404,9 +404,10 @@ import type {
       case 'style': {
         const el = find(cmd.src);
         if (!el) break;
-        for (const [k, v] of Object.entries(cmd.styles))
-          if (v === null || v === '') el.style.removeProperty(k);
-          else el.style.setProperty(k, v);
+        // Removals first: dropping "padding-top" after setting "padding" would undo part of it.
+        const entries = Object.entries(cmd.styles);
+        for (const [k, v] of entries) if (v === null || v === '') el.style.removeProperty(k);
+        for (const [k, v] of entries) if (v !== null && v !== '') el.style.setProperty(k, v);
         redraw();
         if (el === selected) post({ type: 'select', selection: describe(el) });
         break;
