@@ -8,6 +8,14 @@ const call =
     ipcRenderer.invoke(channel, ...args);
 
 const api: OmniApi = {
+  design: {
+    open: call('design:open') as OmniApi['design']['open'],
+    close: call('design:close') as OmniApi['design']['close'],
+    apply: call('design:apply') as OmniApi['design']['apply'],
+    undo: call('design:undo') as OmniApi['design']['undo'],
+    redo: call('design:redo') as OmniApi['design']['redo'],
+    stale: call('design:stale') as OmniApi['design']['stale'],
+  },
   mcp: {
     status: call('mcp:status') as OmniApi['mcp']['status'],
     config: call('mcp:config') as OmniApi['mcp']['config'],

@@ -1,3 +1,4 @@
+import type { DesignApplyResult, DesignOp, DesignSessionView } from './design.js';
 /**
  * The only surface the sandboxed renderer can call. Implemented in preload over a
  * whitelisted set of IPC channels; every argument is re-validated with Zod in main.
@@ -1013,6 +1014,16 @@ export interface McpProjectView {
 }
 
 export interface OmniApi {
+  /** Panel de Edición: the visual editor of the open folder's pages. */
+  design: {
+    open(): Promise<DesignSessionView>;
+    close(): Promise<void>;
+    apply(op: DesignOp): Promise<DesignApplyResult>;
+    undo(): Promise<DesignApplyResult | null>;
+    redo(): Promise<DesignApplyResult | null>;
+    /** The page changed on disk since the preview loaded it. */
+    stale(file: string): Promise<boolean>;
+  };
   mcp: {
     status(): Promise<{ servers: McpServerView[]; project: McpProjectView | null }>;
     /** Text of the global mcp.json. */
@@ -1767,6 +1778,12 @@ export const CHANNELS = [
   'mcp:restart',
   'mcp:setEnabled',
   'mcp:trustProject',
+  'design:open',
+  'design:close',
+  'design:apply',
+  'design:undo',
+  'design:redo',
+  'design:stale',
   'video:tools',
   'video:pickMedia',
   'video:probe',

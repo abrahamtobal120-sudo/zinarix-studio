@@ -44,6 +44,8 @@ import {
 } from './security.js';
 import { shellProfiles, Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
+import { DesignSession, EDITOR_SCRIPT_PATH } from './design/session.js';
+import { EditError } from './design/htmlSource.js';
 import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
 import { McpManager } from './mcp.js';
 import { DebugManager } from './debug/manager.js';
@@ -65,6 +67,8 @@ protocol.registerSchemesAsPrivileged([
     scheme: 'app',
     privileges: { standard: true, secure: true, supportFetchAPI: true, codeCache: true },
   },
+  // Pages of the open project shown (and edited) in the Panel de Edición.
+  { scheme: 'zxp', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
 // A separate data folder (OMNI_HOME: portable installs, tests) is a separate app instance.
@@ -92,6 +96,8 @@ interface Win {
   requests: Set<string>;
   /** Close confirmed by the renderer (unsaved files / running chats checked). */
   allowClose: boolean;
+  /** The visual editor (Panel de Edición) of the open folder, while it is open. */
+  design?: { root: string; session: DesignSession };
 }
 
 const wins = new Map<number, Win>();
@@ -979,6 +985,7 @@ function registerIpc(): void {
     const root = w.workspace?.root;
     if (root) mcpMgr.trustProject(root, on);
   });
+  registerDesignIpc();
   const box = z.string().min(1).max(1000);
   const uid = z.number().int().positive();
   const host = z.string().trim().min(1).max(253);
@@ -1732,6 +1739,115 @@ function registerIpc(): void {
   });
 }
 
+// ---------------- Panel de Edición (visual editor) ----------------
+
+/** The visual editor of the window's open folder (it must be opened again for another folder). */
+function designOf(w: Win): DesignSession {
+  const root = w.workspace?.root;
+  if (!w.design || w.design.root !== root) throw new EditError('Abre el Panel de Edición de nuevo.');
+  return w.design.session;
+}
+
+/** Errors in plain words reach the panel as they are; anything else gets a short prefix. */
+async function designCall<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof EditError) throw e;
+    throw new Error(`No se pudo guardar el cambio: ${(e as Error).message}`);
+  }
+}
+
+function registerDesignIpc(): void {
+  const src = z.string().min(1).max(4096);
+  const css = z.record(z.string().max(60), z.string().max(200).nullable());
+  const op = z.union([
+    z.object({ kind: z.literal('setText'), src, html: z.string().max(200_000) }),
+    z.object({ kind: z.literal('setStyle'), src, styles: css }),
+  ]);
+  handle('design:open', z.tuple([]), async (w) => {
+    const session = new DesignSession(ws(w), `zxp://w${w.id}`);
+    w.design = { root: ws(w).root, session };
+    return session.open();
+  });
+  handle('design:close', z.tuple([]), (w) => {
+    w.design = undefined;
+  });
+  handle('design:apply', z.tuple([op]), (w, o) => designCall(() => designOf(w).apply(o)));
+  handle('design:undo', z.tuple([]), (w) => designCall(() => designOf(w).undo()));
+  handle('design:redo', z.tuple([]), (w) => designCall(() => designOf(w).redo()));
+  handle('design:stale', z.tuple([rel]), (w, file) => designOf(w).stale(file));
+}
+
+const PREVIEW_MIME: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.ico': 'image/x-icon',
+  '.bmp': 'image/bmp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml',
+  '.pdf': 'application/pdf',
+  '.otf': 'font/otf',
+};
+
+/**
+ * zxp://w<window>/<file>: the open project's files for the preview frame of the Panel de
+ * Edición. Only while that window has the panel open, only inside its folder (the same
+ * checks as every other file access); HTML pages come numbered for editing.
+ */
+function registerDesignProtocol(): void {
+  const editorScript = join(appRoot, 'dist', 'preload', 'designPreview.js');
+  const headers = (type: string) => ({
+    'content-type': type,
+    'cache-control': 'no-store',
+    // The frame has an opaque origin (sandboxed): module scripts and fonts need this.
+    'access-control-allow-origin': '*',
+  });
+  protocol.handle('zxp', async (req) => {
+    const url = new URL(req.url);
+    const w = wins.get(Number(/^w(\d+)$/.exec(url.hostname)?.[1]));
+    const design = w?.design;
+    const folder = w?.workspace;
+    if (!w || !design || !folder || design.root !== folder.root)
+      return new Response('not available', { status: 404 });
+    if (url.pathname === EDITOR_SCRIPT_PATH)
+      return readFile(editorScript)
+        .then((b) => new Response(b, { headers: headers('text/javascript; charset=utf-8') }))
+        .catch(() => new Response('not built', { status: 404 }));
+    let file = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    if (file === '' || file.endsWith('/')) file += 'index.html';
+    try {
+      let abs = folder.resolve(file);
+      if (!existsSync(abs) && !extname(file)) {
+        // Pretty addresses: /precios → precios.html, /blog → blog/index.html.
+        const alt = [`${file}.html`, `${file}/index.html`].find((f) =>
+          existsSync(folder.resolve(f)),
+        );
+        if (alt) file = alt;
+      } else if (existsSync(abs) && statSync(abs).isDirectory()) file = `${file}/index.html`;
+      abs = folder.resolve(file);
+      const ext = extname(file).toLowerCase();
+      if (ext === '.html' || ext === '.htm')
+        return new Response(await design.session.serve(file), {
+          headers: headers('text/html; charset=utf-8'),
+        });
+      return new Response(await readFile(abs), {
+        headers: headers(MIME[ext] ?? PREVIEW_MIME[ext] ?? 'application/octet-stream'),
+      });
+    } catch {
+      return new Response('not found', { status: 404 });
+    }
+  });
+}
+
 // ---------------- app:// protocol (serves the built renderer) ----------------
 
 const MIME: Record<string, string> = {
@@ -1993,6 +2109,10 @@ async function createWindow(
   win.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith('app://')) e.preventDefault();
   });
+  // Frames inside the window (the Panel de Edición preview) stay on the project's pages.
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (!e.isMainFrame && !/^(zxp:|about:|data:)/.test(e.url)) e.preventDefault();
+  });
   win.on('close', (e) => {
     if (w.allowClose) return;
     e.preventDefault();
@@ -2151,6 +2271,7 @@ app.whenReady().then(async () => {
   });
   watcher.start();
   registerProtocol();
+  registerDesignProtocol();
   registerIpc();
   buildMenu();
   // Start empty unless a folder is passed explicitly: the user drops or picks one.

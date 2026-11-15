@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { OmniCore } from '@omni/core';
@@ -52,11 +52,42 @@ export function addImageParts(message: ChatMessage, images: ChatImage[]): ChatMe
   return { role: 'user', content: parts };
 }
 
+/** Images older than this are deleted the next time one is written. */
+const KEEP_MS = 24 * 60 * 60 * 1000;
+let privateDir: string | undefined;
+
+/**
+ * A folder only this user can open (screenshots may show secrets). On a shared /tmp another
+ * user could create the fixed name first: then a fresh random folder is used instead.
+ */
+function imageDir(): string {
+  if (privateDir) return privateDir;
+  let dir = join(tmpdir(), 'zinarix-chat-images');
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const st = statSync(dir);
+    const mine = typeof process.getuid !== 'function' || st.uid === process.getuid();
+    if (!mine || (process.platform !== 'win32' && (st.mode & 0o077) !== 0)) throw new Error('shared');
+  } catch {
+    dir = mkdtempSync(join(tmpdir(), 'zinarix-img-'));
+  }
+  const now = Date.now();
+  for (const f of readdirSync(dir)) {
+    const p = join(dir, f);
+    try {
+      if (now - statSync(p).mtimeMs > KEEP_MS) rmSync(p, { force: true });
+    } catch {
+      /* in use or already gone */
+    }
+  }
+  privateDir = dir;
+  return dir;
+}
+
 /** CLI agents (Claude Code, Codex…) read images from disk: writes them and names the files. */
 export function imagesAsFiles(message: ChatMessage, images: ChatImage[]): ChatMessage {
   if (message.role !== 'user' || !images.length) return message;
-  const dir = join(tmpdir(), 'zinarix-chat-images');
-  mkdirSync(dir, { recursive: true });
+  const dir = imageDir();
   const paths = images.map((img, i) => {
     const p = join(
       dir,

@@ -578,10 +578,31 @@ async function fetchPage(
     if (!html && !/text\/(plain|markdown|x-markdown)/i.test(type)) return undefined;
     const len = Number(res.headers.get('content-length') ?? 0);
     if (len > DOC_MAX_BYTES) return undefined;
-    const body = (await res.text()).slice(0, DOC_MAX_BYTES);
+    // No content-length (chunked) does not mean small: stop reading at the limit.
+    const body = await readCapped(res, DOC_MAX_BYTES);
     return { url: current, body, html };
   }
   return undefined;
+}
+
+/** The body as text, reading at most `max` bytes (the rest of the download is cancelled). */
+async function readCapped(res: Response, max: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (size < max) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      size += value.byteLength;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  const all = Buffer.concat(chunks).subarray(0, max);
+  return new TextDecoder().decode(all);
 }
 
 // ---------------------------------------------------------------- agent tools
