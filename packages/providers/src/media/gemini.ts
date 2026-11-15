@@ -75,7 +75,8 @@ export function geminiMediaBody(req: MediaRequest): {
 } {
   const warnings: string[] = [];
   const model = findMediaModel('google-gemini', req.model);
-  if (req.seed !== undefined) warnings.push('La Interactions API no documenta semilla: no se envió.');
+  if (req.seed !== undefined)
+    warnings.push('La Interactions API no documenta semilla: no se envió.');
   if (req.transparent && req.kind === 'image')
     warnings.push('Gemini no hace fondos transparentes: se generó con fondo.');
   if (req.kind === 'image') {
@@ -96,7 +97,8 @@ export function geminiMediaBody(req: MediaRequest): {
   if (req.kind === 'speech') {
     const voice =
       req.voice && (!model?.voices || model.voices.includes(req.voice)) ? req.voice : undefined;
-    if (req.voice && !voice) warnings.push(`La voz "${req.voice}" no existe: se usó ${model?.voices?.[0] ?? 'Kore'}.`);
+    if (req.voice && !voice)
+      warnings.push(`La voz "${req.voice}" no existe: se usó ${model?.voices?.[0] ?? 'Kore'}.`);
     const style = req.style?.trim();
     return {
       body: {
@@ -105,7 +107,11 @@ export function geminiMediaBody(req: MediaRequest): {
           {
             type: 'user_input',
             content: [
-              { type: 'text', text: req.prompt.trim(), ...(style ? { speech_metadata: { style } } : {}) },
+              {
+                type: 'text',
+                text: req.prompt.trim(),
+                ...(style ? { speech_metadata: { style } } : {}),
+              },
             ],
           },
         ],
@@ -119,7 +125,8 @@ export function geminiMediaBody(req: MediaRequest): {
     const range = model?.duration ?? { min: 3, max: 15, default: 5 };
     const asked = Math.round(req.durationSec ?? range.default);
     const secs = Math.max(range.min, Math.min(range.max, asked));
-    if (secs !== asked) warnings.push(`El video dura entre ${range.min} y ${range.max} s: se pidió de ${secs} s.`);
+    if (secs !== asked)
+      warnings.push(`El video dura entre ${range.min} y ${range.max} s: se pidió de ${secs} s.`);
     let aspect = req.aspect ?? '16:9';
     if (model?.aspects && !model.aspects.includes(aspect)) {
       warnings.push(`${aspect} no está disponible para video: se usó 16:9.`);
@@ -162,10 +169,14 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 function failed(cfg: ProviderConfig, it: Interaction): OmniError {
-  return new OmniError('server', `Gemini: ${it.error?.message ?? `la generación terminó como "${it.status}"`}`, {
-    provider: cfg.entry.id,
-    retryable: false,
-  });
+  return new OmniError(
+    'server',
+    `Gemini: ${it.error?.message ?? `la generación terminó como "${it.status}"`}`,
+    {
+      provider: cfg.entry.id,
+      retryable: false,
+    },
+  );
 }
 
 /** Files API id from a uri like ".../v1beta/files/abc123" or "files/abc123". */
@@ -184,11 +195,17 @@ async function download(
   const ext = extFor(mediaType, fallbackType.split('/')[1] ?? 'bin');
   if (found.data) return { data: base64ToBytes(found.data), mediaType, ext };
   const id = found.uri ? fileId(found.uri) : undefined;
-  if (!id) throw new OmniError('server', 'Gemini devolvió un archivo sin dirección válida', { provider: cfg.entry.id });
+  if (!id)
+    throw new OmniError('server', 'Gemini devolvió un archivo sin dirección válida', {
+      provider: cfg.entry.id,
+    });
   for (let i = 0; i < MAX_POLLS; i++) {
     const f = await requestJson<{ state?: string }>(cfg, { path: `/files/${id}`, signal });
     if (!f.state || f.state === 'ACTIVE') break;
-    if (f.state === 'FAILED') throw new OmniError('server', 'Gemini no pudo preparar el archivo', { provider: cfg.entry.id });
+    if (f.state === 'FAILED')
+      throw new OmniError('server', 'Gemini no pudo preparar el archivo', {
+        provider: cfg.entry.id,
+      });
     onProgress?.({ stage: 'waiting' });
     await sleep(POLL_MS, signal);
   }
@@ -200,7 +217,10 @@ async function download(
   return { data: new Uint8Array(await res.arrayBuffer()), mediaType, ext };
 }
 
-const OUTPUT: Record<Exclude<MediaKind, 'music'>, { type: 'image' | 'video' | 'audio'; mime: string }> = {
+const OUTPUT: Record<
+  Exclude<MediaKind, 'music'>,
+  { type: 'image' | 'video' | 'audio'; mime: string }
+> = {
   image: { type: 'image', mime: 'image/png' },
   speech: { type: 'audio', mime: 'audio/wav' },
   video: { type: 'video', mime: 'video/mp4' },
@@ -219,7 +239,8 @@ async function once(
     { method: 'POST', path: '/interactions', body, signal, headers },
   );
   for (let i = 0; it.status && it.status !== 'completed'; i++) {
-    if (it.status === 'failed' || it.status === 'cancelled' || it.status === 'canceled') throw failed(cfg, it);
+    if (it.status === 'failed' || it.status === 'cancelled' || it.status === 'canceled')
+      throw failed(cfg, it);
     if (!it.id || i >= MAX_POLLS) throw failed(cfg, it);
     onProgress?.({ stage: 'waiting' });
     await sleep(POLL_MS, signal);
@@ -228,9 +249,13 @@ async function once(
   const out = OUTPUT[req.kind as Exclude<MediaKind, 'music'>];
   const found = findOutputs(it.steps ?? it, out.type);
   if (!found.length)
-    throw new OmniError('server', `Gemini no devolvió ${req.kind === 'speech' ? 'audio' : req.kind}`, {
-      provider: cfg.entry.id,
-    });
+    throw new OmniError(
+      'server',
+      `Gemini no devolvió ${req.kind === 'speech' ? 'audio' : req.kind}`,
+      {
+        provider: cfg.entry.id,
+      },
+    );
   const files: MediaFile[] = [];
   for (const f of found) files.push(await download(cfg, f, out.mime, signal, onProgress));
   return files;
@@ -244,7 +269,8 @@ export const geminiMedia: MediaGenProvider = {
     onProgress?.({ stage: 'sending' });
     // The Interactions API returns one image per call: several images are several calls.
     const model = findMediaModel('google-gemini', req.model);
-    const n = req.kind === 'image' ? Math.max(1, Math.min(model?.maxCount ?? 4, req.count ?? 1)) : 1;
+    const n =
+      req.kind === 'image' ? Math.max(1, Math.min(model?.maxCount ?? 4, req.count ?? 1)) : 1;
     const files: MediaFile[] = [];
     for (let i = 0; i < n; i++) {
       const got = await once(cfg, req, body, signal, onProgress);

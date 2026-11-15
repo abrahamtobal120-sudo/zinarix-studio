@@ -410,6 +410,13 @@ const api: OmniApi = {
     delete: call('review:delete') as OmniApi['review']['delete'],
     ignore: call('review:ignore') as OmniApi['review']['ignore'],
   },
+  media: {
+    models: call('media:models') as OmniApi['media']['models'],
+    estimate: call('media:estimate') as OmniApi['media']['estimate'],
+    outDir: call('media:outDir') as OmniApi['media']['outDir'],
+    generate: call('media:generate') as OmniApi['media']['generate'],
+    abort: call('media:abort') as OmniApi['media']['abort'],
+  },
   playground: {
     run: call('playground:run') as OmniApi['playground']['run'],
     abort: call('playground:abort') as OmniApi['playground']['abort'],

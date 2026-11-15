@@ -75,6 +75,7 @@ import { isInside } from '../shared/tasks.js';
 import { SETUP_SCRIPT, TaskManager } from './tasks.js';
 import { ReviewManager } from './review.js';
 import { PlaygroundService } from './playground.js';
+import { MediaService } from './media.js';
 import { BuildService } from './build.js';
 import { rulesPrompt } from '../shared/rules.js';
 import { redact } from '@omni/security';
@@ -1077,7 +1078,7 @@ function registerIpc(): void {
   // Titles come as PNGs the renderer drew at the export size (at most 200, 40 MB each).
   const PNG_URL = 'data:image/png;base64,';
   const textPngsArg = z
-    .record(z.string().regex(/^[w-]{1,64}$/), z.string().max(56_000_000).startsWith(PNG_URL))
+    .record(z.string().regex(/^[\w-]{1,64}$/), z.string().max(56_000_000).startsWith(PNG_URL))
     .refine((r) => Object.keys(r).length <= 200, 'demasiados títulos')
     .optional();
   handle(
@@ -2438,6 +2439,37 @@ function registerReviewIpc(): void {
 }
 
 /** Fase 9: Playground (one model or several side by side) and Build. */
+/** Fase 10: image / video / speech generation (Generate panel and generate_* agent tools). */
+function registerMediaIpc(): void {
+  const media = new MediaService(ai.core, app.getPath('userData'));
+  ai.agent.media = media;
+  const genReq = z.object({
+    kind: z.enum(['image', 'video', 'speech', 'music']),
+    provider: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).max(64),
+    model: z.string().min(1).max(200),
+    prompt: z.string().max(20_000),
+    style: z.string().max(500).optional(),
+    aspect: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4']).optional(),
+    durationSec: z.number().int().min(1).max(120).optional(),
+    seed: z.number().int().min(0).max(2 ** 31).optional(),
+    count: z.number().int().min(1).max(4).optional(),
+    quality: z.enum(['low', 'medium', 'high']).optional(),
+    voice: z.string().max(64).optional(),
+    transparent: z.boolean().optional(),
+  });
+  handle('media:models', z.tuple([]), () => media.models());
+  handle('media:estimate', z.tuple([genReq]), (_w, req) => media.estimate(req));
+  handle('media:outDir', z.tuple([]), (w) => media.outDir(w.workspace?.root));
+  handle('media:generate', z.tuple([str, genReq]), (w, requestId, req) => {
+    const id = rid(w, requestId);
+    w.requests.add(id);
+    return media
+      .generate(id, req, w.workspace?.root, (event) => send(w, { type: 'media', requestId, event }))
+      .finally(() => w.requests.delete(id));
+  });
+  handle('media:abort', z.tuple([str]), (w, requestId) => media.abort(rid(w, requestId)));
+}
+
 function registerPlaygroundIpc(): void {
   const playground = new PlaygroundService(ai.core, app.getPath('userData'));
   const build = new BuildService(app.getPath('userData'), () => new Vercel(app.getPath('userData')));
@@ -2895,12 +2927,18 @@ function buildMenu(): void {
         },
         {
           label: `Acerca de ${APP_NAME}`,
-          click: (_item, bw) =>
-            void dialog.showMessageBox((winOf(bw) ?? focused())!.win, {
+          click: async (_item, bw) => {
+            const w = (winOf(bw) ?? focused())!;
+            const { response } = await dialog.showMessageBox(w.win, {
               title: APP_NAME,
               message: `${APP_NAME} ${app.getVersion()} · ${planName()}`,
               detail: `Electron ${process.versions.electron} · Node ${process.versions.node}\nEditor multi-IA · MIT`,
-            }),
+              buttons: ['Aceptar', 'Licencias'],
+              defaultId: 0,
+              cancelId: 0,
+            });
+            if (response === 1) send(w, { type: 'command', command: 'help.licenses' });
+          },
         },
       ],
     },
@@ -3165,6 +3203,7 @@ app.whenReady().then(async () => {
   registerIpc();
   registerTasksIpc();
   registerPlaygroundIpc();
+  registerMediaIpc();
   registerReviewIpc();
   buildMenu();
   // Start empty unless a folder is passed explicitly: the user drops or picks one.

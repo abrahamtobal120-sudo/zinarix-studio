@@ -87,41 +87,64 @@ function mul(a: M3, b: M3): M3 {
   const r = [0, 0, 0, 0, 0, 0, 0, 0, 0] as M3;
   for (let i = 0; i < 3; i++)
     for (let j = 0; j < 3; j++)
-      r[i * 3 + j] =
-        a[i * 3]! * b[j]! + a[i * 3 + 1]! * b[3 + j]! + a[i * 3 + 2]! * b[6 + j]!;
+      r[i * 3 + j] = a[i * 3]! * b[j]! + a[i * 3 + 1]! * b[3 + j]! + a[i * 3 + 2]! * b[6 + j]!;
   return r;
 }
 // The matrices of the Filter Effects spec (what Chromium's canvas filter uses).
 function saturateM(s: number): M3 {
   return [
-    0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s,
-    0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s,
-    0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s,
+    0.213 + 0.787 * s,
+    0.715 - 0.715 * s,
+    0.072 - 0.072 * s,
+    0.213 - 0.213 * s,
+    0.715 + 0.285 * s,
+    0.072 - 0.072 * s,
+    0.213 - 0.213 * s,
+    0.715 - 0.715 * s,
+    0.072 + 0.928 * s,
   ];
 }
 function hueM(deg: number): M3 {
   const c = Math.cos((deg * Math.PI) / 180);
   const s = Math.sin((deg * Math.PI) / 180);
   return [
-    0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928,
-    0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.14, 0.072 - c * 0.072 - s * 0.283,
-    0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072,
+    0.213 + c * 0.787 - s * 0.213,
+    0.715 - c * 0.715 - s * 0.715,
+    0.072 - c * 0.072 + s * 0.928,
+    0.213 - c * 0.213 + s * 0.143,
+    0.715 + c * 0.285 + s * 0.14,
+    0.072 - c * 0.072 - s * 0.283,
+    0.213 - c * 0.213 - s * 0.787,
+    0.715 - c * 0.715 + s * 0.715,
+    0.072 + c * 0.928 + s * 0.072,
   ];
 }
 function sepiaM(a: number): M3 {
   const k = 1 - a;
   return [
-    0.393 + 0.607 * k, 0.769 - 0.769 * k, 0.189 - 0.189 * k,
-    0.349 - 0.349 * k, 0.686 + 0.314 * k, 0.168 - 0.168 * k,
-    0.272 - 0.272 * k, 0.534 - 0.534 * k, 0.131 + 0.869 * k,
+    0.393 + 0.607 * k,
+    0.769 - 0.769 * k,
+    0.189 - 0.189 * k,
+    0.349 - 0.349 * k,
+    0.686 + 0.314 * k,
+    0.168 - 0.168 * k,
+    0.272 - 0.272 * k,
+    0.534 - 0.534 * k,
+    0.131 + 0.869 * k,
   ];
 }
 function grayM(a: number): M3 {
   const k = 1 - a;
   return [
-    0.2126 + 0.7874 * k, 0.7152 - 0.7152 * k, 0.0722 - 0.0722 * k,
-    0.2126 - 0.2126 * k, 0.7152 + 0.2848 * k, 0.0722 - 0.0722 * k,
-    0.2126 - 0.2126 * k, 0.7152 - 0.7152 * k, 0.0722 + 0.9278 * k,
+    0.2126 + 0.7874 * k,
+    0.7152 - 0.7152 * k,
+    0.0722 - 0.0722 * k,
+    0.2126 - 0.2126 * k,
+    0.7152 + 0.2848 * k,
+    0.0722 - 0.0722 * k,
+    0.2126 - 0.2126 * k,
+    0.7152 - 0.7152 * k,
+    0.0722 + 0.9278 * k,
   ];
 }
 
@@ -163,14 +186,7 @@ export function ffmpegEffects(fx: Effects | undefined, pxScale = 1): string[] {
 // ---------------- in / out animations ----------------
 
 export type AnimKind =
-  | 'none'
-  | 'fade'
-  | 'slideUp'
-  | 'slideDown'
-  | 'slideLeft'
-  | 'slideRight'
-  | 'pop'
-  | 'zoom';
+  'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'pop' | 'zoom';
 export const ANIM_KINDS: readonly AnimKind[] = [
   'none',
   'fade',
@@ -331,8 +347,7 @@ export function combineExpr(list: LookExpr[]): LookExpr {
   join('dy', '+');
   join('scale', '*');
   const reveals = list.map((l) => l.reveal).filter((x): x is string => !!x);
-  if (reveals.length)
-    out.reveal = reveals.reduce((a, b) => `min(${a},${b})`);
+  if (reveals.length) out.reveal = reveals.reduce((a, b) => `min(${a},${b})`);
   return out;
 }
 
@@ -392,37 +407,91 @@ export const TEXT_DEFAULT_DUR = 4;
 export const TEXT_PRESETS: { id: string; spec: TextSpec; y: number; anim: ClipAnim }[] = [
   {
     id: 'title',
-    spec: { content: 'Título', font: 'display', size: 0.12, color: '#ffffff', bold: true, italic: false, align: 'center', shadow: true },
+    spec: {
+      content: 'Título',
+      font: 'display',
+      size: 0.12,
+      color: '#ffffff',
+      bold: true,
+      italic: false,
+      align: 'center',
+      shadow: true,
+    },
     y: 0,
     anim: { in: 'pop', out: 'fade' },
   },
   {
     id: 'subtitle',
-    spec: { content: 'Subtítulo', font: 'sans', size: 0.06, color: '#ffffff', bold: false, italic: false, align: 'center', shadow: true },
+    spec: {
+      content: 'Subtítulo',
+      font: 'sans',
+      size: 0.06,
+      color: '#ffffff',
+      bold: false,
+      italic: false,
+      align: 'center',
+      shadow: true,
+    },
     y: 0.1,
     anim: { in: 'fade', out: 'fade' },
   },
   {
     id: 'lower',
-    spec: { content: 'Nombre Apellido\nCargo', font: 'sans', size: 0.045, color: '#ffffff', bold: true, italic: false, align: 'left', bg: '#1f6feb' },
+    spec: {
+      content: 'Nombre Apellido\nCargo',
+      font: 'sans',
+      size: 0.045,
+      color: '#ffffff',
+      bold: true,
+      italic: false,
+      align: 'left',
+      bg: '#1f6feb',
+    },
     y: 0.32,
     anim: { in: 'slideRight', out: 'slideLeft' },
   },
   {
     id: 'caption',
-    spec: { content: 'Texto en pantalla', font: 'sans', size: 0.05, color: '#ffffff', bold: true, italic: false, align: 'center', stroke: { color: '#000000', width: 0.12 } },
+    spec: {
+      content: 'Texto en pantalla',
+      font: 'sans',
+      size: 0.05,
+      color: '#ffffff',
+      bold: true,
+      italic: false,
+      align: 'center',
+      stroke: { color: '#000000', width: 0.12 },
+    },
     y: 0.36,
     anim: { in: 'none', out: 'none' },
   },
   {
     id: 'cta',
-    spec: { content: '¡Suscríbete!', font: 'display', size: 0.08, color: '#ffffff', bold: true, italic: false, align: 'center', bg: '#e5484d' },
+    spec: {
+      content: '¡Suscríbete!',
+      font: 'display',
+      size: 0.08,
+      color: '#ffffff',
+      bold: true,
+      italic: false,
+      align: 'center',
+      bg: '#e5484d',
+    },
     y: 0.3,
     anim: { in: 'zoom', out: 'fade' },
   },
   {
     id: 'quote',
-    spec: { content: '“Una frase memorable”', font: 'serif', size: 0.07, color: '#f5f5f5', bold: false, italic: true, align: 'center', shadow: true },
+    spec: {
+      content: '“Una frase memorable”',
+      font: 'serif',
+      size: 0.07,
+      color: '#f5f5f5',
+      bold: false,
+      italic: true,
+      align: 'center',
+      shadow: true,
+    },
     y: 0,
     anim: { in: 'slideUp', out: 'fade' },
   },

@@ -36,6 +36,7 @@ import { describeTask, detectRunTasks, runTask, type RunTask } from './RunPanel'
 import { ProviderLogo } from './ProviderLogo';
 import type { PickItem } from './QuickPick';
 import { LicensePanel, Onboarding, UpgradeModal, WhatsNew } from './Plan';
+import { Licenses } from './Licenses';
 
 const close = () => setState({ modal: null });
 
@@ -100,6 +101,7 @@ export function Modals() {
       {modal?.kind === 'upgrade' && <UpgradeModal feature={modal.feature} />}
       {modal?.kind === 'welcome' && <Onboarding />}
       {modal?.kind === 'whatsNew' && <WhatsNew />}
+      {modal?.kind === 'licenses' && <Licenses />}
       {inputBox && <InputBox />}
     </>
   );

@@ -33,7 +33,10 @@ export function openAiImageBody(req: MediaRequest): {
   const aspect = req.aspect ?? '1:1';
   const n = Math.max(1, Math.min(model?.maxCount ?? 4, req.count ?? 1));
   if ((req.count ?? 1) > n) warnings.push(`Se piden ${n} imágenes como máximo con este modelo.`);
-  if (APPROX.has(aspect)) warnings.push(`${aspect} se generó como ${SIZE[aspect]} (3:2); recórtala si necesitas la proporción exacta.`);
+  if (APPROX.has(aspect))
+    warnings.push(
+      `${aspect} se generó como ${SIZE[aspect]} (3:2); recórtala si necesitas la proporción exacta.`,
+    );
   if (req.seed !== undefined) warnings.push('OpenAI no acepta semilla en imágenes: no se envió.');
   const body: Record<string, unknown> = {
     model: req.model,
@@ -56,8 +59,12 @@ export function openAiSpeechBody(req: MediaRequest): {
 } {
   const warnings: string[] = [];
   const model = findMediaModel('openai', req.model);
-  const voice = req.voice && (!model?.voices || model.voices.includes(req.voice)) ? req.voice : undefined;
-  if (req.voice && !voice) warnings.push(`La voz "${req.voice}" no existe en ${req.model}: se usó ${model?.voices?.[0] ?? 'alloy'}.`);
+  const voice =
+    req.voice && (!model?.voices || model.voices.includes(req.voice)) ? req.voice : undefined;
+  if (req.voice && !voice)
+    warnings.push(
+      `La voz "${req.voice}" no existe en ${req.model}: se usó ${model?.voices?.[0] ?? 'alloy'}.`,
+    );
   const body: Record<string, unknown> = {
     model: req.model,
     input: req.prompt.trim(),
@@ -73,7 +80,11 @@ export function openAiSpeechBody(req: MediaRequest): {
   return { body, warnings };
 }
 
-async function image(cfg: ProviderConfig, req: MediaRequest, signal: AbortSignal): Promise<MediaResult> {
+async function image(
+  cfg: ProviderConfig,
+  req: MediaRequest,
+  signal: AbortSignal,
+): Promise<MediaResult> {
   const { body, warnings } = openAiImageBody(req);
   const res = await requestJson<{ data?: { b64_json?: string; url?: string }[] }>(
     { ...cfg, timeoutMs: Math.max(cfg.timeoutMs ?? 0, LONG) },
@@ -81,17 +92,27 @@ async function image(cfg: ProviderConfig, req: MediaRequest, signal: AbortSignal
   );
   const files = [];
   for (const d of res.data ?? []) {
-    if (d.b64_json) files.push({ data: base64ToBytes(d.b64_json), mediaType: 'image/png', ext: 'png' });
+    if (d.b64_json)
+      files.push({ data: base64ToBytes(d.b64_json), mediaType: 'image/png', ext: 'png' });
     else if (d.url) {
       const r = await request(cfg, { path: d.url, noAuth: true, signal });
-      files.push({ data: new Uint8Array(await r.arrayBuffer()), mediaType: 'image/png', ext: 'png' });
+      files.push({
+        data: new Uint8Array(await r.arrayBuffer()),
+        mediaType: 'image/png',
+        ext: 'png',
+      });
     }
   }
-  if (!files.length) throw new OmniError('server', 'OpenAI no devolvió ninguna imagen', { provider: cfg.entry.id });
+  if (!files.length)
+    throw new OmniError('server', 'OpenAI no devolvió ninguna imagen', { provider: cfg.entry.id });
   return { kind: 'image', model: req.model, files, warnings };
 }
 
-async function speech(cfg: ProviderConfig, req: MediaRequest, signal: AbortSignal): Promise<MediaResult> {
+async function speech(
+  cfg: ProviderConfig,
+  req: MediaRequest,
+  signal: AbortSignal,
+): Promise<MediaResult> {
   const { body, warnings } = openAiSpeechBody(req);
   const res = await request(
     { ...cfg, timeoutMs: Math.max(cfg.timeoutMs ?? 0, LONG) },
@@ -99,8 +120,14 @@ async function speech(cfg: ProviderConfig, req: MediaRequest, signal: AbortSigna
   );
   const mediaType = res.headers.get('content-type')?.split(';')[0] || 'audio/mpeg';
   const data = new Uint8Array(await res.arrayBuffer());
-  if (!data.length) throw new OmniError('server', 'OpenAI devolvió un audio vacío', { provider: cfg.entry.id });
-  return { kind: 'speech', model: req.model, files: [{ data, mediaType, ext: extFor(mediaType, 'mp3') }], warnings };
+  if (!data.length)
+    throw new OmniError('server', 'OpenAI devolvió un audio vacío', { provider: cfg.entry.id });
+  return {
+    kind: 'speech',
+    model: req.model,
+    files: [{ data, mediaType, ext: extFor(mediaType, 'mp3') }],
+    warnings,
+  };
 }
 
 export const openAiMedia: MediaGenProvider = {

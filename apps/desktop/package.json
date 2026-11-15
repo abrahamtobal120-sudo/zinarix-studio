@@ -109,6 +109,13 @@
         {
           "from": "node_modules/ffprobe-static/bin/linux/${arch}/ffprobe",
           "to": "ffmpeg/ffprobe"
+        },
+        {
+          "from": "build/ffmpeg",
+          "to": "ffmpeg",
+          "filter": [
+            "*.txt"
+          ]
         }
       ]
     },
@@ -163,6 +170,13 @@
         {
           "from": "node_modules/ffprobe-static/bin/darwin/${arch}/ffprobe",
           "to": "ffmpeg/ffprobe"
+        },
+        {
+          "from": "build/ffmpeg",
+          "to": "ffmpeg",
+          "filter": [
+            "*.txt"
+          ]
         }
       ]
     },
@@ -194,6 +208,13 @@
         {
           "from": "node_modules/ffprobe-static/bin/win32/${arch}/ffprobe.exe",
           "to": "ffmpeg/ffprobe.exe"
+        },
+        {
+          "from": "build/ffmpeg",
+          "to": "ffmpeg",
+          "filter": [
+            "*.txt"
+          ]
         }
       ]
     },

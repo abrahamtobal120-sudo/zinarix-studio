@@ -30,6 +30,7 @@ import type {
   PromptTemplate,
 } from './playground.js';
 import type { CodeLang } from './playgroundCode.js';
+import type { GenEstimate, GenEvent, GenModelView, GenRequest, GenResult } from './mediaGen.js';
 import type { BuildDeployView, BuildView } from './build.js';
 
 export interface WorkspaceInfo {
@@ -1072,7 +1073,8 @@ export type AppEvent =
   /** Fase 6: progress of a code review. */
   | { type: 'review:progress'; requestId: string; progress: ReviewProgressView }
   /** Fase 9: stream of a Playground run (one per model when comparing). */
-  | { type: 'playground'; requestId: string; event: PlaygroundEvent };
+  | { type: 'playground'; requestId: string; event: PlaygroundEvent }
+  | { type: 'media'; requestId: string; event: GenEvent };
 
 /** Whether the help assistant can answer locally (Ollama running and its model downloaded). */
 export interface HelperStatus {
@@ -1926,6 +1928,16 @@ export interface OmniApi {
     /** Posts the chosen findings as one review on the PR. Returns its URL. */
     publish(reviewId: string, ids: string[]): Promise<string>;
   };
+  /** Fase 10: image, video and speech generation with the connected providers. */
+  media: {
+    models(): Promise<GenModelView[]>;
+    estimate(req: GenRequest): Promise<GenEstimate>;
+    /** Folder where generated files are saved (project media/generated or app data). */
+    outDir(): Promise<string>;
+    /** Progress arrives as 'media' events; resolves with the saved files. */
+    generate(requestId: string, req: GenRequest): Promise<GenResult>;
+    abort(requestId: string): Promise<void>;
+  };
   /** Fase 9: model playground (one model or 2–4 side by side). */
   playground: {
     run(requestId: string, req: PlaygroundRunRequest): Promise<PlaygroundResult>;
@@ -2337,6 +2349,11 @@ export const CHANNELS = [
   'review:get',
   'review:delete',
   'review:ignore',
+  'media:models',
+  'media:estimate',
+  'media:outDir',
+  'media:generate',
+  'media:abort',
   'playground:run',
   'playground:abort',
   'playground:code',

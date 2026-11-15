@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { MediaItem, MediaKind } from '../../../shared/video';
 import { api } from '../../store';
 import { Icon, type IconName } from '../Icon';
+import { GeneratePanel } from './GeneratePanel';
+import { tg } from './generateStrings';
 import { fmtBytes, fmtDuration, tv } from './strings';
 import { addToTimeline, importPaths, relinkMedia, removeMedia, useV } from './videoStore';
 
@@ -28,6 +30,7 @@ export function MediaLibrary() {
   const [kind, setKind] = useState<MediaKind | 'all'>('all');
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [over, setOver] = useState(false);
+  const [gen, setGen] = useState(false);
 
   const shown = media.filter(
     (m) =>
@@ -66,6 +69,14 @@ export function MediaLibrary() {
         >
           <Icon name="plus" size={14} /> {tv('import')}
         </button>
+        <button
+          className={`vs-import ${gen ? 'on' : ''}`}
+          title={tg('openHint')}
+          aria-expanded={gen}
+          onClick={() => setGen((v) => !v)}
+        >
+          <Icon name="sparkle" size={14} /> {tg('open')}
+        </button>
         <div className="vs-seg" role="group" aria-label={tv('list')}>
           <button
             className={view === 'grid' ? 'on' : ''}
@@ -85,6 +96,7 @@ export function MediaLibrary() {
           </button>
         </div>
       </div>
+      {gen && <GeneratePanel onClose={() => setGen(false)} />}
       <input
         className="vs-search"
         placeholder={tv('searchMedia')}

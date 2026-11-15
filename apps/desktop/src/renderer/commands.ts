@@ -498,6 +498,11 @@ function baseCommands(): Command[] {
       run: () => setState({ modal: { kind: 'shortcuts' } }),
     },
     {
+      id: 'help.licenses',
+      label: t('licensesTitle'),
+      run: () => setState({ modal: { kind: 'licenses' } }),
+    },
+    {
       id: 'app.requestClose',
       label: t('closeWindow'),
       keys: `${mod}+Shift+W`,

@@ -10,7 +10,15 @@
  * in/out animations and transitions (the outgoing clip runs on under the incoming one), and
  * the track mixer (volume, pan, solo).
  */
-import type { Clip, Ease, ExportOptions, KeyProp, MediaItem, Track, VideoProject } from './video.js';
+import type {
+  Clip,
+  Ease,
+  ExportOptions,
+  KeyProp,
+  MediaItem,
+  Track,
+  VideoProject,
+} from './video.js';
 import {
   MAX_KEYS,
   SPEED_MAX,
@@ -413,8 +421,7 @@ export function buildRender(
       const pcV = piece(p, c, o.start, o.end, media, leadOf(p, c), tailOf(p, c));
       if (!pcV || !media) continue;
       const wantVideo = !track.hidden && media.hasVideo;
-      const wantAudio =
-        !!pcA && heard && media.hasAudio && c.volume > 0 && media.kind === 'video';
+      const wantAudio = !!pcA && heard && media.hasAudio && c.volume > 0 && media.kind === 'video';
       if (!wantVideo && !wantAudio) continue;
       if (wantVideo) {
         inputs.push(...inputArgs(pcV));

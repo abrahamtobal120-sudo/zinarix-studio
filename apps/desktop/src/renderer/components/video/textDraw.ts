@@ -13,7 +13,12 @@ export const FONT_FAMILY: Record<TextFont, string> = {
   hand: '"Segoe Print", "Comic Sans MS", cursive',
 };
 
-export function drawText(ctx: CanvasRenderingContext2D, spec: TextSpec, W: number, H: number): void {
+export function drawText(
+  ctx: CanvasRenderingContext2D,
+  spec: TextSpec,
+  W: number,
+  H: number,
+): void {
   const px = Math.max(4, spec.size * H);
   ctx.font = `${spec.italic ? 'italic ' : ''}${spec.bold ? '700' : '400'} ${px}px ${FONT_FAMILY[spec.font]}`;
   ctx.textBaseline = 'middle';

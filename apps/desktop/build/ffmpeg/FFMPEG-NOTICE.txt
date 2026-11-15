@@ -1,0 +1,50 @@
+FFmpeg / FFprobe in Zinarix Studio
+==================================
+
+Zinarix Studio (MIT license) ships two separate programs in this folder:
+ffmpeg and ffprobe, from the FFmpeg project (https://ffmpeg.org).
+Zinarix runs them as independent programs; it does not link to them.
+
+These builds include GPL components (for example libx264 and libx265),
+so they are distributed under the GNU General Public License,
+version 3 or later. The full text is in COPYING.GPLv3.txt, next to this
+file. You may copy, change and share these programs under that license.
+This license applies only to ffmpeg and ffprobe, not to the rest of
+Zinarix Studio.
+
+Builds included
+---------------
+ffmpeg 6.1.1 (npm package ffmpeg-static 5.3.0, release b6.1.1)
+  Windows x64 : 6.1.1 "essentials" build by gyan.dev
+                source: https://github.com/FFmpeg/FFmpeg/commit/e38092ef93
+  Linux       : 6.1.1 static build by John Van Sickle (johnvansickle.com)
+  macOS       : 6.1.1 build used by ffmpeg-static (evermeet.cx / osxexperts)
+  Build notes and configuration for each platform:
+    https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1
+
+ffprobe 4.0.2 (npm package ffprobe-static 3.1.0)
+  https://github.com/joshwnj/ffprobe-static
+
+Source code
+-----------
+FFmpeg 6.1.1 : https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz
+               https://github.com/FFmpeg/FFmpeg/tree/n6.1.1
+FFmpeg 4.0.2 : https://ffmpeg.org/releases/ffmpeg-4.0.2.tar.xz
+               https://github.com/FFmpeg/FFmpeg/tree/n4.0.2
+
+Written offer: for at least three years after we distribute this
+version of Zinarix Studio, anyone can ask for the complete corresponding
+source code of these ffmpeg and ffprobe builds, at no charge beyond the
+cost of delivery, by opening an issue at
+https://github.com/abrahamtobal120-sudo/zinarix-studio/issues
+with the title "FFmpeg source request".
+
+FFmpeg is a trademark of Fabrice Bellard. Zinarix Studio is not
+affiliated with the FFmpeg project.
+
+----------------------------------------------------------------------
+Español: ffmpeg y ffprobe son programas aparte, con licencia GPL v3 o
+posterior (texto completo en COPYING.GPLv3.txt). Esa licencia aplica
+solo a ellos, no al resto de Zinarix Studio (MIT). El código fuente
+está en los enlaces de arriba; también puedes pedirlo abriendo un issue
+"FFmpeg source request" en el repositorio de Zinarix Studio.

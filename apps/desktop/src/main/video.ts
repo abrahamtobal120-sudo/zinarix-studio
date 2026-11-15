@@ -423,7 +423,7 @@ export class VideoService {
     // Titles: one PNG each in the temp folder (only clips that are titles, ids as file names).
     const textImages: Record<string, string> = {};
     for (const [id, png] of Object.entries(textPngs)) {
-      if (!/^[w-]{1,64}$/.test(id) || !project.clips.some((c) => c.id === id && c.text)) continue;
+      if (!/^[\w-]{1,64}$/.test(id) || !project.clips.some((c) => c.id === id && c.text)) continue;
       const file = join(tmpdir(), `zinarix-${job.id}-${id}.png`);
       await writeFile(file, png);
       textImages[id] = file;

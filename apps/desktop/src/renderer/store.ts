@@ -88,7 +88,9 @@ export type Modal =
   /** First launch: a short guided setup. */
   | { kind: 'welcome' }
   /** First launch of a new version: what changed. */
-  | { kind: 'whatsNew' };
+  | { kind: 'whatsNew' }
+  /** Ayuda → Acerca de → Licencias (FFmpeg GPL text and its source links). */
+  | { kind: 'licenses' };
 
 export interface State {
   workspace: WorkspaceInfo | null;

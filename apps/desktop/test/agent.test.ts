@@ -87,6 +87,9 @@ describe('agent safety', () => {
       'gcloud_buckets',
       'gcloud_objects',
       'gcloud_sql_instances',
+      'generate_image',
+      'generate_speech',
+      'generate_video',
       'gcloud_logs',
       // system
       'network_status',

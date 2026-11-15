@@ -209,37 +209,37 @@ export class Player {
     for (const track of compositeOrder(p)) {
       if (track.hidden) continue;
       for (const c of visualClipsAt(p, track.id, t)) {
-      const look = visualAt(p, c, t)!;
-      if (c.text) {
-        layers.push({ c, src: textCanvas(c.text, W, H), w: W, h: H, ready: true, look });
-        continue;
-      }
-      const m = mediaOf(p, c.mediaId);
-      const url = s.urls[c.mediaId];
-      if (!m || !url || (!m.hasVideo && m.kind !== 'image')) continue;
-      if (m.kind === 'image') {
-        const img = this.image(m.id, url);
-        layers.push({
-          c,
-          src: img,
-          w: img.naturalWidth,
-          h: img.naturalHeight,
-          ready: img.complete && img.naturalWidth > 0,
-          look,
-        });
-      } else {
-        const e = this.els.get(c.id);
-        if (!e || !(e.el instanceof HTMLVideoElement)) continue;
-        const v = e.el;
-        layers.push({
-          c,
-          src: v,
-          w: v.videoWidth,
-          h: v.videoHeight,
-          ready: v.readyState >= 2 && !v.seeking,
-          look,
-        });
-      }
+        const look = visualAt(p, c, t)!;
+        if (c.text) {
+          layers.push({ c, src: textCanvas(c.text, W, H), w: W, h: H, ready: true, look });
+          continue;
+        }
+        const m = mediaOf(p, c.mediaId);
+        const url = s.urls[c.mediaId];
+        if (!m || !url || (!m.hasVideo && m.kind !== 'image')) continue;
+        if (m.kind === 'image') {
+          const img = this.image(m.id, url);
+          layers.push({
+            c,
+            src: img,
+            w: img.naturalWidth,
+            h: img.naturalHeight,
+            ready: img.complete && img.naturalWidth > 0,
+            look,
+          });
+        } else {
+          const e = this.els.get(c.id);
+          if (!e || !(e.el instanceof HTMLVideoElement)) continue;
+          const v = e.el;
+          layers.push({
+            c,
+            src: v,
+            w: v.videoWidth,
+            h: v.videoHeight,
+            ready: v.readyState >= 2 && !v.seeking,
+            look,
+          });
+        }
       }
     }
     const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}`).join(',')}`;

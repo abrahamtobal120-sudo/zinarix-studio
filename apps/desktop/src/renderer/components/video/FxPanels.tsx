@@ -97,7 +97,10 @@ export function EffectsPanel() {
               toast(tv('fxApplied', { what, n: targets.length }));
             }}
           >
-            <span className="vs-fx-swatch vs-look-sample" style={{ filter: cssFilter(l.fx, 0.1) }} />
+            <span
+              className="vs-fx-swatch vs-look-sample"
+              style={{ filter: cssFilter(l.fx, 0.1) }}
+            />
             <span className="vs-fx-name">{tv(`look_${l.id}` as VideoKey)}</span>
           </button>
         ))}
@@ -161,7 +164,10 @@ function MixerStrip({ track, dimmed }: { track: Track; dimmed: boolean }) {
   const vol = trackVolume(track);
   const pan = trackPan(track);
   const mix = (patch: { volume?: number; pan?: number }, what: string) =>
-    commitMerged(setTrackMix(getV().project, track.id, patch), `${tv('editMix')} ${what} ${track.id}`);
+    commitMerged(
+      setTrackMix(getV().project, track.id, patch),
+      `${tv('editMix')} ${what} ${track.id}`,
+    );
   return (
     <div className={`vs-strip ${dimmed || track.muted ? 'vs-strip-off' : ''}`}>
       <div className="vs-strip-head">

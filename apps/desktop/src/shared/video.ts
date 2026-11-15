@@ -868,8 +868,7 @@ export function validProject(x: unknown): x is VideoProject {
       (t) =>
         typeof t.id === 'string' &&
         (t.kind === 'video' || t.kind === 'audio') &&
-        (t.volume === undefined ||
-          (Number.isFinite(t.volume) && t.volume >= 0 && t.volume <= 2)) &&
+        (t.volume === undefined || (Number.isFinite(t.volume) && t.volume >= 0 && t.volume <= 2)) &&
         (t.pan === undefined || (Number.isFinite(t.pan) && t.pan >= -1 && t.pan <= 1)),
     ) &&
     p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string')

@@ -776,8 +776,7 @@ function ClipView({
   const left = clip.start * zoom;
   const width = Math.max(2, clipDur(clip) * zoom);
   const kind = clip.text ? 'text' : (media?.kind ?? 'video');
-  const name = clip.text ? clip.text.content.split('
-')[0] || tv('textClip') : media?.name;
+  const name = clip.text ? clip.text.content.split('\n')[0] || tv('textClip') : media?.name;
   const showStrip = track.kind === 'video' && thumb && !media?.missing;
   const h = ROW_H[track.kind] - 8;
   const waveH = track.kind === 'audio' ? h - 16 : 14;

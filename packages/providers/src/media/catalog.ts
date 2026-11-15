@@ -59,16 +59,31 @@ const OPENAI_VOICES = [
   'shimmer',
   'verse',
 ] as const;
-const TTS1_VOICES = ['alloy', 'ash', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer'] as const;
-const GEMINI_VOICES = ['Kore', 'Puck', 'Zephyr', 'Charon', 'Fenrir', 'Leda', 'Aoede', 'Algieba'] as const;
+const TTS1_VOICES = [
+  'alloy',
+  'ash',
+  'coral',
+  'echo',
+  'fable',
+  'onyx',
+  'nova',
+  'sage',
+  'shimmer',
+] as const;
+const GEMINI_VOICES = [
+  'Kore',
+  'Puck',
+  'Zephyr',
+  'Charon',
+  'Fenrir',
+  'Leda',
+  'Aoede',
+  'Algieba',
+] as const;
 const ALL_ASPECTS = ['1:1', '16:9', '9:16', '4:3', '3:4'] as const;
 const QUALITIES = ['low', 'medium', 'high'] as const;
 
-function q(
-  low: [number, number],
-  medium: [number, number],
-  high: [number, number],
-): MediaPrice {
+function q(low: [number, number], medium: [number, number], high: [number, number]): MediaPrice {
   const p = ([square, other]: [number, number]) => ({ square, other });
   return { per: 'image_quality', usd: { low: p(low), medium: p(medium), high: p(high) } };
 }

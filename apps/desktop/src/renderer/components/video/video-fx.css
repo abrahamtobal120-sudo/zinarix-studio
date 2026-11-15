@@ -46,7 +46,7 @@
   background: var(--vs-stage);
 }
 .vs-fx-name {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--fg-dim);
 }
 .vs-look-sample {
@@ -55,7 +55,7 @@
     linear-gradient(160deg, var(--vs-clip-image), var(--vs-audio));
 }
 .vs-text-sample {
-  font-size: 22px;
+  font-size: var(--text-2xl);
   padding: 0 8px;
 }
 .vs-tr-sample {
@@ -116,7 +116,7 @@
 .vs-strip-row code {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 
 /* Inspector controls */

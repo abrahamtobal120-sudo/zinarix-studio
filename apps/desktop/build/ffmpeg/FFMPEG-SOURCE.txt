@@ -1,0 +1,50 @@
+FFmpeg / FFprobe: source code of the exact builds in this folder
+================================================================
+
+ffmpeg and ffprobe are distributed under the GNU General Public License,
+version 3 or later (COPYING.GPLv3.txt, next to this file). Below is the
+corresponding source code of each build that Zinarix Studio ships.
+
+ffmpeg 6.1.1 (npm ffmpeg-static 5.3.0, binary release b6.1.1)
+---------------------------------------------------------------
+Windows x64 : "6.1.1-essentials_build-www.gyan.dev" (gyan.dev)
+  FFmpeg source (exact commit) : https://github.com/FFmpeg/FFmpeg/commit/e38092ef93
+  Build release and config     : https://github.com/GyanD/codexffmpeg/releases/tag/6.1.1
+  Builder                      : https://www.gyan.dev/ffmpeg/builds/
+
+macOS x64 (Intel) : 6.1.1 static build by evermeet.cx
+  FFmpeg source                : https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz
+                                 https://github.com/FFmpeg/FFmpeg/tree/n6.1.1
+  Builder (sources, config)    : https://evermeet.cx/ffmpeg/
+macOS arm64 (Apple Silicon) : 6.1.1 static build by osxexperts.net
+  FFmpeg source                : https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz
+                                 https://github.com/FFmpeg/FFmpeg/tree/n6.1.1
+  Builder                      : https://www.osxexperts.net/
+
+Linux x64 / arm64 : 6.1.1 static build by John Van Sickle
+  FFmpeg and library sources   : https://johnvansickle.com/ffmpeg/release-source/
+  FFmpeg source                : https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz
+                                 https://github.com/FFmpeg/FFmpeg/tree/n6.1.1
+  Builder                      : https://johnvansickle.com/ffmpeg/
+
+All platforms, build notes : https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1
+
+ffprobe 4.0.2 (npm ffprobe-static 3.1.0), Windows / macOS / Linux
+------------------------------------------------------------------
+  FFmpeg source                : https://ffmpeg.org/releases/ffmpeg-4.0.2.tar.xz
+                                 https://github.com/FFmpeg/FFmpeg/tree/n4.0.2
+  Package                      : https://github.com/joshwnj/ffprobe-static
+
+Written offer
+-------------
+For at least three years after we distribute this version of Zinarix
+Studio, anyone can ask for the complete corresponding source code of
+these builds, at no charge beyond the cost of delivery, by opening an
+issue titled "FFmpeg source request" at
+https://github.com/abrahamtobal120-sudo/zinarix-studio/issues
+
+----------------------------------------------------------------------
+Español: arriba están los enlaces al código fuente exacto de cada
+compilación de ffmpeg y ffprobe incluida (Windows, macOS y Linux).
+También puedes pedir el código abriendo un issue "FFmpeg source request"
+en el repositorio de Zinarix Studio.

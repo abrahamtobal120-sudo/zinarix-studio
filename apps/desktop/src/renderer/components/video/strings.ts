@@ -231,7 +231,8 @@ const es = {
   hideQueue: 'Ocultar',
   preparing: 'Preparando…',
   textClip: 'Título',
-  textPanelHint: 'Haz clic en un estilo para agregar un título en el cabezal. Luego cambia el texto en el inspector.',
+  textPanelHint:
+    'Haz clic en un estilo para agregar un título en el cabezal. Luego cambia el texto en el inspector.',
   tp_title: 'Título',
   tp_subtitle: 'Subtítulo',
   tp_lower: 'Tercio inferior',
@@ -280,7 +281,8 @@ const es = {
   look_faded: 'Desvaído',
   look_dream: 'Sueño',
   look_blur: 'Desenfocado',
-  fxHint: 'Elige uno o más clips de video, imagen o texto y haz clic en un estilo. Los valores se ajustan en el inspector.',
+  fxHint:
+    'Elige uno o más clips de video, imagen o texto y haz clic en un estilo. Los valores se ajustan en el inspector.',
   needVisual: 'Primero elige en la línea de tiempo un clip de video, imagen o texto.',
   fxApplied: '{what}: aplicado a {n} clip(s)',
   secAnim: 'Animación',
@@ -304,8 +306,10 @@ const es = {
   tr_wipe: 'Barrido',
   tr_slide: 'Empujar',
   tr_zoomIn: 'Zoom',
-  trHint: 'Elige el clip que entra y haz clic en una transición: se coloca en el corte con el clip anterior de la misma pista.',
-  trReveal: 'No hay un clip justo antes en la pista: la transición revela este clip sobre lo de abajo.',
+  trHint:
+    'Elige el clip que entra y haz clic en una transición: se coloca en el corte con el clip anterior de la misma pista.',
+  trReveal:
+    'No hay un clip justo antes en la pista: la transición revela este clip sobre lo de abajo.',
   trJoin: 'Une con el clip anterior, centrada en el corte.',
   editTransition: 'Transición',
   mixer: 'Mezclador',
@@ -313,7 +317,8 @@ const es = {
   mixPan: 'Paneo',
   mute: 'Silenciar',
   solo: 'Solo',
-  mixHint: 'Volumen y solo se oyen en la vista previa y en el video exportado; el paneo, solo en el exportado.',
+  mixHint:
+    'Volumen y solo se oyen en la vista previa y en el video exportado; el paneo, solo en el exportado.',
   editMix: 'Mezcla',
   panL: 'I',
   panR: 'D',
@@ -552,7 +557,8 @@ const en: Record<VideoKey, string> = {
   hideQueue: 'Hide',
   preparing: 'Preparing…',
   textClip: 'Title',
-  textPanelHint: 'Click a style to add a title at the playhead. Then change the text in the inspector.',
+  textPanelHint:
+    'Click a style to add a title at the playhead. Then change the text in the inspector.',
   tp_title: 'Title',
   tp_subtitle: 'Subtitle',
   tp_lower: 'Lower third',
@@ -601,7 +607,8 @@ const en: Record<VideoKey, string> = {
   look_faded: 'Faded',
   look_dream: 'Dream',
   look_blur: 'Blurred',
-  fxHint: 'Select one or more video, image or text clips and click a look. Fine-tune the values in the inspector.',
+  fxHint:
+    'Select one or more video, image or text clips and click a look. Fine-tune the values in the inspector.',
   needVisual: 'First select a video, image or text clip on the timeline.',
   fxApplied: '{what}: applied to {n} clip(s)',
   secAnim: 'Animation',
@@ -625,8 +632,10 @@ const en: Record<VideoKey, string> = {
   tr_wipe: 'Wipe',
   tr_slide: 'Push',
   tr_zoomIn: 'Zoom',
-  trHint: 'Select the incoming clip and click a transition: it goes on the cut with the previous clip on the same track.',
-  trReveal: 'There is no clip right before it on the track: the transition reveals this clip over what is below.',
+  trHint:
+    'Select the incoming clip and click a transition: it goes on the cut with the previous clip on the same track.',
+  trReveal:
+    'There is no clip right before it on the track: the transition reveals this clip over what is below.',
   trJoin: 'Joins the previous clip, centred on the cut.',
   editTransition: 'Transition',
   mixer: 'Mixer',
