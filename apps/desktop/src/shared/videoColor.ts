@@ -321,9 +321,9 @@ export function gradePixels(
     }
     if (lut) {
       const o = applyLut(lut, r / 255, g / 255, b / 255);
-      px[i] = o[0] * 255 + 0.5;
-      px[i + 1] = o[1] * 255 + 0.5;
-      px[i + 2] = o[2] * 255 + 0.5;
+      px[i] = o[0] * 255; // Uint8ClampedArray rounds to nearest itself
+      px[i + 1] = o[1] * 255;
+      px[i + 2] = o[2] * 255;
     } else {
       px[i] = r;
       px[i + 1] = g;

@@ -365,7 +365,7 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 12 with FFmpeg', () => {
     const src = join(dir, 'grad.mp4');
     // Smooth colours (gradients) so chroma subsampling barely matters; lossless encode.
     sh([
-      ...['-f', 'lavfi', '-i', 'gradients=s=160x90:c0=0x203080:c1=0xe0a040:speed=0:n=2'],
+      ...['-f', 'lavfi', '-i', 'gradients=s=160x90:c0=0x203080:c1=0xe0a040:speed=0.00001:n=2'],
       ...['-t', '1', '-r', '30', '-c:v', 'libx264', '-qp', '0', '-pix_fmt', 'yuv444p', src],
     ]);
     const lutPath = join(dir, 'warm.cube');

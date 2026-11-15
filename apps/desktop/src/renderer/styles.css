@@ -8489,19 +8489,22 @@ body.dragging-y * {
 .activity:hover::after {
   background: var(--hover);
 }
-/* Something that is on (chat, terminal, security tab...): bright icon on a soft pill. */
+/* Something that is on (chat, terminal, security tab...): only a brighter icon, no box. */
 .activity.active {
   color: var(--fg-strong);
 }
 .activity.active::after {
-  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  background: transparent;
 }
-/* The side panel being shown: accent icon, accent pill and the accent marker. */
+.activity.active:hover::after {
+  background: var(--hover);
+}
+/* The side panel being shown, the only accented button: accent icon and the marker. */
 .activity.active.is-view {
   color: var(--brand);
 }
 .activity.active.is-view::after {
-  background: var(--sel-soft);
+  background: transparent;
 }
 .activity.active.is-view::before {
   content: '';
@@ -8521,14 +8524,24 @@ body.dragging-y * {
   outline-offset: -1px;
 }
 .activity .activity-badge {
-  top: 3px;
-  right: 4px;
+  top: 4px;
+  right: 5px;
   z-index: 1;
-  min-width: 15px;
-  height: 15px;
+  min-width: 14px;
+  height: 14px;
   padding: 0 3px;
+  border-radius: 7px;
+  /* A quiet count (git changes, new reports): grey, like VS Code. Red is for alerts only. */
+  background: var(--bg-3);
+  color: var(--fg-dim);
   font-size: var(--text-2xs);
-  line-height: 15px;
+  font-weight: 600;
+  line-height: 14px;
+}
+.activity .activity-badge.alert {
+  background: var(--danger);
+  color: var(--bg);
+  font-weight: 700;
 }
 .activity-sep {
   flex-shrink: 0;
@@ -8737,6 +8750,11 @@ body.dragging-y * {
 .apps-item.on {
   background: var(--sel-soft);
 }
+.apps-badge.alert {
+  background: var(--danger);
+  color: var(--bg);
+  font-weight: 700;
+}
 .apps-icon {
   display: grid;
   place-items: center;
@@ -8777,10 +8795,10 @@ body.dragging-y * {
   min-width: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--danger);
-  color: var(--bg);
+  background: var(--bg-3);
+  color: var(--fg-dim);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 17px;
   text-align: center;
 }

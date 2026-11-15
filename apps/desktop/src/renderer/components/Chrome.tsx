@@ -36,6 +36,8 @@ interface BarItem {
   on: boolean;
   run: () => void;
   badge?: number;
+  /** Red badge (something that needs you, like unread messages); otherwise a quiet grey count. */
+  alert?: boolean;
   /** view: picks the side panel (accent marker); toggle: shows/hides something; action: opens a window. */
   kind: Kind;
 }
@@ -101,16 +103,20 @@ function useBarItems() {
     browser: tool('browser', t('browser'), 'globe', 'toggle', browserActive, () =>
       browserActive ? leaveTab() : openBrowserTab(),
     ),
-    whatsapp: tool(
-      'whatsapp',
-      'WhatsApp',
-      'whatsapp',
-      'toggle',
-      whatsappActive,
-      () => (whatsappActive ? leaveTab() : openWhatsAppTab()),
-      whatsappUnread,
-    ),
-    more: view('apps', t('appsTitle'), 'layers'),
+    whatsapp: {
+      ...tool(
+        'whatsapp',
+        'WhatsApp',
+        'whatsapp',
+        'toggle',
+        whatsappActive,
+        () => (whatsappActive ? leaveTab() : openWhatsAppTab()),
+        whatsappUnread,
+      ),
+      alert: true,
+    },
+    // Unread WhatsApp messages also show on "Más", so they are seen with WhatsApp closed.
+    more: { ...view('apps', t('appsTitle'), 'layers', whatsappUnread), alert: true },
     maximize: tool(
       'maximize',
       sideMax ? t('restoreSize') : t('maximizeSide'),
@@ -147,11 +153,12 @@ function useBarItems() {
 }
 
 /**
- * Left bar, in groups: work (files, search, git, run, debug) · AI (chat, watcher) · create
- * (design, video, terminal) · cloud (Vercel, Supabase, Google Cloud) · messages and web (mail,
- * WhatsApp, browser) · and, at the bottom, security, usage, providers, palette and settings.
- * Every tool keeps its own button. Side views get an accent marker on the left; toggles
- * (chat, terminal...) only light up.
+ * Left bar, in three groups: code (files, search, git, run, debug, tests) · AI and tools (chat,
+ * watcher, design, video, terminal) · integrations ("Más", plus whichever integration is open
+ * right now, so it can be closed from the bar) · and settings at the bottom. Vercel, Supabase,
+ * Google Cloud, mail, WhatsApp, the browser, security, usage, providers, the playground and
+ * the palette live in "Más". Only the side panel being shown gets the accent (icon + marker,
+ * no background); toggles (chat, terminal...) only get a brighter icon.
  */
 export function ActivityBar() {
   const { items, sidebar, browserActive, whatsappActive } = useBarItems();
@@ -184,7 +191,7 @@ export function ActivityBar() {
       >
         <Icon name={it.icon} size={20} />
         {n ? (
-          <span className="activity-badge" aria-hidden="true">
+          <span className={`activity-badge${it.alert ? ' alert' : ''}`} aria-hidden="true">
             {n > 99 ? '99+' : n}
           </span>
         ) : null}
@@ -192,6 +199,17 @@ export function ActivityBar() {
     );
   };
   const sep = (key: string) => <div key={key} className="activity-sep" aria-hidden="true" />;
+  // Integrations open right now get a button next to "Más" while they are open.
+  const openNow = [
+    items.vercel,
+    items.supabase,
+    items.gcloud,
+    items.mail,
+    items.whatsapp,
+    items.browser,
+    items.security,
+    items.playground,
+  ].filter((it) => it.on);
   return (
     <nav className="activity-bar" aria-label={t('appsBar')}>
       {button(items.explorer)}
@@ -203,25 +221,14 @@ export function ActivityBar() {
       {sep('s1')}
       {button(items.chat)}
       {button(items.watch)}
-      {sep('s2')}
       {button(items.design)}
       {button(items.video)}
       {button(items.terminal)}
-      {sep('s3')}
-      {button(items.vercel)}
-      {button(items.supabase)}
-      {button(items.gcloud)}
-      {sep('s4')}
-      {button(items.mail)}
-      {button(items.whatsapp)}
-      {button(items.browser)}
+      {sep('s2')}
+      {button(items.more)}
+      {openNow.map(button)}
       <div className="spacer" />
       {sidebar && sidebar !== 'design' && button(items.maximize)}
-      {button(items.security)}
-      {button(items.playground)}
-      {button(items.usage)}
-      {button(items.providers)}
-      {button(items.palette)}
       {button(items.settings)}
       {tip && !nativeOver && (
         <div className="activity-tip" role="tooltip" style={{ top: tip.y }}>
@@ -233,6 +240,7 @@ export function ActivityBar() {
 }
 
 /** "Más": the integrations and tools that do not have their own button in the bar. */
+// Badges here follow the bar: red only for alerts (unread messages), grey otherwise.
 export function AppsPanel() {
   const { items } = useBarItems();
   const row = (it: BarItem, desc: string) => (
@@ -249,7 +257,11 @@ export function AppsPanel() {
         <span className="apps-name">{it.title}</span>
         <span className="apps-desc">{desc}</span>
       </span>
-      {it.badge ? <span className="apps-badge">{it.badge > 99 ? '99+' : it.badge}</span> : null}
+      {it.badge ? (
+        <span className={`apps-badge${it.alert ? ' alert' : ''}`}>
+          {it.badge > 99 ? '99+' : it.badge}
+        </span>
+      ) : null}
     </button>
   );
   return (
@@ -269,6 +281,8 @@ export function AppsPanel() {
         {row(items.playground, tp('pgTab'))}
         {row(items.usage, t('appsUsage'))}
         {row(items.palette, t('appsPalette'))}
+        {row(items.providers, t('connectProvider'))}
+        {row(items.security, t('securityIntro'))}
       </div>
     </div>
   );

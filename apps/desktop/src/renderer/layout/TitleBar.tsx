@@ -41,7 +41,8 @@ export function TitleBar() {
       alone = false;
       const first = bar.current?.querySelector<HTMLButtonElement>('.titlebar-menu');
       if (!first) return;
-      if (bar.current?.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+      if (bar.current?.contains(document.activeElement))
+        (document.activeElement as HTMLElement).blur();
       else first.focus();
     };
     const cancel = () => (alone = false);
@@ -63,10 +64,15 @@ export function TitleBar() {
   const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
     const items = [...(bar.current?.querySelectorAll<HTMLButtonElement>('.titlebar-menu') ?? [])];
     const go = (n: number) => items[(n + items.length) % items.length]?.focus();
-    if (e.key === 'ArrowRight') (e.preventDefault(), go(i + 1));
-    else if (e.key === 'ArrowLeft') (e.preventDefault(), go(i - 1));
-    else if (e.key === 'ArrowDown') (e.preventDefault(), open(i, e.currentTarget));
-    else if (e.key === 'Escape') e.currentTarget.blur();
+    if (e.key === 'Escape') return e.currentTarget.blur();
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (step) {
+      e.preventDefault();
+      go(i + step);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      open(i, e.currentTarget);
+    }
   };
 
   const title = workspace
