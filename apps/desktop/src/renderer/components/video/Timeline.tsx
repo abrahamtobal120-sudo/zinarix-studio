@@ -5,6 +5,7 @@ import {
   addTrack,
   clipDur,
   clipEnd,
+  speedOf,
   mediaOf,
   moveClips,
   projectDuration,
@@ -794,7 +795,16 @@ function ClipView({
           view={view}
         />
       )}
-      <div className="vs-clip-label">{media?.name ?? '?'}</div>
+      <div className="vs-clip-label">
+        {media?.name ?? '?'}
+        {speedOf(clip) !== 1 && <span className="vs-clip-speed">{`${speedOf(clip)}×`}</span>}
+      </div>
+      {!!clip.fadeIn && (
+        <div className="vs-fade vs-fade-in" style={{ width: clip.fadeIn * zoom }} />
+      )}
+      {!!clip.fadeOut && (
+        <div className="vs-fade vs-fade-out" style={{ width: clip.fadeOut * zoom }} />
+      )}
       {wave && media?.hasAudio && (
         <Waveform
           clip={clip}
@@ -835,7 +845,7 @@ function Filmstrip({
   const firstX = Math.max(0, Math.floor(((view.t0 - clip.start) * zoom) / tileW) * tileW);
   const lastX = Math.min(width, (view.t1 - clip.start) * zoom);
   for (let x = firstX; x < lastX && tiles.length < 200; x += tileW) {
-    const src = clip.in + (x + tileW / 2) / zoom;
+    const src = clip.in + ((x + tileW / 2) / zoom) * speedOf(clip);
     tiles.push({
       x,
       frame: Math.min(23, Math.max(0, Math.floor((src / Math.max(0.001, media.duration)) * 24))),
@@ -883,6 +893,7 @@ function Waveform({
   const b = Math.min(clipEnd(clip), view.t1);
   const left = (a - clip.start) * zoom;
   const width = Math.max(1, Math.min(8000, Math.round((b - a) * zoom)));
+  const sp = speedOf(clip);
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
@@ -897,15 +908,15 @@ function Waveform({
     const mid = height / 2;
     const scaleV = Math.min(2, clip.volume);
     for (let x = 0; x < width; x++) {
-      const t0 = clip.in + (a - clip.start) + x / zoom;
-      const t1 = t0 + 1 / zoom;
+      const t0 = clip.in + (a - clip.start + x / zoom) * sp;
+      const t1 = t0 + sp / zoom;
       let peak = 0;
       for (let i = Math.floor(t0 * wave.pps); i <= Math.floor(t1 * wave.pps); i++)
         peak = Math.max(peak, wave.peaks[i] ?? 0);
       const hh = Math.max(0.5, (peak / 255) * mid * scaleV);
       ctx.fillRect(x, mid - hh, 1, hh * 2);
     }
-  }, [a, b, width, height, zoom, clip.in, clip.start, clip.volume, wave, muted]);
+  }, [a, b, width, height, zoom, clip.in, clip.start, sp, clip.volume, wave, muted]);
   if (b <= a) return null;
   return <canvas ref={ref} className="vs-wave" style={{ left, width, height }} />;
 }

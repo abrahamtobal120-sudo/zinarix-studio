@@ -185,6 +185,50 @@ await win.keyboard.press('m');
 check('marker added', (await win.locator('.vs-marker').count()) === 1);
 await shot('3-edited');
 
+// 5b. Inspector: scale to 50 % (corner goes black) and 2× speed (clip half as long); undo both.
+await win.locator('.vs-clip').first().click();
+await win.waitForSelector('#vs-ts', { timeout: 3000 });
+const corner = () =>
+  win.evaluate(() => {
+    const c = document.querySelector('.vs-canvas');
+    const d = c.getContext('2d').getImageData(2, 2, 1, 1).data;
+    return d[0] + d[1] + d[2];
+  });
+const cornerBefore = await corner();
+await win.locator('.vs-prop-block:has(#vs-ts) .vs-num-input').fill('50');
+await win.waitForTimeout(300);
+const cornerAfter = await corner();
+check(
+  'scale 50 % shrinks the picture',
+  cornerBefore > 30 && cornerAfter < 10,
+  `${cornerBefore} → ${cornerAfter}`,
+);
+const w0 = await win
+  .locator('.vs-clip')
+  .first()
+  .evaluate((e) => e.getBoundingClientRect().width);
+await win.locator('.vs-chip', { hasText: /^2×$/ }).click();
+await win.waitForTimeout(200);
+const w1 = await win
+  .locator('.vs-clip')
+  .first()
+  .evaluate((e) => e.getBoundingClientRect().width);
+check('2× speed halves the clip', Math.abs(w1 - w0 / 2) < 3, `${w0} → ${w1}`);
+await shot('3b-inspector');
+await win.locator('.vs-clip').first().click();
+await win.keyboard.press('Control+z');
+await win.keyboard.press('Control+z');
+await win.waitForTimeout(200);
+const w2 = await win
+  .locator('.vs-clip')
+  .first()
+  .evaluate((e) => e.getBoundingClientRect().width);
+check('undo restores speed', Math.abs(w2 - w0) < 3, `${w2}`);
+// Esc with a clip selected only clears the selection.
+await win.keyboard.press('Escape');
+await win.waitForTimeout(150);
+check('esc clears the selection first', (await win.locator('.vs-clip.selected').count()) === 0);
+
 // 6. Export (dialog mocked) and wait for the job.
 await win.keyboard.press('Control+e');
 await win.waitForSelector('.vs-dialog', { timeout: 3000 });

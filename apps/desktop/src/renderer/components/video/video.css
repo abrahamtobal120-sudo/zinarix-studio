@@ -1472,3 +1472,87 @@ body.vs-open .toast {
 .vs-head-name {
   min-width: 24px;
 }
+
+/* ---- Inspector, phase 2: transform / speed / fades ---- */
+.vs-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.vs-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.vs-num-input {
+  width: 64px;
+  padding: 2px 4px;
+  background: var(--bg-input, rgba(255, 255, 255, 0.06));
+  color: inherit;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.vs-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.vs-toggles {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.vs-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.vs-chips {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.vs-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.vs-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg, #fff);
+}
+.vs-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.vs-clip-speed {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  font-weight: 600;
+}
+.vs-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.vs-fade-in {
+  left: 0;
+  background: linear-gradient(to bottom right, rgba(0, 0, 0, 0.55) 50%, transparent 50%);
+}
+.vs-fade-out {
+  right: 0;
+  background: linear-gradient(to bottom left, rgba(0, 0, 0, 0.55) 50%, transparent 50%);
+}

@@ -4,7 +4,17 @@
  * canvas, bottom track first. Elements live off-DOM and are recycled when far from the playhead.
  */
 import type { Clip, VideoProject } from '../../../shared/video';
-import { clipEnd, compositeOrder, mediaOf, projectDuration, trackOf } from '../../../shared/video';
+import {
+  clipEnd,
+  compositeOrder,
+  fadeAt,
+  mediaOf,
+  projectDuration,
+  sourceAt,
+  speedOf,
+  trackOf,
+  transformOf,
+} from '../../../shared/video';
 import { getV, setV } from './videoStore';
 
 type El = HTMLVideoElement | HTMLAudioElement;
@@ -23,6 +33,8 @@ export class Player {
   private clockFrom = 0;
   private canvas: HTMLCanvasElement | null = null;
   private lastDrawKey = '';
+  /** Edits (transform, fades…) repaint a paused frame too. */
+  private lastProject: VideoProject | null = null;
   private stopped = false;
   /** Since when a layer has been waiting for its frame (seek / load), 0 when none is. */
   private waitingSince = 0;
@@ -121,12 +133,12 @@ export class Player {
       const track = trackOf(p, c.trackId);
       const el = this.element(c, url, m.kind === 'audio' ? 'audio' : 'video');
       live.add(c.id);
-      const target = active ? c.in + (t - c.start) : c.in;
+      const target = active ? sourceAt(c, t) : c.in;
       el.muted = !track || track.muted || !m.hasAudio || c.volume <= 0;
-      el.volume = Math.min(1, Math.max(0, c.volume));
+      el.volume = Math.min(1, Math.max(0, c.volume * (active ? fadeAt(c, t) : 0)));
       if (active && rate > 0) {
         // HTML media plays forward only, up to 16×.
-        const r = Math.min(16, rate);
+        const r = Math.min(16, Math.max(0.0625, rate * speedOf(c)));
         if (el.playbackRate !== r) el.playbackRate = r;
         if (Math.abs(el.currentTime - target) > DRIFT * Math.max(1, r)) el.currentTime = target;
         if (el.paused) void el.play().catch(() => undefined);
@@ -199,7 +211,8 @@ export class Player {
       }
     }
     const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}`).join(',')}`;
-    if (!s.playing && key === this.lastDrawKey) return;
+    if (!s.playing && key === this.lastDrawKey && p === this.lastProject) return;
+    this.lastProject = p;
     const allReady = layers.every((l) => l.ready);
     this.lastDrawKey = allReady ? key : '';
     // While a video is seeking (scrubbing, stepping frames) keep the last picture instead of
@@ -213,11 +226,20 @@ export class Player {
     ctx.fillRect(0, 0, W, H);
     for (const l of layers) {
       if (!l.ready || !l.w || !l.h) continue;
-      // Fit inside the frame, centred (same as the export's scale + overlay).
-      const k = Math.min(W / l.w, H / l.h);
+      // Fit inside the frame, centred, then the clip's transform (same maths as the export).
+      const tr = transformOf(l.c);
+      const alpha = tr.opacity * fadeAt(l.c, t);
+      if (alpha <= 0) continue;
+      const k = Math.min(W / l.w, H / l.h) * tr.scale;
       const dw = l.w * k;
       const dh = l.h * k;
-      ctx.drawImage(l.src, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, alpha);
+      ctx.translate(W / 2 + tr.x * W, H / 2 + tr.y * H);
+      if (tr.rotation) ctx.rotate((tr.rotation * Math.PI) / 180);
+      if (tr.flipH || tr.flipV) ctx.scale(tr.flipH ? -1 : 1, tr.flipV ? -1 : 1);
+      ctx.drawImage(l.src, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
     }
   }
 }

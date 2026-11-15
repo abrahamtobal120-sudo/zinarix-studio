@@ -3,6 +3,7 @@ import {
   FORMAT_PRESETS,
   FPS_CHOICES,
   RESOLUTIONS,
+  clipEnd,
   pasteClips,
   sizeFor,
 } from '../../../shared/video';
@@ -850,7 +851,7 @@ function duplicateSelection(): void {
   const s = getV();
   const clips = s.project.clips.filter((c) => s.selection.includes(c.id));
   if (!clips.length) return;
-  const end = Math.max(...clips.map((c) => c.start + c.out - c.in));
+  const end = Math.max(...clips.map(clipEnd));
   const { project, ids } = pasteClips(s.project, clips, end);
   commit(project, 'Duplicar');
   setV({ selection: ids });

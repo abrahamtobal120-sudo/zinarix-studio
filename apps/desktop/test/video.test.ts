@@ -16,6 +16,9 @@ import {
   newProject,
   projectDuration,
   removeClips,
+  setClipSpeed,
+  setFades,
+  setTransform,
   snap,
   snapPoints,
   splitAt,
@@ -148,6 +151,68 @@ describe('video model', () => {
   });
 });
 
+describe('clip speed, transform and fades', () => {
+  it('speed changes the timeline length and keeps split/trim on the source', () => {
+    const { p, id } = withClip();
+    const fast = setClipSpeed(p, id, 2);
+    const c = fast.clips[0]!;
+    expect(clipEnd(c)).toBeCloseTo(5, 6);
+    // Splitting at 2 s on the timeline cuts the source at 4 s.
+    const { project } = splitAt(fast, 2);
+    const [l, r] = [...project.clips].sort((a, b) => a.start - b.start);
+    expect(l!.out).toBeCloseTo(4, 6);
+    expect(r!.in).toBeCloseTo(4, 6);
+    expect(clipEnd(r!)).toBeCloseTo(5, 6);
+    // Trimming the right edge out to 8 s stops at the end of the media (10 s of source = 5 s).
+    expect(clipEnd(trimClip(fast, id, 'right', 8).clips[0]!)).toBeCloseTo(5, 6);
+  });
+
+  it('slowing down never runs into the next clip', () => {
+    const { p, id } = withClip();
+    const two = insertMedia(p, p.media[0]!).project; // second clip at 10 s
+    const slow = setClipSpeed(two, id, 0.5);
+    const c = slow.clips.find((x) => x.id === id)!;
+    expect(clipEnd(c)).toBeCloseTo(10, 6);
+    expect(c.out).toBeCloseTo(5, 6);
+    expect(setClipSpeed(p, id, 1).clips[0]!.speed).toBeUndefined();
+  });
+
+  it('keeps fades inside the clip and drops an identity transform', () => {
+    const { p, id } = withClip();
+    const f = setFades(setFades(p, id, { fadeIn: 7 }), id, { fadeOut: 7 });
+    const c = f.clips[0]!;
+    expect((c.fadeIn ?? 0) + (c.fadeOut ?? 0)).toBeLessThanOrEqual(10 + 1e-6);
+    const moved = setTransform(p, id, { x: 0.25, rotation: 90 });
+    expect(moved.clips[0]!.transform?.x).toBe(0.25);
+    expect(setTransform(moved, id, { x: 0, rotation: 0 }).clips[0]!.transform).toBeUndefined();
+  });
+
+  it('puts speed, transform and fades in the graph, numbers only', () => {
+    const { p, id } = withClip();
+    let q = setClipSpeed(p, id, 2);
+    q = setTransform(q, id, { scale: 0.5, rotation: 45, opacity: 0.5, flipH: true, x: 0.1 });
+    q = setFades(q, id, { fadeIn: 1, fadeOut: 1 });
+    // A hostile file must not inject filters through a field.
+    q = {
+      ...q,
+      clips: q.clips.map((c) => ({
+        ...c,
+        transform: { ...c.transform!, y: '0;[0:v]evil' as unknown as number },
+      })),
+    };
+    const plan = buildRender(q, defaultExport(q), '/out.mp4');
+    expect(plan.inputs).toContain('10'); // 5 s on the timeline = 10 s of source
+    expect(plan.filter).toContain('setpts=(PTS-STARTPTS)/2');
+    expect(plan.filter).toContain('atempo=2');
+    expect(plan.filter).toContain('hflip');
+    expect(plan.filter).toContain('rotate=a=');
+    expect(plan.filter).toContain('colorchannelmixer=aa=0.5');
+    expect(plan.filter).toContain('fade=t=out:st=4:d=1:alpha=1');
+    expect(plan.filter).toContain('afade=t=in:st=0:d=1');
+    expect(plan.filter).not.toContain('evil');
+  });
+});
+
 describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video smoke (FFmpeg)', () => {
   it('imports a video, cuts it and exports a 5 s MP4', async () => {
     const src = join(dir, 'source.mp4');
@@ -232,5 +297,71 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video smoke (FFmpeg)', () => {
     expect(check.duration).toBeGreaterThan(4.8);
     expect(check.duration).toBeLessThan(5.2);
     expect([check.width, check.height, check.hasAudio]).toEqual([640, 360, true]);
+  }, 120_000);
+
+  it('renders transform, speed and fades with real FFmpeg', async () => {
+    const src = join(dir, 'fx.mp4');
+    const gen = spawnSync(tools.ffmpeg!, [
+      '-hide_banner',
+      '-v',
+      'error',
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc2=size=320x180:rate=30:duration=6',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=440:duration=6',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-pix_fmt',
+      'yuv420p',
+      '-c:a',
+      'aac',
+      '-shortest',
+      src,
+    ]);
+    expect(gen.status, gen.stderr?.toString()).toBe(0);
+    const svc = new VideoService(appRoot, dir, () => undefined);
+    const { url: _u, ...item } = await svc.probe(src);
+    let p: VideoProject = {
+      ...newProject({ width: 320, height: 180, fps: 30, name: 'fx' }),
+      media: [item],
+    };
+    const ins = insertMedia(p, item);
+    p = setClipSpeed(ins.project, ins.clip!.id, 2); // 6 s of source → 3 s
+    p = setTransform(p, ins.clip!.id, {
+      scale: 0.6,
+      rotation: 30,
+      opacity: 0.8,
+      flipH: true,
+      x: 0.1,
+    });
+    p = setFades(p, ins.clip!.id, { fadeIn: 0.5, fadeOut: 0.5 });
+    const out = join(dir, 'fx-out.mp4');
+    const job = svc.enqueue(
+      p,
+      { ...defaultExport(p), width: 320, height: 180, preset: 'veryfast' },
+      out,
+    );
+    await new Promise<void>((resolve) => {
+      const tick = setInterval(() => {
+        const j = svc.list().find((x) => x.id === job.id)!;
+        if (j.state !== 'queued' && j.state !== 'running') {
+          clearInterval(tick);
+          resolve();
+        }
+      }, 100);
+    });
+    const final = svc.list().find((x) => x.id === job.id)!;
+    expect(final.state, final.error).toBe('done');
+    const check = await svc.probe(out);
+    expect(check.duration).toBeGreaterThan(2.8);
+    expect(check.duration).toBeLessThan(3.2);
+    expect(check.hasAudio).toBe(true);
   }, 120_000);
 });

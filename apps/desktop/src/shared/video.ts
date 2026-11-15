@@ -38,6 +38,55 @@ export interface Clip {
   out: number;
   /** 0–2 (1 = original). */
   volume: number;
+  /** Playback speed (1 = original): the clip lasts (out - in) / speed on the timeline. */
+  speed?: number;
+  /** Position, size and look on the canvas (missing = centred, fitted, untouched). */
+  transform?: Transform;
+  /** Fade from/to black (video) and silence (audio), in timeline seconds. */
+  fadeIn?: number;
+  fadeOut?: number;
+}
+
+export interface Transform {
+  /** Offset of the centre, as a fraction of the canvas width / height (0 = centred). */
+  x: number;
+  y: number;
+  /** Size relative to "fit inside the canvas" (1 = fitted). */
+  scale: number;
+  /** Degrees, clockwise. */
+  rotation: number;
+  /** 0–1. */
+  opacity: number;
+  flipH: boolean;
+  flipV: boolean;
+}
+
+export const IDENTITY: Transform = {
+  x: 0,
+  y: 0,
+  scale: 1,
+  rotation: 0,
+  opacity: 1,
+  flipH: false,
+  flipV: false,
+};
+export const SPEED_MIN = 0.25;
+export const SPEED_MAX = 4;
+
+export const speedOf = (c: Clip): number => c.speed ?? 1;
+export const transformOf = (c: Clip): Transform => ({ ...IDENTITY, ...c.transform });
+
+/** Seconds into the source at timeline time t. */
+export const sourceAt = (c: Clip, t: number): number => c.in + (t - c.start) * speedOf(c);
+
+/** 0–1 fade factor at timeline time t (1 = fully visible / audible). */
+export function fadeAt(c: Clip, t: number): number {
+  const into = t - c.start;
+  const left = clipEnd(c) - t;
+  let k = 1;
+  if (c.fadeIn && c.fadeIn > 0) k = Math.min(k, into / c.fadeIn);
+  if (c.fadeOut && c.fadeOut > 0) k = Math.min(k, left / c.fadeOut);
+  return Math.max(0, Math.min(1, k));
 }
 
 export interface Track {
@@ -160,8 +209,9 @@ export function newProject(
   };
 }
 
-export const clipEnd = (c: Clip): number => c.start + (c.out - c.in);
-export const clipDur = (c: Clip): number => c.out - c.in;
+/** Length on the timeline (the source part divided by the speed). */
+export const clipDur = (c: Clip): number => (c.out - c.in) / speedOf(c);
+export const clipEnd = (c: Clip): number => c.start + clipDur(c);
 
 export function projectDuration(p: VideoProject): number {
   return p.clips.reduce((m, c) => Math.max(m, clipEnd(c)), 0);
@@ -296,9 +346,10 @@ export function splitAt(
       clips.push(c);
       continue;
     }
-    const cut = c.in + (time - c.start);
-    const right: Clip = { ...c, id: uid('c'), start: time, in: cut };
-    clips.push({ ...c, out: cut }, right);
+    const cut = sourceAt(c, time);
+    // The fades stay at the outer ends: the left half keeps the fade in, the right the fade out.
+    const right: Clip = { ...c, id: uid('c'), start: time, in: cut, fadeIn: undefined };
+    clips.push({ ...c, out: cut, fadeOut: undefined }, right);
     created.push(right.id);
   }
   return { project: created.length ? { ...p, clips } : p, created };
@@ -381,15 +432,16 @@ export function trimClip(
   if (!c || trackOf(p, c.trackId)?.locked) return p;
   const m = mediaOf(p, c.mediaId);
   const unlimited = m?.kind === 'image';
+  const sp = speedOf(c);
   const siblings = trackClips(p, c.trackId).filter((x) => x.id !== id);
   let next: Clip;
   if (edge === 'left') {
     const prevEnd = siblings
       .filter((x) => clipEnd(x) <= c.start + 1e-6)
       .reduce((mx, x) => Math.max(mx, clipEnd(x)), 0);
-    const minStart = Math.max(prevEnd, unlimited ? 0 : c.start - c.in);
+    const minStart = Math.max(prevEnd, unlimited ? 0 : c.start - c.in / sp);
     const start = Math.min(Math.max(to, minStart), clipEnd(c) - MIN_CLIP);
-    next = { ...c, start, in: c.in + (start - c.start) };
+    next = { ...c, start, in: sourceAt(c, start) };
     if (unlimited && next.in < 0) next = { ...next, out: next.out - next.in, in: 0 };
   } else {
     const nextStart = siblings
@@ -397,10 +449,10 @@ export function trimClip(
       .reduce((mn, x) => Math.min(mn, x.start), Infinity);
     const maxEnd = Math.min(
       nextStart,
-      unlimited ? Infinity : c.start + ((m?.duration ?? c.out) - c.in),
+      unlimited ? Infinity : c.start + ((m?.duration ?? c.out) - c.in) / sp,
     );
     const end = Math.max(Math.min(to, maxEnd), c.start + MIN_CLIP);
-    next = { ...c, out: c.in + (end - c.start) };
+    next = { ...c, out: sourceAt(c, end) };
   }
   return { ...p, clips: p.clips.map((x) => (x.id === id ? next : x)) };
 }
@@ -411,6 +463,51 @@ export function updateClip(
   patch: Partial<Omit<Clip, 'id'>>,
 ): VideoProject {
   return { ...p, clips: p.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) };
+}
+
+/**
+ * Changes a clip's speed keeping its start and its source in-point. Slower clips get longer:
+ * when the next clip on the track is in the way, the source out-point is cut so it still fits.
+ */
+export function setClipSpeed(p: VideoProject, id: string, speed: number): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c || trackOf(p, c.trackId)?.locked || !Number.isFinite(speed)) return p;
+  const sp = Math.min(SPEED_MAX, Math.max(SPEED_MIN, speed));
+  const nextStart = trackClips(p, c.trackId)
+    .filter((x) => x.id !== id && x.start >= c.start + 1e-6)
+    .reduce((mn, x) => Math.min(mn, x.start), Infinity);
+  const room = nextStart - c.start;
+  const out = (c.out - c.in) / sp > room + 1e-6 ? c.in + room * sp : c.out;
+  if (out - c.in < MIN_CLIP) return p;
+  return updateClip(p, id, { speed: sp === 1 ? undefined : sp, out });
+}
+
+/** Sets transform fields (a transform equal to the identity is dropped from the file). */
+export function setTransform(p: VideoProject, id: string, patch: Partial<Transform>): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c) return p;
+  const t = { ...transformOf(c), ...patch };
+  const same = (Object.keys(IDENTITY) as (keyof Transform)[]).every((k) => t[k] === IDENTITY[k]);
+  return updateClip(p, id, { transform: same ? undefined : t });
+}
+
+/** Sets fade lengths, kept within the clip (both together at most its length). */
+export function setFades(
+  p: VideoProject,
+  id: string,
+  fades: { fadeIn?: number; fadeOut?: number },
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c) return p;
+  const len = clipDur(c);
+  let fin = Math.max(0, fades.fadeIn ?? c.fadeIn ?? 0);
+  let fout = Math.max(0, fades.fadeOut ?? c.fadeOut ?? 0);
+  if ('fadeIn' in fades) fin = Math.min(fin, len - fout);
+  else fout = Math.min(fout, len - fin);
+  return updateClip(p, id, {
+    fadeIn: fin > 1e-3 ? fin : undefined,
+    fadeOut: fout > 1e-3 ? fout : undefined,
+  });
 }
 
 /** Copies clips (with new ids) so the earliest starts at `at`, on the same tracks when free. */
@@ -513,7 +610,9 @@ export function validProject(x: unknown): x is VideoProject {
         typeof c.id === 'string' &&
         Number.isFinite(c.start) &&
         Number.isFinite(c.in) &&
-        Number.isFinite(c.out),
+        Number.isFinite(c.out) &&
+        (c.speed === undefined ||
+          (Number.isFinite(c.speed) && c.speed >= SPEED_MIN && c.speed <= SPEED_MAX)),
     ) &&
     p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string')
   );
