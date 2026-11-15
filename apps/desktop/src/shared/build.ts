@@ -43,9 +43,43 @@ export function slugify(text: string, max = 40): string {
 }
 
 const STOP = new Set([
-  'a', 'an', 'the', 'of', 'for', 'with', 'and', 'that', 'to', 'my', 'make', 'build', 'create',
-  'un', 'una', 'unos', 'el', 'la', 'los', 'las', 'de', 'del', 'para', 'con', 'y', 'que', 'mi',
-  'haz', 'hazme', 'crea', 'creame', 'quiero', 'app', 'aplicacion', 'web', 'simple', 'sencilla',
+  'a',
+  'an',
+  'the',
+  'of',
+  'for',
+  'with',
+  'and',
+  'that',
+  'to',
+  'my',
+  'make',
+  'build',
+  'create',
+  'un',
+  'una',
+  'unos',
+  'el',
+  'la',
+  'los',
+  'las',
+  'de',
+  'del',
+  'para',
+  'con',
+  'y',
+  'que',
+  'mi',
+  'haz',
+  'hazme',
+  'crea',
+  'creame',
+  'quiero',
+  'app',
+  'aplicacion',
+  'web',
+  'simple',
+  'sencilla',
 ]);
 
 /** A free folder name: "app", then "app-2", "app-3"… */
@@ -95,7 +129,10 @@ Reemplaza el index.html provisional. Yo la veo en la vista previa en vivo mientr
 
 /** Placeholder page so the preview has something to show from the first second. */
 export function starterHtml(title: string): string {
-  const esc = title.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const esc = title.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!,
+  );
   return `<!doctype html>
 <html lang="es">
   <head>

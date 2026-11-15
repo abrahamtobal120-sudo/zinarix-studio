@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './monaco';
+import './ui/tokens.css';
 import './styles.css';
 import { App } from './App';
 import { lang } from './i18n';

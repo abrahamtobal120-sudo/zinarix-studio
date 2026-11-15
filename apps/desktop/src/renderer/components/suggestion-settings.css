@@ -21,7 +21,7 @@
 .zx-stats-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .zx-stats-table th,
 .zx-stats-table td {

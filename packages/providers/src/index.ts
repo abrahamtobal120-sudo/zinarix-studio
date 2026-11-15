@@ -19,6 +19,7 @@ export * from './models.js';
 export { openAiCompatible, toOpenAiMessages, normalizeStop } from './adapters/openai-compatible.js';
 export { openAiResponses, toResponsesInput } from './adapters/openai-responses.js';
 export { anthropic, toAnthropic } from './adapters/anthropic.js';
+export * from './anthropicRules.js';
 export { awsBedrock, parseAwsCredential, sigV4Headers } from './adapters/aws-bedrock.js';
 export { ibmWatsonx, clearWatsonxTokenCache } from './adapters/ibm-watsonx.js';
 export { replicate, clearReplicateSchemaCache } from './adapters/replicate.js';
@@ -89,3 +90,5 @@ export function getAdapter(id: AdapterId): ProviderAdapter {
 export function isAdapterImplemented(id: AdapterId): boolean {
   return id in ADAPTERS;
 }
+
+export * from './media/index.js';

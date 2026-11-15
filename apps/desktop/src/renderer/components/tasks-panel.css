@@ -23,14 +23,14 @@
 }
 .tasks-head h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-md);
   color: var(--fg-strong);
 }
 .tasks-sub,
 .tasks-hint,
 .tasks-empty {
   color: var(--fg-dim);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .tasks-new {
   padding: 10px 14px;
@@ -54,7 +54,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .tasks-opts label {
   display: flex;
@@ -85,7 +85,7 @@
   background: var(--bg-3);
 }
 .tasks-section-title {
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--warn);
   margin-bottom: 6px;
@@ -94,7 +94,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   padding: 3px 0;
 }
 .tasks-approval-task {
@@ -146,7 +146,7 @@
   font-weight: 600;
 }
 .task-state {
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 1px 6px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -177,7 +177,7 @@
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--fg-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -189,7 +189,7 @@
 }
 .task-last {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--fg-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -208,7 +208,7 @@
 }
 .task-actions button,
 .tasks-approval button {
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .task-actions .danger {
   color: var(--danger);
@@ -239,7 +239,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   padding: 6px 0;
   border-bottom: 1px dashed var(--border);
 }

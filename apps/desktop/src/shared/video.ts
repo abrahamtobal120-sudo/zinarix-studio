@@ -4,6 +4,21 @@
  * Every edit returns a new project; nothing here touches the DOM, Electron or the disk.
  * Times are in seconds.
  */
+import type { ClipAnim, Effects, Look, TextSpec, Transition } from './videoFx.js';
+import {
+  LOOK_NONE,
+  TEXT_DEFAULT_DUR,
+  TRANSITION_MAX,
+  TRANSITION_MIN,
+  animAt,
+  cleanEffects,
+  combine,
+  transitionLook,
+  validAnim,
+  validEffects,
+  validText,
+  validTransition,
+} from './videoFx.js';
 
 export type MediaKind = 'video' | 'audio' | 'image';
 export type TrackKind = 'video' | 'audio';
@@ -47,7 +62,17 @@ export interface Clip {
   fadeOut?: number;
   /** Animated transform values. A property with keys ignores its static transform value. */
   keyframes?: Keyframes;
+  /** Colour and blur effects (videoFx.ts). */
+  effects?: Effects;
+  /** Entry / exit animation. */
+  anim?: ClipAnim;
+  /** Transition from the clip right before it on the track (or a reveal when there is none). */
+  transition?: Transition;
+  /** A title: the clip draws this text instead of a media file (mediaId is ''). */
+  text?: TextSpec;
 }
+
+export const isText = (c: Clip): boolean => !!c.text;
 
 /** Transform properties that can be animated (the flips are on/off, not animated). */
 export type KeyProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
@@ -172,6 +197,10 @@ export interface Track {
   muted: boolean;
   locked: boolean;
   hidden: boolean;
+  /** Mixer: 0–2 (missing = 1), −1 (left) … 1 (right); only soloed tracks are heard. */
+  volume?: number;
+  pan?: number;
+  solo?: boolean;
 }
 
 export interface Marker {
@@ -424,8 +453,23 @@ export function splitAt(
     }
     const cut = sourceAt(c, time);
     // The fades stay at the outer ends: the left half keeps the fade in, the right the fade out.
-    const right: Clip = { ...c, id: uid('c'), start: time, in: cut, fadeIn: undefined };
-    clips.push({ ...c, out: cut, fadeOut: undefined }, right);
+    // So do the animations; the transition stays on the left half (it joins the previous clip).
+    const right: Clip = {
+      ...c,
+      id: uid('c'),
+      start: time,
+      in: cut,
+      fadeIn: undefined,
+      transition: undefined,
+      anim: c.anim && { out: c.anim.out, outD: c.anim.outD },
+    };
+    const left: Clip = {
+      ...c,
+      out: cut,
+      fadeOut: undefined,
+      anim: c.anim && { in: c.anim.in, inD: c.anim.inD },
+    };
+    clips.push(left, right);
     created.push(right.id);
   }
   return { project: created.length ? { ...p, clips } : p, created };
@@ -507,7 +551,7 @@ export function trimClip(
   const c = p.clips.find((x) => x.id === id);
   if (!c || trackOf(p, c.trackId)?.locked) return p;
   const m = mediaOf(p, c.mediaId);
-  const unlimited = m?.kind === 'image';
+  const unlimited = m?.kind === 'image' || isText(c);
   const sp = speedOf(c);
   const siblings = trackClips(p, c.trackId).filter((x) => x.id !== id);
   let next: Clip;
@@ -699,7 +743,7 @@ export function pasteClips(
   if (!copied.length) return { project: p, ids: [] };
   const first = Math.min(...copied.map((c) => c.start));
   const fresh = copied
-    .filter((c) => trackOf(p, c.trackId) && mediaOf(p, c.mediaId))
+    .filter((c) => trackOf(p, c.trackId) && (isText(c) || mediaOf(p, c.mediaId)))
     .map((c) => ({ ...c, id: uid('c'), start: at + (c.start - first) }));
   let project = { ...p, clips: [...p.clips, ...fresh] };
   for (const c of fresh) {
@@ -814,11 +858,233 @@ export function validProject(x: unknown): x is VideoProject {
         Number.isFinite(c.out) &&
         (c.speed === undefined ||
           (Number.isFinite(c.speed) && c.speed >= SPEED_MIN && c.speed <= SPEED_MAX)) &&
-        validKeyframes(c.keyframes),
+        validKeyframes(c.keyframes) &&
+        validEffects(c.effects) &&
+        validAnim(c.anim) &&
+        validTransition(c.transition) &&
+        validText(c.text),
+    ) &&
+    p.tracks.every(
+      (t) =>
+        typeof t.id === 'string' &&
+        (t.kind === 'video' || t.kind === 'audio') &&
+        (t.volume === undefined ||
+          (Number.isFinite(t.volume) && t.volume >= 0 && t.volume <= 2)) &&
+        (t.pan === undefined || (Number.isFinite(t.pan) && t.pan >= -1 && t.pan <= 1)),
     ) &&
     p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string')
   );
 }
+
+// ---------------- phase 2: effects, titles, animations, transitions, mixer ----------------
+
+const editable = (p: VideoProject, c: Clip | undefined): c is Clip =>
+  !!c && !trackOf(p, c.trackId)?.locked;
+
+/** Sets (or clears, with undefined) the effects of some clips. */
+export function setEffects(
+  p: VideoProject,
+  ids: ReadonlySet<string>,
+  fx: Effects | undefined,
+): VideoProject {
+  const clean = cleanEffects(fx);
+  let hit = false;
+  const clips = p.clips.map((c) => {
+    if (!ids.has(c.id) || !editable(p, c)) return c;
+    hit = true;
+    return { ...c, effects: clean };
+  });
+  return hit ? { ...p, clips } : p;
+}
+
+/** Changes one effect value of a clip (the others stay). */
+export function setEffect(
+  p: VideoProject,
+  id: string,
+  key: keyof Effects,
+  v: number,
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!editable(p, c)) return p;
+  return setEffects(p, new Set([id]), { ...c.effects, [key]: v });
+}
+
+export function setAnim(p: VideoProject, id: string, patch: Partial<ClipAnim>): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!editable(p, c)) return p;
+  const a: ClipAnim = { ...c.anim, ...patch };
+  for (const k of Object.keys(a) as (keyof ClipAnim)[]) if (a[k] === undefined) delete a[k];
+  const none = (!a.in || a.in === 'none') && (!a.out || a.out === 'none');
+  return replaceClip(p, { ...c, anim: none ? undefined : a });
+}
+
+/** The clip right before c on its track, touching it (within half a frame). */
+export function prevAdjacent(p: VideoProject, c: Clip): Clip | undefined {
+  const tol = 0.5 / p.fps;
+  return p.clips.find(
+    (x) => x.trackId === c.trackId && x.id !== c.id && Math.abs(clipEnd(x) - c.start) < tol,
+  );
+}
+export function nextAdjacent(p: VideoProject, c: Clip): Clip | undefined {
+  const tol = 0.5 / p.fps;
+  return p.clips.find(
+    (x) => x.trackId === c.trackId && x.id !== c.id && Math.abs(x.start - clipEnd(c)) < tol,
+  );
+}
+
+/** A transition never lasts longer than the clips it joins. */
+function transitionLength(p: VideoProject, c: Clip, d: number, prev: Clip | undefined): number {
+  let max = Math.min(TRANSITION_MAX, clipDur(c));
+  if (prev) max = Math.min(TRANSITION_MAX, clipDur(prev) * 2, clipDur(c) * 2);
+  return Math.max(0, Math.min(Number.isFinite(d) ? d : 0, max));
+}
+
+/**
+ * Where a clip's transition plays on the timeline. Between two clips it is centred on the cut
+ * (the outgoing clip runs on for d/2, the incoming one starts d/2 early); with nothing right
+ * before it, it is a reveal over its first d seconds.
+ */
+export function transitionWindow(
+  p: VideoProject,
+  c: Clip,
+): { from: number; d: number; prev?: Clip } | null {
+  const tr = c.transition;
+  if (!tr || trackOf(p, c.trackId)?.kind !== 'video') return null;
+  const prev = prevAdjacent(p, c);
+  const d = transitionLength(p, c, tr.d, prev);
+  if (d < 1e-3) return null;
+  return prev ? { from: c.start - d / 2, d, prev } : { from: c.start, d };
+}
+
+/** Seconds a clip is drawn before its start / after its end because of transitions. */
+export function leadOf(p: VideoProject, c: Clip): number {
+  const w = transitionWindow(p, c);
+  return w?.prev ? w.d / 2 : 0;
+}
+export function tailOf(p: VideoProject, c: Clip): number {
+  const next = nextAdjacent(p, c);
+  const w = next && transitionWindow(p, next);
+  return w && w.prev?.id === c.id ? w.d / 2 : 0;
+}
+
+export function setTransition(
+  p: VideoProject,
+  id: string,
+  tr: Transition | undefined,
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!editable(p, c)) return p;
+  if (!tr) return replaceClip(p, { ...c, transition: undefined });
+  const d = Math.max(TRANSITION_MIN, transitionLength(p, c, tr.d, prevAdjacent(p, c)));
+  return replaceClip(p, { ...c, transition: { kind: tr.kind, d: Math.round(d * 1000) / 1000 } });
+}
+
+/**
+ * How a visual clip looks at timeline time t: its in/out animation and the transition into
+ * it. Null when it is not drawn at t.
+ */
+export function visualAt(p: VideoProject, c: Clip, t: number): Look | null {
+  const lead = leadOf(p, c);
+  const tail = tailOf(p, c);
+  if (t < c.start - lead - 1e-9 || t >= clipEnd(c) + tail) return null;
+  const len = clipDur(c);
+  const into = Math.min(Math.max(t - c.start, 0), len);
+  let look = animAt(c.anim, into, len);
+  const w = transitionWindow(p, c);
+  if (w && t < w.from + w.d)
+    look = combine(look, transitionLook(c.transition!.kind, (t - w.from) / w.d));
+  return look;
+}
+
+/** Visual clips of a track drawn at t, bottom first (an incoming clip over the outgoing one). */
+export function visualClipsAt(p: VideoProject, trackId: string, t: number): Clip[] {
+  return p.clips
+    .filter((c) => c.trackId === trackId && visualAt(p, c, t))
+    .sort((a, b) => a.start - b.start);
+}
+
+export { LOOK_NONE };
+
+/** Adds a title at `at`: on a free video track above V1, else on a new track on top. */
+export function addTextClip(
+  p: VideoProject,
+  spec: TextSpec,
+  at: number,
+  opts: { dur?: number; y?: number; anim?: ClipAnim } = {},
+): { project: VideoProject; clip: Clip } {
+  const dur = opts.dur ?? TEXT_DEFAULT_DUR;
+  const start = Math.max(0, at);
+  let project = p;
+  const bottom = compositeOrder(project)[0]?.id;
+  let track = project.tracks.find(
+    (t) =>
+      t.kind === 'video' && t.id !== bottom && !t.locked && fits(project, t.id, start, start + dur),
+  );
+  if (!track) {
+    project = addTrack(project, 'video');
+    track = project.tracks[0]!;
+  }
+  const anim =
+    opts.anim && (opts.anim.in ?? 'none') + (opts.anim.out ?? 'none') !== 'nonenone'
+      ? { ...opts.anim }
+      : undefined;
+  const clip: Clip = {
+    id: uid('c'),
+    mediaId: '',
+    trackId: track.id,
+    start,
+    in: 0,
+    out: dur,
+    volume: 0,
+    text: { ...spec },
+    ...(opts.y ? { transform: { ...IDENTITY, y: opts.y } } : {}),
+    ...(anim ? { anim } : {}),
+  };
+  return { project: { ...project, clips: [...project.clips, clip] }, clip };
+}
+
+export function updateText(p: VideoProject, id: string, patch: Partial<TextSpec>): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!editable(p, c) || !c.text) return p;
+  const text: TextSpec = { ...c.text, ...patch };
+  for (const k of Object.keys(text) as (keyof TextSpec)[])
+    if (text[k] === undefined) delete text[k];
+  return replaceClip(p, { ...c, text });
+}
+
+/** Mixer: track volume, pan and solo (neutral values are dropped from the file). */
+export function setTrackMix(
+  p: VideoProject,
+  trackId: string,
+  patch: { volume?: number; pan?: number; solo?: boolean },
+): VideoProject {
+  const t = trackOf(p, trackId);
+  if (!t) return p;
+  const next: Track = { ...t };
+  if (patch.volume !== undefined && Number.isFinite(patch.volume)) {
+    const v = Math.min(2, Math.max(0, patch.volume));
+    if (Math.abs(v - 1) < 1e-3) delete next.volume;
+    else next.volume = v;
+  }
+  if (patch.pan !== undefined && Number.isFinite(patch.pan)) {
+    const v = Math.min(1, Math.max(-1, patch.pan));
+    if (Math.abs(v) < 1e-3) delete next.pan;
+    else next.pan = v;
+  }
+  if (patch.solo !== undefined) {
+    if (patch.solo) next.solo = true;
+    else delete next.solo;
+  }
+  return { ...p, tracks: p.tracks.map((x) => (x.id === trackId ? next : x)) };
+}
+
+/** Whether a track is heard: not muted, and soloed when any track is. */
+export function trackAudible(p: VideoProject, t: Track | undefined): boolean {
+  if (!t || t.muted) return false;
+  return !p.tracks.some((x) => x.solo) || !!t.solo;
+}
+export const trackVolume = (t: Track | undefined): number => t?.volume ?? 1;
+export const trackPan = (t: Track | undefined): number => t?.pan ?? 0;
 
 // ---------------- export ----------------
 

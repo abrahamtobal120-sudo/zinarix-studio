@@ -345,7 +345,13 @@ export class VideoService {
   }
 
   /** Queues an export; jobs run one after another. */
-  enqueue(project: VideoProject, opts: ExportOptions, out: string): VideoJob {
+  enqueue(
+    project: VideoProject,
+    opts: ExportOptions,
+    out: string,
+    /** Clip id → PNG bytes of each title, drawn by the renderer at the export size. */
+    textPngs: Record<string, Buffer> = {},
+  ): VideoJob {
     const job: VideoJob = {
       id: uid('job'),
       name: project.name,
@@ -363,7 +369,7 @@ export class VideoService {
       ),
       job,
     ];
-    this.pending.set(job.id, () => this.render(job, project, opts));
+    this.pending.set(job.id, () => this.render(job, project, opts, textPngs));
     this.onJob({ ...job });
     void this.pump();
     return job;
@@ -401,7 +407,12 @@ export class VideoService {
     this.onJob({ ...job });
   }
 
-  private async render(job: VideoJob, project: VideoProject, opts: ExportOptions): Promise<void> {
+  private async render(
+    job: VideoJob,
+    project: VideoProject,
+    opts: ExportOptions,
+    textPngs: Record<string, Buffer> = {},
+  ): Promise<void> {
     let ffmpeg: string;
     try {
       ffmpeg = this.need('ffmpeg');
@@ -409,7 +420,15 @@ export class VideoService {
       return this.update(job, { state: 'error', error: (e as Error).message });
     }
     const tmpOut = `${job.out}.part${extname(job.out)}`;
-    const plan = buildRender(project, opts, tmpOut);
+    // Titles: one PNG each in the temp folder (only clips that are titles, ids as file names).
+    const textImages: Record<string, string> = {};
+    for (const [id, png] of Object.entries(textPngs)) {
+      if (!/^[w-]{1,64}$/.test(id) || !project.clips.some((c) => c.id === id && c.text)) continue;
+      const file = join(tmpdir(), `zinarix-${job.id}-${id}.png`);
+      await writeFile(file, png);
+      textImages[id] = file;
+    }
+    const plan = buildRender(project, opts, tmpOut, undefined, textImages);
     // Long graphs go in a file: Windows caps a command line at 32 K characters.
     const script = join(tmpdir(), `zinarix-${job.id}.ffgraph`);
     await writeFile(script, plan.filter, 'utf8');
@@ -466,6 +485,7 @@ export class VideoService {
       });
     });
     await unlink(script).catch(() => undefined);
+    for (const f of Object.values(textImages)) await unlink(f).catch(() => undefined);
     if (result.ok) {
       try {
         await rm(job.out);

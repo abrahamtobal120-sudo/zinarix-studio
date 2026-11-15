@@ -11,6 +11,7 @@ import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
 import { ExportDialog, RenderQueue } from './ExportDialog';
 import { Inspector } from './Inspector';
+import { EffectsPanel, MixerPanel, TextPanel, TransitionsPanel } from './FxPanels';
 import { MediaLibrary, pickAndImport } from './MediaLibrary';
 import { tv, type VideoKey } from './strings';
 import {
@@ -53,11 +54,11 @@ import { projectDuration } from '../../../shared/video';
 
 const TABS: { id: StudioTab; key: VideoKey; icon: IconName; phase?: number; soon?: VideoKey }[] = [
   { id: 'media', key: 'tabMedia', icon: 'folder' },
-  { id: 'audio', key: 'tabAudio', icon: 'music', phase: 2, soon: 'soonAudio' },
-  { id: 'text', key: 'tabText', icon: 'type', phase: 2, soon: 'soonText' },
-  { id: 'stickers', key: 'tabStickers', icon: 'smile', phase: 2, soon: 'soonStickers' },
-  { id: 'effects', key: 'tabEffects', icon: 'sparkle', phase: 2, soon: 'soonEffects' },
-  { id: 'transitions', key: 'tabTransitions', icon: 'layers', phase: 2, soon: 'soonTransitions' },
+  { id: 'audio', key: 'tabAudio', icon: 'music' },
+  { id: 'text', key: 'tabText', icon: 'type' },
+  { id: 'stickers', key: 'tabStickers', icon: 'smile', phase: 3, soon: 'soonStickers' },
+  { id: 'effects', key: 'tabEffects', icon: 'sparkle' },
+  { id: 'transitions', key: 'tabTransitions', icon: 'layers' },
   { id: 'filters', key: 'tabFilters', icon: 'palette', phase: 3, soon: 'soonFilters' },
   { id: 'ai', key: 'tabAi', icon: 'cpu', phase: 4, soon: 'soonAi' },
 ];
@@ -260,6 +261,14 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
             <section className="vs-left" style={{ width: leftW }} aria-label={tv(current.key)}>
               {tab === 'media' ? (
                 <MediaLibrary />
+              ) : tab === 'text' ? (
+                <TextPanel />
+              ) : tab === 'effects' ? (
+                <EffectsPanel />
+              ) : tab === 'transitions' ? (
+                <TransitionsPanel />
+              ) : tab === 'audio' ? (
+                <MixerPanel />
               ) : (
                 <div className="vs-soon">
                   <span className="vs-soon-icon">

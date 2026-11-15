@@ -83,6 +83,7 @@ import {
   TaskList,
 } from './AgentPlan';
 import type { ChatMode } from '../../shared/agentModes';
+import { QUEUE_RETRY_DELAYS, queueRetryDelay } from '../../shared/chatQueue';
 import {
   modeFrom,
   nextMode,
@@ -1192,6 +1193,29 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const queued = meta?.queued ?? [];
   /** The user pressed Stop: the queue does not go out by itself. */
   const stopped = useRef(false);
+  /** Error code of each failed request (a passing one makes the queue retry). */
+  const failCodes = useRef(new Map<string, string>());
+  /** Requests that came out of the queue (only those are retried by themselves). */
+  const queuedRuns = useRef(new Set<string>());
+  /** Retries made of the queued message that keeps failing. */
+  const retryTries = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A retry waiting: when it goes and which one it is (shown above the queue). */
+  const [retry, setRetry] = useState<{ at: number; n: number } | null>(null);
+  const cancelRetry = () => {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    retryTimer.current = null;
+    retryTries.current = 0;
+    setRetry(null);
+  };
+  useEffect(() => () => void (retryTimer.current && clearTimeout(retryTimer.current)), []);
+  // The countdown of a waiting retry moves.
+  const [, retryTick] = useState(0);
+  useEffect(() => {
+    if (!retry) return;
+    const h = setInterval(() => retryTick((n) => n + 1), 1000);
+    return () => clearInterval(h);
+  }, [retry]);
 
   /** This chat works in a folder of its own (not the window's open folder). */
   const ownFolder = meta?.folder && meta.folder !== workspace?.root ? meta.folder : undefined;
@@ -1279,6 +1303,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   /** Aborts the in-flight requests (if any) and stops listening to their events. */
   const cancelCurrent = () => {
+    cancelRetry();
     if (!runs.current.size) return;
     for (const [rid, off] of runs.current) {
       off();
@@ -1545,6 +1570,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     for (let i = 0; i < 60 && runs.current.size && !conversationNow.current; i++)
       await new Promise((ok) => setTimeout(ok, 50));
     const requestId = newRequestId();
+    // A queued message, or one sent while others wait in the queue: retried on passing errors.
+    if (fromQueue || (chatTab(id)?.queued.length ?? 0) > 0) queuedRuns.current.add(requestId);
     // Agent mode also works without a folder (system, network, browser and security tools).
     const runMode: ChatMode = modeOverride ?? (forceAgent && !agentMode ? 'agent' : chatMode);
     const useAgent = forceAgent || usesAgent(runMode);
@@ -1693,6 +1720,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           finish();
           break;
         case 'error':
+          failCodes.current.set(requestId, e.code);
           update((turn) => ({ ...turn, error: e.message }));
           finish();
           break;
@@ -1776,15 +1804,47 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const sendQueued = () => {
     const [next, ...rest] = chatTab(id)?.queued ?? [];
     if (next === undefined || busy) return;
+    // Sent by hand: a retry that was waiting is dropped.
+    if (retryTimer.current) cancelRetry();
     updateChat(id, { queued: rest });
     void send(next, [], false, undefined, true);
   };
   const onFinished = useEffectEvent(() => {
     const byUser = stopped.current;
     stopped.current = false;
-    // Stopped by hand or ended in error: the queue waits for the user instead of piling up.
-    if (byUser || turnsNow.current.at(-1)?.error) return;
-    sendQueued();
+    if (byUser) {
+      cancelRetry();
+      return;
+    }
+    const last = turnsNow.current.at(-1);
+    if (!last?.error) {
+      retryTries.current = 0;
+      sendQueued();
+      return;
+    }
+    // A queued message failed for a passing reason (network, overloaded provider): it is
+    // retried by itself after a while. Other errors, or too many tries: the queue waits.
+    const rid = last.rid;
+    const code = rid ? failCodes.current.get(rid) : undefined;
+    const fromQueue = Boolean(rid && queuedRuns.current.has(rid));
+    const prompt = turnsNow.current.find((x) => x.role === 'user' && x.rid === rid)?.content;
+    const wait = fromQueue && prompt ? queueRetryDelay(code, retryTries.current) : null;
+    if (wait === null) {
+      cancelRetry();
+      return;
+    }
+    retryTries.current++;
+    setRetry({ at: Date.now() + wait, n: retryTries.current });
+    retryTimer.current = setTimeout(() => {
+      retryTimer.current = null;
+      setRetry(null);
+      if (handles.get(id)?.busy()) return;
+      // Nothing was done in the failed run: it is replaced. Steps were taken: it stays in
+      // view (with its error) and the message goes again below it.
+      const didWork = last.parts?.some((p) => p.kind === 'tool' && p.status === 'ok');
+      const base = didWork ? undefined : turnsNow.current.filter((x) => x.rid !== rid);
+      void send(prompt!, [], false, base, true);
+    }, wait);
   });
 
   // The tab strip shows what each chat is doing.
@@ -2135,6 +2195,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   /** Stops the running answers; queued messages wait until the user sends them. */
   const stop = () => {
+    // A retry waiting to go is called off too.
+    if (retryTimer.current) cancelRetry();
     if (!busy) return;
     stopped.current = true;
     for (const rid of running) void api().ai.abort(rid);
@@ -2841,38 +2903,55 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         {todos && (busy || todos.some((x) => x.status !== 'completed')) && (
           <TaskList todos={todos} live={Boolean(busy)} />
         )}
-        {queued.length > 0 && (
+        {(queued.length > 0 || retry) && (
           <div className="chat-queue" aria-label={t('chatQueued')}>
             <div className="chat-queue-title">
               <Icon name="clock" size={12} />{' '}
-              {busy ? t('chatQueuedNext', { n: queued.length }) : t('chatQueuedPaused')}
-            </div>
-            {queued.map((q, i) => (
-              <div key={i} className="chat-queue-item" title={q}>
-                <span className="chat-queue-text">{q}</span>
-                {!busy && i === 0 && (
-                  <button title={t('send')} onClick={sendQueued}>
-                    <Icon name="send" size={12} />
-                  </button>
-                )}
-                <button
-                  title={t('chatQueueEdit')}
-                  onClick={() => {
-                    updateChat(id, { queued: queued.filter((_, j) => j !== i) });
-                    setInput((cur) => (cur.trim() ? `${cur}\n${q}` : q));
-                    textarea.current?.focus();
-                  }}
-                >
-                  <Icon name="edit" size={12} />
-                </button>
-                <button
-                  title={t('chatQueueRemove')}
-                  onClick={() => updateChat(id, { queued: queued.filter((_, j) => j !== i) })}
-                >
+              <span className="chat-queue-status">
+                {retry
+                  ? t('chatQueueRetry', {
+                      s: Math.max(1, Math.round((retry.at - Date.now()) / 1000)),
+                      n: retry.n,
+                      max: QUEUE_RETRY_DELAYS.length,
+                    })
+                  : busy
+                    ? t('chatQueuedNext', { n: queued.length })
+                    : t('chatQueuedPaused')}
+              </span>
+              {retry && (
+                <button title={t('chatQueueRetryCancel')} onClick={cancelRetry}>
                   <Icon name="x" size={12} />
                 </button>
-              </div>
-            ))}
+              )}
+            </div>
+            <div className="chat-queue-list">
+              {queued.map((q, i) => (
+                <div key={i} className="chat-queue-item" title={q}>
+                  <span className="chat-queue-text">{q}</span>
+                  {!busy && i === 0 && (
+                    <button title={t('send')} onClick={sendQueued}>
+                      <Icon name="send" size={12} />
+                    </button>
+                  )}
+                  <button
+                    title={t('chatQueueEdit')}
+                    onClick={() => {
+                      updateChat(id, { queued: queued.filter((_, j) => j !== i) });
+                      setInput((cur) => (cur.trim() ? `${cur}\n${q}` : q));
+                      textarea.current?.focus();
+                    }}
+                  >
+                    <Icon name="edit" size={12} />
+                  </button>
+                  <button
+                    title={t('chatQueueRemove')}
+                    onClick={() => updateChat(id, { queued: queued.filter((_, j) => j !== i) })}
+                  >
+                    <Icon name="x" size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <textarea

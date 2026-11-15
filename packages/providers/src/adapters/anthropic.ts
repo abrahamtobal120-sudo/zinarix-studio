@@ -6,6 +6,7 @@ import { parseSse, safeJson } from '../sse.js';
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
 import { decodeText, isPdf, isTextual, unsupportedPart } from '../parts.js';
 import { normalizeStop, testViaModelsOrChat } from './openai-compatible.js';
+import { claudeKnobs, claudeModel, claudeSchema } from '../anthropicRules.js';
 
 const VERSION_HEADERS = { 'anthropic-version': '2023-06-01' };
 const DEFAULT_MAX_TOKENS = 32_000;
@@ -97,24 +98,29 @@ export function toAnthropic(messages: ChatMessage[]): {
 
 function buildBody(req: ChatRequest, maxTokens: number): Record<string, unknown> {
   const { system, messages } = toAnthropic(req.messages);
+  // Only what this Claude model accepts (anthropicRules.ts): sampling knobs it rejects are
+  // left out, older models get budget_tokens thinking, and the schema is made acceptable.
+  const knobs = claudeKnobs(req.model, req, maxTokens);
+  const schema =
+    req.jsonSchema && claudeModel(req.model)
+      ? claudeSchema(req.jsonSchema.schema).schema
+      : req.jsonSchema?.schema;
   return {
     model: req.model,
     max_tokens: maxTokens,
     messages,
     stream: true,
     ...(system ? { system } : {}),
-    ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-    ...(req.topP !== undefined ? { top_p: req.topP } : {}),
-    // Current models think adaptively by default; when the caller asks for reasoning we
-    // raise effort and request readable summaries so the UI can stream them.
-    ...(req.reasoning ? { thinking: { type: 'adaptive', display: 'summarized' } } : {}),
-    ...(req.reasoning || req.jsonSchema
+    ...(knobs.temperature !== undefined ? { temperature: knobs.temperature } : {}),
+    ...(knobs.topP !== undefined ? { top_p: knobs.topP } : {}),
+    // When the caller asks for reasoning we raise effort and request readable summaries so
+    // the UI can stream them.
+    ...(knobs.thinking ? { thinking: knobs.thinking } : {}),
+    ...(knobs.effort || schema
       ? {
           output_config: {
-            ...(req.reasoning ? { effort: req.reasoning } : {}),
-            ...(req.jsonSchema
-              ? { format: { type: 'json_schema', schema: req.jsonSchema.schema } }
-              : {}),
+            ...(knobs.effort ? { effort: knobs.effort } : {}),
+            ...(schema ? { format: { type: 'json_schema', schema } } : {}),
           },
         }
       : {}),

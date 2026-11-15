@@ -8,13 +8,22 @@ import {
   clipEnd,
   compositeOrder,
   fadeAt,
+  leadOf,
   mediaOf,
   projectDuration,
   sourceAt,
   speedOf,
+  tailOf,
+  trackAudible,
   trackOf,
+  trackVolume,
   transformAt,
+  visualAt,
+  visualClipsAt,
 } from '../../../shared/video';
+import type { Look } from '../../../shared/videoFx';
+import { cssFilter } from '../../../shared/videoFx';
+import { textCanvas } from './textDraw';
 import { getV, setV } from './videoStore';
 
 type El = HTMLVideoElement | HTMLAudioElement;
@@ -126,16 +135,25 @@ export class Player {
     for (const c of p.clips) {
       const m = mediaOf(p, c.mediaId);
       const url = s.urls[c.mediaId];
-      if (!m || !url || m.missing || m.kind === 'image') continue;
-      const ahead = c.start - t;
-      const active = t >= c.start && t < clipEnd(c);
+      if (c.text || !m || !url || m.missing || m.kind === 'image') continue;
+      // Pictures run on before / after the clip during transitions; the sound does not.
+      const lead = m.kind === 'video' ? leadOf(p, c) : 0;
+      const tail = m.kind === 'video' ? tailOf(p, c) : 0;
+      const from = c.start - lead;
+      const ahead = from - t;
+      const active = t >= from && t < clipEnd(c) + tail;
       if (!active && !(ahead > 0 && ahead < PRELOAD)) continue;
       const track = trackOf(p, c.trackId);
       const el = this.element(c, url, m.kind === 'audio' ? 'audio' : 'video');
       live.add(c.id);
-      const target = active ? sourceAt(c, t) : c.in;
-      el.muted = !track || track.muted || !m.hasAudio || c.volume <= 0;
-      el.volume = Math.min(1, Math.max(0, c.volume * (active ? fadeAt(c, t) : 0)));
+      const last = Math.max(0, (m.duration || Infinity) - 0.5 / p.fps);
+      const target = Math.min(Math.max(0, sourceAt(c, active ? t : from)), last);
+      const inside = t >= c.start && t < clipEnd(c);
+      el.muted = !trackAudible(p, track) || !m.hasAudio || c.volume <= 0;
+      el.volume = Math.min(
+        1,
+        Math.max(0, c.volume * trackVolume(track) * (inside ? fadeAt(c, t) : 0)),
+      );
       if (active && rate > 0) {
         // HTML media plays forward only, up to 16×.
         const r = Math.min(16, Math.max(0.0625, rate * speedOf(c)));
@@ -180,11 +198,22 @@ export class Player {
     const ctx = cv.getContext('2d');
     if (!ctx) return;
     // Paused on the same frame with every layer ready: nothing to repaint.
-    const layers: { c: Clip; src: CanvasImageSource; w: number; h: number; ready: boolean }[] = [];
+    const layers: {
+      c: Clip;
+      src: CanvasImageSource;
+      w: number;
+      h: number;
+      ready: boolean;
+      look: Look;
+    }[] = [];
     for (const track of compositeOrder(p)) {
       if (track.hidden) continue;
-      const c = p.clips.find((x) => x.trackId === track.id && t >= x.start && t < clipEnd(x));
-      if (!c) continue;
+      for (const c of visualClipsAt(p, track.id, t)) {
+      const look = visualAt(p, c, t)!;
+      if (c.text) {
+        layers.push({ c, src: textCanvas(c.text, W, H), w: W, h: H, ready: true, look });
+        continue;
+      }
       const m = mediaOf(p, c.mediaId);
       const url = s.urls[c.mediaId];
       if (!m || !url || (!m.hasVideo && m.kind !== 'image')) continue;
@@ -196,6 +225,7 @@ export class Player {
           w: img.naturalWidth,
           h: img.naturalHeight,
           ready: img.complete && img.naturalWidth > 0,
+          look,
         });
       } else {
         const e = this.els.get(c.id);
@@ -207,7 +237,9 @@ export class Player {
           w: v.videoWidth,
           h: v.videoHeight,
           ready: v.readyState >= 2 && !v.seeking,
+          look,
         });
+      }
       }
     }
     const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}`).join(',')}`;
@@ -228,16 +260,25 @@ export class Player {
       if (!l.ready || !l.w || !l.h) continue;
       // Fit inside the frame, centred, then the clip's transform (same maths as the export).
       const tr = transformAt(l.c, t);
-      const alpha = tr.opacity * fadeAt(l.c, t);
-      if (alpha <= 0) continue;
-      const k = Math.min(W / l.w, H / l.h) * tr.scale;
+      const lk = l.look;
+      const alpha = tr.opacity * fadeAt(l.c, t) * lk.alpha;
+      if (alpha <= 0 || lk.reveal <= 0) continue;
+      const k = Math.min(W / l.w, H / l.h) * tr.scale * lk.scale;
       const dw = l.w * k;
       const dh = l.h * k;
       ctx.save();
       ctx.globalAlpha = Math.min(1, alpha);
-      ctx.translate(W / 2 + tr.x * W, H / 2 + tr.y * H);
+      ctx.translate(W / 2 + (tr.x + lk.dx) * W, H / 2 + (tr.y + lk.dy) * H);
       if (tr.rotation) ctx.rotate((tr.rotation * Math.PI) / 180);
       if (tr.flipH || tr.flipV) ctx.scale(tr.flipH ? -1 : 1, tr.flipV ? -1 : 1);
+      if (lk.reveal < 1) {
+        // Wipes uncover the picture from its left edge (the same as the export).
+        ctx.beginPath();
+        ctx.rect(tr.flipH ? dw / 2 - dw * lk.reveal : -dw / 2, -dh / 2, dw * lk.reveal, dh);
+        ctx.clip();
+      }
+      const filter = cssFilter(l.c.effects, H / 1080);
+      if (filter !== 'none') ctx.filter = filter;
       ctx.drawImage(l.src, -dw / 2, -dh / 2, dw, dh);
       ctx.restore();
     }

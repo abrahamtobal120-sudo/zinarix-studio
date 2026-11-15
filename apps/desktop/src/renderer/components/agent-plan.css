@@ -24,7 +24,7 @@
   position: absolute;
   bottom: calc(100% + 6px);
   left: 0;
-  z-index: 50;
+  z-index: var(--z-overlay);
   width: 300px;
   padding: 4px;
   background: var(--bg-2);
@@ -59,10 +59,10 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .mode-menu-foot {
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 4px 8px 2px;
   border-top: 1px solid var(--border);
   margin-top: 2px;
@@ -74,7 +74,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-2);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .task-list-head {
   width: 100%;
@@ -140,7 +140,7 @@
 }
 .ask-keys {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .ask-options {
@@ -191,7 +191,7 @@
   gap: 4px;
 }
 .plan-bar.done {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--fg-dim);
   align-items: center;
 }
@@ -207,7 +207,7 @@
   min-height: 46vh;
   resize: vertical;
   font-family: var(--mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--text-sm);
   margin: 8px 0;
 }
 

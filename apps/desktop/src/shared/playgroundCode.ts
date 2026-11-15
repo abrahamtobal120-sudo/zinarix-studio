@@ -8,6 +8,13 @@ import { parseSchema } from './playground.js';
 
 export type CodeLang = 'ts' | 'python' | 'curl';
 
+export interface ClaudeThinking {
+  /** The `thinking` field to write (null = none). */
+  thinking: Record<string, unknown> | null;
+  /** Whether output_config.effort is accepted. */
+  effort: boolean;
+}
+
 export interface CodeTarget {
   /** Catalog adapter id (anthropic, openai-compatible, openai-responses, google-gemini…). */
   adapter: string;
@@ -17,6 +24,8 @@ export interface CodeTarget {
   envVar: string;
   /** Bare model id (without "provider/"). */
   model: string;
+  /** Anthropic only: the thinking / effort this Claude model accepts (main/playground.ts). */
+  claude?: ClaudeThinking;
 }
 
 type Family = 'anthropic' | 'openai' | 'responses' | 'gemini';
@@ -60,7 +69,8 @@ function pyString(s: string): string {
 function lit(v: unknown, lang: CodeLang, indent = 0): string {
   const pad = '  '.repeat(indent + 1);
   const end = '  '.repeat(indent);
-  if (v instanceof Code) return lang === 'ts' ? v.ts : lang === 'python' ? v.py : JSON.stringify(v.curl);
+  if (v instanceof Code)
+    return lang === 'ts' ? v.ts : lang === 'python' ? v.py : JSON.stringify(v.curl);
   if (v === null) return lang === 'python' ? 'None' : 'null';
   if (typeof v === 'boolean') return lang === 'python' ? (v ? 'True' : 'False') : String(v);
   if (typeof v === 'number') return String(v);
@@ -86,15 +96,32 @@ function kwargs(obj: Record<string, unknown>, indent = 1): string {
 }
 
 const keyRef = (lang: CodeLang, env: string) =>
-  lang === 'ts' ? `process.env.${env}` : lang === 'python' ? `os.environ[${pyString(env)}]` : `$${env}`;
+  lang === 'ts'
+    ? `process.env.${env}`
+    : lang === 'python'
+      ? `os.environ[${pyString(env)}]`
+      : `$${env}`;
 
 function shellQuote(json: string): string {
   return `'${json.replace(/'/g, `'\\''`)}'`;
 }
 
 /** Builds the provider-native request body (values may hold Code markers). */
-function body(f: Family, req: PlaygroundRunRequest, model: string, snake: boolean): Record<string, unknown> {
+function body(
+  f: Family,
+  req: PlaygroundRunRequest,
+  model: string,
+  snake: boolean,
+  claude?: ClaudeThinking,
+): Record<string, unknown> {
   const schema = parseSchema(req.schema).schema;
+  // What the model takes (main computes it per Claude model); default: adaptive + effort.
+  const thinking = req.reasoning
+    ? claude
+      ? claude.thinking
+      : { type: 'adaptive', display: 'summarized' }
+    : null;
+  const effort = req.reasoning && (claude ? claude.effort : true) ? req.reasoning : undefined;
   const att = req.attachments;
   const text = req.prompt;
   switch (f) {
@@ -102,8 +129,14 @@ function body(f: Family, req: PlaygroundRunRequest, model: string, snake: boolea
       const content = [
         ...att.map((a) =>
           a.mediaType === 'application/pdf'
-            ? { type: 'document', source: { type: 'base64', media_type: a.mediaType, data: b64(a.name) } }
-            : { type: 'image', source: { type: 'base64', media_type: a.mediaType, data: b64(a.name) } },
+            ? {
+                type: 'document',
+                source: { type: 'base64', media_type: a.mediaType, data: b64(a.name) },
+              }
+            : {
+                type: 'image',
+                source: { type: 'base64', media_type: a.mediaType, data: b64(a.name) },
+              },
         ),
         { type: 'text', text },
       ];
@@ -114,11 +147,11 @@ function body(f: Family, req: PlaygroundRunRequest, model: string, snake: boolea
         messages: [{ role: 'user', content: att.length ? content : text }],
         ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
         ...(req.topP !== undefined ? { top_p: req.topP } : {}),
-        ...(req.reasoning ? { thinking: { type: 'adaptive', display: 'summarized' } } : {}),
-        ...(req.reasoning || schema
+        ...(thinking ? { thinking } : {}),
+        ...(effort || schema
           ? {
               output_config: {
-                ...(req.reasoning ? { effort: req.reasoning } : {}),
+                ...(effort ? { effort } : {}),
                 ...(schema ? { format: { type: 'json_schema', schema } } : {}),
               },
             }
@@ -191,7 +224,12 @@ function body(f: Family, req: PlaygroundRunRequest, model: string, snake: boolea
         ...(schema
           ? {
               text: {
-                format: { type: 'json_schema', name: 'response', schema, strict: req.strict === true },
+                format: {
+                  type: 'json_schema',
+                  name: 'response',
+                  schema,
+                  strict: req.strict === true,
+                },
               },
             }
           : {}),
@@ -221,7 +259,11 @@ function body(f: Family, req: PlaygroundRunRequest, model: string, snake: boolea
             }
           : {}),
         ...(req.reasoning
-          ? { [k('thinkingConfig', 'thinking_config')]: { [k('includeThoughts', 'include_thoughts')]: true } }
+          ? {
+              [k('thinkingConfig', 'thinking_config')]: {
+                [k('includeThoughts', 'include_thoughts')]: true,
+              },
+            }
           : {}),
         ...(req.tools.length
           ? {
@@ -240,7 +282,11 @@ function body(f: Family, req: PlaygroundRunRequest, model: string, snake: boolea
       const parts = [
         ...att.map((a) =>
           snake
-            ? new Code('', `types.Part.from_bytes(data=read(${pyString(a.name)}), mime_type=${pyString(a.mediaType)})`, '')
+            ? new Code(
+                '',
+                `types.Part.from_bytes(data=read(${pyString(a.name)}), mime_type=${pyString(a.mediaType)})`,
+                '',
+              )
             : { inlineData: { mimeType: a.mediaType, data: b64(a.name) } },
         ),
         snake ? text : { text },
@@ -262,7 +308,11 @@ function dataUrl(mediaType: string, file: string): Code {
 }
 
 /** The snippet, or a note when this provider has no snippet. */
-export function generateCode(lang: CodeLang, target: CodeTarget, req: PlaygroundRunRequest): string {
+export function generateCode(
+  lang: CodeLang,
+  target: CodeTarget,
+  req: PlaygroundRunRequest,
+): string {
   const f = codeFamily(target.adapter);
   if (!f)
     return lang === 'python'
@@ -274,10 +324,15 @@ export function generateCode(lang: CodeLang, target: CodeTarget, req: Playground
 
   if (lang === 'curl') {
     if (f === 'gemini') {
-      const b = body('gemini', req, model, false) as { contents: unknown; config: Record<string, unknown> };
+      const b = body('gemini', req, model, false) as {
+        contents: unknown;
+        config: Record<string, unknown>;
+      };
       const { systemInstruction, tools, ...gen } = b.config as Record<string, unknown>;
       const restBody = {
-        ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
+        ...(systemInstruction
+          ? { systemInstruction: { parts: [{ text: systemInstruction }] } }
+          : {}),
         contents: [
           {
             role: 'user',
@@ -295,8 +350,9 @@ export function generateCode(lang: CodeLang, target: CodeTarget, req: Playground
         `  -d ${shellQuote(lit(restBody, 'curl'))}`,
       ].join('\n');
     }
-    const b = body(f, req, model, false);
-    const path = f === 'anthropic' ? '/messages' : f === 'responses' ? '/responses' : '/chat/completions';
+    const b = body(f, req, model, false, target.claude);
+    const path =
+      f === 'anthropic' ? '/messages' : f === 'responses' ? '/responses' : '/chat/completions';
     const auth =
       f === 'anthropic'
         ? [`  -H "x-api-key: ${key}" \\`, `  -H "anthropic-version: 2023-06-01" \\`]
@@ -312,7 +368,7 @@ export function generateCode(lang: CodeLang, target: CodeTarget, req: Playground
 
   if (lang === 'ts') {
     const fsImport = hasFiles ? `import { readFileSync } from 'node:fs';\n` : '';
-    const b = lit(body(f, req, model, false), 'ts');
+    const b = lit(body(f, req, model, false, target.claude), 'ts');
     switch (f) {
       case 'anthropic':
         return `${fsImport}import Anthropic from '@anthropic-ai/sdk';
@@ -360,7 +416,7 @@ console.log(response.text);
   }
 
   // Python
-  const bodyObj = body(f, req, model, f === 'gemini');
+  const bodyObj = body(f, req, model, f === 'gemini', target.claude);
   const helpers = hasFiles
     ? f === 'gemini'
       ? `\n\ndef read(path):\n    with open(path, "rb") as fh:\n        return fh.read()\n`

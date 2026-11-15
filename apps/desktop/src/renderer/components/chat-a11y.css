@@ -27,7 +27,7 @@
   position: absolute;
   right: 0;
   bottom: calc(100% + 6px);
-  z-index: 20;
+  z-index: var(--z-dropdown);
   display: flex;
   flex-direction: column;
   min-width: 210px;
@@ -45,7 +45,7 @@
   text-align: left;
   padding: 5px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .send-menu button > span {
   flex: 1;
@@ -56,7 +56,7 @@
 }
 .send-menu kbd {
   font: inherit;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--fg-dim);
 }
 
@@ -68,8 +68,8 @@
   padding: 6px 10px;
   border: 1px solid var(--warn, var(--border));
   border-radius: 8px;
-  background: color-mix(in srgb, var(--warn, #d9a400) 12%, transparent);
-  font-size: 12px;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  font-size: var(--text-sm);
 }
 
 /* Close (x) of a chat tab and actions of the list: also visible while focused from the keyboard. */

@@ -1,0 +1,133 @@
+name: zinarix agent
+description: >-
+  Runs the Zinarix agent without a UI (`omni agent -p`) on the checked-out repository: it
+  follows the project's AGENTS.md, rules, skills and hooks, and can open a pull request with
+  what it changed.
+branding:
+  icon: cpu
+  color: purple
+
+inputs:
+  prompt:
+    description: The task, e.g. "Make the failing tests pass".
+    required: true
+  model:
+    description: >-
+      "provider/model". Its API key comes from the job's environment (ANTHROPIC_API_KEY,
+      OPENAI_API_KEY, GEMINI_API_KEY…). Commands the agent runs never see those variables.
+    required: true
+  approve:
+    description: >-
+      read-only (only reads), auto-edit (edits files) or full (also runs commands such as the
+      tests). Publishing (git push, gh pr, deploys) is refused at every level.
+    default: auto-edit
+  max-steps:
+    description: Model turns before stopping.
+    default: '40'
+  open-pr:
+    description: '"true" commits the changes to a new branch and opens a pull request.'
+    default: 'false'
+  branch:
+    description: Branch for the pull request (default zinarix/agent-<run id>).
+    default: ''
+  pr-title:
+    description: Title of the pull request (default the first line of the prompt).
+    default: ''
+  lang:
+    description: Language of the CLI messages (es or en).
+    default: 'es'
+  github-token:
+    description: >-
+      Token used only by the pull request step (needs contents and pull-requests write). The
+      agent step never gets it.
+    default: ${{ github.token }}
+
+outputs:
+  result:
+    description: Path of the JSON result of the run (text, tools, files changed, cost).
+    value: ${{ steps.agent.outputs.result }}
+  changed:
+    description: '"true" when the agent changed files.'
+    value: ${{ steps.agent.outputs.changed }}
+  pr-url:
+    description: URL of the pull request it opened.
+    value: ${{ steps.pr.outputs.url }}
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      with:
+        package_json_file: ${{ github.action_path }}/../../../package.json
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version: 24
+    - name: Build the omni CLI
+      shell: bash
+      working-directory: ${{ github.action_path }}/../../..
+      run: |
+        pnpm install --frozen-lockfile --filter "@omni/cli..."
+        pnpm --filter "@omni/cli..." build
+    - name: Run the agent
+      id: agent
+      shell: bash
+      env:
+        OMNI_HOME: ${{ runner.temp }}/omni-home
+        OMNI_NO_KEYCHAIN: '1'
+        ZX_CLI: ${{ github.action_path }}/../../../apps/cli/dist/index.js
+        ZX_PROMPT: ${{ inputs.prompt }}
+        ZX_MODEL: ${{ inputs.model }}
+        ZX_APPROVE: ${{ inputs.approve }}
+        ZX_MAX_STEPS: ${{ inputs.max-steps }}
+        ZX_LANG: ${{ inputs.lang }}
+      run: |
+        set -uo pipefail
+        out="$RUNNER_TEMP/zinarix-agent.json"
+        echo "result=$out" >> "$GITHUB_OUTPUT"
+        # The prompt goes through stdin, never through the command line.
+        printf '%s' "$ZX_PROMPT" | node "$ZX_CLI" --lang "$ZX_LANG" agent \
+          -m "$ZX_MODEL" --approve "$ZX_APPROVE" --max-steps "$ZX_MAX_STEPS" --json > "$out"
+        code=$?
+        node -e '
+          const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+          const lines = ["## Zinarix agent", "", `**${r.stop}** · ${r.model} · ${r.steps} steps · ${r.filesChanged.length} files changed · $${(r.usage.usd ?? 0).toFixed(4)}`, ""];
+          if (r.filesChanged.length) lines.push(...r.filesChanged.map((f) => `- \`${f}\``), "");
+          lines.push(r.text || r.error || "");
+          require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+        ' "$out" || true
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+        fi
+        exit $code
+    - name: Open a pull request
+      id: pr
+      if: inputs.open-pr == 'true' && steps.agent.outputs.changed == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ZX_BRANCH: ${{ inputs.branch }}
+        ZX_TITLE: ${{ inputs.pr-title }}
+        ZX_PROMPT: ${{ inputs.prompt }}
+        ZX_RESULT: ${{ steps.agent.outputs.result }}
+        ZX_RUN: ${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        branch="${ZX_BRANCH:-zinarix/agent-$ZX_RUN}"
+        title="${ZX_TITLE:-$(printf '%s' "$ZX_PROMPT" | head -n 1 | cut -c1-72)}"
+        body="$RUNNER_TEMP/zinarix-agent-pr.md"
+        node -e '
+          const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+          const b = ["Changes made by the Zinarix agent (`omni agent`).", "", "**Task**", "", process.env.ZX_PROMPT, "", "**Summary**", "", r.text, "", `Model: ${r.model} · steps: ${r.steps} · approval: ${r.approve}`];
+          require("fs").writeFileSync(process.argv[2], b.join("\n") + "\n");
+        ' "$ZX_RESULT" "$body"
+        git config user.name "zinarix-agent[bot]"
+        git config user.email "zinarix-agent@users.noreply.github.com"
+        gh auth setup-git
+        git checkout -b "$branch"
+        git add -A
+        git commit -m "$title" -m "Zinarix-Task: $ZX_RUN"
+        git push -u origin "$branch"
+        url="$(gh pr create --head "$branch" --title "$title" --body-file "$body")"
+        echo "url=$url" >> "$GITHUB_OUTPUT"

@@ -109,7 +109,9 @@ export function attachmentType(name: string, reported = ''): string | null {
   const ext = name.toLowerCase().split('.').pop() ?? '';
   const t = EXT_TYPES[ext];
   if (t) return t;
-  return /^(image|audio|video)\//.test(reported) || reported === 'application/pdf' ? reported : null;
+  return /^(image|audio|video)\//.test(reported) || reported === 'application/pdf'
+    ? reported
+    : null;
 }
 
 export type AttachmentKind = 'image' | 'pdf' | 'audio' | 'video' | 'text';
@@ -295,9 +297,9 @@ export function validateJson(value: unknown, schema: unknown, max = 20): string[
       const props = (s.properties ?? {}) as Record<string, unknown>;
       if (Array.isArray(s.required))
         for (const r of s.required)
-          if (typeof r === 'string' && !(r in obj)) push(`falta la propiedad "${r}"`);
+          if (typeof r === 'string' && !Object.hasOwn(obj, r)) push(`falta la propiedad "${r}"`);
       for (const [k, child] of Object.entries(obj)) {
-        if (k in props) walk(child, props[k], `${path}.${k}`, depth + 1);
+        if (Object.hasOwn(props, k)) walk(child, props[k], `${path}.${k}`, depth + 1);
         else if (s.additionalProperties === false) push(`propiedad no permitida "${k}"`);
         else if (typeof s.additionalProperties === 'object')
           walk(child, s.additionalProperties, `${path}.${k}`, depth + 1);
@@ -321,7 +323,8 @@ function validateJsonFrom(value: unknown, sub: unknown, root: Record<string, unk
 /** Checks a finished reply against the schema it was asked to follow. */
 export function checkReply(text: string, schema: Record<string, unknown>): JsonCheck {
   const p = parseJsonReply(text);
-  if (p.error !== undefined) return { ok: false, parsed: false, errors: [`No es JSON: ${p.error}`] };
+  if (p.error !== undefined)
+    return { ok: false, parsed: false, errors: [`No es JSON: ${p.error}`] };
   const errors = validateJson(p.value, schema);
   return { ok: errors.length === 0, parsed: true, errors };
 }
@@ -422,7 +425,10 @@ export function addVersion(
 }
 
 /** Line diff summary between two versions, for the history list ("+3 −1 líneas"). */
-export function versionDelta(a: PlaygroundParams, b: PlaygroundParams): { added: number; removed: number } {
+export function versionDelta(
+  a: PlaygroundParams,
+  b: PlaygroundParams,
+): { added: number; removed: number } {
   const lines = (p: PlaygroundParams) =>
     [p.system, p.prompt, p.schema, JSON.stringify(p.tools)].join('\n').split('\n');
   const before = lines(a);

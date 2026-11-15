@@ -1,0 +1,43 @@
+# Fase 15: the Zinarix agent in CI. Run it by hand (Actions → "Agente: arreglar pruebas"):
+# it runs the tests, lets `omni agent -p` fix what fails, and opens a pull request.
+name: 'Agente: arreglar pruebas'
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: Tarea para el agente
+        default: 'Corre `pnpm test`. Si alguna prueba falla, arregla el código (no la prueba, salvo que la prueba esté mal) hasta que pase.'
+      model:
+        description: Modelo (provider/model)
+        default: 'anthropic/claude-sonnet-5-5'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The agent runs commands: keep the token out of .git/config.
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/zinarix-agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        with:
+          prompt: ${{ inputs.prompt }}
+          model: ${{ inputs.model }}
+          approve: full
+          open-pr: 'true'

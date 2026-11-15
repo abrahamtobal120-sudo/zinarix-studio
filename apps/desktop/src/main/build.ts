@@ -3,7 +3,14 @@
  * deploys its files to Vercel. The agent writes the app (through a normal chat in
  * auto-approve mode); the Design panel previews it.
  */
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { BuildDeployView, BuildInfo, BuildView } from '../shared/build.js';
 import {
@@ -42,7 +49,11 @@ export class BuildService {
     mkdirSync(join(root, '.zinarix'), { recursive: true });
     writeFileSync(join(root, '.zinarix', 'rules.md'), BUILD_RULES);
     writeFileSync(join(root, 'index.html'), starterHtml(desc.split('\n')[0]!.slice(0, 80)));
-    const info: BuildInfo = { description: desc, createdAt: Date.now(), projectName: vercelName(name) };
+    const info: BuildInfo = {
+      description: desc,
+      createdAt: Date.now(),
+      projectName: vercelName(name),
+    };
     this.writeInfo(root, info);
     this.remember(root);
     return { ...info, root };
@@ -58,7 +69,9 @@ export class BuildService {
         description: j.description,
         createdAt: typeof j.createdAt === 'number' ? j.createdAt : 0,
         projectName: vercelName(j.projectName),
-        ...(j.lastDeploy && typeof j.lastDeploy.url === 'string' ? { lastDeploy: j.lastDeploy } : {}),
+        ...(j.lastDeploy && typeof j.lastDeploy.url === 'string'
+          ? { lastDeploy: j.lastDeploy }
+          : {}),
       };
     } catch {
       return null;
@@ -78,7 +91,12 @@ export class BuildService {
   }
 
   private remember(root: string): void {
-    const list = [root, ...this.recent().map((b) => b.root).filter((r) => r !== root)];
+    const list = [
+      root,
+      ...this.recent()
+        .map((b) => b.root)
+        .filter((r) => r !== root),
+    ];
     mkdirSync(join(this.recentFile, '..'), { recursive: true });
     writeFileSync(this.recentFile, JSON.stringify(list.slice(0, RECENT_MAX)));
   }

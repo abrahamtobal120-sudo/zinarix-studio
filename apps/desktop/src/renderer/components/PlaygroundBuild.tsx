@@ -39,7 +39,14 @@ export function BuildView({ models }: { models: string[] }) {
     };
   }, []);
 
+  const stopPoll = () => {
+    if (poll.current) window.clearTimeout(poll.current);
+    poll.current = null;
+  };
+
   useEffect(() => {
+    // Another app: forget the deploy being watched (its state would show on this one).
+    stopPoll();
     setDeploy(null);
     void api()
       .build.info()
@@ -83,17 +90,24 @@ export function BuildView({ models }: { models: string[] }) {
   };
 
   const watch = (d: BuildDeployView, teamId: string | null) => {
+    stopPoll();
     if (DONE.has(d.state)) return;
-    poll.current = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       void api()
         .build.deployState(d.id, teamId)
         .then((state) => {
+          // Superseded by a newer deploy or another app while waiting.
+          if (poll.current !== timer) return;
           const next = { ...d, state };
           setDeploy(next);
           watch(next, teamId);
         })
-        .catch(() => undefined);
+        // A dropped connection is not the end of the deploy: ask again.
+        .catch(() => {
+          if (poll.current === timer) watch(d, teamId);
+        });
     }, 3000);
+    poll.current = timer;
   };
 
   const publish = async (production: boolean) => {
@@ -107,6 +121,7 @@ export function BuildView({ models }: { models: string[] }) {
     );
     if (!ok) return;
     const teamId = team || null;
+    stopPoll();
     setDeploy({ id: '', url: '', state: 'UPLOADING', busy: true });
     try {
       const d = await api().build.deploy(teamId, production);
@@ -193,7 +208,9 @@ export function BuildView({ models }: { models: string[] }) {
             {!vercel?.connected ? (
               <div className="pg-row">
                 <span className="pg-muted">{tp('bdConnect')}</span>
-                <button onClick={() => setState({ sidebar: 'vercel' })}>{tp('bdOpenVercel')}</button>
+                <button onClick={() => setState({ sidebar: 'vercel' })}>
+                  {tp('bdOpenVercel')}
+                </button>
               </div>
             ) : (
               <>

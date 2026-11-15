@@ -13,6 +13,7 @@ import {
 import { api, toast } from '../../store';
 import { Icon } from '../Icon';
 import { fmtBytes, fmtDuration, tv } from './strings';
+import { textPngs } from './textDraw';
 import { getV, holdEscape, setV, useV } from './videoStore';
 
 export function ExportDialog() {
@@ -44,7 +45,8 @@ export function ExportDialog() {
     try {
       const out = await api().video.exportPath(project.name);
       if (!out) return;
-      await api().video.export(getV().project, final, out);
+      const pr = getV().project;
+      await api().video.export(pr, final, out, textPngs(pr.clips, final.width, final.height));
       setV({ dialog: null });
     } catch (e) {
       toast((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));

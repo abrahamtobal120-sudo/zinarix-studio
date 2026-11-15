@@ -24,6 +24,7 @@ import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
 import { MEDIA_DRAG } from './MediaLibrary';
 import { tv } from './strings';
+import { transitionLabel } from './FxPanels';
 import {
   addToTimeline,
   commit,
@@ -774,7 +775,9 @@ function ClipView({
   const wave = useV((s) => s.waves[clip.mediaId]);
   const left = clip.start * zoom;
   const width = Math.max(2, clipDur(clip) * zoom);
-  const kind = media?.kind ?? 'video';
+  const kind = clip.text ? 'text' : (media?.kind ?? 'video');
+  const name = clip.text ? clip.text.content.split('
+')[0] || tv('textClip') : media?.name;
   const showStrip = track.kind === 'video' && thumb && !media?.missing;
   const h = ROW_H[track.kind] - 8;
   const waveH = track.kind === 'audio' ? h - 16 : 14;
@@ -784,7 +787,7 @@ function ClipView({
       style={{ left, width }}
       onMouseDown={(e) => onDown(e, clip, null)}
       onContextMenu={onMenu}
-      title={media ? `${media.name} · ${clipDur(clip).toFixed(2)} s` : ''}
+      title={name ? `${name} · ${clipDur(clip).toFixed(2)} s` : ''}
     >
       {showStrip && media && (
         <Filmstrip
@@ -797,9 +800,17 @@ function ClipView({
         />
       )}
       <div className="vs-clip-label">
-        {media?.name ?? '?'}
+        {clip.text && <span className="vs-clip-t">T</span>}
+        {name ?? '?'}
+        {clip.effects && <span className="vs-clip-speed">fx</span>}
         {speedOf(clip) !== 1 && <span className="vs-clip-speed">{`${speedOf(clip)}×`}</span>}
       </div>
+      {clip.transition && (
+        <div
+          className="vs-tr-mark"
+          title={`${tv('editTransition')} · ${transitionLabel(clip.transition.kind)} · ${clip.transition.d} s`}
+        />
+      )}
       {!!clip.fadeIn && (
         <div className="vs-fade vs-fade-in" style={{ width: clip.fadeIn * zoom }} />
       )}

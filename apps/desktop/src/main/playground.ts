@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto';
 import type { ChatMessage, ContentPart, ToolDefinition } from '@omni/shared';
 import type { OmniCore } from '@omni/core';
 import { parseModelRef } from '@omni/core';
+import { claudeKnobs, claudeModel, claudeSchema } from '@omni/providers';
 import type {
   PlaygroundEvent,
   PlaygroundParams,
@@ -24,7 +25,7 @@ import {
   normalizeParams,
   parseSchema,
 } from '../shared/playground.js';
-import type { CodeLang } from '../shared/playgroundCode.js';
+import type { ClaudeThinking, CodeLang } from '../shared/playgroundCode.js';
 import { generateCode } from '../shared/playgroundCode.js';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -45,6 +46,81 @@ export function buildMessages(req: PlaygroundRunRequest): ChatMessage[] {
     content: parts.length ? [...parts, { type: 'text', text: req.prompt }] : req.prompt,
   });
   return messages;
+}
+
+/** Adapters that enforce a JSON Schema natively (packages/providers: keep in step). */
+const NATIVE_SCHEMA = new Set([
+  'anthropic',
+  'openai-compatible',
+  'openai-responses',
+  'google-gemini',
+  'google-vertex',
+]);
+
+export function supportsSchema(adapter: string | null): boolean {
+  return adapter === null || NATIVE_SCHEMA.has(adapter);
+}
+
+/**
+ * For a provider that drops jsonSchema, the schema goes into the system prompt instead,
+ * so the model still knows the shape (the reply is checked against it afterwards anyway).
+ */
+export function withSchemaInstructions(
+  messages: ChatMessage[],
+  schema: Record<string, unknown>,
+): ChatMessage[] {
+  const note =
+    'Responde SOLO con un objeto JSON válido (sin texto alrededor ni bloques de código) que cumpla este JSON Schema:\n' +
+    JSON.stringify(schema, null, 2);
+  const [first, ...rest] = messages;
+  if (first?.role === 'system' && typeof first.content === 'string')
+    return [{ role: 'system', content: `${first.content}\n\n${note}` }, ...rest];
+  return [{ role: 'system', content: note }, ...messages];
+}
+
+/** Default max_tokens of the Anthropic adapter (packages/providers: keep in step). */
+const ANTHROPIC_MAX_TOKENS = 32_000;
+
+/**
+ * What the Anthropic adapter will change for this Claude model (sampling knobs it rejects,
+ * thinking style, schema keywords), as readable notices, plus the request as it is really
+ * sent, which is what "Get code" writes. Other adapters and non-Claude models: unchanged.
+ */
+export function claudeAdjust(
+  adapter: string | null,
+  req: PlaygroundRunRequest,
+  defaultMaxTokens = ANTHROPIC_MAX_TOKENS,
+): { req: PlaygroundRunRequest; notices: string[]; claude?: ClaudeThinking } {
+  const model = req.model.slice(req.model.indexOf('/') + 1);
+  if (adapter !== 'anthropic' || !claudeModel(model)) return { req, notices: [] };
+  const knobs = claudeKnobs(model, req, req.maxTokens ?? defaultMaxTokens);
+  const notices = knobs.dropped.map((d) => `No se envió ${d}.`);
+  const out: PlaygroundRunRequest = { ...req };
+  if (knobs.temperature === undefined) delete out.temperature;
+  if (knobs.topP === undefined) delete out.topP;
+  if (!knobs.thinking) delete out.reasoning;
+  const parsed = parseSchema(req.schema);
+  if (parsed.schema) {
+    const fixed = claudeSchema(parsed.schema);
+    if (fixed.changed.length) {
+      out.schema = JSON.stringify(fixed.schema, null, 2);
+      const removed = fixed.changed.filter((k) => k !== 'additionalProperties');
+      const parts = [
+        ...(removed.length ? [`se quitó ${removed.join(', ')}`] : []),
+        ...(fixed.changed.includes('additionalProperties')
+          ? ['los objetos van con additionalProperties: false']
+          : []),
+      ];
+      notices.push(
+        `Esquema ajustado para Claude (${parts.join('; ')}). La respuesta se comprueba con tu esquema completo.`,
+      );
+    }
+  }
+  return {
+    req: out,
+    notices,
+    claude: { thinking: knobs.thinking ?? null, effort: knobs.effort !== undefined },
+  };
 }
 
 export function buildTools(req: PlaygroundRunRequest): ToolDefinition[] | undefined {
@@ -93,6 +169,19 @@ export class PlaygroundService {
     this.running.set(requestId, ctrl);
     const started = Date.now();
     const calls = new Map<string, { name: string; arguments: string }>();
+    let messages = buildMessages(req);
+    const adapter = await this.adapterOf(req.model);
+    for (const msg of claudeAdjust(adapter, req).notices) {
+      result.notices.push(msg);
+      emit({ type: 'notice', message: msg });
+    }
+    if (parsed.schema && !supportsSchema(adapter)) {
+      messages = withSchemaInstructions(messages, parsed.schema);
+      const msg =
+        'Este proveedor no impone el JSON Schema: se le pidió en las instrucciones y la respuesta se comprueba al final.';
+      result.notices.push(msg);
+      emit({ type: 'notice', message: msg });
+    }
     try {
       for await (const ev of this.core.stream(
         {
@@ -100,7 +189,7 @@ export class PlaygroundService {
           role: 'chat',
           // Compare must hit the exact model asked for, never a fallback.
           noFallback: true,
-          messages: buildMessages(req),
+          messages,
           tools: buildTools(req),
           maxTokens: req.maxTokens,
           temperature: req.temperature,
@@ -177,16 +266,22 @@ export class PlaygroundService {
   async code(lang: CodeLang, req: PlaygroundRunRequest): Promise<string> {
     const ref = parseModelRef(req.model);
     const cfg = await this.core.providerConfig(ref.provider);
-    return generateCode(
+    // The snippet writes max_tokens 16000 when none is set (playgroundCode.ts).
+    const { req: sent, notices, claude } = claudeAdjust(cfg.entry.adapter, req, 16000);
+    const code = generateCode(
       lang,
       {
         adapter: cfg.entry.adapter,
         baseUrl: cfg.baseUrl.replace(/\/+$/, ''),
         envVar: cfg.entry.envVars[0] ?? `${ref.provider.toUpperCase().replace(/-/g, '_')}_API_KEY`,
         model: ref.model,
+        ...(claude ? { claude } : {}),
       },
-      req,
+      sent,
     );
+    if (!notices.length) return code;
+    const mark = lang === 'ts' ? '//' : '#';
+    return [...notices.map((n) => `${mark} ${n}`), code].join(String.fromCharCode(10));
   }
 
   /** Catalog adapter of a model's provider (the panel warns about attachments it can't take). */

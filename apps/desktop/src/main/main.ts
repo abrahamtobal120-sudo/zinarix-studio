@@ -1074,15 +1074,31 @@ function registerIpc(): void {
     return out;
   });
   // Exports write only where the user chose in the save dialog.
-  handle('video:export', z.tuple([projectArg, exportArg, absPath]), (w, project, options, out) => {
+  // Titles come as PNGs the renderer drew at the export size (at most 200, 40 MB each).
+  const PNG_URL = 'data:image/png;base64,';
+  const textPngsArg = z
+    .record(z.string().regex(/^[w-]{1,64}$/), z.string().max(56_000_000).startsWith(PNG_URL))
+    .refine((r) => Object.keys(r).length <= 200, 'demasiados títulos')
+    .optional();
+  handle(
+    'video:export',
+    z.tuple([projectArg, exportArg, absPath, textPngsArg]),
+    (w, project, options, out, texts) => {
     const target = resolve(out);
     if (!videoOutputs.has(target)) throw new Error('Elige primero dónde guardar el video.');
     if (!(options.end > options.start)) throw new Error('El rango a exportar está vacío.');
-    const job = videoService().enqueue(project, options, target);
+    const pngs: Record<string, Buffer> = {};
+    for (const [id, url] of Object.entries(texts ?? {})) {
+      const buf = Buffer.from(url.slice(PNG_URL.length), 'base64');
+      // The PNG signature: anything else is dropped.
+      if (buf.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) pngs[id] = buf;
+    }
+    const job = videoService().enqueue(project, options, target, pngs);
     videoJobOwner.set(job.id, w);
     send(w, { type: 'video:job', job });
     return job;
-  });
+    },
+  );
   handle('video:jobs', z.tuple([]), () => videoService().list());
   handle('video:cancel', z.tuple([z.string().max(64)]), (_w, jobId) =>
     videoService().cancel(jobId),

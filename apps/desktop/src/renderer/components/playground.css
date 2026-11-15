@@ -48,7 +48,7 @@
 .pg pre,
 .pg code {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .pg-top {
@@ -121,7 +121,7 @@
   color: var(--fg-dim);
 }
 .pg-tag {
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 1px 6px;
   border-radius: 8px;
   background: var(--sel-soft);
@@ -162,7 +162,7 @@
 .pg-label-row > span {
   color: var(--fg-strong);
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .pg-label-row {
   display: flex;
@@ -184,7 +184,7 @@
 }
 .pg textarea.mono {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .pg [aria-invalid='true'] {
   border-color: var(--danger);
@@ -203,7 +203,7 @@
 .pg-vars legend {
   color: var(--fg-strong);
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--text-sm);
   padding: 0 4px;
 }
 .pg-row {
@@ -242,7 +242,7 @@
 }
 .pg-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--fg-dim);
 }
 .pg-hint.err {
@@ -291,7 +291,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .pg-chip small {
   color: var(--fg-dim);
@@ -338,7 +338,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   padding: 1px 7px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -376,7 +376,7 @@
   margin: 0;
   padding: 4px 10px 6px 28px;
   color: var(--danger);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .pg-tools {
   padding: 6px 10px;
@@ -397,7 +397,7 @@
   padding: 6px 10px;
   border-top: 1px solid var(--border);
   color: var(--fg-dim);
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -418,7 +418,7 @@
 }
 .pg-dialog h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-md);
   color: var(--fg-strong);
 }
 .pg-dialog input {
@@ -437,7 +437,7 @@
   border-radius: 4px;
   padding: 10px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--text-sm);
   white-space: pre;
 }
 .pg-dialog-actions {
@@ -473,10 +473,10 @@
   gap: 6px;
 }
 .pg-build h3 {
-  font-size: 14px;
+  font-size: var(--text-md);
 }
 .pg-build h4 {
-  font-size: 12px;
+  font-size: var(--text-sm);
   margin-top: 4px;
 }
 .pg-path {

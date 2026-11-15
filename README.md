@@ -98,6 +98,7 @@ cat app.log | omni ask "resume los errores críticos"
 omni ask --json "…" > respuesta.json   # para scripts
 omni chat                              # TUI; /model <p/m> cambia de modelo a media conversación
 omni compare "parser CSV en Rust" -m openai/<a> -m anthropic/<b>
+omni agent -p "arregla las pruebas" --approve=full --json   # agente sin interfaz (CI)
 omni usage --month                     # tokens y costo por proveedor/modelo
 omni history search jwt
 omni config set privacy.localOnly true # modo 100 % local
@@ -113,6 +114,8 @@ Llaves para CI: variables de entorno estándar (`ANTHROPIC_API_KEY`, `GROQ_API_K
 Servidores sin keychain: `omni auth add <p> --file-vault` (AES-256-GCM + Argon2id; contraseña en `OMNI_VAULT_PASSWORD` o interactiva).
 
 **Códigos de salida:** 0 ok · 1 error (incluye red, timeout y error del servidor) · 2 uso/config · 3 llave inválida (401/403) · 4 rate limit · 5 presupuesto · 130 cancelado (Ctrl+C, también en los prompts ocultos). `omni auth test` devuelve 3 solo si el proveedor rechaza la llave y 1 si no se pudo conectar o verificar; `omni compare` devuelve distinto de 0 si fallan todos los modelos.
+
+**`omni agent`** (sin interfaz, para CI): sigue `AGENTS.md`, las reglas, skills y hooks del proyecto; `--approve` = `read-only` (por omisión, solo leer) · `auto-edit` (editar archivos) · `full` (también comandos). Nunca hace `git push`, `gh pr` ni deploys, y los comandos que corre no reciben claves ni tokens. GitHub Action: `.github/actions/zinarix-agent`.
 
 Headers con secretos en endpoints personalizados: no los pases con `--header` (quedan en el historial del shell y en `ps`). Usa `--auth-header <nombre>` + `omni auth add`, `--header-prompt <nombre>` (entrada oculta) o `--header-stdin`; si hay un solo header de credenciales (o el indicado con `--auth-header`), su valor se guarda en el keychain o la bóveda en vez de `config.json`.
 

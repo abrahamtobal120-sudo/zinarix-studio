@@ -1879,7 +1879,13 @@ export interface OmniApi {
     /** Picks a new file for a missing media item. */
     relink(name: string): Promise<string | null>;
     exportPath(name: string): Promise<string | null>;
-    export(project: VideoProject, options: ExportOptions, out: string): Promise<VideoJobView>;
+    /** `texts`: clip id → PNG data URL of each title, drawn at the export size. */
+    export(
+      project: VideoProject,
+      options: ExportOptions,
+      out: string,
+      texts?: Record<string, string>,
+    ): Promise<VideoJobView>;
     jobs(): Promise<VideoJobView[]>;
     cancel(id: string): Promise<void>;
     reveal(path: string): Promise<void>;

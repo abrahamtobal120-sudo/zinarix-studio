@@ -105,7 +105,9 @@ const fmtMs = (ms: number | undefined) =>
   ms === undefined ? '—' : ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms} ms`;
 const fmtSize = (b64: string) => {
   const bytes = Math.floor((b64.length * 3) / 4);
-  return bytes > 1024 * 1024 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
+  return bytes > 1024 * 1024
+    ? `${(bytes / 1048576).toFixed(1)} MB`
+    : `${Math.ceil(bytes / 1024)} KB`;
 };
 
 function readAsBase64(file: File): Promise<string> {
@@ -355,7 +357,9 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
     const kinds = [...new Set(attachments.map((x) => attachmentKind(x.mediaType)))].filter(
       (k) => !ok.includes(k),
     );
-    return kinds.map((k) => tp('pgAttachUnsupported', { model: m, kind: tp(`pgKind_${k}` as PgKey) }));
+    return kinds.map((k) =>
+      tp('pgAttachUnsupported', { model: m, kind: tp(`pgKind_${k}` as PgKey) }),
+    );
   });
 
   const results = (mode === 'compare' ? slots : slots.slice(0, 1)).map((s) => s.result);
@@ -380,7 +384,9 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
                 name={m === 'single' ? 'sparkle' : m === 'compare' ? 'columns' : 'package'}
                 size={13}
               />
-              {tp(m === 'single' ? 'pgModeSingle' : m === 'compare' ? 'pgModeCompare' : 'pgModeBuild')}
+              {tp(
+                m === 'single' ? 'pgModeSingle' : m === 'compare' ? 'pgModeCompare' : 'pgModeBuild',
+              )}
             </button>
           ))}
         </div>
@@ -420,7 +426,11 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
               <Icon name="plus" size={13} /> {tp('pgTemplateSaveAs')}
             </button>
             {tpl && (
-              <button className="danger" title={tp('pgTemplateDelete')} onClick={() => void remove()}>
+              <button
+                className="danger"
+                title={tp('pgTemplateDelete')}
+                onClick={() => void remove()}
+              >
                 <Icon name="trash" size={13} />
               </button>
             )}
@@ -499,13 +509,18 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
                   placeholder={tp('pgDefault')}
                   value={maxTokens ?? ''}
                   onChange={(e) =>
-                    setMaxTokens(e.target.value ? Math.max(1, Math.trunc(+e.target.value)) : undefined)
+                    setMaxTokens(
+                      e.target.value ? Math.max(1, Math.trunc(+e.target.value)) : undefined,
+                    )
                   }
                 />
               </label>
               <label className="pg-row">
                 <span>{tp('pgThinking')}</span>
-                <select value={reasoning} onChange={(e) => setReasoning(e.target.value as Reasoning | '')}>
+                <select
+                  value={reasoning}
+                  onChange={(e) => setReasoning(e.target.value as Reasoning | '')}
+                >
                   <option value="">{tp('pgThinkingOff')}</option>
                   <option value="low">{tp('pgThinkingLow')}</option>
                   <option value="medium">{tp('pgThinkingMedium')}</option>
@@ -608,7 +623,9 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
                   onClick={() =>
                     setSlots((l) => [
                       ...l,
-                      blank(chatModels.find((m) => !l.some((s) => s.model === m)) ?? chatModels[0]!),
+                      blank(
+                        chatModels.find((m) => !l.some((s) => s.model === m)) ?? chatModels[0]!,
+                      ),
                     ])
                   }
                 >
@@ -988,4 +1005,3 @@ function prettyJson(text: string): string {
     return text;
   }
 }
-

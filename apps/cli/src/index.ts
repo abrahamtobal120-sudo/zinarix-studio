@@ -4,6 +4,7 @@ import { Command, CommanderError } from 'commander';
 import { OmniError, exitCodeFor, setLocale, t } from '@omni/shared';
 import type { MessageKey } from '@omni/shared';
 import { redact } from '@omni/security';
+import { registerAgent } from './commands/agent.js';
 import { registerAsk } from './commands/ask.js';
 import { registerAuth } from './commands/auth.js';
 import { registerCompletion } from './commands/completion.js';
@@ -46,6 +47,7 @@ export function buildProgram(): Command {
   registerProviders(program);
   registerModels(program);
   registerAsk(program);
+  registerAgent(program);
   registerReview(program);
 
   program
