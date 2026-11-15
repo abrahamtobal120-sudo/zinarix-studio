@@ -8506,7 +8506,8 @@ body.dragging-y * {
 .activity.active.is-view::after {
   background: transparent;
 }
-.activity.active.is-view::before {
+/* The marker is always there for side panels, collapsed: it grows in when the panel opens. */
+.activity.is-view::before {
   content: '';
   position: absolute;
   left: 0;
@@ -8515,6 +8516,30 @@ body.dragging-y * {
   width: 3px;
   border-radius: 0 3px 3px 0;
   background: var(--brand);
+  transform: scaleY(0);
+  opacity: 0;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.12s ease;
+}
+.activity.active.is-view::before {
+  transform: scaleY(1);
+  opacity: 1;
+}
+/* Resting icons a bit softer, so the one that is on stands out; a small press feedback. */
+.activity .icon {
+  opacity: 0.82;
+  transition:
+    opacity 0.13s ease,
+    transform 0.1s ease;
+}
+.activity:hover .icon,
+.activity:focus-visible .icon,
+.activity.active .icon {
+  opacity: 1;
+}
+.activity:active .icon {
+  transform: scale(0.9);
 }
 .activity:focus-visible {
   outline: none;
@@ -8567,6 +8592,32 @@ body.dragging-y * {
   pointer-events: none;
   animation: activity-tip-in 0.12s ease;
 }
+/* The shortcut of the button, next to its name. */
+.activity-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.activity-tip-keys {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  line-height: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity.is-view::before,
+  .activity .icon {
+    transition: none;
+  }
+  .activity:active .icon {
+    transform: none;
+  }
+}
 @keyframes activity-tip-in {
   from {
     opacity: 0;
@@ -8580,7 +8631,7 @@ body.dragging-y * {
   .activity::after {
     inset: 1px 7px;
   }
-  .activity.active.is-view::before {
+  .activity.is-view::before {
     top: 8px;
     bottom: 8px;
   }

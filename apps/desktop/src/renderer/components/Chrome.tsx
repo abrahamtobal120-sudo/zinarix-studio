@@ -125,8 +125,13 @@ function useBarItems() {
       sideMax,
       () => toggleMaximized('side'),
     ),
-    security: tool('security', t('securityTitle'), 'shield', 'toggle', active === '::security', () =>
-      openSecurityTab(),
+    security: tool(
+      'security',
+      t('securityTitle'),
+      'shield',
+      'toggle',
+      active === '::security',
+      () => openSecurityTab(),
     ),
     playground: tool(
       'playground',
@@ -162,30 +167,36 @@ function useBarItems() {
  */
 export function ActivityBar() {
   const { items, sidebar, browserActive, whatsappActive } = useBarItems();
-  const [tip, setTip] = useState<{ text: string; y: number } | null>(null);
+  const [tip, setTip] = useState<{ text: string; keys?: string; y: number } | null>(null);
   // The browser and WhatsApp are native views drawn above the page: over them the custom
   // tooltip would be hidden, so the system one is used instead.
   const nativeOver = (browserActive || whatsappActive) && !sidebar;
-  const showTip = (el: HTMLElement, text: string) => {
+  // Shortcut of each button (with the user's own ones from Settings), shown in its tooltip.
+  const keysById = new Map(commands().flatMap((c) => (c.keys ? [[c.id, c.keys] as const] : [])));
+  const keysOf = (key: string) =>
+    keysById.get(`view.${key}`) ?? keysById.get(`app.${key}`) ?? keysById.get(key);
+  const showTip = (el: HTMLElement, text: string, keys?: string) => {
     const r = el.getBoundingClientRect();
-    setTip({ text, y: r.top + r.height / 2 });
+    setTip({ text, keys, y: r.top + r.height / 2 });
   };
   const button = (it: BarItem) => {
     const n = it.badge ?? 0;
     const label = n ? t('badgeCount', { title: it.title, n: n > 99 ? '99+' : n }) : it.title;
+    const keys = keysOf(it.key);
     return (
       <button
         key={it.key}
         className={`activity${it.on ? ' active' : ''}${it.kind === 'view' ? ' is-view' : ''}`}
-        title={nativeOver ? it.title : undefined}
+        title={nativeOver ? (keys ? `${it.title} (${keys})` : it.title) : undefined}
         aria-label={label}
+        aria-keyshortcuts={keys?.replace(/Ctrl/g, 'Control').replace(/⌘/g, 'Meta')}
         aria-pressed={it.kind === 'action' ? undefined : it.on}
         onClick={() => {
           setTip(null);
           it.run();
         }}
-        onMouseEnter={(e) => showTip(e.currentTarget, it.title)}
-        onFocus={(e) => showTip(e.currentTarget, it.title)}
+        onMouseEnter={(e) => showTip(e.currentTarget, it.title, keys)}
+        onFocus={(e) => showTip(e.currentTarget, it.title, keys)}
         onMouseLeave={() => setTip(null)}
         onBlur={() => setTip(null)}
       >
@@ -233,6 +244,7 @@ export function ActivityBar() {
       {tip && !nativeOver && (
         <div className="activity-tip" role="tooltip" style={{ top: tip.y }}>
           {tip.text}
+          {tip.keys && <kbd className="activity-tip-keys">{tip.keys}</kbd>}
         </div>
       )}
     </nav>

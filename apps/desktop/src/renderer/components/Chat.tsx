@@ -109,6 +109,7 @@ import {
   stripMentions,
 } from '../../shared/mentions';
 import type { MentionKind } from '../../shared/mentions';
+import './chat-composer.css';
 
 const NO_KIT_COMMANDS: AgentKitView['commands'] = [];
 const NO_KIT_SKILLS: AgentKitView['skills'] = [];
@@ -2829,13 +2830,37 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         {termMenu && (
           <div
             ref={termMenuEl}
-            className="term-menu"
+            className="term-menu add-menu"
             role="menu"
-            aria-label={t('termPick')}
-            onMouseLeave={() => setTermMenu(null)}
+            aria-label={t('chatAddMenu')}
             onKeyDown={menuArrows}
           >
-            <div className="term-menu-title">{t('termPick')}</div>
+            {(
+              [
+                ['paperclip', t('chatAttach'), attachFile],
+                ['image', t('chatAttachImage'), () => imagePicker.current?.click()],
+                ['film', tv('openStudioHint'), () => void openStudio()],
+              ] as const
+            ).map(([icon, text, run]) => {
+              // "Label (hint)" / "Label · hint": the hint goes right, dimmed.
+              const [label, hint] = text.split(/ \(| · /);
+              return (
+                <button
+                  key={icon}
+                  role="menuitem"
+                  className="add-menu-item"
+                  onClick={() => {
+                    setTermMenu(null);
+                    run();
+                  }}
+                >
+                  <Icon name={icon} size={14} />
+                  <span className="add-menu-label">{label}</span>
+                  {hint && <span className="add-menu-hint">{hint.replace(/\)$/, '')}</span>}
+                </button>
+              );
+            })}
+            <div className="term-menu-head">{t('terminal')}</div>
             {termMenu.length === 0 ? (
               <button
                 role="menuitem"
@@ -2981,6 +3006,17 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           }}
         />
         <div className="chat-input-bar">
+          <button
+            ref={termMenuBtn}
+            className={`term-pick add-menu-btn ${termMenu ? 'on' : ''}`}
+            title={t('chatAddMenu')}
+            aria-label={t('chatAddMenu')}
+            aria-haspopup="menu"
+            aria-expanded={termMenu !== null}
+            onClick={() => setTermMenu((m) => (m ? null : listTerminals()))}
+          >
+            <Icon name="plus" size={15} />
+          </button>
           <ModeMenu mode={chatMode} onChange={(m) => setChatMode(m)} />
           <label
             className={`pill reasoning-pick ${reasoning ? 'on' : ''}`}
@@ -3013,30 +3049,6 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               {active && !active.startsWith('::') ? active.split('/').pop() : t('includeFile')}
             </span>
           </label>
-          <button
-            className="term-pick"
-            title={t('chatAttach')}
-            aria-label={t('chatAttach')}
-            onClick={attachFile}
-          >
-            <Icon name="paperclip" size={15} />
-          </button>
-          <button
-            className="term-pick"
-            title={t('chatAttachImage')}
-            aria-label={t('chatAttachImage')}
-            onClick={() => imagePicker.current?.click()}
-          >
-            <Icon name="image" size={15} />
-          </button>
-          <button
-            className="term-pick"
-            title={tv('openStudioHint')}
-            aria-label={tv('openStudio')}
-            onClick={() => void openStudio()}
-          >
-            <Icon name="film" size={15} />
-          </button>
           <input
             ref={imagePicker}
             type="file"
@@ -3100,17 +3112,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               )}
             </button>
           )}
-          <button
-            ref={termMenuBtn}
-            className={`term-pick ${termMenu ? 'on' : ''}`}
-            title={t('termPick')}
-            aria-label={t('termPick')}
-            aria-haspopup="menu"
-            aria-expanded={termMenu !== null}
-            onClick={() => setTermMenu((m) => (m ? null : listTerminals()))}
-          >
-            <Icon name="terminal" size={15} />
-          </button>
+          <span className="chat-input-spacer" aria-hidden="true" />
           <button
             className={`model-chip ${chatModel ? 'own' : ''}`}
             onClick={pickModel}

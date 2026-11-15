@@ -150,6 +150,7 @@ const es = {
   reasoningHigh: 'Razonar: alto',
   chatScrollBottom: 'Ir al final',
   chatAttach: 'Adjuntar archivo del proyecto (@)',
+  chatAddMenu: 'Agregar contexto (archivo, imagen, terminal o video)',
   mcpHint:
     'Conecta servidores MCP (Slack, Figma, bases de datos, GitHub…) para que el agente de Zinarix use sus herramientas. Mismo formato que Cursor y Claude Desktop. Cada uso de una herramienta te pide permiso.',
   mcpSaved: 'Configuración MCP guardada',
@@ -2303,6 +2304,7 @@ const en: Record<Key, string> = {
   reasoningHigh: 'Reasoning: high',
   chatScrollBottom: 'Jump to latest',
   chatAttach: 'Attach a project file (@)',
+  chatAddMenu: 'Add context (file, image, terminal or video)',
   mcpHint:
     'Connect MCP servers (Slack, Figma, databases, GitHub…) so Zinarix’s agent can use their tools. Same format as Cursor and Claude Desktop. Every tool call asks for your approval.',
   mcpSaved: 'MCP configuration saved',
