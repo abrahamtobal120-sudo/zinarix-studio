@@ -211,6 +211,8 @@ const es = {
   reviewUndoAll: 'Rechazar todo',
   reviewKeep: 'Aceptar',
   reviewUndo: 'Rechazar',
+  reviewCommands:
+    'Esta respuesta también ejecutó {n} comando(s) en la terminal. Lo que hicieron esos comandos no se revierte al rechazar bloques.',
   reviewHint:
     'Se muestra solo lo que cambió esta respuesta. Lo que rechaces se deshace en el archivo actual, sin tocar los cambios posteriores.',
   reviewChangedSince: 'cambió después de esta respuesta',
@@ -2356,6 +2358,8 @@ const en: Record<Key, string> = {
   reviewUndoAll: 'Reject all',
   reviewKeep: 'Accept',
   reviewUndo: 'Reject',
+  reviewCommands:
+    'This answer also ran {n} terminal command(s). What those commands did is not undone by rejecting blocks.',
   reviewHint:
     'Only what this answer changed is shown. Rejected blocks are undone in the current file, keeping later changes.',
   reviewChangedSince: 'changed after this answer',

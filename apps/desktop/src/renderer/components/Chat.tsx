@@ -2650,6 +2650,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           conversationId={conversationId}
           turn={reviewTurn}
           folder={ownFolder}
+          commands={turns.reduce((n, x) => n + (x.rid === reviewTurn ? stepsOf(x, RUN_TOOLS) : 0), 0)}
           onClose={() => setReviewTurn(null)}
         />
       )}

@@ -17,12 +17,15 @@ export function DiffReview({
   conversationId,
   turn,
   folder,
+  commands = 0,
   onClose,
 }: {
   conversationId: string;
   /** The exchange's request id. */
   turn: string;
   folder?: string;
+  /** Terminal commands that exchange ran (never undone). */
+  commands?: number;
   onClose: () => void;
 }) {
   const [files, setFiles] = useState<TurnDiffFileView[] | null>(null);
@@ -98,6 +101,11 @@ export function DiffReview({
           <Icon name="close" size={14} />
         </button>
       </div>
+      {commands > 0 && (
+        <p className="rewind-warn" role="note">
+          <Icon name="warning" size={13} /> {t('reviewCommands', { n: commands })}
+        </p>
+      )}
       <div className="diff-review-main">
         {files && files.length > 1 && (
           <nav className="diff-review-files" aria-label={t('reviewFiles')}>
