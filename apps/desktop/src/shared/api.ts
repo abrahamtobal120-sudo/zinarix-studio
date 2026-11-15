@@ -612,6 +612,22 @@ export interface CompletionRequestView {
 }
 
 /** A memory kept between conversations (global, or for one project folder). */
+/** Cloud sync with the user's own Supabase project (end-to-end encrypted). */
+export interface CloudSyncStatus {
+  connected: boolean;
+  ref: string | null;
+  projectName: string | null;
+  /** Supabase account id (null: the active one). */
+  account: string | null;
+  deviceName: string | null;
+  lastSync: number | null;
+  lastError: string | null;
+  /** Items brought in / sent in the last sync. */
+  lastIn: number;
+  lastOut: number;
+  syncing: boolean;
+}
+
 export interface MemoryView {
   id: string;
   text: string;
@@ -861,6 +877,8 @@ export type AppEvent =
   | { type: 'lsp:applyEdit'; id: number; edit: unknown }
   /** Memories or indexed docs changed (added, removed, a crawl progressed). */
   | { type: 'knowledge:changed' }
+  /** A cloud sync ended (conv: conversations came in from another PC). */
+  | { type: 'cloud:status'; status: CloudSyncStatus; conv: boolean }
   /** The help assistant (Ayuda de Zinarix) streamed part of an answer. */
   | { type: 'helper'; requestId: string; event: HelperEvent }
   /** Progress of a local model download for the help assistant. */
@@ -1315,6 +1333,14 @@ export interface OmniApi {
     /** Asks where to save an attachment of the open message. Returns the path (null: cancelled). */
     saveAttachment(folder: string, uid: number, index: number): Promise<string | null>;
   };
+  cloud: {
+    status(): Promise<CloudSyncStatus>;
+    /** Links a project of a connected Supabase account with the sync passphrase. */
+    connect(account: string | null, ref: string, passphrase: string): Promise<CloudSyncStatus>;
+    /** Unlinks this PC (nothing is deleted, here or in Supabase). */
+    disconnect(): Promise<CloudSyncStatus>;
+    syncNow(): Promise<CloudSyncStatus>;
+  };
   supabase: {
     status(): Promise<SupabaseStatus>;
     /** Saves a personal access token (encrypted with the OS keychain). */
@@ -1758,6 +1784,10 @@ export const CHANNELS = [
   'mail:deleteDraft',
   'mail:send',
   'mail:saveAttachment',
+  'cloud:status',
+  'cloud:connect',
+  'cloud:disconnect',
+  'cloud:syncNow',
   'supabase:status',
   'supabase:setToken',
   'supabase:logout',

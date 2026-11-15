@@ -8301,8 +8301,13 @@ body.dragging-y * {
 }
 .activity .activity-badge {
   top: 3px;
-  right: 5px;
+  right: 4px;
   z-index: 1;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  font-size: 9.5px;
+  line-height: 15px;
 }
 .activity-sep {
   flex-shrink: 0;
@@ -8538,10 +8543,13 @@ body.dragging-y * {
 }
 .apps-desc {
   font-size: 11.5px;
+  line-height: 1.4;
   color: var(--fg-dim);
+  /* Up to two lines on a narrow side bar, then "…". */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .apps-badge {
   flex-shrink: 0;
@@ -8607,9 +8615,10 @@ body.dragging-y webview {
 }
 @container (max-width: 700px) {
   .sv-nav {
-    width: 52px;
+    width: 54px;
     padding: 10px 6px;
     align-items: center;
+    overflow-x: hidden;
   }
   .sv-brand {
     padding: 4px 0 10px;
@@ -8618,9 +8627,13 @@ body.dragging-y webview {
   }
   .sv-nav-item {
     position: relative;
+    flex-shrink: 0;
     justify-content: center;
-    width: 40px;
+    width: 38px;
     padding: 9px 0;
+  }
+  .sv-nav-icon {
+    width: auto;
   }
   .sv-nav-label {
     display: none;

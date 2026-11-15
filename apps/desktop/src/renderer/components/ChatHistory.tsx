@@ -66,6 +66,15 @@ export function ChatHistory({
     return () => clearTimeout(timer);
   }, [query, load]);
 
+  // Conversations that arrived from another PC (cloud sync) show up without reopening.
+  useEffect(
+    () =>
+      api().on((ev) => {
+        if (ev.type === 'cloud:status' && ev.conv) void load();
+      }),
+    [load],
+  );
+
   const groups = useMemo(() => {
     const out: [string, ConversationView[]][] = [];
     for (const c of list) {

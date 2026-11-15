@@ -42,6 +42,7 @@ import {
 import { BrowserController, browserData } from './browser.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
+import { CloudSync } from './cloudSync.js';
 import { Vercel, linkedProject } from './vercel.js';
 import { CLOUD_SCOPE, GCloud } from './gcloud.js';
 import { GOOGLE_ALL_SCOPE } from './googleMail.js';
@@ -109,7 +110,12 @@ protocol.registerSchemesAsPrivileged([
     },
   },
   // Pages of the open project shown (and edited) in the Panel de Edición.
-  { scheme: 'zxp', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  // corsEnabled: the preview frame is sandboxed (opaque origin), so module scripts, fonts
+  // and fetch() of the page are cross-origin requests; without it Chromium refuses them.
+  {
+    scheme: 'zxp',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+  },
 ]);
 
 // A separate data folder (OMNI_HOME: portable installs, tests) is a separate app instance.
@@ -658,6 +664,9 @@ function handle<A extends z.ZodTuple>(
     return (fn as Handler)(w, ...parsed);
   });
 }
+
+/** Cloud sync with the user's own Supabase (set up in registerIpc). */
+let cloud: CloudSync | undefined;
 
 function registerIpc(): void {
   handle('workspace:current', z.tuple([]), (w) => w.workspace?.info() ?? null);
@@ -1600,6 +1609,8 @@ function registerIpc(): void {
       }),
     ]),
     (w, requestId, { folder, noFolder, ...req }) => {
+      // The answer is saved when it ends: sync a while after the last chat started.
+      cloud?.later(90_000);
       // Several chats of the same window (or of other windows) run at the same time: each
       // request is independent and only its own window hears its events.
       const id = rid(w, requestId);
@@ -1997,7 +2008,24 @@ function registerIpc(): void {
     knowledgeTimer = setTimeout(() => {
       for (const w of wins.values()) send(w, { type: 'knowledge:changed' });
     }, 200);
+    cloud?.later();
   };
+
+  // Cloud sync: chats, memories and usage, end-to-end encrypted in the user's own Supabase.
+  cloud = new CloudSync(app.getPath('userData'), ai.core, supabase, knowledge);
+  cloud.onStatus = (status, changed) => {
+    for (const w of wins.values()) send(w, { type: 'cloud:status', status, conv: changed.conv });
+  };
+  cloud.start();
+  const cloudSync = cloud;
+  handle('cloud:status', z.tuple([]), () => cloudSync.status());
+  handle(
+    'cloud:connect',
+    z.tuple([accountId.nullable(), ref, z.string().min(8).max(1000)]),
+    (_w, account, r, passphrase) => cloudSync.connect(account, r, passphrase),
+  );
+  handle('cloud:disconnect', z.tuple([]), () => cloudSync.disconnect());
+  handle('cloud:syncNow', z.tuple([]), () => cloudSync.syncNow());
   const memoryText = z.string().trim().min(1).max(2000);
   handle('knowledge:memories', z.tuple([]), () => knowledge.memories(undefined, true));
   handle(
@@ -2146,6 +2174,18 @@ function registerDesignIpc(): void {
   handle('design:undo', z.tuple([]), (w) => designCall(() => designOf(w).undo()));
   handle('design:redo', z.tuple([]), (w) => designCall(() => designOf(w).redo()));
   handle('design:stale', z.tuple([rel]), (w, file) => designOf(w).stale(file));
+  const how = z.object({
+    mode: z.enum(['live', 'built', 'none']),
+    dir: z.string().max(1024),
+    url: z.string().max(2048).optional(),
+  });
+  handle('design:show', z.tuple([how]), (w, h) => {
+    const s = designOf(w);
+    if (h.mode === 'live') return s.showLive(h.dir, h.url ?? '');
+    if (h.mode === 'built') return s.showBuilt(h.dir);
+    return s.hide();
+  });
+  handle('design:detect', z.tuple([z.string().max(1024)]), (w, dir) => designOf(w).detect(dir));
 }
 
 const PREVIEW_MIME: Record<string, string> = {
@@ -2191,6 +2231,9 @@ function registerDesignProtocol(): void {
       return readFile(editorScript)
         .then((b) => new Response(b, { headers: headers('text/javascript; charset=utf-8') }))
         .catch(() => new Response('not built', { status: 404 }));
+    // A framework project shown by its dev server or its built files (see design/live.ts).
+    const other = await design.session.respond(req);
+    if (other) return other;
     let file = decodeURIComponent(url.pathname).replace(/^\/+/, '');
     if (file === '' || file.endsWith('/')) file += 'index.html';
     try {

@@ -191,22 +191,26 @@ export function buildKnowledge() {
     settingsList(src('renderer/components/Settings.tsx'), es),
   ].join('\n\n');
 
+  // [path, source, weight, text]: the user guide ranks first, developer docs last (they talk
+  // about the code, not about using the app).
   const docs = [
-    [join(appDir, 'knowledge', 'guia-zinarix.md'), 'Guía de usuario'],
-    [null, 'Referencia generada', generated],
-    [join(repo, 'README.md'), 'README'],
+    [join(appDir, 'knowledge', 'guia-zinarix.md'), 'Guía de usuario', 1.6],
+    [null, 'Referencia generada', 1.3, generated],
+    [join(repo, 'README.md'), 'README', 1],
   ];
-  for (const dir of ['es', 'en']) {
+  for (const [dir, weight] of [['es', 0.55], ['en', 0.45]]) {
     const d = join(repo, '.md', dir);
     if (!existsSync(d)) continue;
     for (const f of readdirSync(d).sort())
-      if (f.endsWith('.md') && !SKIP.has(f)) docs.push([join(d, f), relative(repo, join(d, f)).replace(/\\/g, '/')]);
+      if (f.endsWith('.md') && !SKIP.has(f))
+        docs.push([join(d, f), relative(repo, join(d, f)).replace(/\\/g, '/'), weight]);
   }
   const chunks = [];
-  for (const [path, source, text] of docs) {
+  for (const [path, source, weight, text] of docs) {
     if (path && !existsSync(path)) continue;
     // Command lists are long: smaller pieces so retrieval picks the right lines.
-    chunks.push(...chunkMarkdown(text ?? read(path), source, text ? 700 : 1100));
+    for (const c of chunkMarkdown(text ?? read(path), source, text ? 700 : 1100))
+      chunks.push({ ...c, weight });
   }
   return { version: 1, chunks };
 }

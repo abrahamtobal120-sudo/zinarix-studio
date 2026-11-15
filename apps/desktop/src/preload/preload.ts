@@ -164,6 +164,12 @@ const api: OmniApi = {
     send: call('mail:send') as OmniApi['mail']['send'],
     saveAttachment: call('mail:saveAttachment') as OmniApi['mail']['saveAttachment'],
   },
+  cloud: {
+    status: call('cloud:status') as OmniApi['cloud']['status'],
+    connect: call('cloud:connect') as OmniApi['cloud']['connect'],
+    disconnect: call('cloud:disconnect') as OmniApi['cloud']['disconnect'],
+    syncNow: call('cloud:syncNow') as OmniApi['cloud']['syncNow'],
+  },
   supabase: {
     status: call('supabase:status') as OmniApi['supabase']['status'],
     setToken: call('supabase:setToken') as OmniApi['supabase']['setToken'],

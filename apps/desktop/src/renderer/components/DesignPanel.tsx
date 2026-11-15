@@ -14,6 +14,8 @@ import { t } from '../i18n';
 import { api, openFile, setState, toast, useStore } from '../store';
 import { askInChat } from './Chat';
 import { Icon, type IconName } from './Icon';
+import { LiveProps } from './design/LiveProps';
+import { LiveSetup } from './design/LiveSetup';
 import { Properties } from './design/Properties';
 import { tagName } from './design/names';
 import './design/design.css';
@@ -63,6 +65,12 @@ export function DesignPanel() {
   const [ribbonOpen, setRibbonOpen] = useState(true);
   const [aiText, setAiText] = useState('');
   const [box, setBox] = useState({ w: 800, h: 600 });
+  // Live mode: the screen asked for (drives the frame) and the one the app is showing.
+  const [livePath, setLivePath] = useState('/');
+  const [shownPath, setShownPath] = useState('/');
+  const [addr, setAddr] = useState('/');
+  const shownRef = useRef('/');
+  const lastFs = useRef(fsVersion);
 
   const frame = useRef<HTMLIFrameElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -107,6 +115,14 @@ export function DesignPanel() {
 
   // Another program (code editor, the AI, git) changed the page: show it as it is now.
   useEffect(() => {
+    const changed = lastFs.current !== fsVersion;
+    lastFs.current = fsVersion;
+    // Live and built previews: the AI (or the editor) changed the code, show it.
+    if (view && (view.mode === 'live' || view.mode === 'built')) {
+      if (!changed) return;
+      const timer = setTimeout(() => reload(), 1200);
+      return () => clearTimeout(timer);
+    }
     if (!page || !view?.editable) return;
     const timer = setTimeout(() => {
       void api()
@@ -130,6 +146,22 @@ export function DesignPanel() {
 
   const reload = useCallback(() => {
     restore.current = { scroll: scroll.current, src: selRef.current?.src ?? null };
+    setLivePath(shownRef.current);
+    setFrameKey((k) => k + 1);
+  }, []);
+
+  /** A new way of showing the project (live, built, or back to choosing). */
+  const showView = useCallback((v: DesignSessionView) => {
+    setView(v);
+    setHistory(v.history);
+    setSel(null);
+    setTree([]);
+    setPage(v.pages[0]?.file ?? null);
+    setLivePath('/');
+    setShownPath('/');
+    setAddr('/');
+    shownRef.current = '/';
+    restore.current = null;
     setFrameKey((k) => k + 1);
   }, []);
 
@@ -220,17 +252,19 @@ export function DesignPanel() {
         aiInput.current?.focus();
         return;
       }
-      askInChat(
-        t('dzAiPrompt', {
-          file: page ?? '',
-          target: s ? `${tagName(s.tag)} «${s.text}»` : t('dzWholePage'),
-          what,
-        }),
-        ctx,
-      );
+      const target = s ? `${tagName(s.tag)} «${s.text}»` : t('dzWholePage');
+      if (view && view.mode !== 'edit') {
+        const where = view.mode === 'live' ? shownRef.current : `/${page ?? ''}`;
+        askInChat(t('dzAiPromptLive', { kind: view.label, path: where, target, what }), [
+          {
+            source: s ? `${view.label} ${where} · ${tagName(s.tag)}` : `${view.label} ${where}`,
+            content: s ? s.outer : `${view.label} ${where}`,
+          },
+        ]);
+      } else askInChat(t('dzAiPrompt', { file: page ?? '', target, what }), ctx);
       setAiText('');
     },
-    [page],
+    [page, view],
   );
 
   // Messages from the preview frame (only that frame: other windows are ignored).
@@ -258,6 +292,16 @@ export function DesignPanel() {
           }
           break;
         }
+        case 'tree':
+          setTree(msg.tree);
+          setTitle(msg.title);
+          for (const h of hidden) send({ type: 'setHidden', src: h, hidden: true });
+          break;
+        case 'location':
+          shownRef.current = msg.path;
+          setShownPath(msg.path);
+          setAddr(msg.path);
+          break;
         case 'scroll':
           scroll.current = msg.y;
           break;
@@ -379,7 +423,20 @@ export function DesignPanel() {
         {null}
       </Empty>
     );
-  if (!view.editable || !view.base || !page)
+  if (view.mode === 'none' && view.app)
+    return <LiveSetup view={view} onView={showView} onExit={exit} />;
+  if (view.mode === 'none' && view.kind === 'desktop')
+    return (
+      <Empty icon="monitor" title={t('dzDesktopTitle', { kind: view.label })} text={t('dzDesktopText')}>
+        <button className="primary" onClick={() => askInChat(t('dzAiNotYet', { kind: view.label }))}>
+          <Icon name="sparkle" size={14} /> {t('dzAskAi')}
+        </button>
+        <button onClick={exit}>{t('dzExit')}</button>
+      </Empty>
+    );
+  const live = view.mode === 'live';
+  const readOnly = view.mode !== 'edit';
+  if (!view.base || (!live && !page))
     return (
       <Empty
         icon="palette"
@@ -409,7 +466,14 @@ export function DesignPanel() {
   const frameW = devW || Math.max(320, (box.w - pad) / scale);
   const frameH = Math.max(200, (box.h - pad) / scale);
   const shownZoom = Math.round(scale * 100);
-  const url = `${view.base}/${page.split('/').map(encodeURIComponent).join('/')}?v=${frameKey}`;
+  const url = live
+    ? `${view.base}${livePath.startsWith('/') ? '' : '/'}${livePath}`
+    : `${view.base}/${page!.split('/').map(encodeURIComponent).join('/')}?v=${frameKey}`;
+  const changeView = () =>
+    void api()
+      .design.show({ mode: 'none', dir: view.app?.dir ?? '' })
+      .then(showView)
+      .catch((e: unknown) => setProblem(errText(e)));
 
   const R = (props: { icon: IconName; label: string; onClick: () => void; on?: boolean; disabled?: boolean; title?: string }) => (
     <button
@@ -474,7 +538,11 @@ export function DesignPanel() {
           {tab === 'file' && (
             <>
               <Group label={t('dzGroupFile')}>
-                <R icon="file" label={t('dzSeeCode')} onClick={() => void openFile(page)} title={t('dzSeeCodeTitle')} />
+                {readOnly ? (
+                  <R icon="refresh" label={t('dzLiveStop')} onClick={changeView} title={t('dzLiveStopTitle')} />
+                ) : (
+                  <R icon="file" label={t('dzSeeCode')} onClick={() => page && void openFile(page)} title={t('dzSeeCodeTitle')} />
+                )}
                 <R icon="history" label={t('dzVersions')} onClick={() => setState({ sidebar: 'git' })} />
                 <R icon="close" label={t('dzExit')} onClick={exit} />
               </Group>
@@ -526,6 +594,37 @@ export function DesignPanel() {
       <div className="dz-body">
         {/* ---------------- pages + layers ---------------- */}
         <aside className="dz-left">
+          {readOnly && (
+            <div className="dz-live-badge">
+              <span>
+                {live
+                  ? t('dzLiveBadge', { url: view.live ?? '' })
+                  : t('dzBuiltBadge', { dir: view.app?.built ?? '' })}
+              </span>
+              <button className="link" onClick={changeView} title={t('dzLiveStopTitle')}>
+                {t('dzLiveStop')}
+              </button>
+              {!live && <p className="dz-muted">{t('dzBuiltNote')}</p>}
+            </div>
+          )}
+          {live ? (
+            <>
+              <div className="dz-head">{t('dzLiveAddress')}</div>
+              <form
+                className="dz-live-addr"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const p = addr.trim() || '/';
+                  shownRef.current = p.startsWith('/') ? p : `/${p}`;
+                  reload();
+                }}
+              >
+                <input value={addr} onChange={(e) => setAddr(e.target.value)} spellCheck={false} aria-label={t('dzLiveAddress')} />
+                <button type="submit">{t('dzLiveGo')}</button>
+              </form>
+            </>
+          ) : (
+          <>
           <div className="dz-head">{t('dzPages')}</div>
           <div className="dz-pages">
             {view.pages.map((p, i) => (
@@ -544,6 +643,8 @@ export function DesignPanel() {
               </button>
             ))}
           </div>
+          </>
+          )}
           <div className="dz-head">{t('dzLayers')}</div>
           <div className="dz-layers" role="tree" aria-label={t('dzLayers')}>
             {tree.length === 0 ? (
@@ -581,10 +682,10 @@ export function DesignPanel() {
               style={{ width: frameW * scale, height: frameH * scale }}
             >
               <iframe
-                key={page}
+                key={live ? `live:${frameKey}` : (page ?? '')}
                 ref={frame}
                 className="dz-frame"
-                title={title || page}
+                title={title || page || shownPath}
                 src={url}
                 // Opaque origin: the project's scripts can't reach Zinarix (only postMessage).
                 sandbox="allow-scripts allow-forms allow-modals"
@@ -601,7 +702,9 @@ export function DesignPanel() {
         {/* ---------------- properties ---------------- */}
         <aside className="dz-right">
           <div className="dz-head">{t('dzProps')}</div>
-          {sel ? (
+          {readOnly ? (
+            <LiveProps sel={sel} onAsk={askAi} onParent={(src) => send({ type: 'select', src })} />
+          ) : sel ? (
             <Properties
               key={sel.src}
               sel={sel}
@@ -654,7 +757,7 @@ export function DesignPanel() {
         )}
         <span className="spacer" />
         {mode === 'visitor' && <span className="dz-badge">{t('dzVisitorOn')}</span>}
-        <span>{t('dzPageOf', { n: pageIdx + 1, total: view.pages.length })}</span>
+        {!live && <span>{t('dzPageOf', { n: pageIdx + 1, total: view.pages.length })}</span>}
         <input
           type="range"
           min={25}

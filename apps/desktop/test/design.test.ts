@@ -257,3 +257,62 @@ describe('design session', () => {
     expect(s.history().steps).toHaveLength(2);
   });
 });
+
+describe('framework projects (live and built preview)', () => {
+  it('tells a bundler entry page from a real page', async () => {
+    const { isBundlerEntry } = await import('../src/main/design/projectProfile.js');
+    expect(isBundlerEntry('<div id="root"></div><script type="module" src="/src/main.tsx"></script>')).toBe(true);
+    expect(isBundlerEntry('<script src="./main.jsx" type="module"></script>')).toBe(true);
+    expect(isBundlerEntry(PAGE)).toBe(false);
+    expect(isBundlerEntry('<script type="module" src="app.js"></script>')).toBe(false);
+  });
+
+  it('finds the web apps of a monorepo and skips build and release folders', () => {
+    const files = [
+      'package.json',
+      'apps/web/package.json',
+      'apps/web/index.html',
+      'apps/web/dist/index.html',
+      'apps/desktop/package.json',
+      'apps/desktop/release/win-unpacked/LICENSES.chromium.html',
+    ];
+    const p = detectProfile(files, JSON.stringify({ devDependencies: { turbo: '1' } }), {
+      nested: {
+        'apps/web': JSON.stringify({ dependencies: { react: '1' }, devDependencies: { vite: '1' } }),
+        'apps/desktop': JSON.stringify({ devDependencies: { electron: '1', vite: '1' } }),
+      },
+      entries: new Set(['apps/web/index.html']),
+    });
+    expect(p).toMatchObject({ kind: 'vite', label: 'React con Vite', editable: false, pages: [] });
+    expect(p.apps).toEqual([
+      { dir: 'apps/web', kind: 'vite', label: 'React con Vite', devUrl: 'http://localhost:5173', built: 'apps/web/dist' },
+    ]);
+    const electron = detectProfile(['package.json'], JSON.stringify({ devDependencies: { electron: '1' } }));
+    expect(electron).toMatchObject({ kind: 'desktop', apps: [] });
+  });
+
+  it('accepts only addresses of this computer, in plain words otherwise', async () => {
+    const { localOrigin } = await import('../src/main/design/live.js');
+    expect(localOrigin('localhost:5173')).toBe('http://localhost:5173');
+    expect(localOrigin(' http://127.0.0.1:3000/app ')).toBe('http://127.0.0.1:3000');
+    expect(localOrigin('0.0.0.0:4321')).toBe('http://localhost:4321');
+    expect(() => localOrigin('https://example.com')).toThrow(/esta computadora/);
+    expect(() => localOrigin('file:///C:/x')).toThrow(EditError);
+    expect(() => localOrigin('')).toThrow(EditError);
+  });
+
+  it('shows a framework project only after choosing how, and never writes from it', async () => {
+    const files = fakeFiles({
+      'package.json': JSON.stringify({ devDependencies: { vite: '1' } }),
+      'index.html': '<div id="app"></div><script type="module" src="/src/main.ts"></script>',
+      'dist/index.html': '<!doctype html><body><h1>Hola</h1></body>',
+    });
+    const s = new DesignSession(files, 'zxp://w1');
+    const v = await s.open();
+    expect(v).toMatchObject({ mode: 'none', base: null, kind: 'vite', app: { dir: '', built: 'dist' } });
+    await expect(s.showBuilt('')).resolves.toMatchObject({ mode: 'built', base: 'zxp://w1', pages: [{ file: 'index.html' }] });
+    await expect(s.apply({ kind: 'setText', src: 'index.html#1', html: 'x' })).rejects.toThrow(EditError);
+    await expect(s.showLive('', 'https://example.com')).rejects.toThrow(EditError);
+    expect(s.hide()).toMatchObject({ mode: 'none' });
+  });
+});

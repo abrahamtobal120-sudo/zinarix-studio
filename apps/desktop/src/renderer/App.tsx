@@ -21,6 +21,7 @@ import { DesignPanel } from './components/DesignPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
 import { VideoStudioHost } from './components/video/VideoStudio';
+import { HelperBubble } from './components/helper/HelperBubble';
 import { isStudioFile } from './components/video/videoCommands';
 import { getV as getVideo, openStudio } from './components/video/videoStore';
 import {
@@ -549,6 +550,7 @@ export function App() {
       <StatusBar />
       <Modals />
       <VideoStudioHost />
+      <HelperBubble />
       <ConfirmDialog />
       <div className="app-banners">
         <NoticeBanner />

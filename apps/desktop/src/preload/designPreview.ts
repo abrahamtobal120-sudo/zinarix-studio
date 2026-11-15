@@ -27,21 +27,53 @@ import type {
     'height', 'opacity', 'display', 'box-shadow',
   ];
 
+  /**
+   * Live mode (framework projects shown by their dev server or built files): every element
+   * can be selected, but nothing is written to the files (changes are asked to the AI), so
+   * elements get their number here, kept out of the page (no attribute: React and others
+   * would see a changed page).
+   */
+  const LIVE = document.currentScript?.hasAttribute('data-zx-live') ?? false;
+  const liveIds = new WeakMap<Element, string>();
+  const liveEls = new Map<string, WeakRef<Element>>();
+  let liveNext = 0;
+  const liveId = (el: Element): string => {
+    let id = liveIds.get(el);
+    if (!id) {
+      id = `live#${++liveNext}`;
+      liveIds.set(el, id);
+      liveEls.set(id, new WeakRef(el));
+    }
+    return id;
+  };
+
   let mode: 'edit' | 'visitor' = 'edit';
   let selected: HTMLElement | null = null;
   let hovered: HTMLElement | null = null;
   let editing: { el: HTMLElement; before: string } | null = null;
 
   const post = (msg: DesignPreviewMsg) => window.parent.postMessage({ zx: 1, ...msg }, '*');
-  const srcOf = (el: Element | null) => el?.getAttribute(ATTR) ?? null;
+  const srcOf = (el: Element | null) => (!el ? null : LIVE ? liveId(el) : el.getAttribute(ATTR));
   const find = (src: string | null): HTMLElement | null => {
     if (!src) return null;
+    if (LIVE) {
+      const el = liveEls.get(src)?.deref();
+      return el?.isConnected ? (el as HTMLElement) : null;
+    }
     for (const el of document.querySelectorAll<HTMLElement>(`[${ATTR}]`))
       if (el.getAttribute(ATTR) === src) return el;
     return null;
   };
   const target = (node: EventTarget | null): HTMLElement | null => {
     let el = node instanceof Element ? node : null;
+    if (LIVE) {
+      // The drawing as a whole, not one of its lines.
+      const svg = el?.closest('svg');
+      if (svg) el = svg;
+      while (el && (SKIP.has(el.tagName.toLowerCase()) || el === document.documentElement || el === host))
+        el = el.parentElement;
+      return el as HTMLElement | null;
+    }
     while (el && (!el.hasAttribute(ATTR) || SKIP.has(el.tagName.toLowerCase()) || el === document.documentElement))
       el = el.parentElement;
     return el as HTMLElement | null;
@@ -58,6 +90,7 @@ import type {
     return own.replace(/\s+/g, ' ').trim().slice(0, 40);
   };
   const isEditable = (el: Element): boolean => {
+    if (LIVE) return false;
     const tag = el.tagName.toLowerCase();
     if (SKIP.has(tag) || ['img', 'input', 'video', 'iframe', 'svg', 'select', 'textarea', 'html', 'body'].includes(tag))
       return false;
@@ -371,6 +404,7 @@ import type {
 
   /** Visitor mode: links to other pages of the project change the page shown in the panel. */
   const followLink = (e: Event) => {
+    if (LIVE) return; // the app moves between its own screens
     const a = (e.target as Element | null)?.closest?.('a[href]');
     if (!a) return;
     const href = a.getAttribute('href') ?? '';
@@ -457,22 +491,26 @@ import type {
 
   const outlineStyle = document.createElement('style');
   outlineStyle.setAttribute('data-zx-ui', '');
-  outlineStyle.textContent = `[${ATTR}]:not(html):not(body) { outline: 1px dashed rgba(79,140,255,.55); outline-offset: -1px; }`;
+  outlineStyle.textContent = LIVE
+    ? 'body *:not(zx-overlay) { outline: 1px dashed rgba(79,140,255,.55); outline-offset: -1px; }'
+    : `[${ATTR}]:not(html):not(body) { outline: 1px dashed rgba(79,140,255,.55); outline-offset: -1px; }`;
 
   // ------------------------------------------------------------ start
 
+  let treeBudget = 0;
   const tree = (el: Element): DesignLayer[] => {
     const out: DesignLayer[] = [];
     for (const c of el.children) {
       const tag = c.tagName.toLowerCase();
       if (SKIP.has(tag) || c.hasAttribute('data-zx-ui')) continue;
+      if (LIVE && --treeBudget < 0) break;
       const src = srcOf(c);
       if (!src) {
         out.push(...tree(c));
         continue;
       }
       // Formatting inside a text is part of that text, not a layer of its own.
-      const kids = INLINE.has(tag) && tag !== 'a' ? [] : tree(c);
+      const kids = (INLINE.has(tag) && tag !== 'a') || tag === 'svg' ? [] : tree(c);
       out.push({ src, tag, text: snippet(c), children: kids });
     }
     return out;
@@ -481,7 +519,27 @@ import type {
     document.documentElement.appendChild(host);
     outlineStyle.disabled = true;
     document.head?.appendChild(outlineStyle);
+    treeBudget = 3000;
     post({ type: 'ready', title: document.title, tree: document.body ? tree(document.body) : [] });
+    if (!LIVE) return;
+    // Apps draw (and redraw) their screens after the page loads: the Layers follow.
+    let timer = 0;
+    new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        treeBudget = 3000;
+        post({ type: 'tree', title: document.title, tree: document.body ? tree(document.body) : [] });
+        if (selected && !selected.isConnected) select(null);
+        redraw();
+      }, 400);
+    }).observe(document.body ?? document.documentElement, { childList: true, subtree: true });
+    let where = '';
+    const tell = () => {
+      const now = location.pathname + location.search;
+      if (now !== where) post({ type: 'location', path: (where = now) });
+    };
+    tell();
+    setInterval(tell, 500);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();

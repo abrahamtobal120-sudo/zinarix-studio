@@ -20,6 +20,8 @@ import { THEMES } from '../themes';
 import { Icon, type IconName } from './Icon';
 import { McpSection } from './McpSettings';
 import { DocsSection, MemoriesSection } from './KnowledgeSettings';
+import { HelperSettings } from './helper/HelperSettings';
+import { CloudSection } from './CloudSettings';
 import { ModalShell } from './ModalShell';
 
 const close = () => setState({ modal: null });
@@ -48,7 +50,16 @@ const FONTS = [
   'monospace',
 ];
 
-type Section = 'appearance' | 'editor' | 'ai' | 'memories' | 'docs' | 'mcp' | 'phone' | 'keys';
+type Section =
+  | 'appearance'
+  | 'editor'
+  | 'ai'
+  | 'memories'
+  | 'docs'
+  | 'mcp'
+  | 'cloud'
+  | 'phone'
+  | 'keys';
 
 function Toggle({
   label,
@@ -412,6 +423,7 @@ export function SettingsPanel() {
         {nav('mcp', 'MCP', 'plug')}
         {nav('memories', t('setMemories'), 'sparkle')}
         {nav('docs', t('setDocsNav'), 'books')}
+        {nav('cloud', t('cloudTitle'), 'cloud')}
         {nav('phone', t('phoneTitle'), 'smartphone')}
         {nav('keys', t('shortcuts'), 'keyboard')}
       </nav>
@@ -574,12 +586,14 @@ export function SettingsPanel() {
                 await refreshSettings();
               }}
             />
+            <HelperSettings />
           </>
         )}
 
         {section === 'memories' && <MemoriesSection />}
         {section === 'docs' && <DocsSection />}
         {section === 'mcp' && <McpSection />}
+        {section === 'cloud' && <CloudSection />}
 
         {section === 'phone' && <PhoneSection />}
 
