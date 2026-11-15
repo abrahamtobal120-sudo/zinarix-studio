@@ -17,6 +17,7 @@ import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, toast } from '../store';
+import { isWriteSql, sqlExcerpt } from '../sqlSafety';
 
 const errText = (e: unknown) =>
   String((e as Error).message ?? e).replace(/^Error invoking[^:]*: (Error: )?/, '');
@@ -24,6 +25,19 @@ const errText = (e: unknown) =>
 const open = (url: string) => void api().app.openExternal(url);
 const CONSOLE = 'https://console.cloud.google.com';
 const PROJECT_KEY = 'zinarix.gcloudProject';
+
+/** Translated Cloud SQL instance state (falls back to the raw state for unknown ones). */
+function sqlState(state: string): string {
+  const map: Record<string, () => string> = {
+    RUNNABLE: () => t('gcStateRunnable'),
+    STOPPED: () => t('gcStateStopped'),
+    SUSPENDED: () => t('gcStateSuspended'),
+    PENDING_CREATE: () => t('gcStatePending'),
+    MAINTENANCE: () => t('gcStateMaintenance'),
+    FAILED: () => t('gcStateFailed'),
+  };
+  return map[state]?.() ?? state;
+}
 
 type View = 'apis' | 'bigquery' | 'storage' | 'sql' | 'logs';
 
@@ -194,7 +208,12 @@ function BigQueryView({ project }: { project: string }) {
   }, [project, openDs]);
 
   const run = async () => {
-    if (!sql.trim()) return;
+    if (!sql.trim() || running) return;
+    if (
+      isWriteSql(sql) &&
+      !(await confirmDialog(`${t('gcWriteConfirm')}\n\n${sqlExcerpt(sql)}`, { danger: true }))
+    )
+      return;
     setRunning(true);
     setQErr(null);
     try {
@@ -248,6 +267,7 @@ function BigQueryView({ project }: { project: string }) {
       ))}
       <textarea
         value={sql}
+        aria-label={t('sbSqlLabel')}
         spellCheck={false}
         rows={6}
         placeholder={`SELECT * FROM \`${project}.dataset.tabla\` LIMIT 100`}
@@ -264,7 +284,7 @@ function BigQueryView({ project }: { project: string }) {
           <Icon name="play" size={14} /> {running ? '…' : `${t('sbRun')} (Ctrl+Enter)`}
         </button>
         {result && (
-          <button onClick={() => setResult(null)} title={t('sbClear')}>
+          <button onClick={() => setResult(null)} title={t('sbClear')} aria-label={t('sbClear')}>
             <Icon name="x" size={14} />
           </button>
         )}
@@ -393,7 +413,7 @@ function SqlView({ project }: { project: string }) {
             </span>
           </div>
           <div className="git-commit-meta">
-            {i.state} · {i.region} · {i.tier}
+            {sqlState(i.state)} · {i.region} · {i.tier}
             {i.ip ? ` · ${i.ip}` : ''}
           </div>
           <div className="git-connect-actions">
@@ -401,6 +421,8 @@ function SqlView({ project }: { project: string }) {
               {busy === i.name ? '…' : i.state === 'STOPPED' ? t('gcStart') : t('gcStop')}
             </button>
             <button
+              aria-label={t('gcOpenConsole')}
+              title={t('gcOpenConsole')}
               onClick={() => open(`${CONSOLE}/sql/instances/${i.name}/overview?project=${project}`)}
             >
               <Icon name="external" size={13} />
@@ -426,13 +448,18 @@ function LogsView({ project }: { project: string }) {
       <div className="vc-toolbar">
         <input
           value={draft}
+          aria-label={t('gcLogFilter')}
           placeholder={t('gcLogFilter')}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') setFilter(draft);
           }}
         />
-        <button onClick={() => (draft === filter ? logs.reload() : setFilter(draft))}>
+        <button
+          aria-label={t('gitRefresh')}
+          title={t('gitRefresh')}
+          onClick={() => (draft === filter ? logs.reload() : setFilter(draft))}
+        >
           <Icon name="refresh" size={13} />
         </button>
       </div>
@@ -521,12 +548,13 @@ export function GCloudPanel() {
       <span className="panel-title">GOOGLE CLOUD</span>
       <span className="sidebar-actions">
         {st?.connected && (
-          <button title={t('gitRefresh')} onClick={loadProjects}>
+          <button title={t('gitRefresh')} aria-label={t('gitRefresh')} onClick={loadProjects}>
             <Icon name="refresh" size={15} />
           </button>
         )}
         <button
           title="console.cloud.google.com"
+          aria-label={t('gcOpenConsole')}
           onClick={() => open(project ? `${CONSOLE}/home/dashboard?project=${project}` : CONSOLE)}
         >
           <Icon name="external" size={15} />
@@ -565,13 +593,15 @@ export function GCloudPanel() {
           </button>
           <input
             value={client.id}
-            placeholder="Client ID (…apps.googleusercontent.com)"
+            aria-label={t('gcClientId')}
+            placeholder={`${t('gcClientId')} (…apps.googleusercontent.com)`}
             onChange={(e) => setClient({ ...client, id: e.target.value })}
           />
           <input
             type="password"
             value={client.secret}
-            placeholder="Client secret (GOCSPX-…)"
+            aria-label={t('gcClientSecret')}
+            placeholder={`${t('gcClientSecret')} (GOCSPX-…)`}
             onChange={(e) => setClient({ ...client, secret: e.target.value })}
           />
           <button

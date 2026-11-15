@@ -1,6 +1,14 @@
 import './system-ca.js';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
@@ -8,12 +16,29 @@ import { fileURLToPath } from 'node:url';
 import { BrowserWindow, Menu, Notification, app, dialog, ipcMain, protocol, shell } from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
 import { z } from 'zod';
-import type { AppEvent, BotKind, Channel, PhoneAction, PhoneRepo, Prefs, ThemeId, WorkspaceInfo } from '../shared/api.js';
+import type {
+  AppEvent,
+  BotKind,
+  Channel,
+  PhoneAction,
+  PhoneRepo,
+  Prefs,
+  ThemeId,
+  WorkspaceInfo,
+} from '../shared/api.js';
 import { UI_ZOOM_STEPS } from '../shared/api.js';
 import { DEFAULT_PREFS, EVENT_CHANNEL, THEME_IDS } from '../shared/api.js';
 import { AiService } from './ai.js';
 import type { Scope } from './ai.js';
-import { Git, cloneRepo, githubRepos, githubStatus, publishRepo, repoName, runUntrustedGit } from './git.js';
+import {
+  Git,
+  cloneRepo,
+  githubRepos,
+  githubStatus,
+  publishRepo,
+  repoName,
+  runUntrustedGit,
+} from './git.js';
 import { BrowserController } from './browser.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
@@ -74,7 +99,13 @@ protocol.registerSchemesAsPrivileged([
   // Video Studio media (only files the user picked): streamed with byte ranges.
   {
     scheme: 'zmedia',
-    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true },
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      corsEnabled: true,
+    },
   },
   // Pages of the open project shown (and edited) in the Panel de Edición.
   { scheme: 'zxp', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -133,16 +164,16 @@ const terminals = new Terminals(
 /** The window the phone controls (the one that started the remote). */
 let phoneOwner: Win | undefined;
 const phoneRepos: PhoneRepos = {
-    list: async () => {
-      const open = phoneOwner?.workspace?.root;
-      return mapLimit(findRepos(), 8, (p) => repoView(p, p === open));
-    },
-    pull: async (path) => runUntrustedGit(['pull', '--ff-only'], knownRepo(path), 300_000),
-    open: async (path) => {
-      if (!phoneOwner) throw new Error('No hay ninguna ventana conectada al celular.');
-      if (!(await openFolder(phoneOwner, knownRepo(path))))
-        throw new Error('No se pudo abrir la carpeta.');
-    },
+  list: async () => {
+    const open = phoneOwner?.workspace?.root;
+    return mapLimit(findRepos(), 8, (p) => repoView(p, p === open));
+  },
+  pull: async (path) => runUntrustedGit(['pull', '--ff-only'], knownRepo(path), 300_000),
+  open: async (path) => {
+    if (!phoneOwner) throw new Error('No hay ninguna ventana conectada al celular.');
+    if (!(await openFolder(phoneOwner, knownRepo(path))))
+      throw new Error('No se pudo abrir la carpeta.');
+  },
 };
 /** How long the approval dialog waits before it counts as "no" (Cloudflare cuts at ~100 s). */
 const PAIR_APPROVAL_MS = 90_000;
@@ -160,7 +191,9 @@ async function approvePairing(req: PairRequest): Promise<boolean> {
     parent.flashFrame(true);
   }
   const via =
-    req.channel === 'phone' ? 'el control desde el celular' : `el bot de ${req.channel === 'telegram' ? 'Telegram' : 'Discord'}`;
+    req.channel === 'phone'
+      ? 'el control desde el celular'
+      : `el bot de ${req.channel === 'telegram' ? 'Telegram' : 'Discord'}`;
   const options: Electron.MessageBoxOptions = {
     type: 'warning',
     title: 'Nuevo dispositivo',
@@ -665,7 +698,15 @@ function registerIpc(): void {
   handle('workspace:readFile', z.tuple([rel]), (w, p) => ws(w).readFile(p));
   handle(
     'workspace:readBytes',
-    z.tuple([rel, z.number().int().min(0), z.number().int().min(0).max(8 * 1024 * 1024)]),
+    z.tuple([
+      rel,
+      z.number().int().min(0),
+      z
+        .number()
+        .int()
+        .min(0)
+        .max(8 * 1024 * 1024),
+    ]),
     (w, p, offset, length) => ws(w).readBytes(p, offset, length),
   );
   handle('workspace:writeFile', z.tuple([rel, big]), (w, p, c) => ws(w).writeFile(p, c));
@@ -836,7 +877,8 @@ function registerIpc(): void {
     mkdirSync(d, { recursive: true });
     return d;
   };
-  const safeName = (n: string, fallback: string) => n.replace(/[\\/:*?"<>|]+/g, ' ').trim() || fallback;
+  const safeName = (n: string, fallback: string) =>
+    n.replace(/[\\/:*?"<>|]+/g, ' ').trim() || fallback;
   handle('video:tools', z.tuple([]), () => {
     const t = videoService().tools();
     return { ffmpeg: Boolean(t.ffmpeg && t.ffprobe), version: t.version };
@@ -852,7 +894,9 @@ function registerIpc(): void {
   handle('video:probe', z.tuple([absPath]), (_w, p) => videoService().probe(resolve(p)));
   handle('video:workspacePath', z.tuple([rel]), (w, p) => {
     const abs = ws(w).resolve(p);
-    return isFile(abs) && (mediaKindOf(abs) || abs.toLowerCase().endsWith(`.${PROJECT_EXT}`)) ? abs : null;
+    return isFile(abs) && (mediaKindOf(abs) || abs.toLowerCase().endsWith(`.${PROJECT_EXT}`))
+      ? abs
+      : null;
   });
   // Only media files: the protocol never serves anything else the renderer names.
   handle('video:mediaUrl', z.tuple([absPath]), (_w, p) =>
@@ -886,10 +930,15 @@ function registerIpc(): void {
       }
       // The previous version goes to the history (the last 20 per project).
       if (isFile(target)) {
-        const hist = join(videoDir(), 'versions', createHash('sha1').update(target).digest('hex').slice(0, 16));
+        const hist = join(
+          videoDir(),
+          'versions',
+          createHash('sha1').update(target).digest('hex').slice(0, 16),
+        );
         mkdirSync(hist, { recursive: true });
         writeFileSync(join(hist, `${Date.now()}.${PROJECT_EXT}`), readFileSync(target));
-        for (const f of readdirSync(hist).sort().slice(0, -20)) rmSync(join(hist, f), { force: true });
+        for (const f of readdirSync(hist).sort().slice(0, -20))
+          rmSync(join(hist, f), { force: true });
       }
       writeFileSync(target, JSON.stringify(toStored(project, dirname(target)), null, 1), 'utf8');
       videoPaths.add(target);
@@ -916,16 +965,24 @@ function registerIpc(): void {
     videoPaths.add(target);
     return { path: target, project };
   });
-  handle('video:autosave', z.tuple([projectArg.nullable(), absPath.nullable()]), (_w, project, path) => {
-    const file = join(videoDir(), 'autosave.json');
-    if (!project) return void rmSync(file, { force: true });
-    writeFileSync(file, JSON.stringify({ savedAt: Date.now(), path, project }), 'utf8');
-  });
+  handle(
+    'video:autosave',
+    z.tuple([projectArg.nullable(), absPath.nullable()]),
+    (_w, project, path) => {
+      const file = join(videoDir(), 'autosave.json');
+      if (!project) return void rmSync(file, { force: true });
+      writeFileSync(file, JSON.stringify({ savedAt: Date.now(), path, project }), 'utf8');
+    },
+  );
   handle('video:recover', z.tuple([]), () => {
     const file = join(videoDir(), 'autosave.json');
     if (!isFile(file)) return null;
     try {
-      const j = JSON.parse(readFileSync(file, 'utf8')) as { savedAt: number; path: string | null; project: unknown };
+      const j = JSON.parse(readFileSync(file, 'utf8')) as {
+        savedAt: number;
+        path: string | null;
+        project: unknown;
+      };
       if (!validProject(j.project)) return null;
       // Autosaves keep absolute paths (no project folder to be relative to).
       const project = fromStored(j.project, j.path ? dirname(j.path) : videoDir());
@@ -951,7 +1008,9 @@ function registerIpc(): void {
       filters: [{ name: 'MP4 (H.264)', extensions: ['mp4'] }],
     });
     if (r.canceled || !r.filePath) return null;
-    const out = resolve(r.filePath.toLowerCase().endsWith('.mp4') ? r.filePath : `${r.filePath}.mp4`);
+    const out = resolve(
+      r.filePath.toLowerCase().endsWith('.mp4') ? r.filePath : `${r.filePath}.mp4`,
+    );
     videoOutputs.add(out);
     return out;
   });
@@ -966,10 +1025,13 @@ function registerIpc(): void {
     return job;
   });
   handle('video:jobs', z.tuple([]), () => videoService().list());
-  handle('video:cancel', z.tuple([z.string().max(64)]), (_w, jobId) => videoService().cancel(jobId));
+  handle('video:cancel', z.tuple([z.string().max(64)]), (_w, jobId) =>
+    videoService().cancel(jobId),
+  );
   handle('video:reveal', z.tuple([absPath]), (_w, p) => {
     const target = resolve(p);
-    if (isFile(target) && (videoOutputs.has(target) || videoPaths.has(target))) shell.showItemInFolder(target);
+    if (isFile(target) && (videoOutputs.has(target) || videoPaths.has(target)))
+      shell.showItemInFolder(target);
   });
   handle('video:cacheSize', z.tuple([]), () => videoService().cacheSize());
   handle('video:clearCache', z.tuple([]), () => videoService().clearCache());
@@ -1258,7 +1320,14 @@ function registerIpc(): void {
   handle('gcloud:services', z.tuple([gproj, z.boolean()]), (_w, p, all) => gcloud.services(p, all));
   handle(
     'gcloud:setService',
-    z.tuple([gproj, z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/).max(200), z.boolean()]),
+    z.tuple([
+      gproj,
+      z
+        .string()
+        .regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/)
+        .max(200),
+      z.boolean(),
+    ]),
     (_w, p, svc, on) => gcloud.setService(p, svc, on),
   );
   handle('gcloud:datasets', z.tuple([gproj]), (_w, p) => gcloud.datasets(p));
@@ -1514,7 +1583,11 @@ function registerIpc(): void {
           .array(
             z.object({
               mediaType: z.enum(IMAGE_TYPES),
-              data: z.string().min(1).max(MAX_IMAGE_B64).regex(/^[A-Za-z0-9+/=]+$/),
+              data: z
+                .string()
+                .min(1)
+                .max(MAX_IMAGE_B64)
+                .regex(/^[A-Za-z0-9+/=]+$/),
             }),
           )
           .max(MAX_IMAGES)
@@ -1801,7 +1874,8 @@ function registerIpc(): void {
     try {
       const status = await phone.start();
       if (status.running) bots.attach();
-      for (const o of wins.values()) send(o, { type: 'whatsapp:status', status: whatsapp.status() });
+      for (const o of wins.values())
+        send(o, { type: 'whatsapp:status', status: whatsapp.status() });
       return status;
     } catch (e) {
       phoneOwner = undefined;
@@ -1826,10 +1900,14 @@ function registerIpc(): void {
   });
   const botKind = z.enum(['telegram', 'discord']) satisfies z.ZodType<BotKind>;
   handle('bots:status', z.tuple([]), () => bots.status());
-  handle('bots:connect', z.tuple([botKind, z.string().trim().min(20).max(300)]), (w, kind, token) => {
-    if (phoneOwner !== w) throw new Error('Activa primero el control desde el celular.');
-    return bots.connect(kind, token);
-  });
+  handle(
+    'bots:connect',
+    z.tuple([botKind, z.string().trim().min(20).max(300)]),
+    (w, kind, token) => {
+      if (phoneOwner !== w) throw new Error('Activa primero el control desde el celular.');
+      return bots.connect(kind, token);
+    },
+  );
   handle('bots:disconnect', z.tuple([botKind]), (_w, kind) => bots.disconnect(kind));
 
   handle('whatsapp:status', z.tuple([]), () => whatsapp.status());
@@ -1849,8 +1927,10 @@ function registerIpc(): void {
   handle('whatsapp:control', z.tuple([z.boolean()]), (_w, on) => whatsapp.setControl(on));
   handle('whatsapp:useCurrent', z.tuple([]), () => whatsapp.useCurrent());
   handle('whatsapp:forget', z.tuple([]), () => whatsapp.forget());
-  handle('whatsapp:who', z.tuple([z.string().max(200), z.enum(['me', 'them', 'all'])]), (_w, id, who) =>
-    whatsapp.setWho(id, who),
+  handle(
+    'whatsapp:who',
+    z.tuple([z.string().max(200), z.enum(['me', 'them', 'all'])]),
+    (_w, id, who) => whatsapp.setWho(id, who),
   );
   handle('whatsapp:remove', z.tuple([z.string().max(200)]), (_w, id) => whatsapp.remove(id));
   handle('whatsapp:test', z.tuple([z.string().max(200).optional()]), (_w, id) => whatsapp.test(id));
@@ -1858,7 +1938,11 @@ function registerIpc(): void {
   const watchPatch = z
     .object({
       enabled: z.boolean(),
-      everyMin: z.number().int().min(15).max(7 * 24 * 60),
+      everyMin: z
+        .number()
+        .int()
+        .min(15)
+        .max(7 * 24 * 60),
       maxPerDay: z.number().int().min(1).max(48),
       model: z.string().min(3).max(200).nullable(),
     })
@@ -1886,8 +1970,10 @@ function registerIpc(): void {
     z.tuple([memoryText, z.enum(['global', 'project'])]),
     (w, text, scope) => knowledge.addMemory(text, scope, w.workspace?.root),
   );
-  handle('knowledge:updateMemory', z.tuple([z.string().min(1).max(64), memoryText]), (_w, id, text) =>
-    knowledge.updateMemory(id, text),
+  handle(
+    'knowledge:updateMemory',
+    z.tuple([z.string().min(1).max(64), memoryText]),
+    (_w, id, text) => knowledge.updateMemory(id, text),
   );
   handle('knowledge:removeMemory', z.tuple([z.string().min(1).max(64)]), (_w, id) =>
     knowledge.removeMemory(id),
@@ -1947,7 +2033,8 @@ function registerIpc(): void {
 /** The visual editor of the window's open folder (it must be opened again for another folder). */
 function designOf(w: Win): DesignSession {
   const root = w.workspace?.root;
-  if (!w.design || w.design.root !== root) throw new EditError('Abre el Panel de Edición de nuevo.');
+  if (!w.design || w.design.root !== root)
+    throw new EditError('Abre el Panel de Edición de nuevo.');
   return w.design.session;
 }
 
@@ -2164,7 +2251,11 @@ function buildMenu(): void {
           click: cmd('terminal.toChat'),
         },
         { label: 'Chat de IA', accelerator: 'CmdOrCtrl+Alt+I', click: cmd('view.chat') },
-        { label: 'Zinarix Video Studio', accelerator: 'CmdOrCtrl+Shift+V', click: cmd('video.toggle') },
+        {
+          label: 'Zinarix Video Studio',
+          accelerator: 'CmdOrCtrl+Shift+V',
+          click: cmd('video.toggle'),
+        },
         { label: 'Alternar tema claro/oscuro', click: cmd('view.toggleTheme') },
         { type: 'separator' },
         { label: 'Agrandar todo', accelerator: 'CmdOrCtrl+=', click: () => stepZoom(1) },
@@ -2464,8 +2555,7 @@ app.whenReady().then(async () => {
         body: `${report.items.length} sugerencia(s): ${report.items[0]!.title}`,
       });
       n.on('click', () => {
-        const w =
-          [...wins.values()].find((x) => x.workspace?.root === report.project) ?? focused();
+        const w = [...wins.values()].find((x) => x.workspace?.root === report.project) ?? focused();
         if (!w) return;
         if (w.win.isMinimized()) w.win.restore();
         w.win.focus();

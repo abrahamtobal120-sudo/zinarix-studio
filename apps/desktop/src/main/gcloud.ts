@@ -23,6 +23,8 @@ import type {
 
 export const CLOUD_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 const MAX_ROWS = 500;
+/** Upper bound of bytes a BigQuery query from the panel may bill (10 GB, about US$0.06). */
+const MAX_BYTES_BILLED = 10 * 1024 ** 3;
 
 /** APIs the panel and the chat tools use: turned on by themselves in the chosen project. */
 export const NEEDED_APIS = [
@@ -251,7 +253,10 @@ export class GCloud {
     return (j.tables ?? []).map((x) => ({ id: x.tableReference.tableId, type: x.type ?? 'TABLE' }));
   }
 
-  /** Runs standard SQL on BigQuery (billed to the project) and returns up to MAX_ROWS rows. */
+  /**
+   * Runs standard SQL on BigQuery (billed to the project) and returns up to MAX_ROWS rows.
+   * Queries that would bill more than MAX_BYTES_BILLED fail instead of running.
+   */
   async query(project: string, sql: string): Promise<GCloudQueryResult> {
     const p = enc(checkProject(project));
     const started = Date.now();
@@ -268,7 +273,14 @@ export class GCloud {
       `https://bigquery.googleapis.com/bigquery/v2/projects/${p}/queries`,
       {
         method: 'POST',
-        body: { query: sql, useLegacySql: false, maxResults: MAX_ROWS, timeoutMs: 30_000 },
+        body: {
+          query: sql,
+          useLegacySql: false,
+          maxResults: MAX_ROWS,
+          timeoutMs: 30_000,
+          // Cost guard: BigQuery refuses (without billing) a query that would scan more than this.
+          maximumBytesBilled: String(MAX_BYTES_BILLED),
+        },
       },
     );
     // Long queries: wait for the job (up to about two minutes).

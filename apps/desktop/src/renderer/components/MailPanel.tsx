@@ -101,7 +101,9 @@ const quote = (text: string) =>
 
 /** The email HTML inside a document that opens links outside and has a light page. */
 function srcDoc(html: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:10px;font:14px/1.45 system-ui,sans-serif;color:#202124;background:#fff;word-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>${html}</body></html>`;
+  // Explicit policy (not only the one inherited from the app): no scripts, no remote loads
+  // (tracking pixels), only inline styles and embedded images.
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'"><base target="_blank"><style>body{margin:10px;font:14px/1.45 system-ui,sans-serif;color:#202124;background:#fff;word-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>${html}</body></html>`;
 }
 
 export function MailPanel() {
@@ -122,6 +124,7 @@ function MailBody({ reset }: { reset: () => void }) {
   const [gReady, setGReady] = useState<boolean | null>(null);
   const [gSetup, setGSetup] = useState(false);
   const [gClient, setGClient] = useState({ id: '', secret: '' });
+  const [listError, setListError] = useState<string | null>(null);
   const [folders, setFolders] = useState<MailFolderView[]>([]);
   const [folder, setFolder] = useState(() => localStorage.getItem(FOLDER_KEY) ?? 'INBOX');
   const [query, setQuery] = useState('');
@@ -180,14 +183,19 @@ function MailBody({ reset }: { reset: () => void }) {
       try {
         const r = await api().mail.list(folder, next, search);
         if (req !== listRequest.current) return;
+        setListError(null);
         setList((cur) =>
           more && cur ? { total: r.total, messages: [...cur.messages, ...r.messages] } : r,
         );
         setPage(next);
       } catch (e) {
         if (req !== listRequest.current) return;
-        toast(errText(e));
-        if (!more) setList({ total: 0, messages: [] });
+        if (more) toast(errText(e));
+        else {
+          // Shown in the list (with a retry), not as an empty mailbox.
+          setListError(errText(e));
+          setList({ total: 0, messages: [] });
+        }
       }
     },
     [folder, search, page],
@@ -460,11 +468,12 @@ function MailBody({ reset }: { reset: () => void }) {
   );
 
   if (!st.connected || adding) {
-    const field = (key: keyof MailAccount, ph: string, type = 'text') => (
+    const field = (key: keyof MailAccount, ph: string, type = 'text', label = ph) => (
       <input
         type={type}
         value={String(form[key] ?? '')}
         placeholder={ph}
+        aria-label={label}
         spellCheck={false}
         onChange={(e) =>
           setForm({ ...form, [key]: type === 'number' ? Number(e.target.value) : e.target.value })
@@ -509,6 +518,7 @@ function MailBody({ reset }: { reset: () => void }) {
               </button>
               <input
                 value={gClient.id}
+                aria-label={t('mlClientIdPh')}
                 placeholder={t('mlClientIdPh')}
                 spellCheck={false}
                 onChange={(e) => setGClient({ ...gClient, id: e.target.value })}
@@ -516,6 +526,7 @@ function MailBody({ reset }: { reset: () => void }) {
               <input
                 type="password"
                 value={gClient.secret}
+                aria-label={t('mlClientSecretPh')}
                 placeholder={t('mlClientSecretPh')}
                 onChange={(e) => setGClient({ ...gClient, secret: e.target.value })}
               />
@@ -540,6 +551,7 @@ function MailBody({ reset }: { reset: () => void }) {
           <input
             type="email"
             value={form.email}
+            aria-label={t('mlEmail')}
             placeholder={t('mlEmail')}
             spellCheck={false}
             onChange={(e) =>
@@ -555,6 +567,7 @@ function MailBody({ reset }: { reset: () => void }) {
           <input
             type="password"
             value={pass}
+            aria-label={t('mlPassword')}
             placeholder={t('mlPassword')}
             onChange={(e) => setPass(e.target.value)}
             onKeyDown={(e) => {
@@ -570,12 +583,12 @@ function MailBody({ reset }: { reset: () => void }) {
             <div className="ml-servers">
               {field('user', t('mlUser'))}
               <div className="ml-hostport">
-                {field('imapHost', 'imap.servidor.com')}
-                {field('imapPort', '993', 'number')}
+                {field('imapHost', 'imap.servidor.com', 'text', t('mlImapHost'))}
+                {field('imapPort', '993', 'number', t('mlImapPort'))}
               </div>
               <div className="ml-hostport">
-                {field('smtpHost', 'smtp.servidor.com')}
-                {field('smtpPort', '465', 'number')}
+                {field('smtpHost', 'smtp.servidor.com', 'text', t('mlSmtpHost'))}
+                {field('smtpPort', '465', 'number', t('mlSmtpPort'))}
               </div>
             </div>
           )}
@@ -608,6 +621,7 @@ function MailBody({ reset }: { reset: () => void }) {
         <div className="vc-form ml-compose">
           <input
             value={draft.to}
+            aria-label={t('mlTo')}
             placeholder={t('mlTo')}
             spellCheck={false}
             autoFocus={!draft.to}
@@ -615,17 +629,20 @@ function MailBody({ reset }: { reset: () => void }) {
           />
           <input
             value={draft.cc ?? ''}
+            aria-label={t('mlCc')}
             placeholder={t('mlCc')}
             spellCheck={false}
             onChange={(e) => set({ cc: e.target.value })}
           />
           <input
             value={draft.subject}
+            aria-label={t('mlSubject')}
             placeholder={t('mlSubject')}
             onChange={(e) => set({ subject: e.target.value })}
           />
           <textarea
             value={draft.text}
+            aria-label={t('mlBody')}
             placeholder={t('mlBody')}
             autoFocus={!!draft.to}
             onChange={(e) => set({ text: e.target.value })}
@@ -843,6 +860,7 @@ function MailBody({ reset }: { reset: () => void }) {
       <div className="vc-toolbar">
         <input
           value={query}
+          aria-label={t('mlSearch')}
           placeholder={t('mlSearch')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -866,7 +884,17 @@ function MailBody({ reset }: { reset: () => void }) {
             <Icon name="clock" size={13} className="spin-slow" /> {t('mlLoading')}
           </div>
         )}
-        {list?.messages.length === 0 && <div className="git-clean">{t('mlEmpty')}</div>}
+        {listError && (
+          <div className="git-clean" role="alert">
+            {t('mlListError', { error: listError })}{' '}
+            <button className="link" onClick={() => void loadList()}>
+              {t('svcRetry')}
+            </button>
+          </div>
+        )}
+        {!listError && list?.messages.length === 0 && (
+          <div className="git-clean">{t('mlEmpty')}</div>
+        )}
         {list?.messages.map((m) => (
           <div
             key={m.uid}

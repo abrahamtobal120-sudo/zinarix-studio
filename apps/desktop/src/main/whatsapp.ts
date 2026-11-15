@@ -7,6 +7,11 @@ import type { WhatsAppChat, WhatsAppEvent, WhatsAppStatus, WhatsAppWho } from '.
 const URL_HOME = 'https://web.whatsapp.com/';
 const PARTITION = 'persist:zinarix-whatsapp';
 const POLL_MS = 1500;
+/** Error codes thrown to the panel, which shows them translated. */
+const ERR_NO_CHAT = 'wa:noChat';
+const ERR_OPEN_CHAT = 'wa:openChat';
+/** Answers that approve a pending action (same words bots.ts accepts). */
+const APPROVE = /^(s[ií]|ok|aprobar|apruebo|yes|y)$/i;
 /** Marks the messages Zinarix writes, so they are never read back as orders. */
 const MARK = '[Zinarix]';
 /** Longest message WhatsApp Web takes comfortably in one go. */
@@ -412,7 +417,7 @@ export class WhatsApp {
   }
 
   setControl(on: boolean): WhatsAppStatus {
-    if (on && !this.chats.length) throw new Error('Agrega primero un chat permitido.');
+    if (on && !this.chats.length) throw new Error(ERR_NO_CHAT);
     this.saved.control = on;
     this.save();
     this.primed.clear();
@@ -429,10 +434,11 @@ export class WhatsApp {
     if (now?.chat) this.current = { id: now.chat, title: now.title };
     const cur = now?.chat ? this.current : undefined;
     if (!cur?.id)
-      throw new Error('Abre a la izquierda el chat que quieres permitir y escribe algo en él primero.');
+      throw new Error(ERR_OPEN_CHAT);
     if (!this.chats.some((c) => c.id === cur.id)) {
-      // With yourself every message is yours; with someone else, their messages are the orders.
-      const who: WhatsAppWho = SELF.test(cur.title) ? 'me' : 'them';
+      // Only the user's own messages are orders until they choose otherwise (the panel asks
+      // for a confirmation before letting another person command the computer).
+      const who: WhatsAppWho = 'me';
       this.saved.chats = [...this.chats, { id: cur.id, title: cur.title, who }];
     }
     this.saved.control = true;
@@ -469,7 +475,7 @@ export class WhatsApp {
   /** Writes a test message in an allowed chat (opened when needed). */
   test(id?: string): WhatsAppStatus {
     const c = this.chats.find((x) => x.id === id) ?? this.chats[0];
-    if (!c) throw new Error('Agrega primero un chat permitido.');
+    if (!c) throw new Error(ERR_NO_CHAT);
     this.queue(
       c.id,
       'Conectado. Escríbeme aquí lo que quieras pedirle a la IA, o /ayuda para ver los comandos.',
@@ -636,6 +642,16 @@ export class WhatsApp {
       this.seen.add(key(m.id));
       if (!this.from(chat, m)) continue;
       this.note('in', m.text, chat.id);
+      // Another person may give orders, but never approve what the AI asks permission for:
+      // that stays with the computer or the paired phone (otherwise they would approve their
+      // own requests). Their "no" still goes through: denying is always safe.
+      if (!m.mine && APPROVE.test(m.text.trim())) {
+        this.queue(
+          chat.id,
+          'Solo el dueño de la computadora puede aprobar acciones (desde Zinarix o su celular vinculado).',
+        );
+        continue;
+      }
       if (!this.deps.incoming(chat.id, m.text))
         this.queue(
           chat.id,

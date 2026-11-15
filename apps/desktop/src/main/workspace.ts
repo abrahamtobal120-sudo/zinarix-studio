@@ -232,8 +232,11 @@ function isLink(p: string): boolean {
 
 function gitBranch(cwd: string): Promise<string | null> {
   return new Promise((res) =>
-    execFile(bin('git'), ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, timeout: 2000 }, (err, stdout) =>
-      res(err ? null : stdout.trim() || null),
+    execFile(
+      bin('git'),
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd, timeout: 2000 },
+      (err, stdout) => res(err ? null : stdout.trim() || null),
     ),
   );
 }

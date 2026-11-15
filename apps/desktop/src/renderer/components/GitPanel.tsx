@@ -11,7 +11,8 @@ import type {
 } from '../../shared/api';
 import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
-import { t } from '../i18n';
+import { t, type Key } from '../i18n';
+import { errText } from '../errText';
 import { api, askText, openFile, setState, toast, useStore } from '../store';
 import { runInTerminal } from './Terminal';
 import { fileIcon } from './icons';
@@ -33,8 +34,27 @@ function badge(f: GitFileView, staged: boolean): { letter: string; cls: string }
   return { letter, cls };
 }
 
-const errText = (e: unknown) =>
-  String((e as Error).message ?? e).replace(/^Error invoking[^:]*: (Error: )?/, '');
+/** Translated text for the operation in progress (busy ids are internal). */
+const BUSY_KEYS = {
+  init: 'gitBusyInit',
+  commit: 'gitBusyCommit',
+  ai: 'gitBusyAi',
+  stage: 'gitBusyStage',
+  discard: 'gitBusyDiscard',
+  sync: 'gitBusySync',
+  pull: 'gitBusyPull',
+  push: 'gitBusyPush',
+  fetch: 'gitBusyFetch',
+  stash: 'gitBusyStash',
+  remote: 'gitBusyRemote',
+  undo: 'gitBusyUndo',
+  revert: 'gitBusyRevert',
+  branch: 'gitBusyBranch',
+  checkout: 'gitBusyCheckout',
+  merge: 'gitBusyMerge',
+} as const satisfies Record<string, Key>;
+const busyText = (id: string): string =>
+  id in BUSY_KEYS ? t(BUSY_KEYS[id as keyof typeof BUSY_KEYS]) : id;
 
 export function GitPanel() {
   const workspace = useStore((s) => s.workspace);
@@ -50,6 +70,9 @@ export function GitPanel() {
   const [stashes, setStashes] = useState<GitStashView[]>([]);
   const [pr, setPr] = useState<GitHubPrView | null>(null);
   const [filter, setFilter] = useState('');
+  // A list (history, branches, stash) that failed to load: shown with a retry, not as empty.
+  const [listErr, setListErr] = useState<string | null>(null);
+  const [listTry, setListTry] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!workspace) return;
@@ -66,14 +89,19 @@ export function GitPanel() {
     void refresh();
   }, [refresh, fsVersion]);
   useEffect(() => {
-    void api().github.status().then(setGh);
+    void api()
+      .github.status()
+      .then(setGh)
+      .catch(() => {});
   }, []);
   useEffect(() => {
     if (!st?.isRepo) return;
-    if (view === 'history') void api().git.log().then(setLog);
-    if (view === 'branches') void api().git.branches().then(setBranches);
-    if (view === 'stash') void api().git.stashList().then(setStashes);
-  }, [view, st?.isRepo, st?.branch, fsVersion]);
+    setListErr(null);
+    const fail = (e: unknown) => setListErr(errText(e));
+    if (view === 'history') void api().git.log().then(setLog).catch(fail);
+    if (view === 'branches') void api().git.branches().then(setBranches).catch(fail);
+    if (view === 'stash') void api().git.stashList().then(setStashes).catch(fail);
+  }, [view, st?.isRepo, st?.branch, fsVersion, listTry]);
   useEffect(() => setFilter(''), [view]);
 
   // Quiet fetch when the panel opens, so "↓ behind" is real without pressing anything.
@@ -125,7 +153,7 @@ export function GitPanel() {
         <div className="sidebar-empty">
           <p>{t('noFolder')}</p>
           <button className="primary" onClick={() => setState({ modal: { kind: 'clone' } })}>
-            ⤓ {t('gitClone')}
+            <Icon name="download" size={14} /> {t('gitClone')}
           </button>
           <p />
           <button onClick={() => void api().workspace.openDialog()}>{t('openFolder')}</button>
@@ -150,7 +178,9 @@ export function GitPanel() {
             {t('gitInit')}
           </button>
           <p />
-          <button onClick={() => setState({ modal: { kind: 'clone' } })}>⤓ {t('gitClone')}</button>
+          <button onClick={() => setState({ modal: { kind: 'clone' } })}>
+            <Icon name="download" size={14} /> {t('gitClone')}
+          </button>
         </div>
       </div>
     );
@@ -212,13 +242,14 @@ export function GitPanel() {
           )}
           <button
             title={isStaged ? t('gitUnstage') : t('gitStage')}
+            aria-label={isStaged ? t('gitUnstage') : t('gitStage')}
             onClick={() =>
               void act('stage', () =>
                 isStaged ? api().git.unstage([f.path]) : api().git.stage([f.path]),
               )
             }
           >
-            {isStaged ? '−' : '+'}
+            <span aria-hidden="true">{isStaged ? '−' : '+'}</span>
           </button>
         </span>
         <span className={`git-badge ${b.cls}`}>{b.letter}</span>
@@ -234,6 +265,15 @@ export function GitPanel() {
     );
 
   const hasRemote = (st?.remotes.length ?? 0) > 0;
+
+  const listError = (
+    <div className="git-clean" role="alert">
+      <Icon name="warning" size={14} /> {t('uxLoadFailed', { err: listErr ?? '' })}{' '}
+      <button className="link" onClick={() => setListTry((n) => n + 1)}>
+        {t('uxRetry')}
+      </button>
+    </div>
+  );
 
   return (
     <div className="explorer git-panel">
@@ -462,7 +502,7 @@ export function GitPanel() {
           <div className="tree git-list">
             {busy && (
               <div className="git-busy">
-                <Icon name="clock" size={13} className="spin-slow" /> {busy}…
+                <Icon name="clock" size={13} className="spin-slow" /> {busyText(busy)}…
               </div>
             )}
             {staged.length > 0 && (
@@ -473,9 +513,10 @@ export function GitPanel() {
                   </span>
                   <button
                     title={t('gitUnstageAll')}
+                    aria-label={t('gitUnstageAll')}
                     onClick={() => void act('stage', () => api().git.unstage([]))}
                   >
-                    −
+                    <span aria-hidden="true">−</span>
                   </button>
                 </div>
                 {staged.map((f) => row(f, true))}
@@ -489,6 +530,7 @@ export function GitPanel() {
                 <span>
                   <button
                     title={t('gitDiscardAll')}
+                    aria-label={t('gitDiscardAll')}
                     onClick={async () => {
                       if (
                         !(await confirmDialog(t('gitDiscardAllConfirm', { n: unstaged.length }), {
@@ -503,9 +545,10 @@ export function GitPanel() {
                   </button>
                   <button
                     title={t('gitStageAll')}
+                    aria-label={t('gitStageAll')}
                     onClick={() => void act('stage', () => api().git.stage([]))}
                   >
-                    +
+                    <span aria-hidden="true">+</span>
                   </button>
                 </span>
               )}
@@ -553,7 +596,7 @@ export function GitPanel() {
               </button>
             </div>
           )}
-          {log.length === 0 && <div className="git-clean">{t('gitNoCommits')}</div>}
+          {listErr ? listError : log.length === 0 && <div className="git-clean">{t('gitNoCommits')}</div>}
           {log
             .filter((c) => matches(filter, c.subject, c.author, c.short, c.refs))
             .map((c) => (
@@ -651,6 +694,7 @@ export function GitPanel() {
               <Icon name="plus" size={15} />
             </button>
           </div>
+          {listErr && listError}
           {branches.length > 6 && (
             <div className="git-filter">
               <input
@@ -716,7 +760,10 @@ export function GitPanel() {
                           void act('branch', async () => {
                             await api()
                               .git.deleteBranch(b.name, false)
-                              .catch(async (e) => {
+                              .catch(async (e: unknown) => {
+                                // Only an unmerged branch can be forced (-D); any other
+                                // failure is shown as it is.
+                                if (!/not fully merged/i.test(errText(e))) throw e;
                                 if (!(await confirmDialog(t('gitForceDelete'), { danger: true })))
                                   throw e;
                                 await api().git.deleteBranch(b.name, true);
@@ -735,7 +782,7 @@ export function GitPanel() {
             ))}
           {hasRemote && (
             <button className="link git-fetch" onClick={() => void sync('fetch')}>
-              ⟳ {t('gitFetch')}
+              <Icon name="refresh" size={13} /> {t('gitFetch')}
             </button>
           )}
         </div>
@@ -743,7 +790,9 @@ export function GitPanel() {
 
       {view === 'stash' && (
         <div className="tree git-list">
-          {stashes.length === 0 && <div className="git-clean">{t('gitNoStash')}</div>}
+          {listErr
+            ? listError
+            : stashes.length === 0 && <div className="git-clean">{t('gitNoStash')}</div>}
           {stashes.map((x) => {
             const reload = async () => setStashes(await api().git.stashList());
             return (

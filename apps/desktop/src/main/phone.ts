@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { PhoneAction, PhoneRepo, PhoneSnapshot, PhoneStatus } from '../shared/api.js';
 import { PairingGuard, sameSecret } from './pairing.js';
 import type { PairChannel, PinCheck } from './pairing.js';
-import { phonePage } from './phonePage.js';
+import { phoneLang, phonePage } from './phonePage.js';
 import { Tunnel } from './tunnel.js';
 
 /** Preferred port (the phone keeps working after a restart); another one if it is taken. */
@@ -298,7 +298,7 @@ export class PhoneRemote {
           'Referrer-Policy': 'no-referrer',
           'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
         });
-        return void res.end(phonePage(nonce));
+        return void res.end(phonePage(nonce, phoneLang(req.headers['accept-language'])));
       }
       if (req.method === 'POST' && url.pathname === '/api/pair') {
         const { pin, key } = z

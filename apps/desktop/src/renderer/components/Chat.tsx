@@ -1,4 +1,4 @@
-import { memo, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type {
   ChatContext,
@@ -12,7 +12,9 @@ import type {
 } from '../../shared/api';
 import { pressable } from '../a11y';
 import { confirmDialog } from '../confirm';
-import { t } from '../i18n';
+import { errText } from '../errText';
+import { formatUsd } from '../format';
+import { lang, t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import { monacoTheme } from '../themes';
 import {
@@ -43,7 +45,7 @@ import {
   useStore,
   type ChatTab,
 } from '../store';
-import { runCommand } from '../commands';
+import { commands, runCommand } from '../commands';
 import { fileIcon } from './icons';
 import { Icon, TONE, type IconName } from './Icon';
 import { OfflineGames, useOnline } from './OfflineGames';
@@ -51,6 +53,7 @@ import { tv } from './video/strings';
 import { openStudio } from './video/videoStore';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory, when } from './ChatHistory';
+import { SendButton, useDismiss, menuArrows } from './ChatSendMenu';
 import { Markdown } from './Markdown';
 import { listTerminals, sendTerminalToChat, type TerminalSession } from './Terminal';
 
@@ -110,7 +113,7 @@ function readImage(file: File): Promise<PendingImage> {
     r.onload = () => {
       const url = String(r.result);
       const i = url.indexOf(',');
-      ok({ mediaType: file.type, data: url.slice(i + 1), name: file.name || 'imagen' });
+      ok({ mediaType: file.type, data: url.slice(i + 1), name: file.name || t('chatImageName') });
     };
     r.onerror = () => fail(r.error ?? new Error('read failed'));
     r.readAsDataURL(file);
@@ -125,7 +128,10 @@ function newTurnId(): string {
 
 /** "/" commands of the message box: a ready-made prompt (or an action). */
 interface Slash {
+  /** Spanish name (also accepted when the interface is in English). */
   name: string;
+  /** English name (also accepted when the interface is in Spanish). */
+  en: string;
   hint: string;
   prompt?: string;
   agent?: boolean;
@@ -133,20 +139,31 @@ interface Slash {
 }
 function slashCommands(): Slash[] {
   return [
-    { name: 'explicar', hint: t('slashExplain'), prompt: t('slashExplainPrompt') },
-    { name: 'revisar', hint: t('slashReview'), prompt: t('slashReviewPrompt') },
-    { name: 'arreglar', hint: t('slashFix'), prompt: t('slashFixPrompt'), agent: true },
-    { name: 'pruebas', hint: t('slashTests'), prompt: t('slashTestsPrompt'), agent: true },
-    { name: 'docs', hint: t('slashDocs'), prompt: t('slashDocsPrompt') },
-    { name: 'optimizar', hint: t('slashOptimize'), prompt: t('slashOptimizePrompt') },
-    { name: 'seguridad', hint: t('slashSecurity'), prompt: t('slashSecurityPrompt') },
-    { name: 'commit', hint: t('slashCommit'), action: 'commit' },
-    { name: 'reglas', hint: t('rulesEdit'), action: 'rules' },
-    { name: 'agente', hint: t('slashAgent'), action: 'agent' },
-    { name: 'chat', hint: t('slashChat'), action: 'chat' },
-    { name: 'nuevo', hint: t('newChat'), action: 'new' },
-    { name: 'indexar', hint: t('slashIndexDocs'), action: 'docs' },
+    { name: 'explicar', en: 'explain', hint: t('slashExplain'), prompt: t('slashExplainPrompt') },
+    { name: 'revisar', en: 'review', hint: t('slashReview'), prompt: t('slashReviewPrompt') },
+    { name: 'arreglar', en: 'fix', hint: t('slashFix'), prompt: t('slashFixPrompt'), agent: true },
+    { name: 'pruebas', en: 'tests', hint: t('slashTests'), prompt: t('slashTestsPrompt'), agent: true },
+    { name: 'docs', en: 'docs', hint: t('slashDocs'), prompt: t('slashDocsPrompt') },
+    { name: 'optimizar', en: 'optimize', hint: t('slashOptimize'), prompt: t('slashOptimizePrompt') },
+    { name: 'seguridad', en: 'security', hint: t('slashSecurity'), prompt: t('slashSecurityPrompt') },
+    { name: 'commit', en: 'commit', hint: t('slashCommit'), action: 'commit' },
+    { name: 'reglas', en: 'rules', hint: t('rulesEdit'), action: 'rules' },
+    { name: 'agente', en: 'agent', hint: t('slashAgent'), action: 'agent' },
+    { name: 'chat', en: 'chat', hint: t('slashChat'), action: 'chat' },
+    { name: 'nuevo', en: 'new', hint: t('newChat'), action: 'new' },
+    { name: 'indexar', en: 'index', hint: t('slashIndexDocs'), action: 'docs' },
   ];
+}
+
+/** Name of a "/" command in the interface language (the other one also works). */
+function slashName(c: Slash): string {
+  return lang === 'en' ? c.en : c.name;
+}
+
+/** The "/" command typed, in either language. */
+function findSlash(name: string): Slash | undefined {
+  const n = name.toLowerCase();
+  return slashCommands().find((c) => c.name === n || c.en === n);
 }
 
 /** Workspace files mentioned as "@path" in a prompt (only paths that exist). */
@@ -360,12 +377,16 @@ function metaLine(m: {
   outputTokens: number;
   latencyMs: number;
 }): string {
-  return `${m.inputTokens}→${m.outputTokens} tok · ${fmtUsd(m.usd)} · ${(m.latencyMs / 1000).toFixed(1)}s`;
+  return `${m.inputTokens}→${m.outputTokens} ${t('chatTokens')} · ${fmtUsd(m.usd)} · ${(m.latencyMs / 1000).toFixed(1)}s`;
 }
 
 function fmtUsd(n: number | null): string {
-  if (n === null) return '–';
-  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+  return n === null ? '–' : formatUsd(n);
+}
+
+/** Shortcut of a command as shown in the menus (the user's own one if changed; ⌘ on macOS). */
+function shortcutOf(id: string): string {
+  return commands().find((c) => c.id === id)?.keys ?? '';
 }
 
 const SUGGEST_ICON = {
@@ -658,7 +679,7 @@ const ToolCard = memo(function ToolCard({
         </div>
       )}
       {step.status === 'approval' && (
-        <div className="tool-actions">
+        <div className="tool-actions" role="alert" aria-label={t('approve')}>
           <button className="primary" onClick={() => onDecide('approve')}>
             <Icon name="check" size={14} /> {t('approve')}
           </button>
@@ -762,6 +783,12 @@ const ReasoningBlock = memo(function ReasoningBlock({
   );
 });
 
+/** Errors that a missing, wrong or expired API key causes (provider texts vary a lot). */
+const AUTH_ERROR =
+  /\b40[13]\b|api[\s_-]?key|\bkeys?\b|clave|llave|unauthori[sz]ed|authenticat|autentica|credential|credencial|forbidden|permission denied/i;
+/** Errors of a model that cannot call tools (agent mode then needs another model). */
+const TOOLS_ERROR = /tool|function|herramienta/i;
+
 const TurnView = memo(function TurnView({
   turn,
   live,
@@ -847,14 +874,14 @@ const TurnView = memo(function TurnView({
             </div>
           )}
           {turn.error && (
-            <div className="turn-error">
+            <div className="turn-error" role="alert">
               <Icon name="warning" size={14} /> {turn.error}
-              {/key|llave|401/i.test(turn.error) && (
+              {AUTH_ERROR.test(turn.error) && (
                 <button onClick={() => setState({ modal: { kind: 'providers' } })}>
                   {t('providers')}
                 </button>
               )}
-              {/tool|function/i.test(turn.error) && agentMode && (
+              {TOOLS_ERROR.test(turn.error) && agentMode && (
                 <button onClick={actions.agentOff}>{t('agentOff')}</button>
               )}
             </div>
@@ -971,6 +998,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
   const attachments = useStore((s) => s.chatAttachments);
   const [termMenu, setTermMenu] = useState<TerminalSession[] | null>(null);
+  const termMenuEl = useRef<HTMLDivElement>(null);
+  const termMenuBtn = useRef<HTMLButtonElement>(null);
+  const closeTermMenu = useCallback(() => setTermMenu(null), []);
+  useDismiss(termMenu !== null, closeTermMenu, [termMenuEl, termMenuBtn], termMenuBtn);
+  useEffect(() => {
+    if (termMenu) termMenuEl.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [termMenu]);
   /** The requests streaming into their turns, with their event unsubscribe. */
   const runs = useRef(new Map<string, () => void>());
   const [suggest, setSuggest] = useState<Suggest | null>(null);
@@ -1029,7 +1063,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     try {
       data = await api().ai.conversation(cid);
     } catch (err) {
-      toast(String(err instanceof Error ? err.message : err));
+      toast(errText(err));
       return null;
     }
     if (!data) {
@@ -1419,7 +1453,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       if (!runs.current.has(requestId)) return;
       update((turn) => ({
         ...turn,
-        error: err instanceof Error ? err.message : String(err),
+        error: errText(err),
       }));
       finish();
     }
@@ -1614,7 +1648,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const runSlash = async (text: string): Promise<boolean> => {
     const m = /^\/(\S+)\s*([\s\S]*)$/.exec(text.trim());
     if (!m) return false;
-    const cmd = slashCommands().find((c) => c.name === m[1]!.toLowerCase());
+    const cmd = findSlash(m[1]!);
     if (!cmd) return false;
     const rest = m[2]!.trim();
     setInput('');
@@ -1655,7 +1689,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           const d = await api().knowledge.addDocs(name, url);
           toast(t('docsAdded', { name: d.name }));
         } catch (e) {
-          toast(e instanceof Error ? e.message : String(e));
+          toast(errText(e));
         }
         return true;
       }
@@ -1679,8 +1713,12 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (slash) {
       const q = slash[1]!.toLowerCase();
       const items = slashCommands()
-        .filter((c) => c.name.startsWith(q))
-        .map((c) => ({ id: c.name, label: `/${c.name}`, hint: c.hint }));
+        .filter((c) => c.name.startsWith(q) || c.en.startsWith(q))
+        .map((c) => {
+          // Typed in the other language: keep suggesting the name being typed.
+          const name = slashName(c).startsWith(q) ? slashName(c) : c.name.startsWith(q) ? c.name : c.en;
+          return { id: name, label: `/${name}`, hint: c.hint };
+        });
       return setSuggest(
         items.length ? { kind: 'slash', from: 0, to: caret, items, index: 0 } : null,
       );
@@ -1861,7 +1899,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     try {
       restored = await api().ai.revert(conversationId, ownFolder);
     } catch (err) {
-      toast(String(err instanceof Error ? err.message : err));
+      toast(errText(err));
       return;
     }
     for (const p of restored) await reloadFromDisk(p);
@@ -1871,6 +1909,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   const noProviders = models.length === 0 && !settings.defaultModel;
   const online = useOnline();
+  /** Providers that run on this machine (they keep working offline); read when offline. */
+  const [localProviders, setLocalProviders] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (online || localProviders) return;
+    void api()
+      .ai.providers()
+      .then((list) => setLocalProviders(list.filter((p) => p.local).map((p) => p.id)))
+      .catch(() => setLocalProviders([]));
+  }, [online, localProviders]);
   const lastUser = lastUserIndex();
 
   // The messages get one stable object whose functions call the latest closures: a new
@@ -1902,9 +1949,17 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   const shownModel =
     chatModel ?? (agentMode ? settings.roles.agent : undefined) ?? settings.defaultModel;
+  // Offline with a cloud model: say so above the box (not only in the empty chat).
+  const offlineBanner =
+    !online &&
+    !settings.localOnly &&
+    !(shownModel && localProviders?.includes(shownModel.split('/')[0]!));
 
   return (
     <div
+      id={`chat-pane-${id}`}
+      role="tabpanel"
+      aria-labelledby={`chat-tab-${id}`}
       className={`chat chat-session ${split && visible && focusedPane === pane ? 'focused' : ''}`}
       style={{ display: visible ? 'flex' : 'none', order: pane ?? 0 }}
       onMouseDown={() => {
@@ -1942,6 +1997,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       <div
         style={{ display: showHistory ? 'none' : undefined }}
         className="chat-scroll"
+        role="log"
+        aria-live="polite"
+        aria-busy={Boolean(busy)}
+        aria-label={t('chatMessages')}
         ref={scroller}
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -1993,9 +2052,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                 </div>
                 <p>{t('chatTips')}</p>
                 <p>
-                  Ctrl+L · {t('includeFile')}
+                  {shortcutOf('ai.askSelection')} · {t('includeFile')}
                   <br />
-                  Ctrl+K · {t('aiEdit')}
+                  {shortcutOf('ai.edit')} · {t('aiEdit')}
                 </p>
               </div>
             )}
@@ -2039,6 +2098,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           <button onClick={() => void revert()}>
             <Icon name="undo" size={13} /> {t('revert')}
           </button>
+        </div>
+      )}
+      {offlineBanner && (
+        <div className="chat-offline-banner" role="status">
+          <Icon name="warning" size={13} /> {t('chatOfflineBanner')}
         </div>
       )}
       <div
@@ -2096,10 +2160,18 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           </div>
         )}
         {termMenu && (
-          <div className="term-menu" onMouseLeave={() => setTermMenu(null)}>
+          <div
+            ref={termMenuEl}
+            className="term-menu"
+            role="menu"
+            aria-label={t('termPick')}
+            onMouseLeave={() => setTermMenu(null)}
+            onKeyDown={menuArrows}
+          >
             <div className="term-menu-title">{t('termPick')}</div>
             {termMenu.length === 0 ? (
               <button
+                role="menuitem"
                 onClick={() => {
                   setState({ panelOpen: true });
                   setTermMenu(null);
@@ -2111,6 +2183,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               termMenu.flatMap((term) => [
                 <button
                   key={`${term.id}:s`}
+                  role="menuitem"
                   onClick={() => {
                     sendTerminalToChat(term.id, 'session');
                     setTermMenu(null);
@@ -2122,6 +2195,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                 term.hasSelection && (
                   <button
                     key={`${term.id}:sel`}
+                    role="menuitem"
                     onClick={() => {
                       sendTerminalToChat(term.id, 'selection');
                       setTermMenu(null);
@@ -2199,6 +2273,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           value={input}
           rows={3}
           placeholder={agentMode && root ? t('agentPlaceholder') : t('askPlaceholder')}
+          aria-label={t('chatInputLabel')}
           onChange={(e) => {
             setInput(e.target.value);
             updateSuggest(e.target.value, e.target.selectionStart);
@@ -2297,9 +2372,12 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             </button>
           )}
           <button
+            ref={termMenuBtn}
             className={`term-pick ${termMenu ? 'on' : ''}`}
             title={t('termPick')}
             aria-label={t('termPick')}
+            aria-haspopup="menu"
+            aria-expanded={termMenu !== null}
             onClick={() => setTermMenu((m) => (m ? null : listTerminals()))}
           >
             <Icon name="terminal" size={15} />
@@ -2313,55 +2391,44 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             <span className="model-chip-label">{shownModel ?? t('noModel')}</span>
             <Icon name="chevronDown" size={12} />
           </button>
-          {input.trim() && (
-            <button
-              className="send-btn"
-              title={t('chatParallelHint')}
-              aria-label={t('chatParallel')}
-              onClick={sendParallel}
-            >
-              <Icon name="columns" size={15} />
-            </button>
+          {(!busy || input.trim()) && (
+            // One send button; "send now", "queue" and "in parallel" are in its menu.
+            <SendButton
+              busy={Boolean(busy)}
+              hasInput={Boolean(input.trim())}
+              onSend={() => void submit()}
+              onQueue={enqueue}
+              onParallel={sendParallel}
+            />
           )}
-          {busy && input.trim() && (
-            <button
-              className="send-btn"
-              title={t('chatQueueHint')}
-              aria-label={t('chatQueue')}
-              onClick={enqueue}
-            >
-              <Icon name="clock" size={15} />
-            </button>
-          )}
-          {busy && input.trim() && (
-            <button
-              className="primary send-btn"
-              title={t('chatAlongsideHint')}
-              aria-label={t('chatAlongside')}
-              onClick={() => void submit()}
-            >
-              <Icon name="send" size={16} />
-            </button>
-          )}
-          {busy ? (
+          {busy && (
             <button className="danger stop-btn" title={t('chatStopHint')} onClick={stop}>
               <Icon name="stop" size={13} /> {t('stop')}
-            </button>
-          ) : (
-            <button
-              className="primary send-btn"
-              disabled={!input.trim()}
-              title={`${t('send')} (Enter)`}
-              aria-label={t('send')}
-              onClick={() => void submit()}
-            >
-              <Icon name="send" size={16} />
             </button>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Closes the chat of a focused tab (Delete or Ctrl+W on it) and moves the keyboard focus to
+ * the tab that is shown next, so the user does not lose their place.
+ */
+export async function closeChatFromTab(id: string): Promise<void> {
+  await requestCloseChat(id);
+  requestAnimationFrame(() =>
+    document.querySelector<HTMLElement>('.chat-tabs [role="tab"][tabindex="0"]')?.focus(),
+  );
+}
+
+/** Chat of the tab with the keyboard focus (null when the focus is elsewhere). */
+export function focusedChatTab(): string | null {
+  const el = document.activeElement;
+  return el instanceof HTMLElement && el.matches('.chat-tabs [role="tab"]')
+    ? (el.dataset.chat ?? null)
+    : null;
 }
 
 /** Asks before closing a chat that is still working, then stops and closes it. */
@@ -2506,25 +2573,27 @@ function ChatProject({
       <div
         className={`chat-list-folder ${items.some((x) => x.c.id === focusedId) ? 'has-focus' : ''}`}
         title={folder ?? t('chatNoFolder')}
-        aria-expanded={open}
-        {...pressable(onToggle)}
       >
-        <Icon name={open ? 'chevronDown' : 'chevron'} size={11} />
-        <Icon name="folder" size={13} />
-        <span>{folder ? folderName(folder) : t('chatNoFolder')}</span>
-        {!open && (waiting || busy || unread) && (
-          <span className="chat-tab-status">
-            {waiting ? (
-              <Icon name="pause" size={11} />
-            ) : busy ? (
-              <span className="chat-tab-spin" />
-            ) : (
-              <span className="chat-tab-dot" />
-            )}
-          </span>
-        )}
-        {items.length > 0 && <em className="chat-list-count">{items.length}</em>}
+        {/* The row's own button (fold / unfold); its actions are siblings, not nested in it. */}
+        <button className="chat-list-folder-main" aria-expanded={open} onClick={onToggle}>
+          <Icon name={open ? 'chevronDown' : 'chevron'} size={11} />
+          <Icon name="folder" size={13} />
+          <span>{folder ? folderName(folder) : t('chatNoFolder')}</span>
+          {!open && (waiting || busy || unread) && (
+            <span className="chat-tab-status">
+              {waiting ? (
+                <Icon name="pause" size={11} />
+              ) : busy ? (
+                <span className="chat-tab-spin" />
+              ) : (
+                <span className="chat-tab-dot" />
+              )}
+            </span>
+          )}
+          {items.length > 0 && <em className="chat-list-count">{items.length}</em>}
+        </button>
         <button
+          aria-label={t('chatNewHere')}
           title={t('chatNewHere')}
           onClick={(e) => {
             e.stopPropagation();
@@ -2537,6 +2606,7 @@ function ChatProject({
         {!items.length && folder && folder !== windowRoot && (
           <button
             title={t('chatProjectHide')}
+            aria-label={t('chatProjectHide')}
             onClick={(e) => {
               e.stopPropagation();
               forgetProject(folder);
@@ -2562,7 +2632,9 @@ function ChatProject({
                 title={status ? `${label} · ${status}` : label}
                 draggable={Boolean(folder)}
                 onDragStart={(e) => startChatDrag(e, { chat: c.id, from: folder })}
-                {...pressable(() => selectChat(c.id))}
+                // Mouse: the whole row. Keyboard: the name is the button (the row holds the
+                // close button, and a button cannot hold another).
+                onClick={() => selectChat(c.id)}
                 onAuxClick={(e) => {
                   if (e.button === 1) void requestCloseChat(c.id);
                 }}
@@ -2579,10 +2651,24 @@ function ChatProject({
                     </span>
                   )}
                 </span>
-                <span className="chat-list-main">
+                <span
+                  className="chat-list-main"
+                  role="button"
+                  tabIndex={0}
+                  aria-current={shown ? 'true' : undefined}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      selectChat(c.id);
+                    } else if (e.key === 'Delete' && chats.length > 1) {
+                      e.preventDefault();
+                      void requestCloseChat(c.id);
+                    }
+                  }}
+                >
                   <span className="chat-tab-label">{label}</span>
                   <span className="chat-list-meta">
-                    {status || (c.model ? c.model.split('/').pop() : t('chatNoModel'))}
+                    {status ||(c.model ? c.model.split('/').pop() : t('chatNoModel'))}
                   </span>
                 </span>
                 {c.queued.length > 0 && (
@@ -2685,7 +2771,7 @@ function ChatList({ focusedId }: { focusedId: string }) {
       const conv = tab ? tab.conversationId : drag.conv;
       if (conv) await api().ai.moveConversation(conv, to);
     } catch (err) {
-      toast(String((err as Error).message ?? err));
+      toast(errText(err));
       return;
     }
     if (tab)
@@ -2736,6 +2822,36 @@ export function ChatPanel() {
     if (phoneOn) pushToPhone();
   }, [phoneOn, chats, focusedId]);
 
+  /** Tab that holds the keyboard focus stop (← / → move it; Enter shows that chat). */
+  const [rove, setRove] = useState<string | null>(null);
+  const roveId = rove && chats.some((c) => c.id === rove) ? rove : focusedId;
+  useEffect(() => setRove(null), [focusedId]);
+  const onTabsKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const tab = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
+    const cid = tab?.dataset.chat;
+    if (!tab || !cid || e.target !== tab) return;
+    const i = chats.findIndex((c) => c.id === cid);
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (i + 1) % chats.length;
+    else if (e.key === 'ArrowLeft') next = (i - 1 + chats.length) % chats.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = chats.length - 1;
+    else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      selectChat(cid);
+      return;
+    } else if (e.key === 'Delete' && chats.length > 1) {
+      e.preventDefault();
+      void closeChatFromTab(cid);
+      return;
+    }
+    if (next < 0) return;
+    e.preventDefault();
+    const to = chats[next]!.id;
+    setRove(to);
+    strip.current?.querySelector<HTMLElement>(`[data-chat="${CSS.escape(to)}"]`)?.focus();
+  };
+
   // Keep the focused tab in view when there are many.
   useEffect(() => {
     strip.current
@@ -2746,7 +2862,13 @@ export function ChatPanel() {
   return (
     <div className="chat chat-multi">
       <div className="panel-header chat-tabs-bar">
-        <div className="chat-tabs" role="tablist" ref={strip}>
+        <div
+          className="chat-tabs"
+          role="tablist"
+          aria-label={t('chatListTitle')}
+          ref={strip}
+          onKeyDown={onTabsKey}
+        >
           {chats.map((c, i) => {
             const shown = c.id === activeChat || c.id === split;
             const label = c.title || t('chatTabN', { n: i + 1 });
@@ -2754,8 +2876,12 @@ export function ChatPanel() {
             return (
               <div
                 key={c.id}
+                id={`chat-tab-${c.id}`}
+                data-chat={c.id}
                 role="tab"
+                tabIndex={c.id === roveId ? 0 : -1}
                 aria-selected={shown}
+                aria-controls={`chat-pane-${c.id}`}
                 className={`chat-tab ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
                 title={[label, c.folder && folderName(c.folder), status]
                   .filter(Boolean)
@@ -2770,6 +2896,8 @@ export function ChatPanel() {
                 {chats.length > 1 && (
                   <button
                     className="chat-tab-x"
+                    // Closed from the keyboard with Delete / Ctrl+W on the tab: one stop per tab.
+                    tabIndex={-1}
                     aria-label={t('chatCloseTab')}
                     title={t('chatCloseTab')}
                     onClick={(e) => {
@@ -2785,10 +2913,16 @@ export function ChatPanel() {
           })}
         </div>
         <span className="sidebar-actions">
-          <button title={t('chatListToggle')} className={list ? 'on' : ''} onClick={toggleChatList}>
+          <button
+            title={t('chatListToggle')}
+            aria-label={t('chatListToggle')}
+            aria-pressed={list}
+            className={list ? 'on' : ''}
+            onClick={toggleChatList}
+          >
             <Icon name="menu" size={15} />
           </button>
-          <button title={`${t('chatNewTab')} (Ctrl+Alt+N)`} onClick={() => newChat()}>
+          <button title={`${t('chatNewTab')} (${shortcutOf('chat.new')})`} onClick={() => newChat()}>
             <Icon name="plus" size={15} />
           </button>
           <button title={t('chatNewQuestion')} onClick={() => newQuestionChat()}>
@@ -2798,7 +2932,9 @@ export function ChatPanel() {
             <Icon name="folderPlus" size={15} />
           </button>
           <button
-            title={split ? t('chatUnsplit') : `${t('chatSplit')} (Ctrl+Alt+D)`}
+            title={split ? t('chatUnsplit') : `${t('chatSplit')} (${shortcutOf('chat.split')})`}
+            aria-label={t('chatSplit')}
+            aria-pressed={Boolean(split)}
             className={split ? 'on' : ''}
             onClick={toggleChatSplit}
           >
@@ -2806,6 +2942,8 @@ export function ChatPanel() {
           </button>
           <button
             title={t('histTitle')}
+            aria-label={t('histTitle')}
+            aria-pressed={historyFor === focusedId}
             className={historyFor === focusedId ? 'on' : ''}
             onClick={() =>
               setState({ chatHistoryFor: historyFor === focusedId ? null : focusedId })

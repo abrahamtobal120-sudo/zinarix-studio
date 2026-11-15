@@ -31,6 +31,9 @@
   --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 38%, transparent);
   --sel-soft: color-mix(in srgb, var(--brand) 18%, transparent);
   --elev: 0 2px 8px rgba(0, 0, 0, 0.35);
+  /* WhatsApp green, with dark text on it (white on #25d366 is 1.98:1). */
+  --wa: #25d366;
+  --wa-fg: #0b1a10;
 }
 :root[data-theme='light'] {
   --bg: #ffffff;
@@ -45,8 +48,6 @@
   --accent: #005fb8;
   --accent-hover: #0258a8;
   --accent-fg: #ffffff;
-  --focus: #005fb8;
-  --sel: #cce5ff;
   --hover: #e8e8e8;
   --status: #007acc;
   --status-fg: #ffffff;
@@ -66,6 +67,9 @@
   --elev: 0 2px 8px rgba(0, 0, 0, 0.1);
   --focus: #6d4df2;
   --sel: #e4e9ff;
+  /* WhatsApp green: darker in light themes so text and white-on-green pass AA. */
+  --wa: #0f7a6d;
+  --wa-fg: #ffffff;
 }
 
 * {
@@ -110,14 +114,24 @@ button {
     transform 0.06s ease;
 }
 button:hover {
-  background: var(--hover);
+  /* --hover is darker than --bg-4 in the dark theme, so mixing toward --fg always lightens
+     (dark) or darkens (light) the resting color instead of inverting the cue. */
+  background: color-mix(in srgb, var(--bg-4) 85%, var(--fg) 15%);
 }
 button:active {
   transform: translateY(0.5px);
 }
-button:focus-visible {
-  outline: none;
-  box-shadow: var(--ring);
+/* Focus ring: a solid outline in --focus (>= 3:1 on the background in every theme). An outline,
+   unlike box-shadow, survives Windows high-contrast mode and is not overridden by the
+   box-shadow of button.primary or of "on" tabs. */
+button:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+[role='treeitem']:focus-visible,
+[role='option']:focus-visible,
+[role='separator']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }
 button:disabled {
   opacity: 0.45;
@@ -199,7 +213,7 @@ kbd {
   margin: 10px 0;
 }
 .badge {
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 0 6px;
   border-radius: 8px;
   background: var(--bg-4);
@@ -449,7 +463,7 @@ kbd {
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 8px;
-  font-size: 10px;
+  font-size: 10.5px;
   background: var(--bg-4);
   color: var(--fg-dim);
 }
@@ -970,7 +984,7 @@ kbd {
   visibility: visible;
 }
 .tab-close.dirty {
-  font-size: 10px;
+  font-size: 10.5px;
 }
 .breadcrumbs {
   height: 22px;
@@ -984,6 +998,145 @@ kbd {
 .editor-host {
   flex: 1;
   min-height: 0;
+}
+/* Image / hex / large-file viewers */
+.viewer-pane,
+.image-viewer,
+.hex-viewer,
+.large-viewer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.viewer-bar,
+.image-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.viewer-bar {
+  background: var(--bg-2);
+}
+.viewer-bar .spacer,
+.image-tools .spacer {
+  flex: 1;
+}
+.viewer-kind {
+  font-weight: 600;
+}
+.viewer-dim {
+  color: var(--fg-dim);
+}
+.viewer-seg {
+  display: flex;
+}
+.viewer-seg button,
+.image-tools button {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: inherit;
+  padding: 2px 9px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.viewer-seg button {
+  border-radius: 0;
+}
+.viewer-seg button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.viewer-seg button:last-child {
+  border-radius: 0 4px 4px 0;
+  border-left: none;
+}
+.viewer-seg button.on,
+.image-tools button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.image-tools button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.viewer-input {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: inherit;
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  width: 230px;
+}
+.viewer-input.small {
+  width: 52px;
+}
+.image-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background-color: var(--bg-2);
+  background-image:
+    linear-gradient(45deg, var(--bg-3) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--bg-3) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--bg-3) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--bg-3) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+.image-stage img {
+  image-rendering: auto;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+.image-stage.fit img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.hex-scroller {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  font-family: var(--mono, Consolas, 'Courier New', monospace);
+  font-size: 13px;
+}
+.hex-rows {
+  position: sticky;
+  top: 0;
+  padding: 0 12px;
+}
+.hex-row {
+  height: 20px;
+  line-height: 20px;
+  white-space: pre;
+  display: flex;
+  gap: 18px;
+}
+.hex-off {
+  color: var(--fg-dim);
+}
+.hex-ascii {
+  color: var(--accent);
+}
+.large-host {
+  flex: 1;
+  min-height: 0;
+}
+.viewer-error {
+  padding: 4px 12px;
+  color: #e5534b;
+  font-size: 12px;
 }
 .notice-pane {
   flex: 1;
@@ -1369,11 +1522,6 @@ button.big {
     transform: translateY(-3px);
   }
 }
-@keyframes pulse {
-  50% {
-    opacity: 0.3;
-  }
-}
 .chat-input {
   margin: 0 10px 10px;
   padding: 8px 8px 6px;
@@ -1622,6 +1770,7 @@ button.big {
 }
 .status-item.local {
   background: #16825d;
+  color: #ffffff;
 }
 
 /* ---------- modals ---------- */
@@ -1868,12 +2017,6 @@ button.big {
   padding: 9px 16px;
   border-radius: var(--radius);
   animation: toast-in 0.18s ease-out;
-}
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -6px);
-  }
 }
 ::-webkit-scrollbar {
   width: 9px;
@@ -2263,44 +2406,6 @@ button.big {
   display: flex;
   min-height: 0;
 }
-.mp-providers {
-  width: 220px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  border-right: 1px solid var(--border);
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.mp-prov {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  text-align: left;
-  padding: 5px 8px;
-}
-.mp-prov.on {
-  background: var(--sel);
-  color: var(--fg-strong);
-}
-.mp-prov.add {
-  margin-top: 8px;
-  color: var(--fg-dim);
-  border: 1px dashed var(--border);
-}
-.mp-prov-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mp-count {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--fg-dim);
-}
 .mp-list {
   flex: 1;
   overflow-y: auto;
@@ -2362,7 +2467,7 @@ button.big {
   font-family: ui-monospace, monospace;
 }
 .mp-badge {
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 0 6px;
   border-radius: 8px;
   background: var(--bg-4);
@@ -2814,7 +2919,7 @@ button.link {
   background: var(--bg-4);
 }
 .usage-day {
-  font-size: 9px;
+  font-size: 10.5px;
   color: var(--fg-dim);
 }
 .usage-tabs {
@@ -3115,7 +3220,7 @@ button.link {
 }
 .browser-omni.editing {
   border-color: #7c5cff;
-  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent);
 }
 .browser-sec {
   display: grid;
@@ -3166,7 +3271,7 @@ button.link {
   font-size: 11.5px;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(90deg, #8b3dff, #2f7bff);
+  background: linear-gradient(90deg, var(--brand-1), var(--brand-2));
   animation: browser-fade 0.25s ease-out;
 }
 .browser-ai-pill .dot {
@@ -3192,7 +3297,7 @@ button.link {
   flex-shrink: 0;
   margin: 0 10px;
   border-radius: 2px;
-  background: linear-gradient(90deg, transparent, #8b3dff, #2f7bff, transparent);
+  background: linear-gradient(90deg, transparent, var(--brand-1), var(--brand-2), transparent);
   background-size: 50% 100%;
   background-repeat: no-repeat;
   opacity: 0;
@@ -3221,10 +3326,10 @@ button.link {
   transition: box-shadow 0.3s;
 }
 .browser-frame.ai {
-  background: linear-gradient(135deg, #8b3dff, #2f7bff, #8b3dff);
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2), var(--brand-1));
   background-size: 200% 200%;
   animation: browser-glow 2s linear infinite;
-  box-shadow: 0 0 22px rgba(124, 92, 255, 0.35);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--brand) 35%, transparent);
 }
 @keyframes browser-glow {
   to {
@@ -3247,12 +3352,12 @@ button.link {
   flex-direction: column;
   align-items: center;
   padding: 7vh 24px 32px;
-  background: radial-gradient(ellipse at top, rgba(124, 92, 255, 0.14), transparent 60%), var(--bg);
+  background: radial-gradient(ellipse at top, color-mix(in srgb, var(--brand) 14%, transparent), transparent 60%), var(--bg);
 }
 .browser-start-logo {
   width: 64px;
   height: 64px;
-  filter: drop-shadow(0 6px 20px rgba(124, 92, 255, 0.45));
+  filter: drop-shadow(0 6px 20px color-mix(in srgb, var(--brand) 45%, transparent));
 }
 .browser-start h2 {
   margin: 14px 0 22px;
@@ -3276,7 +3381,7 @@ button.link {
 .browser-start-search:focus-within {
   border-color: #7c5cff;
   box-shadow:
-    0 0 0 3px rgba(124, 92, 255, 0.25),
+    0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent),
     0 6px 24px rgba(0, 0, 0, 0.25);
 }
 .browser-start-search input {
@@ -3326,7 +3431,7 @@ button.link {
   height: 34px;
   border-radius: 10px;
   color: #fff;
-  background: linear-gradient(135deg, #8b3dff, #2f7bff);
+  background: var(--brand-grad);
 }
 .browser-tile-label {
   color: var(--fg-strong);
@@ -3370,7 +3475,7 @@ button.link {
   border-style: solid;
   border-color: #7c5cff;
   color: var(--fg-strong);
-  background: rgba(124, 92, 255, 0.08);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
 .browser-safety {
   max-width: 560px;
@@ -3380,7 +3485,11 @@ button.link {
   text-align: center;
   color: var(--fg-dim);
 }
-@media (max-width: 640px) {
+/* The window is never narrower than 800px, but the browser pane can be: size by the pane. */
+.browser-start {
+  container-type: inline-size;
+}
+@container (max-width: 640px) {
   .browser-quick {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3438,13 +3547,13 @@ button.link {
 }
 .qo-name mark {
   background: transparent;
-  color: #4daafc;
+  color: var(--focus);
   font-weight: 700;
 }
 .search-view .sx-fuzzy mark {
   background: transparent;
   outline: none;
-  color: #4daafc;
+  color: var(--focus);
   font-weight: 700;
 }
 /* Approvals for actions beyond the project */
@@ -3475,7 +3584,7 @@ button.link {
   flex-shrink: 0;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #fff;
@@ -3681,7 +3790,7 @@ button.link {
 .scan-bar {
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(90deg, #2fbf71, #2f7bff);
+  background: linear-gradient(90deg, var(--ok), var(--brand-2));
   transition: width 0.2s;
   min-width: 2px;
 }
@@ -3999,7 +4108,7 @@ button.link {
   flex-wrap: wrap;
 }
 .sv-sev {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -4070,15 +4179,16 @@ button.link {
   position: absolute;
   right: 1px;
   top: 1px;
-  min-width: 15px;
-  height: 15px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 9.5px;
-  font-weight: 600;
-  line-height: 15px;
+  /* --danger contrasts with --bg in every theme (>= 4.5:1), so --bg is the text color. */
+  background: var(--danger);
+  color: var(--bg);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 16px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--activity);
   pointer-events: none;
@@ -4283,7 +4393,7 @@ button.link {
   margin-left: 6px;
 }
 .git-ref {
-  font-size: 10px;
+  font-size: 10.5px;
   background: var(--bg-4);
   border-radius: 8px;
   padding: 0 6px;
@@ -4660,7 +4770,7 @@ kbd.custom {
 .sv-bar-fill {
   height: 100%;
   border-radius: 5px;
-  background: linear-gradient(90deg, #2f7bff, #8b3dff);
+  background: linear-gradient(90deg, var(--brand-2), var(--brand-1));
 }
 .sv-bar-n {
   text-align: right;
@@ -4694,7 +4804,7 @@ kbd.custom {
   white-space: nowrap;
 }
 .sv-cat {
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 1px 7px;
   border-radius: 9px;
   background: var(--bg-4);
@@ -5351,7 +5461,7 @@ kbd.custom {
   text-overflow: ellipsis;
 }
 .browser-tab-owner {
-  font-size: 10px;
+  font-size: 10.5px;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--sel-soft);
@@ -5766,11 +5876,6 @@ button.big {
   align-items: center;
   gap: 6px;
 }
-@media (max-width: 640px) {
-  .onb-cards {
-    grid-template-columns: 1fr;
-  }
-}
 
 .plan-panel.news h2 {
   margin: 0;
@@ -6167,7 +6272,7 @@ button.big {
   margin-top: 4px;
 }
 .vc-dot {
-  font-size: 10px;
+  font-size: 10.5px;
 }
 .vc-dot.git-dir {
   flex: none;
@@ -6230,7 +6335,7 @@ button.big {
 /* chat list as projects */
 .chat-list-head {
   padding: 8px 10px 2px;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -6255,7 +6360,7 @@ button.big {
 }
 .chat-list-count {
   font-style: normal;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   padding: 0 5px;
   border-radius: 8px;
@@ -6539,7 +6644,7 @@ button.big {
 }
 .chat-list-sub {
   padding: 8px 12px 3px 28px;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -6849,13 +6954,11 @@ body {
 }
 
 /* Primary buttons share the accent color. */
-button.primary,
-.btn-primary {
+button.primary {
   background: var(--accent);
   color: var(--accent-fg);
 }
-button.primary:hover,
-.btn-primary:hover {
+button.primary:hover {
   background: var(--accent-hover);
 }
 
@@ -6920,7 +7023,7 @@ button.primary:hover,
   flex-direction: column;
   gap: 2px;
   font-size: 11px;
-  color: var(--muted, inherit);
+  color: var(--fg-dim);
 }
 .vc-settings select {
   width: 100%;
@@ -7038,7 +7141,7 @@ button.primary:hover,
   border-radius: 8px;
   background: var(--hover);
   color: var(--fg-strong);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
 }
 .ml-folder.active .ml-folder-count {
@@ -7159,7 +7262,7 @@ button.primary:hover,
   font-size: 13px;
 }
 .ml-note {
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--fg-dim);
   padding: 3px 12px;
   border-top: 1px solid var(--border);
@@ -7459,8 +7562,8 @@ button.primary:hover,
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: #25d366;
-  color: #fff;
+  background: var(--wa);
+  color: var(--wa-fg);
 }
 .wa-state {
   display: inline-flex;
@@ -7481,23 +7584,14 @@ button.primary:hover,
   background: var(--fg-dim);
 }
 .wa-state.on .dot {
-  background: #25d366;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #25d366 25%, transparent);
+  background: var(--wa);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wa) 25%, transparent);
 }
 .wa-state.warn .dot {
   background: var(--warn);
 }
 .wa-pane button.wa-btn {
   font-size: 12.5px;
-}
-.wa-help {
-  margin: 0 10px 4px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--fg-dim);
-  background: var(--bg-3);
 }
 .wa-body {
   flex: 1;
@@ -7533,8 +7627,8 @@ button.primary:hover,
 }
 
 .wa-pane button.wa-toggle.active {
-  color: #25d366;
-  border-color: color-mix(in srgb, #25d366 45%, transparent);
+  color: var(--wa);
+  border-color: color-mix(in srgb, var(--wa) 45%, transparent);
 }
 .wa-side {
   width: 300px;
@@ -7566,11 +7660,11 @@ button.primary:hover,
   font-weight: 600;
 }
 .wa-pill.on {
-  color: #fff;
-  background: #25d366;
+  color: var(--wa-fg);
+  background: var(--wa);
 }
 .wa-pill.warn {
-  color: #fff;
+  color: #1a1206;
   background: #e0a33a;
 }
 .wa-pill:not(.on):not(.warn) {
@@ -7579,8 +7673,8 @@ button.primary:hover,
   border: 1px solid var(--border);
 }
 .wa-main.on {
-  border-color: #25d366;
-  box-shadow: 0 0 0 1px #25d36633 inset;
+  border-color: var(--wa);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wa) 20%, transparent) inset;
 }
 .wa-main-head {
   display: flex;
@@ -7635,13 +7729,16 @@ button.primary:hover,
   transition: transform 0.15s;
 }
 .wa-switch input:checked + span {
-  background: #25d366;
+  background: var(--wa);
 }
 .wa-switch input:checked + span::after {
   transform: translateX(16px);
 }
 .wa-switch input:disabled + span {
   opacity: 0.5;
+}
+.wa-switch input:focus-visible + span {
+  box-shadow: var(--ring);
 }
 .wa-checks {
   display: flex;
@@ -7666,7 +7763,7 @@ button.primary:hover,
   color: var(--fg);
 }
 .wa-chk.ok svg {
-  color: #25d366;
+  color: var(--wa);
 }
 .wa-chk button {
   margin-left: auto;
@@ -7680,7 +7777,7 @@ button.primary:hover,
   margin-top: 6px;
 }
 .wa-chat.open {
-  border-color: #25d36688;
+  border-color: color-mix(in srgb, var(--wa) 53%, transparent);
 }
 .wa-chat-row {
   display: flex;
@@ -7784,7 +7881,7 @@ button.wa-add {
   color: var(--fg);
 }
 .wa-ev.out .wa-ev-text {
-  color: #25d366;
+  color: var(--wa);
 }
 .wa-ev.info .wa-ev-text {
   color: var(--fg-dim);
@@ -7861,8 +7958,8 @@ button.plain-btn:active {
 }
 /* Rows that act as buttons (role="button"): visible keyboard focus. */
 [role='button']:focus-visible {
-  outline: none;
-  box-shadow: var(--ring);
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }
 
 /* Long conversations: messages far off screen skip layout and paint until scrolled near
@@ -8090,4 +8187,148 @@ button.plain-btn:active {
   padding: 6px 10px;
   border-top: 1px solid var(--border);
   font-size: 11px;
+}
+
+/* ---------- accessibility and responsive fixes (UI review) ---------- */
+
+/* Separators: the visible line stays 4px, the grab zone is 10px. */
+.sash {
+  position: relative;
+}
+.sash::before {
+  content: '';
+  position: absolute;
+}
+.sash-x::before {
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+}
+.sash-y::before {
+  left: 0;
+  right: 0;
+  top: -3px;
+  bottom: -3px;
+}
+.sash:focus-visible {
+  background: var(--focus);
+}
+body.dragging-y,
+body.dragging-y * {
+  cursor: row-resize !important;
+  user-select: none;
+}
+
+/* Row actions that appear on hover also appear when the keyboard focus is in the row. */
+.git-row:focus-within .git-row-actions,
+.git-commit-row:focus-within .git-commit-actions,
+.ch-item:focus-within .ch-actions {
+  display: flex;
+}
+.turn:focus-within .turn-actions,
+.chat-tab:focus-within .chat-tab-x,
+.chat-list-item:focus-within .chat-tab-x,
+.chat-list-folder:focus-within button,
+.sv-finding:focus-within .sv-finding-actions button,
+.term-tab:focus-within .term-tab-close {
+  opacity: 1;
+}
+.tab:focus-within .tab-close,
+.sx-head:focus-within .sx-mini {
+  visibility: visible;
+}
+
+/* Visible focus on controls drawn by a sibling or without a native ring. */
+.wa-switch input:focus-visible + span,
+.offline-game-canvas:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Severity badges: a faint tint of the severity color (set inline) with a border of that
+   color, and strong text on it, instead of white text on yellow / orange / blue. */
+.sv-badge,
+.sv-nav-count {
+  color: var(--fg-strong);
+  border: 1px solid transparent;
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--bg) 78%, transparent),
+      color-mix(in srgb, var(--bg) 78%, transparent)
+    ),
+    linear-gradient(transparent, transparent);
+  background-clip: padding-box, border-box;
+}
+.sv-nav-count {
+  line-height: 15px;
+}
+
+/* Activity bar: scrolls (without a visible scrollbar) instead of cutting off its last
+   buttons on short windows, and the buttons shrink below 700px of height. */
+.activity-bar {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.activity-bar::-webkit-scrollbar {
+  display: none;
+}
+/* The overflow clips anything outside the bar: keep the selected marker inside it. */
+.activity.active::before {
+  left: -5px;
+}
+@media (max-height: 700px) {
+  .activity,
+  :root[data-theme='light'] .activity {
+    width: 32px;
+    height: 32px;
+  }
+  .activity-bar {
+    gap: 1px;
+  }
+  .activity.active::before {
+    left: -8px;
+    height: 16px;
+  }
+}
+
+/* Settings and Providers fit under the backdrop's 8vh top padding. */
+.settings,
+.providers {
+  max-height: calc(92vh - 16px);
+}
+@media (max-width: 1000px) {
+  .settings-nav {
+    width: 200px;
+  }
+  .settings-body {
+    padding: 20px;
+  }
+}
+
+/* Model table: on a narrow picker the output price and the capabilities give way. */
+.mp-list {
+  container-type: inline-size;
+}
+@container (max-width: 760px) {
+  .mp-row {
+    grid-template-columns: 28px minmax(0, 1fr) 72px 86px 104px;
+  }
+  .mp-row > :nth-child(5),
+  .mp-row > :nth-child(6) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

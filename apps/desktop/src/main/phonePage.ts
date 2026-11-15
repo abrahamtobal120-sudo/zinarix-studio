@@ -3,9 +3,82 @@
  * approvals, stop). Self-contained (no files, no outside requests); text is never parsed as
  * HTML.
  */
-export function phonePage(nonce: string): string {
+const TEXT = {
+  es: {
+    connecting: 'Conectando…',
+    chats: 'Chats',
+    newChat: 'Nuevo chat',
+    pairTitle: 'Conecta tu celular',
+    pairHint: 'Escribe el PIN que aparece en Zinarix Studio',
+    pairWhere: 'Configuración → Celular',
+    pin: 'PIN',
+    connect: 'Conectar',
+    pairWait: 'Si el PIN es correcto, acepta la conexión en la ventana de Zinarix de la computadora…',
+    ask: 'Pregunta o pide un cambio…',
+    message: 'Mensaje',
+    agent: 'Agente',
+    stop: 'Detener',
+    send: 'Enviar',
+    offline: 'Sin conexión',
+    working: 'Trabajando…',
+    workingBadge: 'Trabajando',
+    online: 'Conectado',
+    approve: 'Aprobar',
+    deny: 'Rechazar',
+    emptyTitle: '¿En qué te ayudo?',
+    emptyHint: 'Escribe abajo para hablar con la IA de tu computadora.',
+    badPin: 'PIN incorrecto',
+    noComputer: 'No se pudo conectar con la computadora',
+  },
+  en: {
+    connecting: 'Connecting…',
+    chats: 'Chats',
+    newChat: 'New chat',
+    pairTitle: 'Connect your phone',
+    pairHint: 'Type the PIN shown in Zinarix Studio',
+    pairWhere: 'Settings → Phone',
+    pin: 'PIN',
+    connect: 'Connect',
+    pairWait: 'If the PIN is right, accept the connection in the Zinarix window on the computer…',
+    ask: 'Ask or request a change…',
+    message: 'Message',
+    agent: 'Agent',
+    stop: 'Stop',
+    send: 'Send',
+    offline: 'Offline',
+    working: 'Working…',
+    workingBadge: 'Working',
+    online: 'Connected',
+    approve: 'Approve',
+    deny: 'Deny',
+    emptyTitle: 'How can I help?',
+    emptyHint: 'Type below to talk to the AI on your computer.',
+    badPin: 'Wrong PIN',
+    noComputer: 'Could not reach the computer',
+  },
+} as const;
+
+export type PhoneLang = keyof typeof TEXT;
+
+/** The page language from an Accept-Language header (Spanish unless English comes first). */
+export function phoneLang(accept: string | undefined): PhoneLang {
+  for (const part of (accept ?? '').split(',')) {
+    const tag = part.trim().slice(0, 2).toLowerCase();
+    if (tag === 'es' || tag === 'en') return tag;
+  }
+  return 'es';
+}
+
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+export function phonePage(nonce: string, lang: PhoneLang = 'es'): string {
+  const T = TEXT[lang] ?? TEXT.es;
+  const h = (k: keyof typeof T) => esc(T[k]);
+  // Strings for the page script (constants: "<" escaped so nothing can close the tag).
+  const json = JSON.stringify(T).replace(/</g, '\\u003c');
   return `<!doctype html>
-<html lang="es">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
@@ -138,38 +211,39 @@ textarea{display:block;width:100%;resize:none;max-height:35vh;min-height:24px;bo
 </head>
 <body>
 <header id="head" class="hide">
-  <button class="icon" id="menu" aria-label="Chats"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-  <button id="title"><b id="tname">Zinarix</b><small><span class="dot" id="dot"></span><span id="state">Conectando…</span></small></button>
-  <button class="icon" id="new" aria-label="Nuevo chat"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="icon" id="menu" aria-label="${h('chats')}"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  <button id="title"><b id="tname">Zinarix</b><small><span class="dot" id="dot"></span><span id="state">${h('connecting')}</span></small></button>
+  <button class="icon" id="new" aria-label="${h('newChat')}"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
 </header>
 <div id="scrim"></div>
-<nav id="drawer" aria-label="Chats">
+<nav id="drawer" aria-label="${h('chats')}">
   <div class="dhead"><span class="logo">Z</span><b>Zinarix Studio</b></div>
-  <button class="newbtn primary" id="new2"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Nuevo chat</button>
-  <div class="dtitle">Chats</div>
+  <button class="newbtn primary" id="new2"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>${h('newChat')}</button>
+  <div class="dtitle">${h('chats')}</div>
   <div id="list"></div>
 </nav>
 <div id="pair">
   <span class="logo">Z</span>
-  <h1>Conecta tu celular</h1>
-  <p>Escribe el PIN que aparece en Zinarix Studio<br><small>Configuración → Celular</small></p>
-  <input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······">
-  <button id="go" class="primary">Conectar</button>
-  <p id="pwait" class="hide">Si el PIN es correcto, acepta la conexión en la ventana de Zinarix de la computadora…</p>
+  <h1>${h('pairTitle')}</h1>
+  <p>${h('pairHint')}<br><small>${h('pairWhere')}</small></p>
+  <input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="${h('pin')}">
+  <button id="go" class="primary">${h('connect')}</button>
+  <p id="pwait" class="hide">${h('pairWait')}</p>
   <div class="err" id="perr"></div>
 </div>
 <div id="log" class="hide"></div>
 <footer id="foot" class="hide">
   <div class="composer">
-    <textarea id="text" rows="1" placeholder="Pregunta o pide un cambio…"></textarea>
+    <textarea id="text" rows="1" placeholder="${h('ask')}" aria-label="${h('message')}"></textarea>
     <div class="bar">
-      <button class="pill" id="agent" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>Agente</button>
-      <button class="danger stopb hide" id="stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>Detener</button>
-      <button class="primary send" id="send" aria-label="Enviar" disabled><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      <button class="pill" id="agent" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>${h('agent')}</button>
+      <button class="danger stopb hide" id="stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>${h('stop')}</button>
+      <button class="primary send" id="send" aria-label="${h('send')}" disabled><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
     </div>
   </div>
 </footer>
 <script nonce="${nonce}">
+const L = ${json};
 const $ = (id) => document.getElementById(id);
 let token = localStorage.getItem('zx.token') || '';
 let snap = null, es = null, stick = true, online = false;
@@ -221,7 +295,7 @@ function setOnline(on) {
   status();
 }
 function status() {
-  $('state').textContent = !online ? 'Sin conexión' : snap && snap.busy ? 'Trabajando…' : 'Conectado';
+  $('state').textContent = !online ? L.offline : snap && snap.busy ? L.working : L.online;
 }
 function drawer(open) { document.body.classList.toggle('open', open); }
 
@@ -280,9 +354,9 @@ function renderList() {
   list.textContent = '';
   for (const c of snap.chats) {
     const b = el('button', 'item' + (c.id === snap.chatId ? ' cur' : ''));
-    b.append(el('span', '', c.title || 'Chat nuevo'));
-    if (c.waiting) b.append(el('span', 'badge wait', 'Aprobar'));
-    else if (c.busy) b.append(el('span', 'badge', 'Trabajando'));
+    b.append(el('span', '', c.title || L.newChat));
+    if (c.waiting) b.append(el('span', 'badge wait', L.approve));
+    else if (c.busy) b.append(el('span', 'badge', L.workingBadge));
     b.onclick = () => { drawer(false); if (c.id !== snap.chatId) act({ kind: 'select', chatId: c.id }); };
     list.append(b);
   }
@@ -298,8 +372,8 @@ function renderTool(tool) {
   c.append(head);
   if (tool.status === 'approval') {
     const row = el('div', 'tactions');
-    const yes = el('button', 'primary', 'Aprobar');
-    const no = el('button', 'danger', 'Rechazar');
+    const yes = el('button', 'primary', L.approve);
+    const no = el('button', 'danger', L.deny);
     yes.onclick = () => { yes.disabled = no.disabled = true; act({ kind: 'decide', toolCallId: tool.id, decision: 'approve' }); };
     no.onclick = () => { yes.disabled = no.disabled = true; act({ kind: 'decide', toolCallId: tool.id, decision: 'deny' }); };
     row.append(yes, no);
@@ -311,7 +385,7 @@ function render() {
   if (!snap) return;
   renderList();
   const cur = snap.chats.find((c) => c.id === snap.chatId);
-  $('tname').textContent = (cur && cur.title) || 'Chat nuevo';
+  $('tname').textContent = (cur && cur.title) || L.newChat;
   $('agent').classList.toggle('on', !!snap.agent);
   $('agent').setAttribute('aria-pressed', String(!!snap.agent));
   status();
@@ -322,7 +396,7 @@ function render() {
   log.textContent = '';
   if (!snap.turns.length) {
     const e = el('div', 'empty');
-    e.append(el('span', 'logo', 'Z'), el('b', '', '¿En qué te ayudo?'), el('span', '', 'Escribe abajo para hablar con la IA de tu computadora.'));
+    e.append(el('span', 'logo', 'Z'), el('b', '', L.emptyTitle), el('span', '', L.emptyHint));
     log.append(e);
   }
   for (const t of snap.turns) {
@@ -368,11 +442,11 @@ $('go').onclick = async () => {
   try {
     const key = new URLSearchParams(location.hash.slice(1)).get('k') || undefined;
     const r = await post('/api/pair', { pin: $('pin').value, key });
-    if (!r.ok) { $('perr').textContent = (await r.json().catch(() => ({}))).error || 'PIN incorrecto'; return; }
+    if (!r.ok) { $('perr').textContent = (await r.json().catch(() => ({}))).error || L.badPin; return; }
     token = (await r.json()).token;
     localStorage.setItem('zx.token', token);
     paired();
-  } catch { $('perr').textContent = 'No se pudo conectar con la computadora'; }
+  } catch { $('perr').textContent = L.noComputer; }
   finally { $('go').disabled = false; $('pwait').classList.add('hide'); }
 };
 $('pin').onkeydown = (e) => { if (e.key === 'Enter') $('go').click(); };

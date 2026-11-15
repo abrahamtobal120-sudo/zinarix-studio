@@ -2,12 +2,32 @@ import { useEffect, useRef, useState } from 'react';
 import type { WhatsAppStatus, WhatsAppWho } from '../../shared/api';
 import { api, getState, setState, toast, useStore } from '../store';
 import { t } from '../i18n';
+import { confirmDialog } from '../confirm';
 import { Icon } from './Icon';
 
+/** Error codes main/whatsapp.ts throws, shown translated. */
+const ERRORS: Record<string, () => string> = {
+  'wa:noChat': () => t('waErrNoChat'),
+  'wa:openChat': () => t('waErrOpenChat'),
+};
+
 function message(e: unknown): string {
-  return e instanceof Error
-    ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
-    : String(e);
+  const raw =
+    e instanceof Error
+      ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+      : String(e);
+  return ERRORS[raw.trim()]?.() ?? raw;
+}
+
+/** "Message yourself" (WhatsApp shows it as "Name (You)"). */
+const SELF = /\((t[uú]|you)\)\s*$/i;
+
+/** Danger confirmation before letting another person's messages command the computer. */
+function confirmOthers(name: string): Promise<boolean> {
+  return confirmDialog(t('waOthersConfirm', { name }), {
+    danger: true,
+    okLabel: t('waOthersConfirmOk'),
+  });
 }
 
 function clock(at: number): string {
@@ -98,14 +118,27 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
   const toggle = (on: boolean) =>
     act(async () => {
       if (!on) return api().whatsapp.control(false);
-      if (!st?.chats.length) await api().whatsapp.useCurrent();
+      if (!st?.chats.length) {
+        if (!(await confirmAllowCurrent())) return;
+        await api().whatsapp.useCurrent();
+      }
       else await api().whatsapp.control(true);
       await ensureRemote();
       return api().whatsapp.status();
     });
 
+  /** Allowing a chat with someone else gives a channel to the computer: asked first. */
+  const confirmAllowCurrent = async () => {
+    const c = getState().whatsapp?.current;
+    if (!c || SELF.test(c.title)) return true;
+    return confirmDialog(t('waAllowConfirm', { name: c.title || t('waThisChat') }), {
+      danger: true,
+    });
+  };
+
   const allow = () =>
     act(async () => {
+      if (!(await confirmAllowCurrent())) return;
       await api().whatsapp.useCurrent();
       await ensureRemote();
       return api().whatsapp.status();
@@ -148,7 +181,11 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
           {st?.pending ? ` · ${t('waPending', { n: st.pending })}` : ''}
         </span>
         <div className="spacer" />
-        <button className="bicon" title={t('navReload')} onClick={() => void api().whatsapp.reload()}>
+        <button
+          className="bicon"
+          title={t('navReload')}
+          aria-label={t('navReload')}
+          onClick={() => void api().whatsapp.reload()}>
           <Icon name="refresh" size={15} />
         </button>
         <button
@@ -176,6 +213,8 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
                 <label className="wa-switch" title={listening ? t('waStop') : t('waTitle')}>
                   <input
                     type="checkbox"
+                    role="switch"
+                    aria-label={t('waTitle')}
                     checked={listening}
                     disabled={busy || !logged || (!chats.length && !cur)}
                     onChange={(e) => void toggle(e.target.checked)}
@@ -210,7 +249,7 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
               </div>
               {!chats.length && <div className="wa-note">{t('waNoChats')}</div>}
               {chats.map((c) => {
-                const self = /\((t[uú]|you)\)\s*$/i.test(c.title);
+                const self = SELF.test(c.title);
                 const open = cur?.id === c.id;
                 return (
                   <div key={c.id} className={`wa-chat${open ? ' open' : ''}`}>
@@ -226,13 +265,18 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
                         className="wa-who"
                         value={c.who}
                         disabled={busy}
+                        aria-label={t('waWhoLabel', { name: c.title || c.id })}
+                        title={t('waWhoLabel', { name: c.title || c.id })}
                         onChange={(e) => {
                           const who = e.target.value as WhatsAppWho;
-                          void act(() => api().whatsapp.who(c.id, who));
+                          void act(async () => {
+                            if (who !== 'me' && !(await confirmOthers(c.title || c.id))) return;
+                            return api().whatsapp.who(c.id, who);
+                          });
                         }}
                       >
-                        <option value="them">{t('waWhoThem')}</option>
                         <option value="me">{t('waWhoMe')}</option>
+                        <option value="them">{t('waWhoThem')}</option>
                         <option value="all">{t('waWhoAll')}</option>
                       </select>
                     )}

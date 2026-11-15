@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { api, openFile, setState, toast, useStore } from '../store';
@@ -15,6 +16,8 @@ export interface RunTask {
   file: string;
   /** Lower runs first when "Detect & run" picks automatically. */
   priority: number;
+  /** What the command really runs, when it is an alias (the body of an npm script). */
+  detail?: string;
 }
 
 /** Config files worth opening when reviewing how a project runs. */
@@ -89,9 +92,9 @@ async function tasksFor(path: string, all: Set<string>): Promise<RunTask[]> {
   const dir = dirOf(path);
   const name = nameOf(path).toLowerCase();
   const extra = depthOf(path) * 2; // root configs win over nested ones
-  const add = (label: string, cmd: string, priority: number): RunTask | null => {
+  const add = (label: string, cmd: string, priority: number, detail?: string): RunTask | null => {
     const command = inDir(dir, cmd);
-    return command ? { label, command, file: path, priority: priority + extra } : null;
+    return command ? { label, command, file: path, priority: priority + extra, detail } : null;
   };
 
   if (name === 'package.json') {
@@ -106,7 +109,15 @@ async function tasksFor(path: string, all: Set<string>): Promise<RunTask[]> {
     const pm = packageManager(dir, all);
     return Object.keys(scripts)
       .filter((s) => SAFE_NAME.test(s))
-      .map((s) => add(`${pm} run ${s}`, `${pm} run ${s}`, scriptPriority(s)))
+      .map((s) => {
+        const body = scripts[s];
+        return add(
+          `${pm} run ${s}`,
+          `${pm} run ${s}`,
+          scriptPriority(s),
+          typeof body === 'string' ? body : undefined,
+        );
+      })
       .filter((x): x is RunTask => x !== null);
   }
 
@@ -173,7 +184,16 @@ async function tasksFor(path: string, all: Set<string>): Promise<RunTask[]> {
     }
     return Object.keys(tasks)
       .filter((s) => SAFE_NAME.test(s))
-      .map((s) => add(`deno task ${s}`, `deno task ${s}`, scriptPriority(s)))
+      .map((s) => {
+        const body = tasks[s];
+        const cmd =
+          typeof body === 'string'
+            ? body
+            : typeof (body as { command?: unknown } | null)?.command === 'string'
+              ? (body as { command: string }).command
+              : undefined;
+        return add(`deno task ${s}`, `deno task ${s}`, scriptPriority(s), cmd);
+      })
       .filter((x): x is RunTask => x !== null);
   }
   // A plain static site: only when nothing else in the repo says how to run it.
@@ -189,17 +209,65 @@ export interface Detection {
   files: string[];
 }
 
+/** Config files of the workspace, shallowest first. */
+function configsOf(files: string[]): string[] {
+  return files
+    .filter((f) => CONFIG_NAMES.has(nameOf(f).toLowerCase()))
+    .sort((a, b) => depthOf(a) - depthOf(b) || a.localeCompare(b));
+}
+
+/** Configs whose content (not only their presence) decides the tasks. */
+const READ_CONFIGS = /^(package\.json|(gnu)?makefile|deno\.jsonc?)$/;
+
+/**
+ * Cheap fingerprint of what detection depends on (which config files exist and the content of
+ * those it reads), to skip a rescan when a save touched some other file.
+ */
+async function configFingerprint(): Promise<string> {
+  const configs = configsOf(await api().workspace.listFiles()).slice(0, 40);
+  const parts: string[] = [];
+  for (const f of configs)
+    parts.push(f, READ_CONFIGS.test(nameOf(f).toLowerCase()) ? ((await readText(f)) ?? '') : '');
+  return parts.join('\0');
+}
+
 /** Scans the workspace for run configs and builds the list of runnable commands. */
 export async function detectRunTasks(): Promise<Detection> {
   const files = await api().workspace.listFiles();
   const all = new Set(files);
-  const configs = files
-    .filter((f) => CONFIG_NAMES.has(nameOf(f).toLowerCase()))
-    .sort((a, b) => depthOf(a) - depthOf(b) || a.localeCompare(b));
+  const configs = configsOf(files);
   const tasks: RunTask[] = [];
   for (const f of configs.slice(0, 40)) tasks.push(...(await tasksFor(f, all)));
   tasks.sort((a, b) => a.priority - b.priority || a.label.localeCompare(b.label));
   return { tasks, files: configs };
+}
+
+/** The command as the user should see it before running: "npm run dev → vite --host". */
+export function describeTask(task: RunTask): string {
+  return task.detail ? `${task.command} → ${task.detail}` : task.command;
+}
+
+const CONFIRMED_KEY = 'zs.runConfirmed';
+
+/** Workspaces where "Detect & run" was already confirmed once (the choice is remembered). */
+function confirmedRoots(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CONFIRMED_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberConfirmed(root: string): void {
+  try {
+    localStorage.setItem(
+      CONFIRMED_KEY,
+      JSON.stringify([...confirmedRoots().filter((r) => r !== root), root].slice(-200)),
+    );
+  } catch {
+    // storage unavailable: it will ask again next time
+  }
 }
 
 /** Opens the terminal panel and types the command into it. */
@@ -220,17 +288,22 @@ export function RunPanel() {
   const [allTasks, setAllTasks] = useState(false);
   const [allFiles, setAllFiles] = useState(false);
 
-  const detect = useCallback(async (): Promise<Detection | null> => {
-    setBusy(true);
+  // Fingerprint of the configs behind the current detection (see configFingerprint).
+  const seen = useRef<string | null>(null);
+
+  /** quiet: a background refresh that keeps the current list on screen (no "Detecting…"). */
+  const detect = useCallback(async (quiet = false): Promise<Detection | null> => {
+    if (!quiet) setBusy(true);
     try {
-      const d = await detectRunTasks();
+      const [d, fp] = await Promise.all([detectRunTasks(), configFingerprint().catch(() => null)]);
+      seen.current = fp;
       setDetection(d);
       return d;
     } catch {
-      setDetection({ tasks: [], files: [] });
+      if (!quiet) setDetection({ tasks: [], files: [] });
       return null;
     } finally {
-      setBusy(false);
+      if (!quiet) setBusy(false);
     }
   }, []);
 
@@ -238,8 +311,23 @@ export function RunPanel() {
     setDetection(null);
     setAllTasks(false);
     setAllFiles(false);
+    seen.current = null;
     if (workspace) void detect();
-  }, [workspace, fsVersion, detect]);
+  }, [workspace, detect]);
+
+  // File changes (every save): wait for a pause, and rescan only if a run config changed.
+  useEffect(() => {
+    if (!workspace || fsVersion === 0) return;
+    let live = true;
+    const timer = setTimeout(async () => {
+      const fp = await configFingerprint().catch(() => null);
+      if (live && fp !== null && fp !== seen.current) await detect(true);
+    }, 1500);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [fsVersion, workspace, detect]);
 
   if (!workspace) {
     return (
@@ -255,8 +343,21 @@ export function RunPanel() {
   const detectAndRun = async () => {
     const d = detection ?? (await detect());
     const best = d?.tasks[0];
-    if (best) runTask(best);
-    else toast(t('runNone'));
+    if (!best) {
+      toast(t('runNone'));
+      return;
+    }
+    // The first time in each project, show what will really run (it may be someone else's repo).
+    const root = workspace.root;
+    if (!confirmedRoots().includes(root)) {
+      const ok = await confirmDialog(
+        t('runConfirmFirst', { cmd: describeTask(best), file: best.file }),
+        { okLabel: t('runRun') },
+      );
+      if (!ok) return;
+      rememberConfirmed(root);
+    }
+    runTask(best);
   };
 
   const tasks = detection?.tasks ?? [];
@@ -269,7 +370,7 @@ export function RunPanel() {
       <div className="sidebar-title">
         <span>{t('runTitle').toUpperCase()}</span>
         <span className="sidebar-actions">
-          <button title={t('refresh')} onClick={() => void detect()}>
+          <button title={t('refresh')} aria-label={t('refresh')} onClick={() => void detect()}>
             <Icon name="refresh" size={14} />
           </button>
         </span>
@@ -285,10 +386,11 @@ export function RunPanel() {
           <>
             <div className="run-section">{t('runTasks')}</div>
             {shownTasks.map((task, i) => (
-              <div key={`${task.file}:${task.label}`} className="run-row" title={task.command}>
+              <div key={`${task.file}:${task.label}`} className="run-row" title={describeTask(task)}>
                 <button
                   className="run-go"
-                  title={`${t('runRun')}: ${task.command}`}
+                  title={`${t('runRun')}: ${describeTask(task)}`}
+                  aria-label={`${t('runRun')}: ${describeTask(task)}`}
                   onClick={() => runTask(task)}
                 >
                   <Icon name="play" size={14} />

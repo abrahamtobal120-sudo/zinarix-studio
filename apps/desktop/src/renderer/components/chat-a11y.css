@@ -1,0 +1,112 @@
+/* Chat: send button with its menu, offline banner, keyboard-reachable tab and list actions. */
+
+.send-split {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.send-split .send-btn {
+  margin-left: 0;
+}
+.send-split .send-btn:first-child:not(:last-child) {
+  border-top-right-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+.send-split .send-more {
+  width: 20px;
+  border-top-left-radius: 2px;
+  border-bottom-left-radius: 2px;
+}
+.send-split + .stop-btn {
+  margin-left: 0;
+}
+.send-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.send-menu button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.send-menu button > span {
+  flex: 1;
+}
+.send-menu button:hover,
+.send-menu button:focus-visible {
+  background: var(--bg-4);
+}
+.send-menu kbd {
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+.chat-offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 10px 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--warn, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn, #d9a400) 12%, transparent);
+  font-size: 12px;
+}
+
+/* Close (x) of a chat tab and actions of the list: also visible while focused from the keyboard. */
+.chat-tab:focus-within .chat-tab-x,
+.chat-list-item:focus-within .chat-tab-x {
+  opacity: 1;
+}
+
+/* Project row of the chat list: a real button for fold / unfold, its actions beside it. */
+.chat-list-folder > button.chat-list-folder-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  width: auto;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  opacity: 1;
+  cursor: pointer;
+}
+.chat-list-folder > button.chat-list-folder-main:hover {
+  background: transparent;
+  color: inherit;
+}
+.chat-list-folder-main > span:not(.chat-tab-status) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-list-folder:focus-within button {
+  opacity: 1;
+}

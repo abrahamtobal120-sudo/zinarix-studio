@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AiRole, ProviderView } from '../../shared/api';
 import { t } from '../i18n';
+import { formatUsd } from '../format';
 import { api, refreshModels, refreshSettings, setState, toast, useStore } from '../store';
 import { Icon, type IconName } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
+import { ModalShell } from './ModalShell';
+import './modal-shell.css';
 import { fuzzy } from './QuickPick';
 import { isLegacyModel, siblingIds } from '../legacyModels';
 
@@ -58,7 +61,7 @@ function fmtCtx(n: number | null): string {
 function fmtPrice(n: number | null): string {
   if (n === null) return '—';
   if (n === 0) return t('free');
-  return `$${n < 1 ? +n.toFixed(3) : +n.toFixed(2)}`;
+  return formatUsd(n, n < 1 ? 3 : 2);
 }
 
 /** Flagship-first ordering when the user has not chosen a sort. */
@@ -322,294 +325,315 @@ export function ModelPicker({
   };
 
   const chip = (f: Filter, icon: IconName, label: string) => (
-    <button className={`mp-chip ${filters.has(f) ? 'on' : ''}`} onClick={() => toggleFilter(f)}>
+    <button
+      className={`mp-chip ${filters.has(f) ? 'on' : ''}`}
+      aria-pressed={filters.has(f)}
+      onClick={() => toggleFilter(f)}
+    >
       <Icon name={icon} size={13} />
       {label}
     </button>
   );
 
   return (
-    <div className="modal-backdrop" onMouseDown={close}>
-      <div className="model-picker" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="mp-head">
-          <div className="mp-title">
-            <img src="./logo.svg" alt="" />
-            {pick ? pick.title : t('pickModel')}
-          </div>
-          {pick ? (
-            <div className="mp-pick-hint dim">{t('mpPickHint')}</div>
-          ) : (
-            <div className="mp-roles" role="tablist">
-              {(['chat', 'agent', 'inline'] as AiRole[]).map((r) => (
-                <button
-                  key={r}
-                  role="tab"
-                  aria-selected={role === r}
-                  className={`mp-role ${role === r ? 'on' : ''}`}
-                  onClick={() => setRole(r)}
-                >
-                  {ROLE_LABEL[r]()}
-                  <span className="mp-role-model">
-                    {r === 'chat'
-                      ? (settings.defaultModel ?? t('noModel'))
-                      : (settings.roles[r] ?? t('sameAsChat'))}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          <button className="modal-x" onClick={close} aria-label={t('close')}>
-            ×
-          </button>
+    <ModalShell
+      // Esc (wherever the focus is): back from a provider to the grid, then close.
+      onClose={() => (provider ? setProvider(null) : close())}
+      onBackdrop={close}
+      className="model-picker"
+      labelledBy="mp-title"
+    >
+      <div className="mp-head">
+        <div className="mp-title" id="mp-title">
+          <img src="./logo.svg" alt="" />
+          {pick ? pick.title : t('pickModel')}
         </div>
-
-        <div className="mp-toolbar">
-          <input
-            autoFocus
-            className="mp-search"
-            value={query}
-            placeholder={t('searchModels', { n: rows.length - hiddenCount })}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              const max = (gridMode ? ordered.length : visible.length) - 1;
-              if (e.key === 'Escape') {
-                if (provider) setProvider(null);
-                else close();
-              } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-                e.preventDefault();
-                setIndex((i) => Math.max(0, Math.min(i + 1, max)));
-              } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                e.preventDefault();
-                setIndex((i) => Math.max(i - 1, 0));
-              } else if (e.key === 'Enter') {
-                if (gridMode && ordered[index]) setProvider(ordered[index]!.id);
-                else if (!gridMode && visible[index]) void choose(visible[index]!);
-              }
-            }}
-          />
-          <select
-            className="mp-sort"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as Sort)}
-            title={t('sortBy')}
-          >
-            <option value="recommended">{t('sortRecommended')}</option>
-            <option value="price">{t('sortPrice')}</option>
-            <option value="context">{t('sortContext')}</option>
-            <option value="name">{t('sortName')}</option>
-          </select>
-          <button onClick={() => void refresh()} disabled={loading} title={t('refreshModels')}>
-            {loading ? '…' : '⟳'}
-          </button>
-        </div>
-        <div className="mp-chips">
-          {chip('connected', 'check', t('fConnected'))}
-          {chip('fav', 'star', t('fFavorites'))}
-          {chip('tools', 'wrench', t('fTools'))}
-          {chip('vision', 'eye', t('fVision'))}
-          {chip('reasoning', 'thinking', t('fReasoning'))}
-          {chip('long', 'books', '≥200k')}
-          {chip('cheap', 'dollar', t('fCheap'))}
-          {chip('local', 'home', t('fLocal'))}
-          {(hiddenCount > 0 || showOld) && (
-            <button
-              className={`mp-chip ${showOld ? 'on' : ''}`}
-              onClick={() => setShowOld((v) => !v)}
-              title={t('mpOldHint')}
-            >
-              <Icon name="clock" size={13} />
-              {showOld ? t('mpHideOld') : t('mpShowOld', { n: hiddenCount })}
-            </button>
-          )}
-          {pick?.current && (
-            <button
-              className="mp-chip reset"
-              onClick={() => {
-                close();
-                pick.onPick(null);
-              }}
-            >
-              ↺ {t('chatModelDefault')}
-            </button>
-          )}
-          {!pick && role !== 'chat' && settings.roles[role] && (
-            <button
-              className="mp-chip reset"
-              onClick={async () => {
-                await api().ai.setRole(role, null);
-                await refreshSettings();
-              }}
-            >
-              ↺ {t('sameAsChat')}
-            </button>
-          )}
-        </div>
-
-        <div className="mp-body">
-          {gridMode ? (
-            <div className="mp-grid" ref={list}>
-              {sections.map((g) => (
-                <div key={g.key} className="mp-section">
-                  <div className="mp-section-title">
-                    {g.title} <span className="dim">{g.cards.length}</span>
-                  </div>
-                  {g.cards.map((p) => {
-                    const i = ordered.indexOf(p);
-                    return (
-                      <button
-                        key={p.id}
-                        className={`mp-card ${i === index ? 'active' : ''} ${p.connected ? 'connected' : ''} ${p.inUse ? 'in-use' : ''}`}
-                        onMouseEnter={() => setIndex(i)}
-                        onClick={() => setProvider(p.id)}
-                      >
-                        <ProviderLogo id={p.id} name={p.name} size={44} />
-                        <span className="mp-card-body">
-                          <span className="mp-card-name">{p.name}</span>
-                          <span className="mp-card-meta">
-                            {t('nModels', { n: p.count })}
-                            {p.maxContext ? ` · ${t('upTo')} ${fmtCtx(p.maxContext)}` : ''}
-                            {p.local
-                              ? ` · ${t('free')}`
-                              : p.minPrice !== null
-                                ? ` · ${t('from')} ${fmtPrice(p.minPrice)}`
-                                : ''}
-                          </span>
-                          <span className="mp-card-status">
-                            {p.inUse && <span className="mp-badge cur">{t('inUse')}</span>}
-                            {p.local && <span className="mp-badge local">{t('fLocal')}</span>}
-                            {p.connected ? (
-                              <span className="mp-ok">● {t('connected')}</span>
-                            ) : (
-                              <span className="dim">○ {t('notConnected')}</span>
-                            )}
-                          </span>
-                        </span>
-                        <span className="mp-card-go">›</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+        {pick ? (
+          <div className="mp-pick-hint dim">{t('mpPickHint')}</div>
+        ) : (
+          <div className="mp-roles" role="tablist">
+            {(['chat', 'agent', 'inline'] as AiRole[]).map((r) => (
               <button
-                className="mp-card add"
-                onClick={() => setState({ modal: { kind: 'providers' } })}
+                key={r}
+                role="tab"
+                aria-selected={role === r}
+                className={`mp-role ${role === r ? 'on' : ''}`}
+                onClick={() => setRole(r)}
               >
-                <span className="mp-avatar add">＋</span>
-                <span className="mp-card-body">
-                  <span className="mp-card-name">{t('connectProvider')}</span>
-                  <span className="mp-card-meta">{t('allProvidersHint')}</span>
+                {ROLE_LABEL[r]()}
+                <span className="mp-role-model">
+                  {r === 'chat'
+                    ? (settings.defaultModel ?? t('noModel'))
+                    : (settings.roles[r] ?? t('sameAsChat'))}
                 </span>
               </button>
-              {providerCards.length === 0 && (
-                <div className="mp-empty">{loading ? '…' : t('noMatches')}</div>
-              )}
-            </div>
-          ) : (
-            <div className="mp-list" ref={list}>
-              {provider && (
-                <div className="mp-crumb">
-                  <button onClick={() => setProvider(null)}>← {t('providersTitle')}</button>
-                  <ProviderLogo id={provider} name={openProvider?.name} size={30} />
-                  <span className="mp-crumb-name">{openProvider?.name ?? provider}</span>
-                  <span className="dim">{t('nModels', { n: visible.length })}</span>
-                  <span className="spacer" />
-                  {openProvider && !openProvider.connected && (
-                    <button
-                      className="primary"
-                      onClick={() =>
-                        setState({ modal: { kind: 'providers', focus: openProvider.id } })
-                      }
-                    >
-                      <Icon name="key" size={13} /> {t('connect')} {openProvider.name}
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="mp-row mp-header">
-                <span />
-                <span>{t('model')}</span>
-                <span className="num">{t('context')}</span>
-                <span className="num">{t('priceIn')}</span>
-                <span className="num">{t('priceOut')}</span>
-                <span>{t('capabilities')}</span>
-                <span />
-              </div>
-              {visible.map((r, i) => (
-                <div
-                  key={r.ref}
-                  className={`mp-row ${i === index ? 'active' : ''} ${r.ref === effective ? 'current' : ''} ${r.connected ? '' : 'locked'}`}
-                  onMouseEnter={() => setIndex(i)}
-                  onDoubleClick={() => void choose(r)}
-                >
-                  <button
-                    className={`mp-star ${favs.has(r.ref) ? 'on' : ''}`}
-                    onClick={() => toggleFav(r.ref)}
-                    title={t('fFavorites')}
-                  >
-                    {favs.has(r.ref) ? '★' : '☆'}
-                  </button>
-                  <span className="mp-name-row">
-                    <ProviderLogo id={r.provider} name={r.providerName} size={26} />
-                    <span className="mp-name">
-                      <span className="mp-label">
-                        {r.label}
-                        {r.ref === effective && <span className="mp-badge cur">{t('inUse')}</span>}
-                        {r.local && <span className="mp-badge local">{t('fLocal')}</span>}
-                      </span>
-                      <span className="mp-id">
-                        {r.providerName} · {r.id}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="num">{fmtCtx(r.context)}</span>
-                  <span className="num">{r.local ? t('free') : fmtPrice(r.inputPrice)}</span>
-                  <span className="num">{r.local ? t('free') : fmtPrice(r.outputPrice)}</span>
-                  <span className="mp-caps">
-                    <span className={r.tools ? '' : 'off'} title={t('fTools')}>
-                      <Icon name="wrench" size={14} />
-                    </span>
-                    <span className={r.vision ? '' : 'off'} title={t('fVision')}>
-                      <Icon name="eye" size={14} />
-                    </span>
-                    <span className={r.reasoning ? '' : 'off'} title={t('fReasoning')}>
-                      <Icon name="thinking" size={14} />
-                    </span>
-                  </span>
-                  <button
-                    className={r.connected ? 'primary mp-use' : 'mp-use'}
-                    onClick={() => void choose(r)}
-                  >
-                    {r.connected ? (
-                      t('use')
-                    ) : (
-                      <>
-                        <Icon name="key" size={12} /> {t('connect')}
-                      </>
-                    )}
-                  </button>
-                </div>
-              ))}
-              {visible.length === 0 && (
-                <div className="mp-empty">{loading ? '…' : t('noMatches')}</div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="mp-foot">
-          <span className="dim">
-            {t('pricesNote')}
-            {errors.length > 0 && ' · '}
-          </span>
-          {errors.map((e) => (
-            <span key={e.provider} className="err" title={e.error}>
-              <Icon name="warning" size={12} /> {e.provider}
-            </span>
-          ))}
-          <span className="spacer" />
-          <span className="dim">↑↓ Enter · {t('doubleClick')}</span>
-        </div>
+            ))}
+          </div>
+        )}
+        <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
+          <Icon name="close" size={16} />
+        </button>
       </div>
-    </div>
+
+      <div className="mp-toolbar">
+        <input
+          autoFocus
+          className="mp-search"
+          value={query}
+          aria-label={t('searchModels', { n: rows.length - hiddenCount })}
+          placeholder={t('searchModels', { n: rows.length - hiddenCount })}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            const max = (gridMode ? ordered.length : visible.length) - 1;
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+              e.preventDefault();
+              setIndex((i) => Math.max(0, Math.min(i + 1, max)));
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+              e.preventDefault();
+              setIndex((i) => Math.max(i - 1, 0));
+            } else if (e.key === 'Enter') {
+              if (gridMode && ordered[index]) setProvider(ordered[index]!.id);
+              else if (!gridMode && visible[index]) void choose(visible[index]!);
+            }
+          }}
+        />
+        <select
+          className="mp-sort"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as Sort)}
+          title={t('sortBy')}
+          aria-label={t('sortBy')}
+        >
+          <option value="recommended">{t('sortRecommended')}</option>
+          <option value="price">{t('sortPrice')}</option>
+          <option value="context">{t('sortContext')}</option>
+          <option value="name">{t('sortName')}</option>
+        </select>
+        <button
+          onClick={() => void refresh()}
+          disabled={loading}
+          title={t('refreshModels')}
+          aria-label={t('refreshModels')}
+          aria-busy={loading}
+        >
+          {loading ? '…' : <Icon name="refresh" size={14} />}
+        </button>
+      </div>
+      <div className="mp-chips">
+        {chip('connected', 'check', t('fConnected'))}
+        {chip('fav', 'star', t('fFavorites'))}
+        {chip('tools', 'wrench', t('fTools'))}
+        {chip('vision', 'eye', t('fVision'))}
+        {chip('reasoning', 'thinking', t('fReasoning'))}
+        {chip('long', 'books', '≥200k')}
+        {chip('cheap', 'dollar', t('fCheap'))}
+        {chip('local', 'home', t('fLocal'))}
+        {(hiddenCount > 0 || showOld) && (
+          <button
+            className={`mp-chip ${showOld ? 'on' : ''}`}
+            aria-pressed={showOld}
+            onClick={() => setShowOld((v) => !v)}
+            title={t('mpOldHint')}
+          >
+            <Icon name="clock" size={13} />
+            {showOld ? t('mpHideOld') : t('mpShowOld', { n: hiddenCount })}
+          </button>
+        )}
+        {pick?.current && (
+          <button
+            className="mp-chip reset"
+            onClick={() => {
+              close();
+              pick.onPick(null);
+            }}
+          >
+            <Icon name="undo" size={13} /> {t('chatModelDefault')}
+          </button>
+        )}
+        {!pick && role !== 'chat' && settings.roles[role] && (
+          <button
+            className="mp-chip reset"
+            onClick={async () => {
+              await api().ai.setRole(role, null);
+              await refreshSettings();
+            }}
+          >
+            <Icon name="undo" size={13} /> {t('sameAsChat')}
+          </button>
+        )}
+      </div>
+
+      <div className="mp-body">
+        {gridMode ? (
+          <div className="mp-grid" ref={list}>
+            {sections.map((g) => (
+              <div key={g.key} className="mp-section">
+                <div className="mp-section-title">
+                  {g.title} <span className="dim">{g.cards.length}</span>
+                </div>
+                {g.cards.map((p) => {
+                  const i = ordered.indexOf(p);
+                  return (
+                    <button
+                      key={p.id}
+                      className={`mp-card ${i === index ? 'active' : ''} ${p.connected ? 'connected' : ''} ${p.inUse ? 'in-use' : ''}`}
+                      onMouseEnter={() => setIndex(i)}
+                      onClick={() => setProvider(p.id)}
+                    >
+                      <ProviderLogo id={p.id} name={p.name} size={44} />
+                      <span className="mp-card-body">
+                        <span className="mp-card-name">{p.name}</span>
+                        <span className="mp-card-meta">
+                          {t('nModels', { n: p.count })}
+                          {p.maxContext ? ` · ${t('upTo')} ${fmtCtx(p.maxContext)}` : ''}
+                          {p.local
+                            ? ` · ${t('free')}`
+                            : p.minPrice !== null
+                              ? ` · ${t('from')} ${fmtPrice(p.minPrice)}`
+                              : ''}
+                        </span>
+                        <span className="mp-card-status">
+                          {p.inUse && <span className="mp-badge cur">{t('inUse')}</span>}
+                          {p.local && <span className="mp-badge local">{t('fLocal')}</span>}
+                          {p.connected ? (
+                            <span className="mp-ok">● {t('connected')}</span>
+                          ) : (
+                            <span className="dim">○ {t('notConnected')}</span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="mp-card-go">›</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            <button
+              className="mp-card add"
+              onClick={() => setState({ modal: { kind: 'providers' } })}
+            >
+              <span className="mp-avatar add">
+                <Icon name="plus" size={20} />
+              </span>
+              <span className="mp-card-body">
+                <span className="mp-card-name">{t('connectProvider')}</span>
+                <span className="mp-card-meta">{t('allProvidersHint')}</span>
+              </span>
+            </button>
+            {providerCards.length === 0 && (
+              <div className="mp-empty">{loading ? '…' : t('noMatches')}</div>
+            )}
+          </div>
+        ) : (
+          <div className="mp-list" ref={list}>
+            {provider && (
+              <div className="mp-crumb">
+                <button onClick={() => setProvider(null)}>
+                  <Icon name="back" size={13} /> {t('providersTitle')}
+                </button>
+                <ProviderLogo id={provider} name={openProvider?.name} size={30} />
+                <span className="mp-crumb-name">{openProvider?.name ?? provider}</span>
+                <span className="dim">{t('nModels', { n: visible.length })}</span>
+                <span className="spacer" />
+                {openProvider && !openProvider.connected && (
+                  <button
+                    className="primary"
+                    onClick={() =>
+                      setState({ modal: { kind: 'providers', focus: openProvider.id } })
+                    }
+                  >
+                    <Icon name="key" size={13} /> {t('connect')} {openProvider.name}
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="mp-row mp-header">
+              <span />
+              <span>{t('model')}</span>
+              <span className="num">{t('context')}</span>
+              <span className="num">{t('priceIn')}</span>
+              <span className="num">{t('priceOut')}</span>
+              <span>{t('capabilities')}</span>
+              <span />
+            </div>
+            {visible.map((r, i) => (
+              <div
+                key={r.ref}
+                className={`mp-row ${i === index ? 'active' : ''} ${r.ref === effective ? 'current' : ''} ${r.connected ? '' : 'locked'}`}
+                onMouseEnter={() => setIndex(i)}
+                onDoubleClick={() => void choose(r)}
+              >
+                <button
+                  className={`mp-star ${favs.has(r.ref) ? 'on' : ''}`}
+                  onClick={() => toggleFav(r.ref)}
+                  title={t('fFavorites')}
+                  aria-label={`${t('fFavorites')}: ${r.label}`}
+                  aria-pressed={favs.has(r.ref)}
+                >
+                  <Icon name="star" size={14} />
+                </button>
+                <span className="mp-name-row">
+                  <ProviderLogo id={r.provider} name={r.providerName} size={26} />
+                  <span className="mp-name">
+                    <span className="mp-label">
+                      {r.label}
+                      {r.ref === effective && <span className="mp-badge cur">{t('inUse')}</span>}
+                      {r.local && <span className="mp-badge local">{t('fLocal')}</span>}
+                    </span>
+                    <span className="mp-id">
+                      {r.providerName} · {r.id}
+                    </span>
+                  </span>
+                </span>
+                <span className="num">{fmtCtx(r.context)}</span>
+                <span className="num">{r.local ? t('free') : fmtPrice(r.inputPrice)}</span>
+                <span className="num">{r.local ? t('free') : fmtPrice(r.outputPrice)}</span>
+                <span className="mp-caps">
+                  <span className={r.tools ? '' : 'off'} title={t('fTools')}>
+                    <Icon name="wrench" size={14} />
+                  </span>
+                  <span className={r.vision ? '' : 'off'} title={t('fVision')}>
+                    <Icon name="eye" size={14} />
+                  </span>
+                  <span className={r.reasoning ? '' : 'off'} title={t('fReasoning')}>
+                    <Icon name="thinking" size={14} />
+                  </span>
+                </span>
+                <button
+                  className={r.connected ? 'primary mp-use' : 'mp-use'}
+                  onClick={() => void choose(r)}
+                >
+                  {r.connected ? (
+                    t('use')
+                  ) : (
+                    <>
+                      <Icon name="key" size={12} /> {t('connect')}
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+            {visible.length === 0 && (
+              <div className="mp-empty">{loading ? '…' : t('noMatches')}</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="mp-foot">
+        <span className="dim">
+          {t('pricesNote')}
+          {errors.length > 0 && ' · '}
+        </span>
+        {errors.map((e) => (
+          <span key={e.provider} className="err" title={e.error}>
+            <Icon name="warning" size={12} />{' '}
+            {providers.find((p) => p.id === e.provider)?.name ?? e.provider}: {e.error}
+          </span>
+        ))}
+        <span className="spacer" />
+        <span className="dim">↑↓ Enter · {t('doubleClick')}</span>
+      </div>
+    </ModalShell>
   );
 }

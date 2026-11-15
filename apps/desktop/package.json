@@ -21,6 +21,7 @@
     "install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows.ps1",
     "install:local": "node scripts/install-local.mjs",
     "smoke": "node scripts/smoke.mjs /tmp",
+    "smoke:video": "node scripts/video-e2e.mjs",
     "dist:especial": "pnpm build && node scripts/build-especial.mjs"
   },
   "dependencies": {

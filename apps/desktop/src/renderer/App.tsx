@@ -41,15 +41,49 @@ import {
 } from './store';
 import { t } from './i18n';
 
-/** Drag handle that resizes a neighbour; persists nothing (kept simple on purpose). */
-function Sash({ dir, onDrag }: { dir: 'x' | 'y'; onDrag: (delta: number) => void }) {
+/** Pixels a separator moves per arrow key press. */
+const SASH_STEP = 16;
+
+/**
+ * Drag handle that resizes a neighbour. `onStart` runs when a drag (or a key press) begins,
+ * so the owner can sync its stored size with the size actually shown; `onDrag` then gets
+ * the movement since the previous call (the owner adds it with a functional setState, so
+ * every move builds on the latest size). Focusable: ←/→ (or ↑/↓) move it SASH_STEP px.
+ */
+function Sash({
+  dir,
+  label,
+  onStart,
+  onDrag,
+}: {
+  dir: 'x' | 'y';
+  label: string;
+  onStart?: () => void;
+  onDrag: (delta: number) => void;
+}) {
   const last = useRef(0);
   return (
     <div
       className={`sash sash-${dir}`}
+      role="separator"
+      // A vertical bar (between columns) resizes horizontally, and the other way round.
+      aria-orientation={dir === 'x' ? 'vertical' : 'horizontal'}
+      aria-label={label}
+      title={label}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        const back = dir === 'x' ? 'ArrowLeft' : 'ArrowUp';
+        const fwd = dir === 'x' ? 'ArrowRight' : 'ArrowDown';
+        if (e.key !== back && e.key !== fwd) return;
+        e.preventDefault();
+        onStart?.();
+        onDrag(e.key === fwd ? SASH_STEP : -SASH_STEP);
+      }}
       onMouseDown={(e) => {
         e.preventDefault();
+        onStart?.();
         last.current = dir === 'x' ? e.clientX : e.clientY;
+        const cls = dir === 'x' ? 'dragging' : 'dragging-y';
         const move = (ev: MouseEvent) => {
           const now = dir === 'x' ? ev.clientX : ev.clientY;
           onDrag(now - last.current);
@@ -58,9 +92,9 @@ function Sash({ dir, onDrag }: { dir: 'x' | 'y'; onDrag: (delta: number) => void
         const up = () => {
           window.removeEventListener('mousemove', move);
           window.removeEventListener('mouseup', up);
-          document.body.classList.remove('dragging');
+          document.body.classList.remove(cls);
         };
-        document.body.classList.add('dragging');
+        document.body.classList.add(cls);
         window.addEventListener('mousemove', move);
         window.addEventListener('mouseup', up);
       }}
@@ -70,8 +104,41 @@ function Sash({ dir, onDrag }: { dir: 'x' | 'y'; onDrag: (delta: number) => void
 
 const CHAT_W_KEY = 'zs.chatWidth';
 const SIDE_W_KEY = 'zs.sideWidth';
+const PANEL_H_KEY = 'zs.panelHeight';
 /** Room the editor keeps between the side bar and the chat, so neither squeezes it flat. */
 const CENTER_MIN = 360;
+/** Height kept for the editor (and the status bar) above the bottom panel. */
+const PANEL_ROOM = 180;
+const PANEL_MIN = 100;
+
+/** The height the user last dragged the bottom panel to. */
+function initialPanelHeight(): number {
+  const saved = Number(localStorage.getItem(PANEL_H_KEY));
+  return saved >= PANEL_MIN ? saved : 260;
+}
+
+/** Notifications: their own component so a toast does not re-render the whole app. The live
+ *  region is always mounted, so screen readers announce each new message. */
+function Toast() {
+  const toast = useStore((s) => s.toast);
+  return (
+    <div className="toast-live" role="status" aria-live="polite">
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+/** Changed-files badge on the Git icon. Separate, so `fs:changed` bursts (an agent writing
+ *  many files) do not re-render the whole app. */
+function GitBadgeWatcher() {
+  const workspaceRoot = useStore((s) => s.workspace?.root);
+  const fsVersion = useStore((s) => s.fsVersion);
+  useEffect(() => {
+    const timer = setTimeout(() => void refreshGitBadge(), 400);
+    return () => clearTimeout(timer);
+  }, [workspaceRoot, fsVersion]);
+  return null;
+}
 
 /** The width the user last dragged the side bar to; otherwise a fifth of the window. */
 function initialSideWidth(): number {
@@ -87,48 +154,11 @@ function initialChatWidth(): number {
   return Math.round(Math.min(640, Math.max(400, window.innerWidth * 0.36)));
 }
 
-export function App() {
-  const sidebar = useStore((s) => s.sidebar);
-  const panelOpen = useStore((s) => s.panelOpen);
-  const chatOpen = useStore((s) => s.chatOpen);
-  const chatSplit = useStore((s) => Boolean(s.chatSplit));
-  const chatList = useStore((s) => s.chatList);
-  const noTabs = useStore((s) => s.tabs.length === 0);
-  const toast = useStore((s) => s.toast);
-  const [sideW, setSideW] = useState(initialSideWidth);
-  const [chatW, setChatW] = useState(initialChatWidth);
-  const [winW, setWinW] = useState(window.innerWidth);
-  const [panelH, setPanelH] = useState(260);
-  const [terminalMounted, setTerminalMounted] = useState(false);
-  const maxWanted = useStore((s) => s.maximized);
-  // Only an area that is showing can fill the window.
-  const max =
-    (maxWanted === 'side' && sidebar) ||
-    (maxWanted === 'panel' && panelOpen) ||
-    (maxWanted === 'editor' && !noTabs)
-      ? maxWanted
-      : null;
-  // The Panel de Edición takes the editor's place (and the side bar's): the chat stays.
-  const design = sidebar === 'design';
-  const chatWide = chatOpen && noTabs && !panelOpen && !max && !design;
-  // On a narrow window the side bar gives way first, then the chat, so the editor keeps
-  // CENTER_MIN. The dragged widths are kept and come back when the window grows.
-  const room = winW - 48 - CENTER_MIN;
-  const chatShown = chatOpen && !chatWide;
-  // Two chats side by side (and the list of chats) need their own room: below this
-  // each pane gets squeezed and its contents spill out.
-  const chatMin = (chatSplit ? 620 : 280) + (chatList ? 190 : 0);
-  const sideShown = sidebar && !design
-    ? Math.max(160, Math.min(sideW, room - (chatShown ? Math.min(chatW, chatMin + 120) : 0)))
-    : 0;
-  const chatShownW = Math.min(
-    Math.max(280, winW - 48 - sideShown - 160),
-    Math.max(chatMin, Math.min(chatW, room - sideShown)),
-  );
+/** Drop a folder (or a file) anywhere in the window to open it. Capture phase so the editor
+ *  does not swallow the drop as text. Own component: the "dragging" state re-renders only
+ *  the overlay. */
+function DropOverlay() {
   const [dragging, setDragging] = useState(false);
-
-  // Drop a folder (or a file) anywhere in the window to open it. Capture phase so the
-  // editor does not swallow the drop as text.
   useEffect(() => {
     let depth = 0;
     // Images dropped on the chat's message box are attachments (Chat.tsx), not a folder to open.
@@ -185,11 +215,94 @@ export function App() {
       window.removeEventListener('drop', drop, true);
     };
   }, []);
+  if (!dragging) return null;
+  return (
+    <div className="drop-overlay">
+      <div className="drop-box">
+        <div className="drop-icon">
+          <Icon name="folder" size={30} />
+        </div>
+        {t('dropRelease')}
+      </div>
+    </div>
+  );
+}
+
+export function App() {
+  const sidebar = useStore((s) => s.sidebar);
+  const panelOpen = useStore((s) => s.panelOpen);
+  const chatOpen = useStore((s) => s.chatOpen);
+  const chatSplit = useStore((s) => Boolean(s.chatSplit));
+  const chatList = useStore((s) => s.chatList);
+  const noTabs = useStore((s) => s.tabs.length === 0);
+  const [sideW, setSideW] = useState(initialSideWidth);
+  const [chatW, setChatW] = useState(initialChatWidth);
+  const [winW, setWinW] = useState(window.innerWidth);
+  const [winH, setWinH] = useState(window.innerHeight);
+  const [panelH, setPanelH] = useState(initialPanelHeight);
+  const [terminalMounted, setTerminalMounted] = useState(false);
+  const maxWanted = useStore((s) => s.maximized);
+  // Only an area that is showing can fill the window.
+  const max =
+    (maxWanted === 'side' && sidebar) ||
+    (maxWanted === 'panel' && panelOpen) ||
+    (maxWanted === 'editor' && !noTabs)
+      ? maxWanted
+      : null;
+  // The Panel de Edición takes the editor's place (and the side bar's): the chat stays.
+  const design = sidebar === 'design';
+  const chatWide = chatOpen && noTabs && !panelOpen && !max && !design;
+  // On a narrow window the side bar gives way first, then the chat, so the editor keeps
+  // CENTER_MIN. The dragged widths are kept and come back when the window grows.
+  const room = winW - 48 - CENTER_MIN;
+  const chatShown = chatOpen && !chatWide;
+  // Two chats side by side (and the list of chats) need their own room: below this
+  // each pane gets squeezed and its contents spill out.
+  const chatMin = (chatSplit ? 620 : 280) + (chatList ? 190 : 0);
+  const sideShown = sidebar && !design
+    ? Math.max(160, Math.min(sideW, room - (chatShown ? Math.min(chatW, chatMin + 120) : 0)))
+    : 0;
+  const chatShownW = Math.min(
+    Math.max(280, winW - 48 - sideShown - 160),
+    Math.max(chatMin, Math.min(chatW, room - sideShown)),
+  );
+  // The bottom panel never takes the whole window: the editor keeps PANEL_ROOM px.
+  const panelMax = Math.max(PANEL_MIN, winH - PANEL_ROOM);
+  const panelShownH = Math.max(PANEL_MIN, Math.min(panelH, panelMax));
+
+  // When the window shrinks so far that the editor would drop under CENTER_MIN, the list
+  // of chats closes (the conversation stays). Only on resize: opening the list on a narrow
+  // window is the user's choice.
+  const layout = useRef({ center: 0, chatList: false, chatShown: false });
+  layout.current = {
+    center: winW - 48 - sideShown - (chatShown ? chatShownW : 0),
+    chatList: Boolean(chatList),
+    chatShown,
+  };
+  const prevWinW = useRef(winW);
+  useEffect(() => {
+    const shrank = winW < prevWinW.current;
+    prevWinW.current = winW;
+    const l = layout.current;
+    if (shrank && l.chatShown && l.chatList && l.center < CENTER_MIN) setState({ chatList: false });
+  }, [winW]);
 
   useEffect(() => {
-    const onResize = () => setWinW(window.innerWidth);
+    // One layout pass per frame while the window is being resized.
+    let frame = 0;
+    const onResize = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        setWinW(window.innerWidth);
+        setWinH(window.innerHeight);
+      });
+    };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
@@ -230,13 +343,29 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
-  // Changed-files badge on the Git icon.
-  const workspaceRoot = useStore((s) => s.workspace?.root);
-  const fsVersion = useStore((s) => s.fsVersion);
-  useEffect(() => {
-    const timer = setTimeout(() => void refreshGitBadge(), 400);
-    return () => clearTimeout(timer);
-  }, [workspaceRoot, fsVersion]);
+  // Separators. A drag starts from the size actually shown (it can be smaller than the stored
+  // one on a narrow window), then each move adds its delta to the latest size; the result is
+  // clamped and remembered for the next launch.
+  const sideMaxW = 900;
+  const chatMaxW = chatSplit ? 1600 : 900;
+  const dragSide = (d: number) =>
+    setSideW((w) => {
+      const next = Math.min(sideMaxW, Math.max(160, w + d));
+      localStorage.setItem(SIDE_W_KEY, String(Math.round(next)));
+      return next;
+    });
+  const dragChat = (d: number) =>
+    setChatW((w) => {
+      const next = Math.min(chatMaxW, Math.max(280, w - d));
+      localStorage.setItem(CHAT_W_KEY, String(Math.round(next)));
+      return next;
+    });
+  const dragPanel = (d: number) =>
+    setPanelH((h) => {
+      const next = Math.min(panelMax, Math.max(PANEL_MIN, h - d));
+      localStorage.setItem(PANEL_H_KEY, String(Math.round(next)));
+      return next;
+    });
 
   useEffect(() => {
     void (async () => {
@@ -336,13 +465,9 @@ export function App() {
             {!max && (
               <Sash
                 dir="x"
-                onDrag={(d) =>
-                  setSideW(() => {
-                    const next = Math.min(900, Math.max(160, sideShown + d));
-                    localStorage.setItem(SIDE_W_KEY, String(Math.round(next)));
-                    return next;
-                  })
-                }
+                label={t('resizeSidebar')}
+                onStart={() => setSideW(sideShown)}
+                onDrag={dragSide}
               />
             )}
           </>
@@ -364,11 +489,13 @@ export function App() {
               {!max && (
                 <Sash
                   dir="y"
-                  onDrag={(d) => setPanelH((h) => Math.min(800, Math.max(100, h - d)))}
+                  label={t('resizePanel')}
+                  onStart={() => setPanelH(panelShownH)}
+                  onDrag={dragPanel}
                 />
               )}
               <div
-                style={max === 'panel' ? { flex: 1, minHeight: 0 } : { height: panelH }}
+                style={max === 'panel' ? { flex: 1, minHeight: 0 } : { height: panelShownH }}
                 className="panel-wrap"
               >
                 <TerminalPanel />
@@ -380,13 +507,9 @@ export function App() {
         {chatOpen && !chatWide && !max && (
           <Sash
             dir="x"
-            onDrag={(d) =>
-              setChatW(() => {
-                const next = Math.min(chatSplit ? 1600 : 900, Math.max(280, chatShownW - d));
-                localStorage.setItem(CHAT_W_KEY, String(Math.round(next)));
-                return next;
-              })
-            }
+            label={t('resizeChat')}
+            onStart={() => setChatW(chatShownW)}
+            onDrag={dragChat}
           />
         )}
         <aside
@@ -407,17 +530,9 @@ export function App() {
         <NoticeBanner />
         <UpdateBanner />
       </div>
-      {toast && <div className="toast">{toast}</div>}
-      {dragging && (
-        <div className="drop-overlay">
-          <div className="drop-box">
-            <div className="drop-icon">
-              <Icon name="folder" size={30} />
-            </div>
-            {t('dropRelease')}
-          </div>
-        </div>
-      )}
+      <Toast />
+      <DropOverlay />
+      <GitBadgeWatcher />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { SearchHit } from '../../shared/api';
 import { globToRegExp } from '../../shared/glob';
 import { confirmDialog } from '../confirm';
+import { errText } from '../errText';
 import { t } from '../i18n';
 import { api, getState, openFile, reloadFromDisk, toast, useStore } from '../store';
 import { fileIcon } from './icons';
@@ -95,6 +96,7 @@ function Toggle({
     <button
       className={`sx-toggle ${on ? 'on' : ''}`}
       title={title}
+      aria-label={title}
       aria-pressed={on}
       onClick={onClick}
     >
@@ -123,6 +125,8 @@ export function SearchView() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
   const [nonce, setNonce] = useState(0);
+  // A search that failed (ripgrep missing, bad pattern…) is not "no results".
+  const [searchErr, setSearchErr] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
 
@@ -153,6 +157,7 @@ export function SearchView() {
     if (mode !== 'content' || !workspace || !query || reError) {
       setHits([]);
       setMs(null);
+      setSearchErr(null);
       return;
     }
     // A slower, older search must not overwrite the results of a newer one.
@@ -165,9 +170,15 @@ export function SearchView() {
           ? `\\b(?:${regex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`
           : query;
         const found = await api().workspace.search(q, regex || word, matchCase);
-        if (!stale) setHits(found);
-      } catch {
-        if (!stale) setHits([]);
+        if (!stale) {
+          setHits(found);
+          setSearchErr(null);
+        }
+      } catch (e) {
+        if (!stale) {
+          setHits([]);
+          setSearchErr(errText(e));
+        }
       } finally {
         if (!stale) {
           setMs(Math.round(performance.now() - t0));
@@ -188,12 +199,22 @@ export function SearchView() {
 
   // File list for "by name" mode.
   useEffect(() => {
-    if (mode === 'name' && workspace) void api().workspace.listFiles().then(setFiles);
+    if (mode !== 'name' || !workspace) return;
+    setSearchErr(null);
+    void api()
+      .workspace.listFiles()
+      .then(setFiles)
+      .catch((e: unknown) => setSearchErr(errText(e)));
   }, [mode, workspace, fsVersion]);
 
   const grouped = useMemo(() => {
     const m = new Map<string, SearchHit[]>();
-    for (const h of hits) if (pathFilter(h.path)) m.set(h.path, [...(m.get(h.path) ?? []), h]);
+    for (const h of hits) {
+      if (!pathFilter(h.path)) continue;
+      const l = m.get(h.path);
+      if (l) l.push(h);
+      else m.set(h.path, [h]);
+    }
     return [...m];
   }, [hits, pathFilter]);
 
@@ -251,8 +272,9 @@ export function SearchView() {
   const replaceIn = async (paths: string[]) => {
     if (!goodRe || !paths.length) return;
     const total = grouped.filter(([p]) => paths.includes(p)).reduce((n, [, l]) => n + l.length, 0);
+    // Several matches (even in one file) are confirmed: the change is written straight to disk.
     if (
-      paths.length > 1 &&
+      (paths.length > 1 || total > 1) &&
       !(await confirmDialog(
         t('replaceConfirm', { n: total, f: paths.length, s: query, r: replace }),
       ))
@@ -291,18 +313,24 @@ export function SearchView() {
           {mode === 'content' && grouped.length > 0 && (
             <button
               title={collapsed.size ? t('expandAll') : t('collapseAll')}
+              aria-label={collapsed.size ? t('expandAll') : t('collapseAll')}
               onClick={() =>
                 setCollapsed(collapsed.size ? new Set() : new Set(grouped.map(([p]) => p)))
               }
             >
-              {collapsed.size ? '⊞' : '⊟'}
+              <span aria-hidden="true">{collapsed.size ? '⊞' : '⊟'}</span>
             </button>
           )}
-          <button title={t('refresh')} onClick={() => setNonce((n) => n + 1)}>
+          <button
+            title={t('refresh')}
+            aria-label={t('refresh')}
+            onClick={() => setNonce((n) => n + 1)}
+          >
             <Icon name="refresh" size={14} />
           </button>
           <button
             title={t('clear')}
+            aria-label={t('clear')}
             onClick={() => {
               setQuery('');
               setReplace('');
@@ -338,9 +366,12 @@ export function SearchView() {
             <button
               className={`sx-chevron ${showReplace ? 'open' : ''}`}
               title={t('toggleReplace')}
+              aria-label={t('toggleReplace')}
+              aria-expanded={showReplace}
+              aria-pressed={showReplace}
               onClick={() => setShowReplace(!showReplace)}
             >
-              ›
+              <span aria-hidden="true">›</span>
             </button>
           )}
           <div className={`sx-field ${reError ? 'error' : ''}`}>
@@ -406,6 +437,7 @@ export function SearchView() {
               <button
                 className="sx-toggle"
                 title={t('replaceAll')}
+                aria-label={t('replaceAll')}
                 disabled={!grouped.length}
                 onClick={() => void replaceIn(grouped.map(([p]) => p))}
               >
@@ -451,6 +483,13 @@ export function SearchView() {
           t('openFolder')
         ) : !query ? (
           ''
+        ) : searchErr ? (
+          <span className="sx-warn" role="alert">
+            {t('searchFailed', { err: searchErr })}
+          </span>
+        ) : capped && !grouped.length ? (
+          // Every result of the (capped) search was hidden by the filters: more may exist.
+          <span className="sx-warn">{t('searchCappedFiltered')}</span>
         ) : nResults ? (
           <>
             {mode === 'content'
@@ -509,7 +548,9 @@ export function SearchView() {
                   title={path}
                   onClick={() => activateRow(head)}
                 >
-                  <span className={`sx-caret ${isOpen ? 'open' : ''}`}>›</span>
+                  <span className={`sx-caret ${isOpen ? 'open' : ''}`} aria-hidden="true">
+                    ›
+                  </span>
                   <span className="sx-ficon">{fileIcon(path)}</span>
                   <span className="sx-fname">{name}</span>
                   <span className="sx-fdir">{dir}</span>
@@ -517,6 +558,7 @@ export function SearchView() {
                     <button
                       className="sx-mini"
                       title={t('replaceInFile')}
+                      aria-label={t('replaceInFile')}
                       onClick={(e) => {
                         e.stopPropagation();
                         void replaceIn([path]);

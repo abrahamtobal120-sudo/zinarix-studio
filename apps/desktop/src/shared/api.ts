@@ -40,7 +40,7 @@ export interface FileContent {
 
 /** Raw slice of a file: `bytes` starts at the requested offset; `size` is the whole file. */
 export interface FileBytes {
-  bytes: Uint8Array;
+  bytes: Uint8Array<ArrayBuffer>;
   size: number;
 }
 
@@ -1503,7 +1503,11 @@ export interface OmniApi {
     thumbnails(path: string, duration: number, count: number): Promise<string>;
     waveform(path: string): Promise<{ peaksPerSecond: number; peaks: number[] }>;
     /** Saves (asking where when there is no path or saveAs); null when canceled. */
-    saveProject(project: VideoProject, path: string | null, saveAs: boolean): Promise<string | null>;
+    saveProject(
+      project: VideoProject,
+      path: string | null,
+      saveAs: boolean,
+    ): Promise<string | null>;
     /** Opens a .zvproj (asking which when no path); media paths come back absolute. */
     openProject(path: string | null): Promise<{ path: string; project: VideoProject } | null>;
     /** Crash recovery copy (null clears it). */

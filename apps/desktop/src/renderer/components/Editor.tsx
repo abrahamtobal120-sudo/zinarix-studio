@@ -1,5 +1,6 @@
 import { Icon } from './Icon';
 import { useEffect, useRef } from 'react';
+import { tabKeyDown } from '../a11y';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
 import { registerInlineCompletions } from '../inline';
@@ -22,6 +23,7 @@ import { BrowserPane } from './Browser';
 import { WhatsAppPane } from './WhatsApp';
 import { SecuritySection } from './SecuritySection';
 import { Welcome } from './Chrome';
+import { FileViewerPane } from './FileViewers';
 
 function prefOptions(p: Prefs): monaco.editor.IEditorOptions {
   return {
@@ -87,7 +89,7 @@ export function EditorArea() {
     ed.setModel(doc?.model ?? null);
     if (doc?.viewState) ed.restoreViewState(doc.viewState);
     if (doc) ed.focus();
-  }, [active, tabs.length]);
+  }, [active, tabs.length, activeTab?.viewer]);
 
   const isBrowser = active === BROWSER_TAB;
   const isSecurity = active === SECURITY_TAB;
@@ -95,10 +97,10 @@ export function EditorArea() {
   const isWhatsApp = active === WHATSAPP_TAB;
   const hasWhatsAppTab = tabs.some((x) => x.path === WHATSAPP_TAB);
   const showEditor = Boolean(
-    activeTab && !activeTab.notice && !isBrowser && !isSecurity && !isWhatsApp,
+    activeTab && !activeTab.notice && !activeTab.viewer && !isBrowser && !isSecurity && !isWhatsApp,
   );
   return (
-    <div className="editor-area">
+    <div className="editor-area" id="editor-tabpanel" role="tabpanel">
       {tabs.length > 0 && (
         <div className="tabs" role="tablist">
           {tabs.map((tab) => (
@@ -106,9 +108,18 @@ export function EditorArea() {
               key={tab.path}
               role="tab"
               aria-selected={tab.path === active}
+              aria-controls="editor-tabpanel"
+              tabIndex={tab.path === active || (!activeTab && tab === tabs[0]) ? 0 : -1}
               className={`tab ${tab.path === active ? 'active' : ''}`}
               title={tab.path}
               onClick={() => activate(tab.path)}
+              onKeyDown={(e) =>
+                tabKeyDown(
+                  e,
+                  () => activate(tab.path),
+                  () => void closeTab(tab.path),
+                )
+              }
               onMouseDown={(e) => {
                 if (e.button === 1) {
                   e.preventDefault();
@@ -140,6 +151,7 @@ export function EditorArea() {
               <button
                 className={`tab-close ${tab.dirty ? 'dirty' : ''}`}
                 aria-label={t('close')}
+                tabIndex={-1}
                 onClick={(e) => {
                   e.stopPropagation();
                   void closeTab(tab.path);
@@ -165,6 +177,7 @@ export function EditorArea() {
       )}
       <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />
       {activeTab?.notice && <div className="notice-pane">{activeTab.notice}</div>}
+      {activeTab?.viewer && <FileViewerPane key={activeTab.path} tab={activeTab} />}
       {hasBrowserTab && <BrowserPane visible={isBrowser} />}
       {hasWhatsAppTab && <WhatsAppPane visible={isWhatsApp} />}
       {isSecurity && <SecuritySection />}

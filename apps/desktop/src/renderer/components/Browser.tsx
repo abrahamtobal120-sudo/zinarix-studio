@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BrowserStateView, BrowserTabsView } from '../../shared/api';
 import { BROWSER_TAB, api, setState, toast, useStore } from '../store';
+import { tabKeyDown } from '../a11y';
 import { t } from '../i18n';
 import { askInChat } from './Chat';
 import { Icon as UiIcon } from './Icon';
@@ -177,9 +178,17 @@ export function BrowserPane({ visible }: { visible: boolean }) {
               key={x.id}
               role="tab"
               aria-selected={x.id === tabs.active}
+              tabIndex={x.id === tabs.active || (!tabs.active && x === tabs.tabs[0]) ? 0 : -1}
               className={`browser-tab ${x.id === tabs.active ? 'on' : ''} ${x.ai ? 'ai' : ''}`}
               title={`${title}\n${who}${x.url ? `\n${x.url}` : ''}`}
               onClick={() => void api().browser.selectTab(x.id)}
+              onKeyDown={(e) =>
+                tabKeyDown(
+                  e,
+                  () => void api().browser.selectTab(x.id),
+                  () => void api().browser.closeTab(x.id),
+                )
+              }
               onAuxClick={(e) => {
                 if (e.button === 1) void api().browser.closeTab(x.id);
               }}
@@ -197,6 +206,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
                 className="browser-tab-x"
                 title={t('browserCloseTab')}
                 aria-label={t('browserCloseTab')}
+                tabIndex={-1}
                 onClick={(e) => {
                   e.stopPropagation();
                   void api().browser.closeTab(x.id);
@@ -210,6 +220,7 @@ export function BrowserPane({ visible }: { visible: boolean }) {
         <button
           className="bicon browser-tab-new"
           title={t('browserNewTab')}
+          aria-label={t('browserNewTab')}
           onClick={() => void api().browser.newTab()}
         >
           <UiIcon name="plus" size={14} />
@@ -238,8 +249,10 @@ export function BrowserPane({ visible }: { visible: boolean }) {
             disabled={!st.url}
             onClick={() => void api().browser.reload(tabs.active)}
             title={t('navReload')}
+            aria-label={t('navReload')}
           >
-            <Icon d={st.loading ? ICON.stop : ICON.reload} />
+            {/* There is no "stop loading" call in the API: never show a stop icon that reloads. */}
+            <Icon d={ICON.reload} />
           </button>
           <button
             className="bicon"

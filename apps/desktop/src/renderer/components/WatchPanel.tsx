@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WatchItem, WatchReport, WatchSettings } from '../../shared/api';
-import { t } from '../i18n';
+import { errText } from '../errText';
+import { lang, t } from '../i18n';
 import { api, openFile, setState, toast, useStore } from '../store';
 import { askAgent } from './Chat';
 import { Icon } from './Icon';
@@ -8,15 +9,17 @@ import { Icon } from './Icon';
 const EVERY = [30, 60, 120, 240, 480, 1440];
 const PER_DAY = [1, 2, 4, 8, 12];
 
-const time = (ts: number) =>
-  new Date(ts).toLocaleString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+// Dates in the app's language (not the system's), like the rest of the UI.
+const DATE_FMT = new Intl.DateTimeFormat(lang, {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const time = (ts: number) => DATE_FMT.format(ts);
 
-const every = (min: number) => (min < 60 ? `${min} min` : `${min / 60} h`);
+const every = (min: number) =>
+  min < 60 ? t('wtMinutes', { n: min }) : t('wtHours', { n: min / 60 });
 
 /** "src/a.ts:12" -> the file and the line, to open it in the editor. */
 function place(file: string): { path: string; line?: number } {
@@ -55,7 +58,7 @@ export function WatchPanel() {
     try {
       setState({ watch: await api().watch.runNow() });
     } catch (e) {
-      toast(String((e as Error).message ?? e));
+      toast(errText(e));
     } finally {
       setRunning(false);
     }
@@ -67,7 +70,7 @@ export function WatchPanel() {
       <div className="sidebar-title">
         <span>{t('wtTitle').toUpperCase()}</span>
         <span className="sidebar-actions">
-          <button title={t('wtRunNow')} disabled={busy || !root} onClick={() => void runNow()}>
+          <button title={t('wtRunNow')} aria-label={t('wtRunNow')} disabled={busy || !root} onClick={() => void runNow()}>
             <Icon name="refresh" size={14} />
           </button>
         </span>
@@ -148,6 +151,7 @@ export function WatchPanel() {
               <button
                 className="link"
                 title={t('wtDismiss')}
+                aria-label={t('wtDismiss')}
                 onClick={() =>
                   void api()
                     .watch.dismiss(r.id)

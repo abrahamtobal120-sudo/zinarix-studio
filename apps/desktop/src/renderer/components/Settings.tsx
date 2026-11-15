@@ -2,16 +2,40 @@ import { useEffect, useMemo, useState } from 'react';
 import type { BotKind, BotsStatus, ThemeId } from '../../shared/api';
 import { THEME_IDS } from '../../shared/api';
 import { commands, defaultKeys, runCommand } from '../commands';
-import { t } from '../i18n';
+import { lang, t } from '../i18n';
+import { confirmDialog } from '../confirm';
 import { comboFromEvent } from '../keys';
 import { qrEncode } from '../qr';
-import { api, refreshSettings, setState, setTheme, toast, updatePrefs, useStore } from '../store';
+import {
+  api,
+  getState,
+  refreshSettings,
+  setState,
+  setTheme,
+  toast,
+  updatePrefs,
+  useStore,
+} from '../store';
 import { THEMES } from '../themes';
 import { Icon, type IconName } from './Icon';
 import { McpSection } from './McpSettings';
 import { DocsSection, MemoriesSection } from './KnowledgeSettings';
+import { ModalShell } from './ModalShell';
 
 const close = () => setState({ modal: null });
+
+/** Saves a custom shortcut; if another command already uses it, asks before taking it over. */
+async function assignKey(id: string, combo: string): Promise<void> {
+  const other = commands().find((x) => x.id !== id && x.keys === combo);
+  if (other && !(await confirmDialog(t('setKeysConflict', { name: other.label, keys: combo })))) {
+    return;
+  }
+  const current = getState().prefs.keybindings;
+  const next: Record<string, string> = { ...current, [id]: combo };
+  // The other command loses this combination (back to its built-in shortcut, if any).
+  if (other && next[other.id] === combo) delete next[other.id];
+  await updatePrefs({ keybindings: next });
+}
 
 const FONTS = [
   "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace",
@@ -120,7 +144,7 @@ function PhoneSection() {
         </div>
         <div className="phone-url">
           <code title={url}>{url}</code>
-          <button title={t('copy')} onClick={() => copy(url)}>
+          <button title={t('copy')} aria-label={t('copy')} onClick={() => copy(url)}>
             <Icon name="copy" size={14} />
           </button>
         </div>
@@ -271,12 +295,27 @@ function BotsSection({ pin }: { pin?: string }) {
             {kind === 'discord' && b.invite && (
               <div className="phone-url">
                 <span className="small">{t('botInvite')}</span>
-                <button onClick={() => void api().app.openExternal(b.invite!)}>
+                <button
+                  title={t('botInvite')}
+                  aria-label={t('botInvite')}
+                  onClick={() => void api().app.openExternal(b.invite!)}
+                >
                   <Icon name="external" size={14} />
                 </button>
               </div>
             )}
-            <button disabled={busy} onClick={() => void run(() => api().bots.disconnect(kind))}>
+            <button
+              disabled={busy}
+              onClick={async () => {
+                if (
+                  !(await confirmDialog(t('botDisconnectConfirm', { name: title }), {
+                    danger: true,
+                  }))
+                )
+                  return;
+                void run(() => api().bots.disconnect(kind));
+              }}
+            >
               {t('botDisconnect')}
             </button>
           </>
@@ -286,6 +325,7 @@ function BotsSection({ pin }: { pin?: string }) {
             <div className="phone-url">
               <input
                 type="password"
+                aria-label={`${title} · ${t('botToken')}`}
                 placeholder={t('botToken')}
                 value={tokens[kind]}
                 onChange={(e) => setTokens({ ...tokens, [kind]: e.target.value })}
@@ -361,247 +401,258 @@ export function SettingsPanel() {
   );
 
   return (
-    <div className="modal-backdrop" onMouseDown={close}>
-      <div className="settings" onMouseDown={(e) => e.stopPropagation()}>
-        <nav className="settings-nav">
-          <div className="settings-title">
-            <Icon name="settings" size={16} /> {t('settings')}
-          </div>
-          {nav('appearance', t('setAppearance'), 'palette')}
-          {nav('editor', t('setEditor'), 'edit')}
-          {nav('ai', t('setAi'), 'agent')}
-          {nav('mcp', 'MCP', 'plug')}
-          {nav('memories', t('setMemories'), 'sparkle')}
-          {nav('docs', t('setDocsNav'), 'books')}
-          {nav('phone', t('phoneTitle'), 'smartphone')}
-          {nav('keys', t('shortcuts'), 'keyboard')}
-        </nav>
-        <div className="settings-body">
-          <button className="modal-x" onClick={close} aria-label={t('close')}>
-            ×
-          </button>
-          {section === 'appearance' && (
-            <>
-              <h3>{t('setTheme')}</h3>
-              <div className="theme-grid">
-                {THEME_IDS.map((id) => (
-                  <ThemeCard key={id} id={id} active={settings.theme === id} />
-                ))}
-              </div>
-              <h3>{t('setUiZoom')}</h3>
-              <label className="settings-field">
-                <span>{t('setUiZoomHint')}</span>
-                <span className="settings-range">
-                  <input
-                    type="range"
-                    min={50}
-                    max={300}
-                    step={5}
-                    value={prefs.uiZoom}
-                    onChange={(e) => void updatePrefs({ uiZoom: Number(e.target.value) })}
-                  />
-                  <b>{prefs.uiZoom}%</b>
-                </span>
-              </label>
-              <h3>{t('setFont')}</h3>
-              <label className="settings-field">
-                <span>{t('setFontSize')}</span>
-                <span className="settings-range">
-                  <input
-                    type="range"
-                    min={10}
-                    max={28}
-                    value={prefs.fontSize}
-                    onChange={(e) => void updatePrefs({ fontSize: Number(e.target.value) })}
-                  />
-                  <b>{prefs.fontSize}px</b>
-                </span>
-              </label>
-              <label className="settings-field">
-                <span>{t('setFontFamily')}</span>
-                <select
-                  value={FONTS.includes(prefs.fontFamily) ? prefs.fontFamily : ''}
-                  onChange={(e) => void updatePrefs({ fontFamily: e.target.value })}
-                >
-                  {!FONTS.includes(prefs.fontFamily) && (
-                    <option value="">{prefs.fontFamily}</option>
-                  )}
-                  {FONTS.map((f) => (
-                    <option key={f} value={f}>
-                      {f.split(',')[0]!.replace(/'/g, '')}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div
-                className="font-sample"
-                style={{ fontFamily: prefs.fontFamily, fontSize: prefs.fontSize }}
-              >
-                {'const saludo = (nombre) => `Hola, ${nombre}!`; // => != === 0x1F'}
-              </div>
-            </>
-          )}
-
-          {section === 'editor' && (
-            <>
-              <h3>{t('setEditor')}</h3>
-              <label className="settings-field">
-                <span>{t('setTabSize')}</span>
-                <select
-                  value={prefs.tabSize}
-                  onChange={(e) => void updatePrefs({ tabSize: Number(e.target.value) })}
-                >
-                  {[2, 4, 8].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Toggle
-                label={t('setWordWrap')}
-                checked={prefs.wordWrap}
-                onChange={(v) => void updatePrefs({ wordWrap: v })}
-              />
-              <Toggle
-                label={t('setMinimap')}
-                checked={prefs.minimap}
-                onChange={(v) => void updatePrefs({ minimap: v })}
-              />
-              <Toggle
-                label={t('setLineNumbers')}
-                checked={prefs.lineNumbers}
-                onChange={(v) => void updatePrefs({ lineNumbers: v })}
-              />
-              <Toggle
-                label={t('setFormatOnSave')}
-                hint={t('setFormatOnSaveHint')}
-                checked={prefs.formatOnSave}
-                onChange={(v) => void updatePrefs({ formatOnSave: v })}
-              />
-              <Toggle
-                label={t('setAutoSave')}
-                hint={t('setAutoSaveHint')}
-                checked={prefs.autoSave}
-                onChange={(v) => void updatePrefs({ autoSave: v })}
-              />
-            </>
-          )}
-
-          {section === 'ai' && (
-            <>
-              <h3>{t('setAi')}</h3>
-              <Toggle
-                label={t('setInline')}
-                hint={t('setInlineHint')}
-                checked={prefs.inlineCompletions}
-                onChange={(v) => void updatePrefs({ inlineCompletions: v })}
-              />
-              <div className="settings-sub">
-                <button onClick={() => setState({ modal: { kind: 'models', role: 'inline' } })}>
-                  {t('setInlineModel')}:{' '}
-                  {settings.roles.inline ?? settings.defaultModel ?? t('noModel')}
-                </button>
-              </div>
-              <Toggle
-                label={t('setRules')}
-                hint={t('setRulesHint')}
-                checked={prefs.projectRules}
-                onChange={(v) => void updatePrefs({ projectRules: v })}
-              />
-              <div className="settings-sub">
-                <button onClick={() => (close(), void runCommand('ai.rules'))}>
-                  <Icon name="scroll" size={13} /> {t('rulesEdit')}
-                </button>
-              </div>
-              <Toggle
-                label={t('setLocalOnly')}
-                hint={t('setLocalOnlyHint')}
-                checked={settings.localOnly}
-                onChange={async (v) => {
-                  await api().ai.setLocalOnly(v);
-                  await refreshSettings();
-                }}
-              />
-            </>
-          )}
-
-          {section === 'memories' && <MemoriesSection />}
-          {section === 'docs' && <DocsSection />}
-          {section === 'mcp' && <McpSection />}
-
-          {section === 'phone' && <PhoneSection />}
-
-          {section === 'keys' && (
-            <>
-              <h3>{t('shortcuts')}</h3>
-              <p className="dim small">{t('setKeysHint')}</p>
-              <input
-                className="settings-filter"
-                value={filter}
-                placeholder={t('setKeysFilter')}
-                onChange={(e) => setFilter(e.target.value)}
-              />
-              <table className="keys-table">
-                <tbody>
-                  {list.map((c) => {
-                    const custom = prefs.keybindings[c.id];
-                    return (
-                      <tr key={c.id}>
-                        <td>{c.label}</td>
-                        <td>
-                          {recording === c.id ? (
-                            <input
-                              autoFocus
-                              className="key-recorder"
-                              readOnly
-                              value={t('setKeysPress')}
-                              onBlur={() => setRecording(null)}
-                              onKeyDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (e.key === 'Escape') return setRecording(null);
-                                const combo = comboFromEvent(e.nativeEvent);
-                                if (!combo) return;
-                                void updatePrefs({
-                                  keybindings: { ...prefs.keybindings, [c.id]: combo },
-                                });
-                                setRecording(null);
-                              }}
-                            />
-                          ) : (
-                            <button className="key-btn" onClick={() => setRecording(c.id)}>
-                              {custom || defaults[c.id] ? (
-                                <kbd className={custom ? 'custom' : ''}>
-                                  {custom ?? defaults[c.id]}
-                                </kbd>
-                              ) : (
-                                <span className="dim">{t('setKeysAdd')}</span>
-                              )}
-                            </button>
-                          )}
-                          {custom && (
-                            <button
-                              className="key-reset"
-                              title={t('setKeysReset')}
-                              onClick={() => {
-                                const { [c.id]: _gone, ...rest } = prefs.keybindings;
-                                void updatePrefs({ keybindings: rest });
-                              }}
-                            >
-                              ↺
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </>
-          )}
+    <ModalShell onClose={close} className="settings" labelledBy="settings-title">
+      <nav className="settings-nav">
+        <div className="settings-title" id="settings-title">
+          <Icon name="settings" size={16} /> {t('settings')}
         </div>
+        {nav('appearance', t('setAppearance'), 'palette')}
+        {nav('editor', t('setEditor'), 'edit')}
+        {nav('ai', t('setAi'), 'agent')}
+        {nav('mcp', 'MCP', 'plug')}
+        {nav('memories', t('setMemories'), 'sparkle')}
+        {nav('docs', t('setDocsNav'), 'books')}
+        {nav('phone', t('phoneTitle'), 'smartphone')}
+        {nav('keys', t('shortcuts'), 'keyboard')}
+      </nav>
+      <div className="settings-body">
+        <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
+          <Icon name="close" size={16} />
+        </button>
+        {section === 'appearance' && (
+          <>
+            <h3>{t('setTheme')}</h3>
+            <div className="theme-grid">
+              {THEME_IDS.map((id) => (
+                <ThemeCard key={id} id={id} active={settings.theme === id} />
+              ))}
+            </div>
+            <h3>{t('setLanguage')}</h3>
+            <label className="settings-field">
+              <span>{t('setLanguageHint')}</span>
+              <select
+                value={lang}
+                onChange={(e) => {
+                  // Two languages: picking the other one is the palette's "switch language".
+                  if (e.target.value !== lang) void runCommand('app.language');
+                }}
+              >
+                <option value="es">Español</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <h3>{t('setUiZoom')}</h3>
+            <label className="settings-field">
+              <span>{t('setUiZoomHint')}</span>
+              <span className="settings-range">
+                <input
+                  type="range"
+                  min={50}
+                  max={300}
+                  step={5}
+                  value={prefs.uiZoom}
+                  onChange={(e) => void updatePrefs({ uiZoom: Number(e.target.value) })}
+                />
+                <b>{prefs.uiZoom}%</b>
+              </span>
+            </label>
+            <h3>{t('setFont')}</h3>
+            <label className="settings-field">
+              <span>{t('setFontSize')}</span>
+              <span className="settings-range">
+                <input
+                  type="range"
+                  min={10}
+                  max={28}
+                  value={prefs.fontSize}
+                  onChange={(e) => void updatePrefs({ fontSize: Number(e.target.value) })}
+                />
+                <b>{prefs.fontSize}px</b>
+              </span>
+            </label>
+            <label className="settings-field">
+              <span>{t('setFontFamily')}</span>
+              <select
+                value={FONTS.includes(prefs.fontFamily) ? prefs.fontFamily : ''}
+                onChange={(e) => void updatePrefs({ fontFamily: e.target.value })}
+              >
+                {!FONTS.includes(prefs.fontFamily) && <option value="">{prefs.fontFamily}</option>}
+                {FONTS.map((f) => (
+                  <option key={f} value={f}>
+                    {f.split(',')[0]!.replace(/'/g, '')}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div
+              className="font-sample"
+              style={{ fontFamily: prefs.fontFamily, fontSize: prefs.fontSize }}
+            >
+              {'const saludo = (nombre) => `Hola, ${nombre}!`; // => != === 0x1F'}
+            </div>
+          </>
+        )}
+
+        {section === 'editor' && (
+          <>
+            <h3>{t('setEditor')}</h3>
+            <label className="settings-field">
+              <span>{t('setTabSize')}</span>
+              <select
+                value={prefs.tabSize}
+                onChange={(e) => void updatePrefs({ tabSize: Number(e.target.value) })}
+              >
+                {[2, 4, 8].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Toggle
+              label={t('setWordWrap')}
+              checked={prefs.wordWrap}
+              onChange={(v) => void updatePrefs({ wordWrap: v })}
+            />
+            <Toggle
+              label={t('setMinimap')}
+              checked={prefs.minimap}
+              onChange={(v) => void updatePrefs({ minimap: v })}
+            />
+            <Toggle
+              label={t('setLineNumbers')}
+              checked={prefs.lineNumbers}
+              onChange={(v) => void updatePrefs({ lineNumbers: v })}
+            />
+            <Toggle
+              label={t('setFormatOnSave')}
+              hint={t('setFormatOnSaveHint')}
+              checked={prefs.formatOnSave}
+              onChange={(v) => void updatePrefs({ formatOnSave: v })}
+            />
+            <Toggle
+              label={t('setAutoSave')}
+              hint={t('setAutoSaveHint')}
+              checked={prefs.autoSave}
+              onChange={(v) => void updatePrefs({ autoSave: v })}
+            />
+          </>
+        )}
+
+        {section === 'ai' && (
+          <>
+            <h3>{t('setAi')}</h3>
+            <Toggle
+              label={t('setInline')}
+              hint={t('setInlineHint')}
+              checked={prefs.inlineCompletions}
+              onChange={(v) => void updatePrefs({ inlineCompletions: v })}
+            />
+            <div className="settings-sub">
+              <button onClick={() => setState({ modal: { kind: 'models', role: 'inline' } })}>
+                {t('setInlineModel')}:{' '}
+                {settings.roles.inline ?? settings.defaultModel ?? t('noModel')}
+              </button>
+            </div>
+            <Toggle
+              label={t('setRules')}
+              hint={t('setRulesHint')}
+              checked={prefs.projectRules}
+              onChange={(v) => void updatePrefs({ projectRules: v })}
+            />
+            <div className="settings-sub">
+              <button onClick={() => (close(), void runCommand('ai.rules'))}>
+                <Icon name="scroll" size={13} /> {t('rulesEdit')}
+              </button>
+            </div>
+            <Toggle
+              label={t('setLocalOnly')}
+              hint={t('setLocalOnlyHint')}
+              checked={settings.localOnly}
+              onChange={async (v) => {
+                await api().ai.setLocalOnly(v);
+                await refreshSettings();
+              }}
+            />
+          </>
+        )}
+
+        {section === 'memories' && <MemoriesSection />}
+        {section === 'docs' && <DocsSection />}
+        {section === 'mcp' && <McpSection />}
+
+        {section === 'phone' && <PhoneSection />}
+
+        {section === 'keys' && (
+          <>
+            <h3>{t('shortcuts')}</h3>
+            <p className="dim small">{t('setKeysHint')}</p>
+            <input
+              className="settings-filter"
+              aria-label={t('setKeysFilter')}
+              value={filter}
+              placeholder={t('setKeysFilter')}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+            <table className="keys-table">
+              <tbody>
+                {list.map((c) => {
+                  const custom = prefs.keybindings[c.id];
+                  return (
+                    <tr key={c.id}>
+                      <td>{c.label}</td>
+                      <td>
+                        {recording === c.id ? (
+                          <input
+                            autoFocus
+                            className="key-recorder"
+                            aria-label={`${c.label} · ${t('setKeysPress')}`}
+                            readOnly
+                            value={t('setKeysPress')}
+                            onBlur={() => setRecording(null)}
+                            onKeyDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.key === 'Escape') return setRecording(null);
+                              const combo = comboFromEvent(e.nativeEvent);
+                              if (!combo) return;
+                              setRecording(null);
+                              void assignKey(c.id, combo);
+                            }}
+                          />
+                        ) : (
+                          <button className="key-btn" onClick={() => setRecording(c.id)}>
+                            {custom || defaults[c.id] ? (
+                              <kbd className={custom ? 'custom' : ''}>
+                                {custom ?? defaults[c.id]}
+                              </kbd>
+                            ) : (
+                              <span className="dim">{t('setKeysAdd')}</span>
+                            )}
+                          </button>
+                        )}
+                        {custom && (
+                          <button
+                            className="key-reset"
+                            title={t('setKeysReset')}
+                            aria-label={`${t('setKeysReset')}: ${c.label}`}
+                            onClick={() => {
+                              const { [c.id]: _gone, ...rest } = prefs.keybindings;
+                              void updatePrefs({ keybindings: rest });
+                            }}
+                          >
+                            <Icon name="undo" size={13} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
-    </div>
+    </ModalShell>
   );
 }

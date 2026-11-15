@@ -22,7 +22,8 @@ import type {
 import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
-import { api, setState, toast, useStore } from '../store';
+import { api, askText, setState, toast, useStore } from '../store';
+import { isWriteSql, sqlExcerpt } from '../sqlSafety';
 import { runInTerminal } from './Terminal';
 
 const errText = (e: unknown) =>
@@ -99,8 +100,21 @@ function copy(text: string, msg = t('vcCopied')) {
   toast(msg);
 }
 
-/** Statements that only read (anything else asks first: it runs on the real database). */
-const READ_ONLY = /^\s*(select|with|explain|show|table|values)\b/i;
+/** Text of the busy indicator for each `act()` label (falls back to a generic "Working…"). */
+const BUSY_LABEL: Record<string, () => string> = {
+  sql: () => t('sbBusySql'),
+  preview: () => t('sbBusyLoading'),
+  columns: () => t('sbBusyLoading'),
+  files: () => t('sbBusyLoading'),
+  recheck: () => t('sbBusyChecking'),
+  delete: () => t('sbBusyDeleting'),
+  secret: () => t('sbBusySaving'),
+  auth: () => t('sbBusySaving'),
+  rls: () => t('sbBusySaving'),
+  mail: () => t('sbBusySending'),
+  restore: () => t('sbBusyRestoring'),
+  pause: () => t('sbBusyPausing'),
+};
 
 const TEMPLATE_LABEL: Record<SupabaseEmailKind, () => string> = {
   confirmation: () => t('sbTplConfirmation'),
@@ -226,6 +240,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
   const [buckets, setBuckets] = useState<SupabaseBucketView[] | null>(null);
   const [secrets, setSecrets] = useState<string[] | null>(null);
   const [secretForm, setSecretForm] = useState<{ name: string; value: string } | null>(null);
+  const [showSecret, setShowSecret] = useState(false);
   const [userFilter, setUserFilter] = useState('');
   const [authCfg, setAuthCfg] = useState<SupabaseAuthConfig | null>(null);
   const [authDraft, setAuthDraft] = useState<SupabaseAuthConfig | null>(null);
@@ -370,14 +385,27 @@ function SupabaseBody({ reset }: { reset: () => void }) {
 
   const runSql = async () => {
     if (!ref || !sql.trim() || busy) return;
-    if (!READ_ONLY.test(sql) && !(await confirmDialog(t('sbWriteConfirm')))) return;
+    const write = isWriteSql(sql);
+    if (
+      write &&
+      !(await confirmDialog(`${t('sbWriteConfirm')}\n\n${sqlExcerpt(sql)}`, { danger: true }))
+    )
+      return;
     const q = sql.trim();
     void act('sql', async () => {
       setResult(await api().supabase.query(ref, q));
+      // Writes are not kept: the history is stored in plain text and is easy to re-run by mistake.
+      if (write) return;
       const next = [q, ...history.filter((h) => h !== q)].slice(0, HISTORY_MAX);
       setHistory(next);
       localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
     });
+  };
+
+  const clearHistory = async () => {
+    if (!(await confirmDialog(t('sbHistoryClearConfirm'), { danger: true }))) return;
+    setHistory([]);
+    localStorage.removeItem(HISTORY_KEY);
   };
 
   /** Opens a table's rows or structure under its row (clicking the open one closes it). */
@@ -747,8 +775,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
   );
   const schemas = [...new Set(shownTables.map((x) => x.schema))];
 
-  const newMigration = () => {
-    const name = prompt(t('sbNewMigrationPrompt'), '');
+  const newMigration = async () => {
+    const name = await askText(t('sbNewMigrationPrompt'), '');
     if (!name?.trim()) return;
     inTerminal(st.cli, `migration new ${name.trim().replace(/[^\w-]+/g, '_')}`);
   };
@@ -1081,9 +1109,15 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                     </option>
                   ))}
                 </select>
+                {history.length > 0 && (
+                  <button className="link git-fetch" onClick={() => void clearHistory()}>
+                    {t('sbHistoryClear')}
+                  </button>
+                )}
               </div>
               <textarea
                 value={sql}
+                aria-label={t('sbSqlLabel')}
                 spellCheck={false}
                 rows={6}
                 placeholder="select * from …"
@@ -1180,8 +1214,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                   </button>
                   <button
                     className="link git-fetch"
-                    onClick={() => {
-                      const name = prompt(t('sbFnNewPrompt'), '');
+                    onClick={async () => {
+                      const name = await askText(t('sbFnNewPrompt'), '');
                       if (name?.trim())
                         inTerminal(
                           st.cli,
@@ -1490,19 +1524,34 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                   <input
                     value={secretForm.name}
                     placeholder={t('phSecretName')}
+                    aria-label={t('phSecretName')}
                     spellCheck={false}
                     autoFocus
                     onChange={(e) =>
                       setSecretForm({ ...secretForm, name: e.target.value.replace(/[^\w]/g, '_') })
                     }
                   />
-                  <textarea
-                    value={secretForm.value}
-                    placeholder={t('vcEnvValue')}
-                    spellCheck={false}
-                    rows={2}
-                    onChange={(e) => setSecretForm({ ...secretForm, value: e.target.value })}
-                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      style={{ flex: 1, minWidth: 0 }}
+                      type={showSecret ? 'text' : 'password'}
+                      value={secretForm.value}
+                      placeholder={t('vcEnvValue')}
+                      aria-label={t('vcEnvValue')}
+                      spellCheck={false}
+                      autoComplete="off"
+                      onChange={(e) => setSecretForm({ ...secretForm, value: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      aria-label={showSecret ? t('uiSecretHide') : t('uiSecretShow')}
+                      title={showSecret ? t('uiSecretHide') : t('uiSecretShow')}
+                      aria-pressed={showSecret}
+                      onClick={() => setShowSecret((v) => !v)}
+                    >
+                      <Icon name={showSecret ? 'eyeOff' : 'eye'} size={14} />
+                    </button>
+                  </div>
                   <div className="git-connect-actions">
                     <button
                       className="primary"
@@ -1926,7 +1975,8 @@ function SupabaseBody({ reset }: { reset: () => void }) {
 
           {busy && (
             <div className="git-busy">
-              <Icon name="clock" size={13} className="spin-slow" /> {busy}…
+              <Icon name="clock" size={13} className="spin-slow" />{' '}
+              {(BUSY_LABEL[busy] ?? (() => t('sbBusyWorking')))()}
             </div>
           )}
         </>

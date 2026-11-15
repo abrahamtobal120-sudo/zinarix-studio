@@ -5,19 +5,68 @@ import { monaco } from './monaco';
  * Color themes. Each one is a base (the dark or light stylesheet in styles.css) plus CSS
  * variable overrides for the app chrome and a Monaco theme for the editor.
  */
-interface ThemeDef {
+
+/**
+ * Variables every custom theme must set. A custom theme that inherits one of these from the
+ * base stylesheet ends up with mixed colors (the base violet, a red that fails contrast on the
+ * theme background, an unreadable status bar...), so the compiler requires all of them.
+ */
+export const REQUIRED_VARS = [
+  '--bg',
+  '--bg-2',
+  '--bg-3',
+  '--bg-4',
+  '--activity',
+  '--border',
+  '--fg',
+  '--fg-dim',
+  '--fg-strong',
+  '--accent',
+  '--accent-hover',
+  '--accent-fg',
+  '--focus',
+  '--sel',
+  '--hover',
+  '--status',
+  '--status-fg',
+  '--danger',
+  '--ok',
+  '--warn',
+  '--code-bg',
+  '--brand',
+  '--brand-1',
+  '--brand-2',
+  '--brand-grad',
+] as const;
+export type RequiredVar = (typeof REQUIRED_VARS)[number];
+export type ThemeVars = Record<RequiredVar, string>;
+
+export interface ThemeDef {
   label: string;
   dark: boolean;
-  /** Overrides of the CSS variables declared in styles.css (:root). */
-  vars: Record<string, string>;
+  /** Overrides of the CSS variables declared in styles.css (:root). Empty for the base themes. */
+  vars: Readonly<Record<string, string>>;
   /** Editor colors (Monaco), on top of vs / vs-dark. */
   editor: Record<string, string>;
   rules?: monaco.editor.ITokenThemeRule[];
 }
 
-export const THEMES: Record<ThemeId, ThemeDef> = {
-  dark: { label: 'Oscuro', dark: true, vars: {}, editor: {} },
-  light: { label: 'Claro', dark: false, vars: {}, editor: {} },
+/** A custom theme: same shape, but every required variable must be present. */
+export interface CustomThemeDef extends ThemeDef {
+  vars: ThemeVars;
+}
+
+export type CustomThemeId = Exclude<ThemeId, 'dark' | 'light'>;
+
+const grad = (a: string, b: string): string => `linear-gradient(135deg, ${a}, ${b})`;
+
+/**
+ * Custom themes. Contrast rules (checked in test/themes.test.ts):
+ * text colors (--fg, --fg-dim, --danger, --ok, --warn, --brand) >= 4.5:1 on --bg,
+ * --status-fg on --status and --accent-fg on --accent >= 4.5:1, white on --brand-1/--brand-2
+ * (primary buttons) >= 4.5:1 and --focus >= 3:1 on --bg.
+ */
+export const CUSTOM_THEMES: Record<CustomThemeId, CustomThemeDef> = {
   midnight: {
     label: 'Medianoche',
     dark: true,
@@ -30,13 +79,23 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--border': '#30363d',
       '--fg': '#c9d1d9',
       '--fg-dim': '#8b949e',
+      '--fg-strong': '#f0f6fc',
       '--accent': '#238636',
-      '--accent-hover': '#2ea043',
+      '--accent-hover': '#1f7a31',
+      '--accent-fg': '#ffffff',
       '--focus': '#58a6ff',
       '--sel': '#1f3a5f',
       '--hover': '#1b2230',
       '--status': '#1f6feb',
+      '--status-fg': '#ffffff',
+      '--danger': '#f85149',
+      '--ok': '#3fb950',
+      '--warn': '#d29922',
       '--code-bg': '#010409',
+      '--brand': '#58a6ff',
+      '--brand-1': '#1f6feb',
+      '--brand-2': '#1a7f37',
+      '--brand-grad': grad('#1f6feb', '#1a7f37'),
     },
     editor: {
       'editor.background': '#0d1117',
@@ -57,6 +116,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--border': '#3b3e51',
       '--fg': '#f8f8f2',
       '--fg-dim': '#9ea3c0',
+      '--fg-strong': '#ffffff',
       '--accent': '#bd93f9',
       '--accent-hover': '#caa9fa',
       '--accent-fg': '#1e1f29',
@@ -64,7 +124,15 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--sel': '#44475a',
       '--hover': '#343746',
       '--status': '#6272a4',
+      '--status-fg': '#ffffff',
+      '--danger': '#ff6e6e',
+      '--ok': '#50fa7b',
+      '--warn': '#f1fa8c',
       '--code-bg': '#1e1f29',
+      '--brand': '#bd93f9',
+      '--brand-1': '#8a4fd6',
+      '--brand-2': '#b03d82',
+      '--brand-grad': grad('#8a4fd6', '#b03d82'),
     },
     editor: {
       'editor.background': '#282a36',
@@ -94,6 +162,7 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--border': '#3e3d32',
       '--fg': '#f8f8f2',
       '--fg-dim': '#a59f85',
+      '--fg-strong': '#ffffff',
       '--accent': '#a6e22e',
       '--accent-hover': '#b6f23e',
       '--accent-fg': '#1e1f1c',
@@ -101,7 +170,15 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--sel': '#49483e',
       '--hover': '#33342c',
       '--status': '#75715e',
+      '--status-fg': '#f8f8f2',
+      '--danger': '#ff4f8b',
+      '--ok': '#a6e22e',
+      '--warn': '#e6db74',
       '--code-bg': '#1e1f1c',
+      '--brand': '#ae81ff',
+      '--brand-1': '#8c5ad9',
+      '--brand-2': '#3f7a8a',
+      '--brand-grad': grad('#8c5ad9', '#3f7a8a'),
     },
     editor: {
       'editor.background': '#272822',
@@ -128,14 +205,24 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--activity': '#242933',
       '--border': '#3b4252',
       '--fg': '#d8dee9',
-      '--fg-dim': '#8b95a7',
-      '--accent': '#5e81ac',
-      '--accent-hover': '#6d8fba',
+      '--fg-dim': '#9ba5b8',
+      '--fg-strong': '#eceff4',
+      '--accent': '#4b6c94',
+      '--accent-hover': '#56789f',
+      '--accent-fg': '#ffffff',
       '--focus': '#88c0d0',
       '--sel': '#434c5e',
       '--hover': '#353c4a',
       '--status': '#4c566a',
+      '--status-fg': '#ffffff',
+      '--danger': '#e8838b',
+      '--ok': '#a3be8c',
+      '--warn': '#ebcb8b',
       '--code-bg': '#242933',
+      '--brand': '#88c0d0',
+      '--brand-1': '#4b6c94',
+      '--brand-2': '#3f7a8a',
+      '--brand-grad': grad('#4b6c94', '#3f7a8a'),
     },
     editor: {
       'editor.background': '#2e3440',
@@ -161,16 +248,26 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--bg-4': '#ddd6c1',
       '--activity': '#e8e1cc',
       '--border': '#d3cbb7',
-      '--fg': '#586e75',
-      '--fg-dim': '#93a1a1',
+      '--fg': '#475b62',
+      // #657b83 (the value suggested in the review) is still 4.1:1 on --bg; a step darker passes AA.
+      '--fg-dim': '#5c7078',
       '--fg-strong': '#073642',
-      '--accent': '#268bd2',
-      '--accent-hover': '#2aa198',
-      '--focus': '#268bd2',
+      '--accent': '#1f6fa8',
+      '--accent-hover': '#1a5f91',
+      '--accent-fg': '#ffffff',
+      '--focus': '#1e6fa8',
       '--sel': '#eee8d5',
       '--hover': '#efe8d3',
       '--status': '#b58900',
+      '--status-fg': '#002b36',
+      '--danger': '#b8231f',
+      '--ok': '#5f7a00',
+      '--warn': '#8a6400',
       '--code-bg': '#f5efdc',
+      '--brand': '#5a5fb5',
+      '--brand-1': '#5a5fb5',
+      '--brand-2': '#1f6fa8',
+      '--brand-grad': grad('#5a5fb5', '#1f6fa8'),
     },
     editor: {
       'editor.background': '#fdf6e3',
@@ -194,14 +291,27 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       '--bg-2': '#f6f8fa',
       '--bg-3': '#eff2f5',
       '--bg-4': '#e6eaef',
+      '--activity': '#f6f8fa',
       '--border': '#d0d7de',
       '--fg': '#24292f',
       '--fg-dim': '#57606a',
+      '--fg-strong': '#1f2328',
       '--accent': '#1f883d',
       '--accent-hover': '#1a7f37',
+      '--accent-fg': '#ffffff',
       '--focus': '#0969da',
       '--sel': '#ddf4ff',
+      '--hover': '#eaeef2',
       '--status': '#24292f',
+      '--status-fg': '#ffffff',
+      '--danger': '#cf222e',
+      '--ok': '#1a7f37',
+      '--warn': '#9a6700',
+      '--code-bg': '#f6f8fa',
+      '--brand': '#8250df',
+      '--brand-1': '#8250df',
+      '--brand-2': '#0969da',
+      '--brand-grad': grad('#8250df', '#0969da'),
     },
     editor: { 'editor.lineHighlightBackground': '#f6f8fa' },
     rules: [
@@ -212,6 +322,12 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       { token: 'type', foreground: '953800' },
     ],
   },
+};
+
+export const THEMES: Record<ThemeId, ThemeDef> = {
+  dark: { label: 'Oscuro', dark: true, vars: {}, editor: {} },
+  light: { label: 'Claro', dark: false, vars: {}, editor: {} },
+  ...CUSTOM_THEMES,
 };
 
 export function isDark(id: ThemeId): boolean {

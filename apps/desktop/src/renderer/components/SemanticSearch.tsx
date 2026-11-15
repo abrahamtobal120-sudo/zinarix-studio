@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { KnowledgeHit } from '../../shared/api';
+import { pressable } from '../a11y';
+import { errText } from '../errText';
 import { t } from '../i18n';
 import { api, openFile, useStore } from '../store';
 import { fileIcon } from './icons';
@@ -30,7 +32,7 @@ export function SemanticResults({ query, nonce }: { query: string; nonce: number
         setHits(r.hits);
         setInfo({ semantic: r.semantic, files: r.files });
       } catch (e) {
-        if (live) setError(e instanceof Error ? e.message : String(e));
+        if (live) setError(t('searchMeaningError', { err: errText(e) }));
       } finally {
         if (live) setBusy(false);
       }
@@ -51,10 +53,13 @@ export function SemanticResults({ query, nonce }: { query: string; nonce: number
         ) : !workspace ? (
           t('openFolder')
         ) : error ? (
-          <span className="sx-warn">{error}</span>
+          <span className="sx-warn" role="alert">
+            {error}
+          </span>
         ) : info ? (
           <>
-            {t('filesFound', { n: hits.length })}
+            {/* Hits are fragments; several can come from the same file. */}
+            {t('filesFound', { n: new Set(hits.map((h) => h.source)).size })}
             <span className="dim">
               &nbsp;· {info.semantic ? t('searchSemantic') : t('searchLexical')} ·{' '}
               {t('searchIndexed', { n: info.files })}
@@ -86,7 +91,8 @@ export function SemanticResults({ query, nonce }: { query: string; nonce: number
               <div
                 className="sx-filerow sx-head"
                 title={`${h.source}:${h.start}-${h.end}`}
-                onClick={() => void openFile(h.source, { line: h.start, column: 1 })}
+                aria-label={`${h.source}:${h.start}-${h.end}`}
+                {...pressable(() => void openFile(h.source, { line: h.start, column: 1 }))}
               >
                 <span className="sx-ficon">{fileIcon(h.source)}</span>
                 <span className="sx-fname">{name}</span>

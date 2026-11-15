@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { t } from '../i18n';
 import type { ReactNode } from 'react';
 
 export interface PickItem {
@@ -51,6 +52,8 @@ export function QuickPick({
   const [query, setQuery] = useState(initial);
   const [index, setIndex] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+  const uid = useId();
+  const optId = (i: number) => `${uid}-opt-${i}`;
 
   const filtered = useMemo(() => {
     if (!query) return items.slice(0, limit);
@@ -78,6 +81,12 @@ export function QuickPick({
       <div className="quick-pick" onMouseDown={(e) => e.stopPropagation()}>
         <input
           autoFocus
+          role="combobox"
+          aria-expanded={true}
+          aria-autocomplete="list"
+          aria-controls={`${uid}-list`}
+          aria-activedescendant={filtered[index] ? optId(index) : undefined}
+          aria-label={placeholder}
           value={query}
           placeholder={placeholder}
           onChange={(e) => setQuery(e.target.value)}
@@ -92,13 +101,18 @@ export function QuickPick({
             } else if (e.key === 'Enter' && filtered[index]) onPick(filtered[index]!);
           }}
         />
-        <div className="pick-list" ref={list}>
+        <div className="pick-list" ref={list} id={`${uid}-list`} role="listbox" aria-label={placeholder}>
           {filtered.map((it, i) => (
-            <div key={it.id}>
+            <div key={it.id} role="presentation">
               {it.group && (i === 0 || filtered[i - 1]!.group !== it.group) && !query && (
-                <div className="pick-group">{it.group}</div>
+                <div className="pick-group" role="presentation">
+                  {it.group}
+                </div>
               )}
               <div
+                id={optId(i)}
+                role="option"
+                aria-selected={i === index}
                 className={`pick-item ${i === index ? 'active' : ''}`}
                 onMouseEnter={() => setIndex(i)}
                 onClick={() => onPick(it)}
@@ -113,7 +127,9 @@ export function QuickPick({
               </div>
             </div>
           ))}
-          {filtered.length === 0 && <div className="pick-empty">—</div>}
+          {filtered.length === 0 && <div className="pick-empty" role="status">
+              {t('noResults')}
+            </div>}
         </div>
         {footer && <div className="pick-footer">{footer}</div>}
       </div>

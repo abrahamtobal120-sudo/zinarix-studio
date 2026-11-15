@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ConversationView } from '../../shared/api';
 import { confirmDialog } from '../confirm';
-import { pressable } from '../a11y';
-import { t } from '../i18n';
+import { lang, t } from '../i18n';
 import { api, askText, toast, useStore } from '../store';
+import { errText } from '../errText';
 import { ProviderLogo } from './ProviderLogo';
 import { Icon } from './Icon';
 
@@ -24,8 +24,8 @@ export function when(ts: number): string {
   const d = new Date(ts);
   const sameDay = new Date().toDateString() === d.toDateString();
   return sameDay
-    ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    ? d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString(lang, { day: 'numeric', month: 'short' });
 }
 
 /** Saved conversations: search, project filter, open, rename, export and delete. */
@@ -46,12 +46,16 @@ export function ChatHistory({
   const [onlyProject, setOnlyProject] = useState(Boolean(workspace));
   const [list, setList] = useState<ConversationView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const root = workspace?.root;
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setList(await api().ai.conversations(query, onlyProject && Boolean(root)));
+      setLoadErr(null);
+    } catch (e) {
+      setLoadErr(errText(e));
     } finally {
       setLoading(false);
     }
@@ -96,7 +100,12 @@ export function ChatHistory({
   return (
     <div className="chat-history">
       <div className="ch-head">
-        <button className="ch-back" onClick={onClose} title={t('histBack')}>
+        <button
+          className="ch-back"
+          onClick={onClose}
+          title={t('histBack')}
+          aria-label={t('histBack')}
+        >
           <Icon name="back" size={15} />
         </button>
         <span className="ch-title">{t('histTitle')}</span>
@@ -125,17 +134,27 @@ export function ChatHistory({
         )}
       </div>
       <div className="ch-list">
-        {!loading && list.length === 0 && (
+        {loadErr && (
+          <p className="dim ch-empty" role="alert">
+            {t('uxLoadFailed', { err: loadErr })}{' '}
+            <button className="link" onClick={() => void load()}>
+              {t('uxRetry')}
+            </button>
+          </p>
+        )}
+        {!loading && !loadErr && list.length === 0 && (
           <p className="dim ch-empty">{query ? t('noMatches') : t('histEmpty')}</p>
         )}
         {groups.map(([label, items]) => (
           <div key={label}>
             <div className="ch-group">{label}</div>
             {items.map((c) => (
+              // The row opens with the mouse anywhere; for the keyboard the title is the button
+              // (the row cannot be one: it holds the action buttons).
               <div
                 key={c.id}
                 className={`ch-item ${c.id === current ? 'active' : ''}`}
-                {...pressable(() => onOpen(c.id, c.project))}
+                onClick={() => onOpen(c.id, c.project)}
                 title={c.project ?? ''}
               >
                 {c.model ? (
@@ -145,7 +164,18 @@ export function ChatHistory({
                     <Icon name="agent" size={13} />
                   </span>
                 )}
-                <span className="ch-main">
+                <span
+                  className="ch-main"
+                  role="button"
+                  tabIndex={0}
+                  aria-current={c.id === current ? 'true' : undefined}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onOpen(c.id, c.project);
+                    }
+                  }}
+                >
                   <span className="ch-name">{c.title}</span>
                   <span className="ch-meta">
                     {when(c.updatedAt)} · {t('histMessages', { n: c.messageCount })}
@@ -153,13 +183,25 @@ export function ChatHistory({
                   </span>
                 </span>
                 <span className="ch-actions" onClick={(e) => e.stopPropagation()}>
-                  <button title={t('histRename')} onClick={() => void rename(c)}>
+                  <button
+                    title={t('histRename')}
+                    aria-label={`${t('histRename')}: ${c.title}`}
+                    onClick={() => void rename(c)}
+                  >
                     <Icon name="edit" size={13} />
                   </button>
-                  <button title={t('histExport')} onClick={() => void exportMd(c)}>
-                    ⤓
+                  <button
+                    title={t('histExport')}
+                    aria-label={`${t('histExport')}: ${c.title}`}
+                    onClick={() => void exportMd(c)}
+                  >
+                    <Icon name="download" size={13} />
                   </button>
-                  <button title={t('histDelete')} onClick={() => void remove(c)}>
+                  <button
+                    title={t('histDelete')}
+                    aria-label={`${t('histDelete')}: ${c.title}`}
+                    onClick={() => void remove(c)}
+                  >
                     <Icon name="trash" size={13} />
                   </button>
                 </span>

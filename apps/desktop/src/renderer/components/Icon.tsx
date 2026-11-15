@@ -8,6 +8,20 @@ import { createElement } from 'react';
  */
 type IconNode = readonly (readonly [string, Record<string, string>])[];
 
+// Shared shapes, so aliases stay identical (run = play, x = close).
+const PLAY = [
+  [
+    'path',
+    { d: 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z' },
+  ],
+] as const satisfies IconNode;
+const CLOSE = [
+  ['path', { d: 'M18 6 6 18' }],
+  ['path', { d: 'm6 6 12 12' }],
+] as const satisfies IconNode;
+const STAR_D =
+  'M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z';
+
 const ICONS = {
   smartphone: [
     ['rect', { width: '14', height: '20', x: '5', y: '2', rx: '2', ry: '2' }],
@@ -46,12 +60,7 @@ const ICONS = {
     ['circle', { cx: '18', cy: '6', r: '3' }],
     ['circle', { cx: '6', cy: '18', r: '3' }],
   ],
-  run: [
-    [
-      'path',
-      { d: 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z' },
-    ],
-  ],
+  run: PLAY,
   agent: [
     ['path', { d: 'M3 4h18v13H10l-5 4v-4H3z' }],
     ['path', { d: 'm8 8.5 2.5 2-2.5 2' }],
@@ -153,10 +162,7 @@ const ICONS = {
     ['path', { d: 'M5 12h14' }],
     ['path', { d: 'M12 5v14' }],
   ],
-  close: [
-    ['path', { d: 'M18 6 6 18' }],
-    ['path', { d: 'm6 6 12 12' }],
-  ],
+  close: CLOSE,
   bolt: [
     [
       'path',
@@ -234,12 +240,7 @@ const ICONS = {
     ['path', { d: 'M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8' }],
     ['path', { d: 'M10 12h4' }],
   ],
-  play: [
-    [
-      'path',
-      { d: 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z' },
-    ],
-  ],
+  play: PLAY,
   arrowDown: [
     ['path', { d: 'M12 5v14' }],
     ['path', { d: 'm19 12-7 7-7-7' }],
@@ -255,10 +256,7 @@ const ICONS = {
     ['path', { d: 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' }],
   ],
   check: [['path', { d: 'M20 6 9 17l-5-5' }]],
-  x: [
-    ['path', { d: 'M18 6 6 18' }],
-    ['path', { d: 'm6 6 12 12' }],
-  ],
+  x: CLOSE,
   edit: [
     [
       'path',
@@ -494,13 +492,24 @@ const ICONS = {
       },
     ],
   ],
-  star: [
+  star: [['path', { d: STAR_D }]],
+  starFilled: [['path', { d: STAR_D, fill: 'currentColor' }]],
+  /** Send in parallel (a new turn alongside the running one): one stream splitting in two. */
+  parallel: [
+    ['path', { d: 'M16 3h5v5' }],
+    ['path', { d: 'M8 3H3v5' }],
+    ['path', { d: 'M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3' }],
+    ['path', { d: 'm15 9 6-6' }],
+  ],
+  /** Send now (skip the queue): the diagonal paper plane, distinct from the horizontal `send`. */
+  sendNow: [
     [
       'path',
       {
-        d: 'M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z',
+        d: 'M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z',
       },
     ],
+    ['path', { d: 'm21.854 2.147-10.94 10.939' }],
   ],
   sparkle: [
     [

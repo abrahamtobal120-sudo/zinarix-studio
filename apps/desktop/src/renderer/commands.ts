@@ -1,8 +1,9 @@
-import { askInChat } from './components/Chat';
-import { sendTerminalToChat, terminalFocused } from './components/Terminal';
+import { askInChat, closeChatFromTab, focusedChatTab } from './components/Chat';
+import { listTerminals, sendTerminalToChat, terminalFocused } from './components/Terminal';
 import { confirmDialog } from './confirm';
 import { studioCommand, videoCommands } from './components/video/videoCommands';
 import { lang, setLang, t } from './i18n';
+import { comboFromEvent } from './keys';
 import {
   api,
   askText,
@@ -34,6 +35,8 @@ export interface Command {
   id: string;
   label: string;
   keys?: string;
+  /** A second built-in shortcut (not a menu accelerator: listened for in this file). */
+  altKeys?: string;
   run: () => unknown;
 }
 
@@ -120,7 +123,17 @@ function baseCommands(): Command[] {
       run: async () => (await save(), toast(t('saved'))),
     },
     { id: 'file.saveAll', label: t('cmdSaveAll'), keys: `${mod}+Alt+S`, run: () => saveAll() },
-    { id: 'tab.close', label: t('cmdCloseTab'), keys: `${mod}+W`, run: () => void closeTab() },
+    {
+      id: 'tab.close',
+      label: t('cmdCloseTab'),
+      keys: `${mod}+W`,
+      run: () => {
+        // On a chat tab (keyboard focus), Ctrl+W closes that chat, not the editor tab.
+        const chat = focusedChatTab();
+        if (chat) return void closeChatFromTab(chat);
+        void closeTab();
+      },
+    },
     {
       id: 'view.explorer',
       label: t('explorer'),
@@ -217,6 +230,8 @@ function baseCommands(): Command[] {
       id: 'view.terminal',
       label: t('cmdToggle', { what: t('terminal').toLowerCase() }),
       keys: 'Ctrl+`',
+      // ` is a dead key on Spanish (and other) keyboards.
+      altKeys: 'Ctrl+J',
       run: () => setState((s) => ({ panelOpen: !s.panelOpen })),
     },
     {
@@ -313,8 +328,9 @@ function baseCommands(): Command[] {
       label: t('cmdAskSelection'),
       keys: `${mod}+L`,
       run: () => {
-        // From the terminal, Ctrl+L sends its selection (or the session) to the chat.
-        if (terminalFocused()) return void sendTerminalToChat();
+        // In the terminal Ctrl+L is the shell's "clear screen": hand it over instead of taking
+        // it (Ctrl+Shift+L still sends the terminal to the chat).
+        if (terminalFocused()) return void clearFocusedTerminal();
         const ed = getEditor();
         const sel = ed?.getSelection();
         const model = ed?.getModel();
@@ -413,6 +429,43 @@ function baseCommands(): Command[] {
     },
     ...videoCommands(mod),
   ];
+}
+
+/**
+ * Gives Ctrl+L back to the focused terminal: the app menu may have taken the key before xterm
+ * saw it, so the form feed the shell expects is written to that session (clearing twice is
+ * harmless when xterm got it too).
+ */
+function clearFocusedTerminal(): void {
+  const host = document.activeElement?.closest('.xterm-host');
+  if (!host) return;
+  const hosts = [...document.querySelectorAll('.terminal-host .xterm-host')];
+  const id = listTerminals()[hosts.indexOf(host)]?.id;
+  if (id !== undefined) void api().terminal.write(id, '\x0c');
+}
+
+/**
+ * Second shortcuts (`altKeys`, e.g. Ctrl+J for the terminal). The menu only has one accelerator
+ * per item, so these are listened for here. A shortcut the user gave to another command wins.
+ */
+function onAltKey(e: KeyboardEvent): void {
+  const combo = comboFromEvent(e);
+  if (!combo) return;
+  // The Settings recorder is capturing a new shortcut.
+  if ((e.target as Element | null)?.closest?.('.key-recorder')) return;
+  const custom = getState().prefs.keybindings;
+  if (Object.values(custom).includes(combo)) return;
+  const c = baseCommands().find((x) => x.altKeys === combo);
+  if (!c) return;
+  e.preventDefault();
+  e.stopPropagation();
+  void runCommand(c.id);
+}
+const ALT_KEYS_FLAG = '__zxAltKeys';
+const w = window as unknown as Record<string, unknown>;
+if (!w[ALT_KEYS_FLAG]) {
+  w[ALT_KEYS_FLAG] = true;
+  window.addEventListener('keydown', onAltKey, true);
 }
 
 function askInChatWithSelection(path: string, text: string, from: number, to: number): void {

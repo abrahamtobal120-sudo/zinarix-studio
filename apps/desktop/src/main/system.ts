@@ -227,12 +227,14 @@ export interface SystemPreview {
  * (reads are additionally executed in read-only mode by the database itself).
  */
 export function isWriteSql(query: string): boolean {
+  // One left-to-right pass: a quote inside a comment (e.g. "-- don't") must not open a string
+  // that swallows the next statement.
   const q = query
-    .replace(/'(?:[^']|'')*'/g, "''")
-    .replace(/"(?:[^"]|"")*"/g, '""')
-    .replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"|--[^\n]*|\/\*[\s\S]*?\*\//g, (m) =>
+      m[0] === "'" ? "''" : m[0] === '"' ? '""' : ' ',
+    )
     .trim()
-    .replace(/;\s*$/, '');
+    .replace(/[;\s]+$/, '');
   if (q.includes(';')) return true;
   if (!/^(select|with|explain|show|describe|desc|pragma\s+\w+\s*$|values)\b/i.test(q)) return true;
   return /\b(insert|update|delete|drop|alter|create|truncate|replace|grant|revoke|merge|attach|detach|vacuum|copy|call|exec|execute|lock|reindex|rename|into)\b/i.test(

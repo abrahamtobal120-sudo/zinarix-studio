@@ -1,0 +1,6 @@
+/* Small additions for the modals of ModalShell / ModelPicker (styles.css keeps the base rules). */
+
+/* A favourite star is filled, not only coloured. */
+.mp-star.on .icon {
+  fill: currentColor;
+}

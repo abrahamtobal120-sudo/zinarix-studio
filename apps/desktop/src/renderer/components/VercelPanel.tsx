@@ -1,6 +1,7 @@
 import { AccountSwitch } from './AccountSwitch';
 import { Icon } from './Icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type {
   VercelDeploymentView,
   VercelProjectInfo,
@@ -62,7 +63,7 @@ function inTerminal(cli: boolean, args: string) {
 }
 
 async function deploy(prod: boolean, cli: boolean) {
-  if (prod && !(await confirmDialog(t('vcProdConfirm')))) return;
+  if (prod && !(await confirmDialog(t('vcProdConfirm'), { danger: true }))) return;
   inTerminal(cli, `deploy${prod ? ' --prod' : ''}`);
 }
 
@@ -191,14 +192,45 @@ function parseDotenv(text: string): { key: string; value: string }[] {
   return [...out].map(([key, value]) => ({ key, value }));
 }
 
-const SETTING_FIELDS: { key: keyof VercelSettings; label: string; ph: string }[] = [
-  { key: 'framework', label: 'Framework', ph: 'nextjs, vite, astro…' },
-  { key: 'rootDirectory', label: 'Root directory', ph: 'apps/web' },
-  { key: 'installCommand', label: 'Install command', ph: 'npm install' },
-  { key: 'buildCommand', label: 'Build command', ph: 'npm run build' },
-  { key: 'devCommand', label: 'Dev command', ph: 'npm run dev' },
-  { key: 'outputDirectory', label: 'Output directory', ph: 'dist' },
+const SETTING_FIELDS: { key: keyof VercelSettings; label: () => string; ph: string }[] = [
+  { key: 'framework', label: () => t('vcSetFramework'), ph: 'nextjs, vite, astro…' },
+  { key: 'rootDirectory', label: () => t('vcSetRootDir'), ph: 'apps/web' },
+  { key: 'installCommand', label: () => t('vcSetInstallCmd'), ph: 'npm install' },
+  { key: 'buildCommand', label: () => t('vcSetBuildCmd'), ph: 'npm run build' },
+  { key: 'devCommand', label: () => t('vcSetDevCmd'), ph: 'npm run dev' },
+  { key: 'outputDirectory', label: () => t('vcSetOutputDir'), ph: 'dist' },
 ];
+
+/** Translated name of a Vercel environment ("production", "preview", "development"). */
+function targetName(tg: string): string {
+  return tg === 'production'
+    ? t('vcTargetProduction')
+    : tg === 'preview'
+      ? t('vcTargetPreview')
+      : tg === 'development'
+        ? t('vcTargetDevelopment')
+        : tg;
+}
+
+/** Text of the busy indicator for each `act()` label (falls back to a generic "Working…"). */
+const BUSY_LABEL: Record<string, () => string> = {
+  env: () => t('sbBusySaving'),
+  settings: () => t('sbBusySaving'),
+  domain: () => t('sbBusySaving'),
+  verify: () => t('sbBusyChecking'),
+  recheck: () => t('sbBusyChecking'),
+  cancel: () => t('vcBusyCancel'),
+  redeploy: () => t('vcBusyRedeploy'),
+  promote: () => t('vcBusyPromote'),
+  delete: () => t('sbBusyDeleting'),
+  ai: () => t('vcBusyAi'),
+};
+const busyText = (id: string) => (BUSY_LABEL[id] ?? (() => t('sbBusyWorking')))();
+
+/** Placeholder of a hidden secret value. */
+const MASK = '••••';
+/** Hides what is typed in a textarea (Chromium honours it like a password field). */
+const HIDDEN_TEXT = { WebkitTextSecurity: 'disc' } as CSSProperties;
 const NODE_VERSIONS = ['24.x', '22.x', '20.x'];
 
 export function VercelPanel() {
@@ -229,6 +261,19 @@ function VercelBody({ reset }: { reset: () => void }) {
   );
   const [newDomain, setNewDomain] = useState('');
   const [envImport, setEnvImport] = useState<{ text: string; targets: string[] } | null>(null);
+  /** Secret values (env form and .env import) are hidden until asked. */
+  const [showValues, setShowValues] = useState(false);
+  const eye = (
+    <button
+      type="button"
+      aria-label={showValues ? t('uiSecretHide') : t('uiSecretShow')}
+      title={showValues ? t('uiSecretHide') : t('uiSecretShow')}
+      aria-pressed={showValues}
+      onClick={() => setShowValues((v) => !v)}
+    >
+      <Icon name={showValues ? 'eyeOff' : 'eye'} size={14} />
+    </button>
+  );
   const [envFilter, setEnvFilter] = useState('');
   const [depFilter, setDepFilter] = useState('');
   const [settings, setSettings] = useState<VercelSettings | null>(null);
@@ -578,7 +623,7 @@ function VercelBody({ reset }: { reset: () => void }) {
   const { projectId, teamId } = pick;
 
   const saveEnv = () => {
-    if (!envForm || !envForm.key.trim() || !envForm.targets.length) return;
+    if (!envForm || !envForm.key.trim() || !envForm.value || !envForm.targets.length) return;
     const f = envForm;
     void act('env', async () => {
       await api().vercel.setEnv(projectId, teamId, f.key.trim(), f.value, f.targets);
@@ -886,6 +931,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                         if (
                           !(await confirmDialog(
                             toProd ? t('vcRedeployProdConfirm') : t('vcRedeployConfirm'),
+                            { danger: toProd },
                           ))
                         )
                           return;
@@ -907,7 +953,8 @@ function VercelBody({ reset }: { reset: () => void }) {
                           d.target === 'production'
                             ? t('vcRollbackConfirm')
                             : t('vcPromoteConfirm');
-                        if (!(await confirmDialog(msg))) return;
+                        // Either way it changes what production serves.
+                        if (!(await confirmDialog(msg, { danger: true }))) return;
                         void act('promote', async () => {
                           await api().vercel.promote(projectId, d.id, teamId);
                           toast(t('vcPromoted'));
@@ -951,7 +998,7 @@ function VercelBody({ reset }: { reset: () => void }) {
           ))}
           {busy && (
             <div className="git-busy">
-              <Icon name="clock" size={13} className="spin-slow" /> {busy}…
+              <Icon name="clock" size={13} className="spin-slow" /> {busyText(busy)}
             </div>
           )}
         </div>
@@ -993,6 +1040,7 @@ function VercelBody({ reset }: { reset: () => void }) {
             <div className="vc-form">
               <input
                 value={envForm.key}
+                aria-label={t('phEnvName')}
                 placeholder={t('phEnvName')}
                 spellCheck={false}
                 autoFocus
@@ -1000,13 +1048,19 @@ function VercelBody({ reset }: { reset: () => void }) {
                   setEnvForm({ ...envForm, key: e.target.value.replace(/[^\w]/g, '_') })
                 }
               />
-              <textarea
-                value={envForm.value}
-                placeholder={t('vcEnvValue')}
-                spellCheck={false}
-                rows={2}
-                onChange={(e) => setEnvForm({ ...envForm, value: e.target.value })}
-              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  type={showValues ? 'text' : 'password'}
+                  style={{ flex: 1, minWidth: 0 }}
+                  value={envForm.value}
+                  placeholder={t('vcEnvValue')}
+                  aria-label={t('vcEnvValue')}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => setEnvForm({ ...envForm, value: e.target.value })}
+                />
+                {eye}
+              </div>
               <div className="vc-targets">
                 {ENV_TARGETS.map((tg) => (
                   <label key={tg}>
@@ -1022,14 +1076,17 @@ function VercelBody({ reset }: { reset: () => void }) {
                         })
                       }
                     />
-                    {tg}
+                    {targetName(tg)}
                   </label>
                 ))}
               </div>
               <div className="git-connect-actions">
                 <button
                   className="primary"
-                  disabled={!envForm.key.trim() || !envForm.targets.length || busy !== null}
+                  disabled={
+                    !envForm.key.trim() || !envForm.value || !envForm.targets.length || busy !== null
+                  }
+                  title={!envForm.value ? t('vcEnvValueRequired') : undefined}
                   onClick={saveEnv}
                 >
                   {t('vcEnvSave')}
@@ -1040,14 +1097,30 @@ function VercelBody({ reset }: { reset: () => void }) {
           )}
           {envImport && (
             <div className="vc-form">
-              <textarea
-                value={envImport.text}
-                placeholder={'API_URL=https://…\nSECRET_KEY=…'}
-                spellCheck={false}
-                autoFocus
-                rows={6}
-                onChange={(e) => setEnvImport({ ...envImport, text: e.target.value })}
-              />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                <textarea
+                  value={envImport.text}
+                  placeholder={'API_URL=https://…\nSECRET_KEY=…'}
+                  aria-label={t('vcImport')}
+                  spellCheck={false}
+                  autoFocus
+                  rows={6}
+                  style={{ flex: 1, minWidth: 0, ...(showValues ? {} : HIDDEN_TEXT) }}
+                  onChange={(e) => setEnvImport({ ...envImport, text: e.target.value })}
+                />
+                {eye}
+              </div>
+              {!showValues && parseDotenv(envImport.text).length > 0 && (
+                <div className="vc-hint">
+                  {parseDotenv(envImport.text).map((v) => (
+                    <div key={v.key}>
+                      <code>
+                        {v.key} = {v.value ? MASK : '∅'}
+                      </code>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="vc-targets">
                 {ENV_TARGETS.map((tg) => (
                   <label key={tg}>
@@ -1063,7 +1136,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                         })
                       }
                     />
-                    {tg}
+                    {targetName(tg)}
                   </label>
                 ))}
               </div>
@@ -1088,6 +1161,7 @@ function VercelBody({ reset }: { reset: () => void }) {
             <div className="vc-toolbar">
               <input
                 value={envFilter}
+                aria-label={t('vcFilter')}
                 placeholder={t('vcFilter')}
                 onChange={(e) => setEnvFilter(e.target.value)}
               />
@@ -1246,7 +1320,7 @@ function VercelBody({ reset }: { reset: () => void }) {
               <div className="git-gh-hint">{t('vcSettingsHint')}</div>
               {SETTING_FIELDS.map((f) => (
                 <label key={f.key}>
-                  <span>{f.label}</span>
+                  <span>{f.label()}</span>
                   <input
                     value={settingsDraft[f.key] ?? ''}
                     placeholder={f.ph}
@@ -1303,7 +1377,7 @@ function VercelBody({ reset }: { reset: () => void }) {
 
       {busy && view !== 'deploys' && (
         <div className="git-busy">
-          <Icon name="clock" size={13} className="spin-slow" /> {busy}…
+          <Icon name="clock" size={13} className="spin-slow" /> {busyText(busy)}
         </div>
       )}
     </div>

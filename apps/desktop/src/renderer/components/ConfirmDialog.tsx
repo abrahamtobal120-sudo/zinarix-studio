@@ -12,11 +12,13 @@ export function ConfirmDialog() {
   const req = useConfirmRequest();
   const box = useRef<HTMLDivElement>(null);
   const okBtn = useRef<HTMLButtonElement>(null);
+  const cancelBtn = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!req) return;
     const before = document.activeElement as HTMLElement | null;
-    okBtn.current?.focus();
+    // A destructive action starts on Cancel, so a reflex Enter does not confirm it.
+    (req.danger ? cancelBtn : okBtn).current?.focus();
     return () => {
       // Back to where the user was (if it is still there).
       if (before && before.isConnected) before.focus();
@@ -35,7 +37,12 @@ export function ConfirmDialog() {
       return;
     }
     // Enter confirms; on a focused button it presses that button (Cancel cancels).
+    // With danger, Enter only works on a button: confirming needs focusing it on purpose.
     if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
+      if (req.danger) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       answer(true);
       return;
@@ -65,6 +72,7 @@ export function ConfirmDialog() {
         className="confirm-dialog"
         role="alertdialog"
         aria-modal="true"
+        aria-labelledby={`confirm-msg-${req.id}`}
         aria-describedby={`confirm-msg-${req.id}`}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
@@ -73,7 +81,7 @@ export function ConfirmDialog() {
           {req.message}
         </div>
         <div className="confirm-actions">
-          <button type="button" onClick={() => answer(false)}>
+          <button type="button" ref={cancelBtn} onClick={() => answer(false)}>
             {req.cancelLabel ?? t('cancel')}
           </button>
           <button

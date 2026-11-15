@@ -3,15 +3,16 @@ import type { ScanResultView } from '../../shared/api';
 import { t } from '../i18n';
 import { api, newRequestId, setState } from '../store';
 import { Icon } from './Icon';
+import { ModalShell } from './ModalShell';
 
 const presets = (): { id: string; label: string; ports?: string }[] => [
-  { id: 'top', label: 'Top 100', ports: undefined },
+  { id: 'top', label: t('scanTop100'), ports: undefined },
   {
     id: 'common',
     label: t('scanCommon'),
     ports: '21,22,23,25,53,80,110,143,443,445,3306,3389,5432,6379,8080,8443,27017',
   },
-  { id: 'web', label: 'Web', ports: '80,443,3000,5000,5173,8000,8080,8443,8888' },
+  { id: 'web', label: t('scanWeb'), ports: '80,443,3000,5000,5173,8000,8080,8443,8888' },
   { id: 'all', label: t('scanAll'), ports: '1-65535' },
   { id: 'custom', label: t('scanCustom') },
 ];
@@ -44,7 +45,6 @@ export function Scanner() {
   const [result, setResult] = useState<ScanResultView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reqId = useRef<string | null>(null);
-  const close = () => setState({ modal: null });
   const isPublic = target.trim() !== '' && !looksPrivate(target);
 
   useEffect(
@@ -89,173 +89,197 @@ export function Scanner() {
   const stop = () => {
     if (reqId.current) void api().security.scanAbort(reqId.current);
   };
+  const busyRef = useRef(false);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+  // Closing (or being replaced by another modal) while scanning stops the scan.
+  useEffect(
+    () => () => {
+      if (busyRef.current && reqId.current) void api().security.scanAbort(reqId.current);
+    },
+    [],
+  );
+  const close = () => {
+    if (busy) stop();
+    setState({ modal: null });
+  };
+  const pct = progress ? Math.round((progress.done / Math.max(progress.total, 1)) * 100) : 0;
 
   const totalOpen = result?.hosts.reduce((n, h) => n + h.openPorts.length, 0) ?? 0;
   return (
-    <div className="modal-backdrop" onMouseDown={close}>
-      <div className="scanner" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={close} aria-label={t('close')}>
-          ×
-        </button>
-        <h2>
-          <Icon name="wifi" size={16} /> {t('scannerTitle')}
-        </h2>
-        <p className="dim">{t('scannerIntro')}</p>
+    <ModalShell
+      onClose={close}
+      // A stray click outside must not throw away a scan in progress.
+      onBackdrop={busy ? null : close}
+      className="scanner"
+      labelledBy="scanner-title"
+    >
+      <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
+        <Icon name="close" size={16} />
+      </button>
+      <h2 id="scanner-title">
+        <Icon name="wifi" size={16} /> {t('scannerTitle')}
+      </h2>
+      <p className="dim">{t('scannerIntro')}</p>
 
-        <div className="scan-form">
-          <label className="scan-target">
-            {t('scannerTarget')}
-            <input
-              value={target}
-              placeholder={t('phScanTarget')}
-              spellCheck={false}
-              onChange={(e) => setTarget(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void run()}
-            />
-          </label>
-          <div className="scan-presets">
-            {presets().map((p) => (
-              <button
-                key={p.id}
-                className={`scan-chip ${preset === p.id ? 'on' : ''}`}
-                onClick={() => setPreset(p.id)}
-              >
-                {p.label}
-              </button>
-            ))}
-            {preset === 'custom' && (
-              <input
-                className="scan-ports"
-                value={customPorts}
-                placeholder="22,80,443,8000-8100"
-                spellCheck={false}
-                onChange={(e) => setCustomPorts(e.target.value)}
-              />
-            )}
-          </div>
-          <label className="scan-opt">
-            <input
-              type="checkbox"
-              checked={service}
-              onChange={(e) => setService(e.target.checked)}
-            />
-            {t('scannerService')}
-          </label>
-        </div>
-
-        {isPublic && (
-          <label className={`scan-authorize ${authorized ? 'ok' : ''}`}>
-            <input
-              type="checkbox"
-              checked={authorized}
-              onChange={(e) => setAuthorized(e.target.checked)}
-            />
-            <span>
-              <Icon name="warning" size={13} /> {t('scannerAuthorize')}
-            </span>
-          </label>
-        )}
-
-        <div className="scan-actions">
-          {busy ? (
-            <button className="danger" onClick={stop}>
-              ⏹ {t('scannerStop')}
-            </button>
-          ) : (
+      <div className="scan-form">
+        <label className="scan-target">
+          {t('scannerTarget')}
+          <input
+            value={target}
+            placeholder={t('phScanTarget')}
+            spellCheck={false}
+            onChange={(e) => setTarget(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void run()}
+          />
+        </label>
+        <div className="scan-presets">
+          {presets().map((p) => (
             <button
-              className="primary"
-              disabled={!target.trim() || (isPublic && !authorized)}
-              onClick={() => void run()}
+              key={p.id}
+              className={`scan-chip ${preset === p.id ? 'on' : ''}`}
+              aria-pressed={preset === p.id}
+              onClick={() => setPreset(p.id)}
             >
-              ▶ {t('scannerRun')}
+              {p.label}
             </button>
-          )}
-          {progress && (
-            <div className="scan-progress">
-              <div
-                className="scan-bar"
-                style={{
-                  width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%`,
-                }}
-              />
-              <span>{Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%</span>
-            </div>
+          ))}
+          {preset === 'custom' && (
+            <input
+              className="scan-ports"
+              aria-label={t('scanCustom')}
+              value={customPorts}
+              placeholder="22,80,443,8000-8100"
+              spellCheck={false}
+              onChange={(e) => setCustomPorts(e.target.value)}
+            />
           )}
         </div>
+        <label className="scan-opt">
+          <input type="checkbox" checked={service} onChange={(e) => setService(e.target.checked)} />
+          {t('scannerService')}
+        </label>
+      </div>
 
-        {error && <div className="scan-error">
-            <Icon name="warning" size={13} /> {error}
-          </div>}
+      {isPublic && (
+        <label className={`scan-authorize ${authorized ? 'ok' : ''}`}>
+          <input
+            type="checkbox"
+            checked={authorized}
+            onChange={(e) => setAuthorized(e.target.checked)}
+          />
+          <span>
+            <Icon name="warning" size={13} /> {t('scannerAuthorize')}
+          </span>
+        </label>
+      )}
 
-        {result && (
-          <div className="scan-results">
-            <div className="scan-summary">
-              {t('scannerSummary', {
-                open: totalOpen,
-                hosts: result.hosts.length,
-                ports: result.scannedPorts,
-              })}
-            </div>
-            {result.hosts.length === 0 && <p className="dim">{t('scannerNoneOpen')}</p>}
-            {result.hosts.map((h) => (
-              <div key={h.host} className="scan-host">
-                <div className="scan-host-name">
-                  <Icon name="monitor" size={13} /> {h.host}
-                  {h.reverse && <span className="dim"> · {h.reverse}</span>}
-                </div>
-                <table className="scan-table">
-                  <thead>
-                    <tr>
-                      <th>{t('scannerPort')}</th>
-                      <th>{t('scannerServiceCol')}</th>
-                      <th>{t('scannerVersion')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {h.openPorts.map((p) => (
-                      <tr key={p.port} className={p.risky ? 'risky' : ''}>
-                        <td>
-                          {p.port} {p.risky && (
-                            <span title={t('scannerRisky')}>
-                              <Icon name="warning" size={12} />
-                            </span>
-                          )}
-                        </td>
-                        <td>{p.service}</td>
-                        <td className="scan-banner">{p.banner ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-            {totalOpen > 0 && (
-              <button
-                className="scan-explain"
-                onClick={() => {
-                  close();
-                  import('./Chat').then((m) =>
-                    m.askAgent(
-                      t('scanExplainPrompt', {
-                        target: target.trim(),
-                        ports: result.hosts
-                          .map(
-                            (h) =>
-                              `${h.host}: ${h.openPorts.map((p) => `${p.port} ${p.service}${p.banner ? ` (${p.banner})` : ''}`).join(', ')}`,
-                          )
-                          .join('\n'),
-                      }),
-                    ),
-                  );
-                }}
-              >
-                <Icon name="sparkle" size={13} /> {t('scannerExplain')}
-              </button>
-            )}
+      <div className="scan-actions">
+        {busy ? (
+          <button className="danger" onClick={stop}>
+            <Icon name="stop" size={13} /> {t('scannerStop')}
+          </button>
+        ) : (
+          <button
+            className="primary"
+            disabled={!target.trim() || (isPublic && !authorized)}
+            onClick={() => void run()}
+          >
+            <Icon name="play" size={13} /> {t('scannerRun')}
+          </button>
+        )}
+        {progress && (
+          <div
+            className="scan-progress"
+            role="progressbar"
+            aria-label={t('scannerTitle')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+            aria-valuetext={`${pct}% (${progress.done}/${progress.total})`}
+          >
+            <div className="scan-bar" style={{ width: `${pct}%` }} />
+            <span aria-hidden="true">{pct}%</span>
           </div>
         )}
-        <p className="sec-legal">{t('scannerLegal')}</p>
       </div>
-    </div>
+
+      {error && (
+        <div className="scan-error" role="alert">
+          <Icon name="warning" size={13} /> {error}
+        </div>
+      )}
+
+      {result && (
+        <div className="scan-results">
+          <div className="scan-summary">
+            {t('scannerSummary', {
+              open: totalOpen,
+              hosts: result.hosts.length,
+              ports: result.scannedPorts,
+            })}
+          </div>
+          {result.hosts.length === 0 && <p className="dim">{t('scannerNoneOpen')}</p>}
+          {result.hosts.map((h) => (
+            <div key={h.host} className="scan-host">
+              <div className="scan-host-name">
+                <Icon name="monitor" size={13} /> {h.host}
+                {h.reverse && <span className="dim"> · {h.reverse}</span>}
+              </div>
+              <table className="scan-table">
+                <thead>
+                  <tr>
+                    <th>{t('scannerPort')}</th>
+                    <th>{t('scannerServiceCol')}</th>
+                    <th>{t('scannerVersion')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {h.openPorts.map((p) => (
+                    <tr key={p.port} className={p.risky ? 'risky' : ''}>
+                      <td>
+                        {p.port}{' '}
+                        {p.risky && (
+                          <span title={t('scannerRisky')} role="img" aria-label={t('scannerRisky')}>
+                            <Icon name="warning" size={12} />
+                          </span>
+                        )}
+                      </td>
+                      <td>{p.service}</td>
+                      <td className="scan-banner">{p.banner ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+          {totalOpen > 0 && (
+            <button
+              className="scan-explain"
+              onClick={() => {
+                close();
+                import('./Chat').then((m) =>
+                  m.askAgent(
+                    t('scanExplainPrompt', {
+                      target: target.trim(),
+                      ports: result.hosts
+                        .map(
+                          (h) =>
+                            `${h.host}: ${h.openPorts.map((p) => `${p.port} ${p.service}${p.banner ? ` (${p.banner})` : ''}`).join(', ')}`,
+                        )
+                        .join('\n'),
+                    }),
+                  ),
+                );
+              }}
+            >
+              <Icon name="sparkle" size={13} /> {t('scannerExplain')}
+            </button>
+          )}
+        </div>
+      )}
+      <p className="sec-legal">{t('scannerLegal')}</p>
+    </ModalShell>
   );
 }

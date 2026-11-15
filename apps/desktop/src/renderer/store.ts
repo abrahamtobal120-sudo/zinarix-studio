@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { ModelInfo } from '@omni/shared';
 import type {
+  FileContent,
   AiRole,
   ChatContext,
   OmniApi,
@@ -33,6 +34,26 @@ export interface Tab {
   dirty: boolean;
   /** Non-text file: shown as a message instead of an editor. */
   notice?: string;
+  /** Shown in a read-only viewer instead of the editor: picture, hex dump or paged text. */
+  viewer?: FileViewer;
+  /** Bytes of the file, for viewer tabs. */
+  size?: number;
+}
+
+export type FileViewer = 'image' | 'hex' | 'large';
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|ico|avif|apng|jfif)$/i;
+export const isImagePath = (path: string): boolean => IMAGE_EXT.test(path);
+
+/** Picks the viewer of a file the text editor can't take (null = it is plain text). */
+async function viewerFor(
+  path: string,
+  file: FileContent,
+): Promise<{ viewer: FileViewer; size: number } | null> {
+  if (!isImagePath(path) && !file.binary && !file.tooLarge) return null;
+  const head = await api().workspace.readBytes(path, 0, 8000);
+  if (isImagePath(path)) return { viewer: 'image', size: head.size };
+  return { viewer: file.binary || head.bytes.includes(0) ? 'hex' : 'large', size: head.size };
 }
 
 export type Modal =
@@ -290,7 +311,17 @@ export async function openFile(
 async function loadTab(path: string): Promise<void> {
   const name = path.split('/').pop() ?? path;
   {
-    const file = await api().workspace.readFile(path);
+    const file = isImagePath(path)
+      ? { content: '', binary: true, tooLarge: false }
+      : await api().workspace.readFile(path);
+    const view = await viewerFor(path, file).catch(() => null);
+    if (view) {
+      setState((s) => ({
+        tabs: [...s.tabs, { path, name, dirty: false, ...view }],
+        active: path,
+      }));
+      return;
+    }
     if (file.binary || file.tooLarge) {
       setState((s) => ({
         tabs: [
@@ -301,10 +332,39 @@ async function loadTab(path: string): Promise<void> {
       }));
       return;
     }
+    createDoc(path, file.content);
+    setState((s) => ({ tabs: [...s.tabs, { path, name, dirty: false }] }));
+  }
+}
+
+/**
+ * Turns a large-file viewer tab into a normal, editable editor tab, reading the whole
+ * file in slices (up to the 50 MB the save channel accepts).
+ */
+export const MAX_EDITABLE = 50 * 1024 * 1024;
+export async function openLargeInEditor(path: string): Promise<void> {
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  let offset = 0;
+  for (;;) {
+    const { bytes, size } = await api().workspace.readBytes(path, offset, 8 * 1024 * 1024);
+    if (size > MAX_EDITABLE) throw new Error(t('tooLarge'));
+    parts.push(bytes);
+    offset += bytes.length;
+    if (bytes.length === 0 || offset >= size) break;
+  }
+  const content = await new Blob(parts).text();
+  if (!docs.has(path)) createDoc(path, content);
+  setState((s) => ({
+    tabs: s.tabs.map((x) => (x.path === path ? { path, name: x.name, dirty: false } : x)),
+    active: path,
+  }));
+}
+
+function createDoc(path: string, content: string): void {
+  {
     const uri = monaco.Uri.from({ scheme: 'file', path: `/${path}` });
     const model =
-      monaco.editor.getModel(uri) ??
-      monaco.editor.createModel(file.content, languageFor(path), uri);
+      monaco.editor.getModel(uri) ?? monaco.editor.createModel(content, languageFor(path), uri);
     docs.set(path, { model, savedVersion: model.getAlternativeVersionId(), viewState: null });
     let autoSave: ReturnType<typeof setTimeout> | undefined;
     model.onDidChangeContent(() => {
@@ -316,7 +376,6 @@ async function loadTab(path: string): Promise<void> {
           void save(path, false);
       }, 1000);
     });
-    setState((s) => ({ tabs: [...s.tabs, { path, name, dirty: false }] }));
   }
 }
 

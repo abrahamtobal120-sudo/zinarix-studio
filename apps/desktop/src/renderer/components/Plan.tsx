@@ -15,8 +15,11 @@ import {
   toast,
   useStore,
 } from '../store';
+import { pressable } from '../a11y';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
+import { ModalShell } from './ModalShell';
+import { openProviders } from './providersNav';
 
 const close = () => setState({ modal: null });
 const buy = () => void api().app.openExternal(getState().license.buyUrl);
@@ -54,9 +57,11 @@ export function PlanBadge() {
     <span
       className={`status-item plan-badge plan-${l.plan}`}
       title={t('planTitle')}
-      onClick={() => setState({ modal: { kind: 'license' } })}
+      aria-label={`${t('planTitle')}: ${planLabel(l)}`}
+      {...pressable(() => setState({ modal: { kind: 'license' } }))}
     >
-      <Icon name={l.plan === 'free' ? 'star' : l.plan === 'ai' ? 'cpu' : 'agent'} size={12} /> {planLabel(l)}
+      <Icon name={l.plan === 'free' ? 'star' : l.plan === 'ai' ? 'cpu' : 'agent'} size={12} />{' '}
+      {planLabel(l)}
     </span>
   );
 }
@@ -191,6 +196,7 @@ function ActivateForm({ onDone }: { onDone?: (l: LicenseStatus) => void }) {
           value={key}
           spellCheck={false}
           placeholder="ZX1.…"
+          aria-invalid={!!error}
           onChange={(e) => setKey(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void activate()}
         />
@@ -198,7 +204,11 @@ function ActivateForm({ onDone }: { onDone?: (l: LicenseStatus) => void }) {
           {busy ? '…' : t('planActivate')}
         </button>
       </div>
-      {error && <div className="plan-error">{error}</div>}
+      {error && (
+        <div className="plan-error" role="alert">
+          {error}
+        </div>
+      )}
     </div>
   );
 }
@@ -223,53 +233,53 @@ export function LicensePanel() {
           ? t('planTrialUntil', { date: new Date(l.trialEndsAt).toLocaleDateString() })
           : t('planFreeHint');
   return (
-    <div className="modal-backdrop" onMouseDown={close}>
-      <div className="plan-panel" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={close} aria-label={t('close')}>
-          ×
-        </button>
-        <div className={`plan-hero plan-${l.plan}`}>
-          <img src="./logo.svg" alt="" />
-          <div>
-            <div className="plan-name">Zinarix Studio {planLabel(l)}</div>
-            <div className="plan-sub">
-              {l.email ? `${l.name ? `${l.name} · ` : ''}${l.email} · ` : ''}
-              {until}
-            </div>
+    <ModalShell onClose={close} className="plan-panel" labelledBy="plan-name">
+      <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
+        <Icon name="close" size={16} />
+      </button>
+      <div className={`plan-hero plan-${l.plan}`}>
+        <img src="./logo.svg" alt="" />
+        <div>
+          <div className="plan-name" id="plan-name">
+            Zinarix Studio {planLabel(l)}
+          </div>
+          <div className="plan-sub">
+            {l.email ? `${l.name ? `${l.name} · ` : ''}${l.email} · ` : ''}
+            {until}
           </div>
         </div>
-        {l.problem && (
-          <div className="plan-error">
-            <Icon name="warning" size={13} /> {l.problem}
-          </div>
-        )}
-        {l.plan === 'open' && (
-          <>
-            <div className="plan-open">
-              <Icon name="agent" size={14} /> {t('planOpenBody')}
-            </div>
-            <Included />
-          </>
-        )}
-        <ProTable />
-        {/* The button sells Pro: not shown to someone who already has it. */}
-        {l.billing && !hasPro(l.plan) && (
-          <div className="plan-buy">
-            <button className="primary big" onClick={buy}>
-              <Icon name="agent" size={15} /> {t('planBuy')}
-            </button>
-            <span className="dim">{t('planBuyHint')}</span>
-          </div>
-        )}
-        {/* A plan code can always be swapped for another one. */}
-        {(!isActivated(l.plan) || l.code) && <ActivateForm />}
-        {(isActivated(l.plan) || l.code) && (
-          <div className="plan-footer">
-            <button onClick={() => void remove()}>{t('planRemove')}</button>
-          </div>
-        )}
       </div>
-    </div>
+      {l.problem && (
+        <div className="plan-error" role="alert">
+          <Icon name="warning" size={13} /> {l.problem}
+        </div>
+      )}
+      {l.plan === 'open' && (
+        <>
+          <div className="plan-open">
+            <Icon name="agent" size={14} /> {t('planOpenBody')}
+          </div>
+          <Included />
+        </>
+      )}
+      <ProTable />
+      {/* The button sells Pro: not shown to someone who already has it. */}
+      {l.billing && !hasPro(l.plan) && (
+        <div className="plan-buy">
+          <button className="primary big" onClick={buy}>
+            <Icon name="agent" size={15} /> {t('planBuy')}
+          </button>
+          <span className="dim">{t('planBuyHint')}</span>
+        </div>
+      )}
+      {/* A plan code can always be swapped for another one. */}
+      {(!isActivated(l.plan) || l.code) && <ActivateForm />}
+      {(isActivated(l.plan) || l.code) && (
+        <div className="plan-footer">
+          <button onClick={() => void remove()}>{t('planRemove')}</button>
+        </div>
+      )}
+    </ModalShell>
   );
 }
 
@@ -284,32 +294,30 @@ export function UpgradeModal({ feature }: { feature: ProFeature }) {
   const [activating, setActivating] = useState(false);
   const free = useStore((s) => s.license.free);
   return (
-    <div className="modal-backdrop" onMouseDown={close}>
-      <div className="plan-panel upgrade" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={close} aria-label={t('close')}>
-          ×
-        </button>
-        <div className="upgrade-icon">
-          <Icon name="agent" size={26} />
-        </div>
-        <h2>{t(FEATURE_TITLE[feature], { n: free.maxChats })}</h2>
-        <p className="dim">{t('upBody')}</p>
-        <ProTable />
-        {activating ? (
-          <ActivateForm onDone={close} />
-        ) : (
-          <div className="upgrade-actions">
-            <button className="primary big" onClick={buy}>
-              {t('planBuy')}
-            </button>
-            <button onClick={() => setActivating(true)}>{t('planHaveKey')}</button>
-            <button className="link" onClick={close}>
-              {t('notNow')}
-            </button>
-          </div>
-        )}
+    <ModalShell onClose={close} className="plan-panel upgrade" labelledBy="upgrade-title">
+      <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
+        <Icon name="close" size={16} />
+      </button>
+      <div className="upgrade-icon">
+        <Icon name="agent" size={26} />
       </div>
-    </div>
+      <h2 id="upgrade-title">{t(FEATURE_TITLE[feature], { n: free.maxChats })}</h2>
+      <p className="dim">{t('upBody')}</p>
+      <ProTable />
+      {activating ? (
+        <ActivateForm onDone={close} />
+      ) : (
+        <div className="upgrade-actions">
+          <button className="primary big" onClick={buy}>
+            {t('planBuy')}
+          </button>
+          <button onClick={() => setActivating(true)}>{t('planHaveKey')}</button>
+          <button className="link" onClick={close}>
+            {t('notNow')}
+          </button>
+        </div>
+      )}
+    </ModalShell>
   );
 }
 
@@ -350,137 +358,172 @@ export function introOnStart(version: string, hasModels: boolean): void {
   if (seen !== version && hasModels) setState({ modal: { kind: 'whatsNew' } });
 }
 
+// Step to come back to after a detour to Providers.
+let onbResume = 0;
+
 /** First launch: four short steps to a working AI. */
 export function Onboarding() {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => onbResume);
   const models = useStore((s) => s.models);
   const l = useStore((s) => s.license);
   const [searching, setSearching] = useState(false);
+  /** Result of the last local search: nothing found, or why it failed. */
+  const [localMsg, setLocalMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const steps = 4;
+  useEffect(() => {
+    onbResume = step;
+  }, [step]);
   const findLocal = async () => {
     setSearching(true);
+    setLocalMsg(null);
     try {
       await refreshModels(true);
+      const n = getState().models.length;
+      setLocalMsg(
+        n > 0 ? { ok: true, text: t('onbReady', { n }) } : { ok: false, text: t('onbLocalNone') },
+      );
+    } catch (e) {
+      setLocalMsg({ ok: false, text: t('onbLocalError', { msg: errText(e) }) });
     } finally {
       setSearching(false);
     }
   };
-  const providers = () => setState({ modal: { kind: 'providers' } });
+  // Terminal agents or API keys: Providers filtered by that kind, then back to this step.
+  const providers = (kind: 'cli' | 'api') =>
+    openProviders({ kind, onClose: () => setState({ modal: { kind: 'welcome' } }) });
+  const finish = () => {
+    onbResume = 0;
+    close();
+  };
   return (
-    <div className="modal-backdrop onboarding-backdrop">
-      <div className="onboarding" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="onb-dots" aria-hidden="true">
-          {Array.from({ length: steps }, (_, i) => (
-            <span key={i} className={i === step ? 'on' : i < step ? 'done' : ''} />
-          ))}
-        </div>
-        {step === 0 && (
-          <div className="onb-step center">
-            <img className="onb-logo" src="./logo.svg" alt="" />
-            <h1>{t('onbWelcome')}</h1>
-            <p className="onb-lead">{t('onbLead')}</p>
-            <div className="onb-pills">
-              <span>
-                <Icon name="message" size={13} /> {t('onbPill1')}
-              </span>
-              <span>
-                <Icon name="globe" size={13} /> {t('onbPill2')}
-              </span>
-              <span>
-                <Icon name="users" size={13} /> {t('onbPill3')}
-              </span>
-            </div>
-          </div>
-        )}
-        {step === 1 && (
-          <div className="onb-step">
-            <h2>{t('onbConnect')}</h2>
-            <p className="dim">{t('onbConnectLead')}</p>
-            {models.length > 0 && (
-              <div className="onb-ok">
-                <Icon name="check" size={14} /> {t('onbReady', { n: models.length })}
-              </div>
-            )}
-            <div className="onb-cards">
-              <button className="onb-card" onClick={() => void findLocal()}>
-                <Icon name="cpu" size={22} />
-                <b>{t('onbLocal')}</b>
-                <span>{searching ? t('onbSearching') : t('onbLocalHint')}</span>
-              </button>
-              <button className="onb-card" onClick={providers}>
-                <Icon name="terminal" size={22} />
-                <b>{t('onbCli')}</b>
-                <span>{t('onbCliHint')}</span>
-              </button>
-              <button className="onb-card" onClick={providers}>
-                <Icon name="key" size={22} />
-                <b>{t('onbKey')}</b>
-                <span>{t('onbKeyHint')}</span>
-              </button>
-            </div>
-          </div>
-        )}
-        {step === 2 && (
-          <div className="onb-step">
-            <h2>
-              {l.plan === 'open'
-                ? t('onbFreeAll')
-                : l.plan === 'trial'
-                  ? t('onbTrial', { n: l.trialDaysLeft ?? TRIAL_DAYS })
-                  : `Zinarix Studio ${planLabel(l)}`}
-            </h2>
-            <p className="dim">{l.plan === 'open' ? t('planOpenBody') : t('onbTrialLead')}</p>
-            {l.plan === 'open' ? <Included /> : <ProTable />}
-            {l.billing && !isActivated(l.plan) && <ActivateForm />}
-          </div>
-        )}
-        {step === 3 && (
-          <div className="onb-step">
-            <h2>{t('onbDone')}</h2>
-            <div className="onb-tips">
-              <div>
-                <kbd>Ctrl+Alt+N</kbd> {t('chatNewTab')}
-              </div>
-              <div>
-                <kbd>Ctrl+Alt+D</kbd> {t('chatSplit')}
-              </div>
-              <div>
-                <kbd>Ctrl+Shift+N</kbd> {t('newWindow')}
-              </div>
-              <div>
-                <kbd>Ctrl+K</kbd> {t('aiEdit')}
-              </div>
-              <div>
-                <kbd>Ctrl+Shift+P</kbd> {t('cmdPalette')}
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="onb-nav">
-          {step > 0 ? (
-            <button onClick={() => setStep(step - 1)}>{t('back')}</button>
-          ) : (
-            <button className="link" onClick={close}>
-              {t('onbSkip')}
-            </button>
-          )}
-          {step < steps - 1 ? (
-            <button className="primary" onClick={() => setStep(step + 1)}>
-              {step === 0 ? t('onbStart') : t('next')}
-            </button>
-          ) : (
-            <span className="onb-final">
-              <button onClick={() => (close(), void runCommand('workspace.open'))}>
-                <Icon name="folder" size={14} /> {t('openFolder')}
-              </button>
-              <button className="primary" onClick={() => (close(), setState({ chatOpen: true }))}>
-                <Icon name="agent" size={14} /> {t('onbGo')}
-              </button>
-            </span>
-          )}
-        </div>
+    <ModalShell
+      onClose={finish}
+      onBackdrop={null}
+      backdropClassName="onboarding-backdrop"
+      className="onboarding"
+      label={t('onbWelcome')}
+    >
+      <div className="onb-dots" aria-hidden="true">
+        {Array.from({ length: steps }, (_, i) => (
+          <span key={i} className={i === step ? 'on' : i < step ? 'done' : ''} />
+        ))}
       </div>
-    </div>
+      {step === 0 && (
+        <div className="onb-step center">
+          <img className="onb-logo" src="./logo.svg" alt="" />
+          <h1>{t('onbWelcome')}</h1>
+          <p className="onb-lead">{t('onbLead')}</p>
+          <div className="onb-pills">
+            <span>
+              <Icon name="message" size={13} /> {t('onbPill1')}
+            </span>
+            <span>
+              <Icon name="globe" size={13} /> {t('onbPill2')}
+            </span>
+            <span>
+              <Icon name="users" size={13} /> {t('onbPill3')}
+            </span>
+          </div>
+        </div>
+      )}
+      {step === 1 && (
+        <div className="onb-step">
+          <h2>{t('onbConnect')}</h2>
+          <p className="dim">{t('onbConnectLead')}</p>
+          {models.length > 0 && (
+            <div className="onb-ok" role="status">
+              <Icon name="check" size={14} /> {t('onbReady', { n: models.length })}
+            </div>
+          )}
+          {localMsg && !localMsg.ok && (
+            <div className="plan-error" role="alert">
+              <Icon name="warning" size={13} /> {localMsg.text}
+            </div>
+          )}
+          <div className="onb-cards">
+            <button
+              className="onb-card"
+              disabled={searching}
+              aria-busy={searching}
+              onClick={() => void findLocal()}
+            >
+              <Icon name="cpu" size={22} />
+              <b>{t('onbLocal')}</b>
+              <span>{searching ? t('onbSearching') : t('onbLocalHint')}</span>
+            </button>
+            <button className="onb-card" onClick={() => providers('cli')}>
+              <Icon name="terminal" size={22} />
+              <b>{t('onbCli')}</b>
+              <span>{t('onbCliHint')}</span>
+            </button>
+            <button className="onb-card" onClick={() => providers('api')}>
+              <Icon name="key" size={22} />
+              <b>{t('onbKey')}</b>
+              <span>{t('onbKeyHint')}</span>
+            </button>
+          </div>
+        </div>
+      )}
+      {step === 2 && (
+        <div className="onb-step">
+          <h2>
+            {l.plan === 'open'
+              ? t('onbFreeAll')
+              : l.plan === 'trial'
+                ? t('onbTrial', { n: l.trialDaysLeft ?? TRIAL_DAYS })
+                : `Zinarix Studio ${planLabel(l)}`}
+          </h2>
+          <p className="dim">{l.plan === 'open' ? t('planOpenBody') : t('onbTrialLead')}</p>
+          {l.plan === 'open' ? <Included /> : <ProTable />}
+          {l.billing && !isActivated(l.plan) && <ActivateForm />}
+        </div>
+      )}
+      {step === 3 && (
+        <div className="onb-step">
+          <h2>{t('onbDone')}</h2>
+          <div className="onb-tips">
+            <div>
+              <kbd>Ctrl+Alt+N</kbd> {t('chatNewTab')}
+            </div>
+            <div>
+              <kbd>Ctrl+Alt+D</kbd> {t('chatSplit')}
+            </div>
+            <div>
+              <kbd>Ctrl+Shift+N</kbd> {t('newWindow')}
+            </div>
+            <div>
+              <kbd>Ctrl+K</kbd> {t('aiEdit')}
+            </div>
+            <div>
+              <kbd>Ctrl+Shift+P</kbd> {t('cmdPalette')}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="onb-nav">
+        {step > 0 ? (
+          <button onClick={() => setStep(step - 1)}>{t('back')}</button>
+        ) : (
+          <button className="link" onClick={finish}>
+            {t('onbSkip')}
+          </button>
+        )}
+        {step < steps - 1 ? (
+          <button className="primary" onClick={() => setStep(step + 1)}>
+            {step === 0 ? t('onbStart') : t('next')}
+          </button>
+        ) : (
+          <span className="onb-final">
+            <button onClick={() => (finish(), void runCommand('workspace.open'))}>
+              <Icon name="folder" size={14} /> {t('openFolder')}
+            </button>
+            <button className="primary" onClick={() => (finish(), setState({ chatOpen: true }))}>
+              <Icon name="agent" size={14} /> {t('onbGo')}
+            </button>
+          </span>
+        )}
+      </div>
+    </ModalShell>
   );
 }
 
@@ -502,36 +545,34 @@ export function WhatsNew() {
       .then((s) => setVersion(s.version));
   }, []);
   return (
-    <div className="modal-backdrop" onMouseDown={close}>
-      <div className="plan-panel news" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={close} aria-label={t('close')}>
-          ×
-        </button>
-        <h2>
-          <Icon name="agent" size={18} /> {t('newsTitle', { v: version })}
-        </h2>
-        <div className="news-grid">
-          {NEWS.map((n) => (
-            <div key={n.title} className="news-card">
-              <span className="news-icon">
-                <Icon name={n.icon} size={18} />
-              </span>
-              <div>
-                <b>{t(n.title)}</b>
-                <p>{t(n.body)}</p>
-                {n.keys && <kbd>{n.keys}</kbd>}
-              </div>
+    <ModalShell onClose={close} className="plan-panel news" labelledBy="news-title">
+      <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
+        <Icon name="close" size={16} />
+      </button>
+      <h2 id="news-title">
+        <Icon name="agent" size={18} /> {t('newsTitle', { v: version })}
+      </h2>
+      <div className="news-grid">
+        {NEWS.map((n) => (
+          <div key={n.title} className="news-card">
+            <span className="news-icon">
+              <Icon name={n.icon} size={18} />
+            </span>
+            <div>
+              <b>{t(n.title)}</b>
+              <p>{t(n.body)}</p>
+              {n.keys && <kbd>{n.keys}</kbd>}
             </div>
-          ))}
-        </div>
-        <div className="upgrade-actions">
-          <button className="primary" onClick={close}>
-            {t('newsOk')}
-          </button>
-          <button onClick={() => setState({ modal: { kind: 'license' } })}>{t('planTitle')}</button>
-        </div>
+          </div>
+        ))}
       </div>
-    </div>
+      <div className="upgrade-actions">
+        <button className="primary" onClick={close}>
+          {t('newsOk')}
+        </button>
+        <button onClick={() => setState({ modal: { kind: 'license' } })}>{t('planTitle')}</button>
+      </div>
+    </ModalShell>
   );
 }
 
@@ -567,8 +608,9 @@ export function UpdateBanner() {
         className="link"
         onClick={() => setHidden(`${u.state}:${u.version}`)}
         aria-label={t('close')}
+        title={t('close')}
       >
-        ×
+        <Icon name="close" size={14} />
       </button>
     </div>
   );
@@ -598,8 +640,8 @@ export function NoticeBanner() {
           {t('noticeMore')}
         </button>
       )}
-      <button className="link" onClick={dismiss} aria-label={t('close')}>
-        ×
+      <button className="link" onClick={dismiss} aria-label={t('close')} title={t('close')}>
+        <Icon name="close" size={14} />
       </button>
     </div>
   );

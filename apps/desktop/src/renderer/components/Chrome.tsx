@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { runCommand } from '../commands';
+import { commands, runCommand } from '../commands';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
 import { Icon, TONE, type IconName } from './Icon';
@@ -39,16 +39,23 @@ export function ActivityBar() {
     icon: IconName,
     onClick: () => void,
     badge?: number,
+    /** false for buttons that only open a dialog (no on/off state to announce). */
+    toggle = true,
   ) => (
     <button
       className={`activity ${active ? 'active' : ''}`}
       style={{ '--tone': TONE[icon] ?? 'var(--fg)' } as CSSProperties}
       title={title}
-      aria-label={title}
+      aria-label={badge ? t('badgeCount', { title, n: badge > 99 ? '99+' : badge }) : title}
+      aria-pressed={toggle ? active : undefined}
       onClick={onClick}
     >
       <Icon name={icon} size={21} />
-      {badge ? <span className="activity-badge">{badge > 99 ? '99+' : badge}</span> : null}
+      {badge ? (
+        <span className="activity-badge" aria-hidden="true">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      ) : null}
     </button>
   );
   return (
@@ -122,10 +129,10 @@ export function ActivityBar() {
           () => toggleMaximized('side'),
         )}
       {item(active === '::security', t('securityTitle'), 'shield', () => openSecurityTab())}
-      {item(false, t('usageTitle'), 'chart', () => setState({ modal: { kind: 'usage' } }))}
-      {item(false, t('providers'), 'key', () => setState({ modal: { kind: 'providers' } }))}
-      {item(false, t('cmdPalette'), 'menu', () => setState({ modal: { kind: 'palette' } }))}
-      {item(false, t('settings'), 'settings', () => setState({ modal: { kind: 'settings' } }))}
+      {item(false, t('usageTitle'), 'chart', () => setState({ modal: { kind: 'usage' } }), 0, false)}
+      {item(false, t('providers'), 'key', () => setState({ modal: { kind: 'providers' } }), 0, false)}
+      {item(false, t('cmdPalette'), 'menu', () => setState({ modal: { kind: 'palette' } }), 0, false)}
+      {item(false, t('settings'), 'settings', () => setState({ modal: { kind: 'settings' } }), 0, false)}
     </nav>
   );
 }
@@ -209,7 +216,10 @@ export function Welcome() {
   useEffect(() => {
     if (!workspace) void api().workspace.recent().then(setRecent);
   }, [workspace]);
-  const row = (label: string, keys: string, id: string, icon: IconName) => (
+  // Shortcut text from the command table, so it shows ⌘ on macOS and the user's own bindings.
+  const keyOf = new Map(commands().map((c) => [c.id, c.keys ?? ''] as const));
+  const openFolder = () => void api().workspace.openDialog();
+  const row = (label: string, id: string, icon: IconName) => (
     <div className="welcome-row" {...pressable(() => void runCommand(id))}>
       <span className="welcome-row-label">
         <span
@@ -220,7 +230,7 @@ export function Welcome() {
         </span>
         {label}
       </span>
-      <kbd>{keys}</kbd>
+      {keyOf.get(id) ? <kbd>{keyOf.get(id)}</kbd> : null}
     </div>
   );
   return (
@@ -230,13 +240,23 @@ export function Welcome() {
       <p className="dim">{t('welcomeSub')}</p>
       {!workspace ? (
         <>
-          <div className="drop-zone" {...pressable(() => void api().workspace.openDialog())}>
+          {/* The whole zone is a mouse target; the button inside is the keyboard control (a
+              role="button" around a <button> would nest two buttons). */}
+          <div className="drop-zone" onClick={openFolder}>
             <div className="drop-icon">
               <Icon name="folder" size={30} />
             </div>
             <div className="drop-title">{t('dropHere')}</div>
             <div className="dim">{t('dropOr')}</div>
-            <button className="primary big">{t('openFolder')}</button>
+            <button
+              className="primary big"
+              onClick={(e) => {
+                e.stopPropagation();
+                openFolder();
+              }}
+            >
+              {t('openFolder')}
+            </button>
           </div>
           {recent.length > 0 && (
             <div className="recent">
@@ -274,12 +294,12 @@ export function Welcome() {
             </button>
           </div>
           <div className="welcome-keys">
-            {row(t('welcomeQuickOpen'), 'Ctrl+P', 'quickOpen', 'search')}
-            {row(t('cmdPalette'), 'Ctrl+Shift+P', 'palette', 'menu')}
-            {row(t('aiEdit'), 'Ctrl+K', 'ai.edit', 'edit')}
-            {row(t('welcomeAsk'), 'Ctrl+L', 'ai.askSelection', 'message')}
-            {row(t('pickModel'), 'Ctrl+Alt+M', 'ai.pickModel', 'thinking')}
-            {row(t('terminal'), 'Ctrl+`', 'view.terminal', 'terminal')}
+            {row(t('welcomeQuickOpen'), 'quickOpen', 'search')}
+            {row(t('cmdPalette'), 'palette', 'menu')}
+            {row(t('aiEdit'), 'ai.edit', 'edit')}
+            {row(t('welcomeAsk'), 'ai.askSelection', 'message')}
+            {row(t('pickModel'), 'ai.pickModel', 'thinking')}
+            {row(t('terminal'), 'view.terminal', 'terminal')}
           </div>
         </>
       )}

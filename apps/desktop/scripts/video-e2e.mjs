@@ -1,4 +1,5 @@
-// End-to-end check of Video Studio in the real Electron app (run from apps/desktop).
+// End-to-end check of Video Studio in the real Electron app: pnpm build, then
+// `node scripts/video-e2e.mjs [screenshot folder]` from apps/desktop (DBG=1 prints the timeline).
 import { _electron as electron } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, statSync } from 'node:fs';
@@ -7,7 +8,12 @@ import { join } from 'node:path';
 
 const out = process.argv[2] ?? join(tmpdir(), 'zvs-shots');
 mkdirSync(out, { recursive: true });
-const ff = join(process.cwd(), 'node_modules/ffmpeg-static/ffmpeg.exe');
+const exe = process.platform === 'win32' ? '.exe' : '';
+const ff = join(process.cwd(), `node_modules/ffmpeg-static/ffmpeg${exe}`);
+const ffprobe = join(
+  process.cwd(),
+  `node_modules/ffprobe-static/bin/${process.platform}/${process.arch}/ffprobe${exe}`,
+);
 const ws = mkdtempSync(join(tmpdir(), 'zvs-ws-'));
 execFileSync(ff, [
   '-hide_banner',
@@ -48,7 +54,15 @@ execFileSync(ff, [
 ]);
 
 const app = await electron.launch({
-  executablePath: join(process.cwd(), 'node_modules/electron/dist/electron.exe'),
+  executablePath: join(
+    process.cwd(),
+    'node_modules/electron/dist',
+    process.platform === 'win32'
+      ? 'electron.exe'
+      : process.platform === 'darwin'
+        ? 'Electron.app/Contents/MacOS/Electron'
+        : 'electron',
+  ),
   args: ['.', ws],
   env: {
     ...process.env,
@@ -184,7 +198,7 @@ await win.waitForSelector('.vs-job-done', { timeout: 60000 }).catch(() => undefi
 const ok = existsSync(exportPath);
 let dur = '';
 if (ok)
-  dur = execFileSync(join(process.cwd(), 'node_modules/ffprobe-static/bin/win32/x64/ffprobe.exe'), [
+  dur = execFileSync(ffprobe, [
     '-v',
     'error',
     '-show_entries',

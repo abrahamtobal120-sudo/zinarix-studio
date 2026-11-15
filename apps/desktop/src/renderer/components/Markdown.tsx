@@ -273,6 +273,7 @@ function inline(text: string): ReactNode {
         <a
           key={k++}
           href="#"
+          title={url}
           onClick={(e) => (e.preventDefault(), void window.omni.app.openExternal(url!))}
         >
           {label}
@@ -314,7 +315,7 @@ function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boo
   const insert = (replaceSelection: boolean) => {
     const ed = getEditor();
     const model = ed?.getModel();
-    if (!ed || !model) return toast(t('noFolder'));
+    if (!ed || !model) return toast(t('noEditor'));
     const sel = ed.getSelection();
     if (!sel) return;
     const range = replaceSelection
@@ -359,7 +360,12 @@ function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boo
             {SHELL.test(lang) && (
               <button
                 onClick={async () => {
-                  if (!(await confirmDialog(t('confirmRun', { cmd: code })))) return;
+                  // Code proposed by the AI: shown in full, with the danger style.
+                  const ok = await confirmDialog(t('confirmRun', { cmd: code }), {
+                    danger: true,
+                    okLabel: t('runInTerminal'),
+                  });
+                  if (!ok) return;
                   setState({ panelOpen: true });
                   setTimeout(() => void runInTerminal(code), 300);
                 }}
