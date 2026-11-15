@@ -71,14 +71,30 @@ import {
 } from './security.js';
 import { shellProfiles, Terminals } from './terminal.js';
 import { Workspace } from './workspace.js';
+import { isInside } from '../shared/tasks.js';
+import { SETUP_SCRIPT, TaskManager } from './tasks.js';
+import { ReviewManager } from './review.js';
+import { PlaygroundService } from './playground.js';
+import { BuildService } from './build.js';
+import { rulesPrompt } from '../shared/rules.js';
+import { redact } from '@omni/security';
 import { DesignSession, EDITOR_SCRIPT_PATH } from './design/session.js';
 import { EditError } from './design/htmlSource.js';
 import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
 import { McpManager } from './mcp.js';
 import { HookTrust } from './hooks.js';
 import { DebugManager } from './debug/manager.js';
+import {
+  clearLastRun,
+  discoverTests,
+  loadLastRun,
+  setTestResultsDir,
+  TestManager,
+  type TestRunRequest,
+} from './testing.js';
 import { ExtensionStore } from './extensions/store.js';
 import { HelperService, MODEL_NAME } from './helper.js';
+import { gitMention, webMention } from './mentions.js';
 import { VideoService, fromStored, toStored } from './video.js';
 import type { VideoProject } from '../shared/video.js';
 import { MEDIA_EXTENSIONS, PROJECT_EXT, mediaKindOf, validProject } from '../shared/video.js';
@@ -602,6 +618,16 @@ function debugOf(w: Win): DebugManager {
   }
   return d;
 }
+/** Test runs of each window (by webContents id). */
+const testRuns = new Map<number, TestManager>();
+function testsOf(w: Win): TestManager {
+  let t = testRuns.get(w.id);
+  if (!t) {
+    t = new TestManager((event) => send(w, { type: 'tests', event }));
+    testRuns.set(w.id, t);
+  }
+  return t;
+}
 let extStore: ExtensionStore | undefined;
 function extensions(): ExtensionStore {
   return (extStore ??= new ExtensionStore(app.getPath('userData')));
@@ -841,6 +867,28 @@ function registerIpc(): void {
       }),
     ]),
     (w, requestId, req) => ai.nextEdit(rid(w, requestId), req),
+  );
+  // Fase 8: acceptance metric of the editor suggestions.
+  handle(
+    'ai:suggestionOutcome',
+    z.tuple([
+      z.enum(['inline', 'nextEdit']),
+      z.enum(['accepted', 'dismissed']),
+      z.number().int().min(1).max(8),
+    ]),
+    (_w, kind, outcome, count) => ai.suggestionOutcome(kind, outcome, count),
+  );
+  handle('ai:suggestionStats', z.tuple([]), () => ai.suggestionStats());
+  handle('ai:suggestionStatsClear', z.tuple([]), () => ai.metrics.clear());
+  // Fase 8: chat mentions resolved in main (@git, @web).
+  handle(
+    'ai:mention',
+    z.tuple([z.enum(['git', 'web']), z.string().max(2048).nullable()]),
+    async (w, kind, arg) => {
+      if (kind === 'git') return gitMention(git(w), arg ?? undefined);
+      if (!arg) throw new Error('@web necesita una dirección: @web:https://…');
+      return webMention(arg, AbortSignal.timeout(20_000));
+    },
   );
   // Language servers (LSP): documents in, Monaco features out (see lsp.ts).
   const lspLang = z.string().min(1).max(64);
@@ -1090,6 +1138,44 @@ function registerIpc(): void {
   handle('debug:setBreakpoints', z.tuple([rel, bpList]), (w, p, b) =>
     debugOf(w).setBreakpoints(p, b),
   );
+  // Test Explorer. The renderer only names files and tests: main builds the command.
+  setTestResultsDir(join(app.getPath('userData'), 'test-results'));
+  const testTarget = z.object({
+    file: rel,
+    fullName: z.string().max(4000),
+    kind: z.enum(['suite', 'test']),
+    dynamic: z.boolean().optional(),
+  });
+  const testReq = z.object({
+    framework: z.enum(['vitest', 'jest', 'pytest']),
+    cwd: z.string().max(4096),
+    files: z.array(rel).max(5000).optional(),
+    item: testTarget.optional(),
+    items: z.array(testTarget).max(500).optional(),
+    related: z.array(rel).max(200).optional(),
+  });
+  /** Every path of a request must stay inside the open folder. */
+  const checkTestReq = (w: Win, req: TestRunRequest): TestRunRequest => {
+    const wsp = ws(w);
+    if (req.cwd) wsp.resolve(req.cwd);
+    for (const f of req.files ?? []) wsp.resolve(f);
+    for (const f of req.related ?? []) wsp.resolve(f);
+    if (req.item) wsp.resolve(req.item.file);
+    for (const i of req.items ?? []) wsp.resolve(i.file);
+    return req;
+  };
+  handle('tests:discover', z.tuple([]), async (w) =>
+    discoverTests(ws(w).root, await ws(w).listFiles()),
+  );
+  handle('tests:run', z.tuple([testReq]), (w, req) =>
+    testsOf(w).run(ws(w).root, checkTestReq(w, req)),
+  );
+  handle('tests:cancel', z.tuple([]), (w) => testsOf(w).cancel());
+  handle('tests:last', z.tuple([]), async (w) => (await loadLastRun(ws(w).root)) ?? null);
+  handle('tests:clear', z.tuple([]), (w) => clearLastRun(ws(w).root));
+  handle('debug:startTest', z.tuple([testReq, z.record(rel, bpList)]), (w, req, bps) =>
+    debugOf(w).startTest(ws(w).root, checkTestReq(w, req), bps),
+  );
   // Extensions (Open VSX): shared by every window; they all hear about changes.
   const extId = z.string().min(1).max(300);
   const extPart = z
@@ -1133,6 +1219,15 @@ function registerIpc(): void {
   );
   handle('ai:agentKit', z.tuple([z.string().min(1).max(4096).optional()]), (w, folder) =>
     ai.agentKit(scope(w, folder)),
+  );
+  handle(
+    'ai:createKitFile',
+    z.tuple([
+      z.enum(['agent', 'skill', 'command']),
+      z.string().min(1).max(64),
+      z.string().min(1).max(4096).optional(),
+    ]),
+    (w, kind, name, folder) => ai.createKitFile(scope(w, folder), kind, name),
   );
   handle('ai:resetContext', z.tuple([conv]), (_w, c) => ai.resetContext(c));
 
@@ -1576,6 +1671,7 @@ function registerIpc(): void {
       lsp: z.boolean(),
       lspCommands: z.record(z.string().max(64), z.string().max(2000)),
       nextEdit: z.boolean(),
+      autoImport: z.boolean(),
       helperBubble: z.boolean(),
       helperModel: z.string().regex(MODEL_NAME),
     })
@@ -1604,6 +1700,7 @@ function registerIpc(): void {
         context: ctx,
         conversationId: conv.optional(),
         agent: z.boolean().optional(),
+        mode: z.enum(['plan', 'agent', 'auto']).optional(),
         folder: z.string().min(1).max(4096).optional(),
         noFolder: z.boolean().optional(),
         images: z
@@ -1632,6 +1729,25 @@ function registerIpc(): void {
       const where: Scope = noFolder
         ? { workspace: () => undefined, browser: w.browser }
         : scope(w, folder);
+      // Fase 5: a chat on a task's worktree ("Open chat") keeps the task's limits, and does
+      // not run while the task itself works there (two agents on the same files).
+      const task =
+        !noFolder && folder && isInside(tasksDir(), resolve(folder), process.platform === 'win32')
+          ? taskManager().scopeFor(folder)
+          : undefined;
+      if (task?.busy) {
+        send(w, {
+          type: 'chat',
+          requestId,
+          event: {
+            type: 'error',
+            code: 'task_busy',
+            message: `La tarea "${task.title}" está trabajando en esta carpeta. Pausa la tarea o espera a que termine para escribir aquí.`,
+          },
+        });
+        return;
+      }
+      if (task) where.task = task.scope;
       w.requests.add(id);
       void ai
         .chat(id, req, (_r, event) => send(w, { type: 'chat', requestId, event }), where)
@@ -1718,8 +1834,58 @@ function registerIpc(): void {
     z.tuple([str, str, z.enum(['approve', 'deny', 'always'])]),
     (w, r, id, d) => ai.toolDecision(rid(w, r), id, d),
   );
+  handle(
+    'ai:answerQuestion',
+    z.tuple([str, str, z.array(z.string().max(2000)).max(10).nullable()]),
+    (w, r, id, answer) => ai.answerQuestion(rid(w, r), id, answer),
+  );
   handle('ai:revert', z.tuple([conv, z.string().min(1).max(4096).optional()]), (w, c, folder) =>
     ai.revert(c, scope(w, folder)),
+  );
+  // Fase 2: the UI names exchanges by its own request ids; the agent tagged them per window.
+  // A conversation opened from the history already carries the tagged id ("<window>:<id>",
+  // saved with the message): it is kept as it is, also after a restart.
+  const turnId = (w: Win, t: string) => (t.includes(':') ? t : rid(w, t));
+  const turnList = z.array(str).max(10_000);
+  handle(
+    'ai:rewind',
+    z.tuple([conv, turnList, z.string().min(1).max(4096).optional()]),
+    (w, c, turns, folder) =>
+      ai.rewind(
+        c,
+        turns.map((t) => turnId(w, t)),
+        scope(w, folder),
+      ),
+  );
+  handle(
+    'ai:rewindPreview',
+    z.tuple([conv, turnList, z.string().min(1).max(4096).optional()]),
+    (w, c, turns, folder) =>
+      ai.rewindPreview(
+        c,
+        turns.map((t) => turnId(w, t)),
+        scope(w, folder),
+      ),
+  );
+  handle('ai:rewindConversation', z.tuple([conv, z.number().int().min(0).max(1e6)]), (_w, c, i) =>
+    ai.rewindConversation(c, i),
+  );
+  handle(
+    'ai:turnDiff',
+    z.tuple([conv, str, z.string().min(1).max(4096).optional()]),
+    (w, c, t, folder) => ai.turnDiff(c, turnId(w, t), scope(w, folder)),
+  );
+  handle(
+    'ai:applyReview',
+    z.tuple([
+      conv,
+      str,
+      z.string().min(1).max(4096),
+      z.array(z.number().int().min(0).max(1e6)).max(100_000),
+      z.string().min(1).max(4096).optional(),
+    ]),
+    (w, c, t, path, rejected, folder) =>
+      ai.applyReview(c, turnId(w, t), path, rejected, scope(w, folder)),
   );
 
   const rect = z
@@ -2169,6 +2335,254 @@ function registerHelperIpc(): void {
   handle('helper:abort', z.tuple([reqId]), (w, requestId) => helper.abort(rid(w, requestId)));
 }
 
+/** Fase 5: background tasks in git worktrees (outside the repository, in userData). */
+let tasks: TaskManager | undefined;
+const tasksDir = () => join(app.getPath('userData'), 'worktrees');
+
+function taskManager(): TaskManager {
+  if (!tasks) {
+    tasks = new TaskManager({
+      dir: tasksDir(),
+      runner: ai,
+      onChange: (status) => {
+        for (const w of wins.values()) send(w, { type: 'tasks', status });
+      },
+      notify: (title, body) => {
+        if (Notification.isSupported())
+          new Notification({ title, body: body.slice(0, 200) }).show();
+      },
+    });
+    void tasks.prune();
+  }
+  return tasks;
+}
+
+/** Fase 6: "Revisar cambios" (AI review of local changes, a branch or a PR). */
+function registerReviewIpc(): void {
+  const reviews = new ReviewManager(() => ai.core, {
+    dir: join(app.getPath('userData'), 'reviews'),
+  });
+  // Project rules (AGENTS.md hierarchy, .zinarix/rules…) that apply to the changed files.
+  const rulesOf = (w: Win) => (paths: string[]) =>
+    rulesPrompt(
+      ai.rulesFor(
+        scope(w),
+        paths.map((p) => `file:${p}`),
+      ).active,
+      [],
+      redact,
+    ).text;
+  const model = z.string().min(1).max(300);
+  const source = z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('local') }),
+    z.object({ kind: z.literal('branch'), base: z.string().min(1).max(255) }),
+    z.object({ kind: z.literal('pr'), number: z.number().int().positive().max(1e9) }),
+  ]);
+  const reviewId = z.string().regex(/^r[0-9a-z]{1,20}$/);
+  const ids = z.array(z.string().max(40)).max(500);
+  handle(
+    'review:run',
+    z.tuple([
+      str,
+      z.object({
+        source,
+        models: z.array(model).max(4),
+        verifier: model.optional(),
+        verify: z.boolean().optional(),
+        security: z.boolean().optional(),
+      }),
+    ]),
+    (w, requestId, req) =>
+      reviews.run(
+        rid(w, requestId),
+        ws(w).root,
+        req,
+        (progress) => send(w, { type: 'review:progress', requestId, progress }),
+        rulesOf(w),
+      ),
+  );
+  handle('review:abort', z.tuple([str]), (w, requestId) => reviews.abort(rid(w, requestId)));
+  handle('review:prs', z.tuple([]), (w) => reviews.prs(ws(w).root));
+  handle('review:preview', z.tuple([reviewId, ids]), (w, id, list) =>
+    reviews.preview(ws(w).root, id, list),
+  );
+  handle('review:history', z.tuple([]), (w) => reviews.history(ws(w).root));
+  handle('review:get', z.tuple([reviewId]), (w, id) => reviews.get(ws(w).root, id));
+  handle('review:delete', z.tuple([reviewId]), (w, id) => reviews.delete(ws(w).root, id));
+  // The renderer asks for the reason (and the user's go-ahead) before calling this.
+  handle(
+    'review:ignore',
+    z.tuple([reviewId, ids.min(1), z.string().max(500).optional()]),
+    (w, id, list, reason) => reviews.ignore(ws(w).root, id, list, reason),
+  );
+  // The renderer asks the user (with the preview) before calling this.
+  handle('review:publish', z.tuple([reviewId, ids]), (w, id, list) =>
+    reviews.publish(ws(w).root, id, list),
+  );
+}
+
+/** Fase 9: Playground (one model or several side by side) and Build. */
+function registerPlaygroundIpc(): void {
+  const playground = new PlaygroundService(ai.core, app.getPath('userData'));
+  const build = new BuildService(app.getPath('userData'), () => new Vercel(app.getPath('userData')));
+  const model = z.string().min(1).max(300);
+  const jsonObject = z.record(z.string(), z.unknown());
+  const params = z.object({
+    system: z.string().max(200_000),
+    prompt: z.string().max(2_000_000),
+    temperature: z.number().min(0).max(2).optional(),
+    topP: z.number().min(0).max(1).optional(),
+    maxTokens: z.number().int().min(1).max(1_000_000).optional(),
+    reasoning: z.enum(['low', 'medium', 'high']).optional(),
+    tools: z
+      .array(
+        z.object({
+          name: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
+          description: z.string().max(4000),
+          parameters: jsonObject,
+        }),
+      )
+      .max(32),
+    schema: z.string().max(200_000),
+    strict: z.boolean().optional(),
+  });
+  const runReq = params.extend({
+    model,
+    attachments: z
+      .array(
+        z.object({
+          name: z.string().min(1).max(255),
+          mediaType: z.string().regex(/^[a-z]+\/[a-z0-9.+-]+$/i).max(100),
+          // 20 MB of file is ~27 MB of base64.
+          data: z.string().max(28 * 1024 * 1024),
+        }),
+      )
+      .max(10),
+  });
+  const templateId = z.string().regex(/^t[0-9a-f]{12}$/);
+  handle('playground:run', z.tuple([str, runReq]), (w, requestId, req) => {
+    const id = rid(w, requestId);
+    w.requests.add(id);
+    return playground
+      .run(id, req, (event) => send(w, { type: 'playground', requestId, event }))
+      .finally(() => w.requests.delete(id));
+  });
+  handle('playground:abort', z.tuple([str]), (w, requestId) =>
+    playground.abort(rid(w, requestId)),
+  );
+  handle('playground:code', z.tuple([z.enum(['ts', 'python', 'curl']), runReq]), (_w, lang, req) =>
+    playground.code(lang, req),
+  );
+  handle('playground:adapter', z.tuple([model]), (_w, m) => playground.adapterOf(m));
+  handle('playground:templates', z.tuple([]), () => playground.templates());
+  handle(
+    'playground:saveTemplate',
+    z.tuple([
+      params,
+      z.object({
+        id: templateId.optional(),
+        name: z.string().max(80).optional(),
+        model: model.optional(),
+        note: z.string().max(200).optional(),
+      }),
+    ]),
+    (_w, p, opts) => playground.saveTemplate(p, opts),
+  );
+  handle('playground:deleteTemplate', z.tuple([templateId]), (_w, id) =>
+    playground.deleteTemplate(id),
+  );
+
+  const buildsDir = () => join(app.getPath('documents'), 'Zinarix Apps');
+  handle('build:defaultParent', z.tuple([]), () => buildsDir());
+  handle('build:pickParent', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      defaultPath: buildsDir(),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return r.canceled ? null : (r.filePaths[0] ?? null);
+  });
+  handle(
+    'build:create',
+    z.tuple([z.string().min(1).max(4096), z.string().min(1).max(20_000)]),
+    (_w, parent, description) => build.create(parent, description),
+  );
+  handle('build:info', z.tuple([]), (w) => (w.workspace ? build.info(w.workspace.root) : null));
+  handle('build:recent', z.tuple([]), () => build.recent());
+  const team = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).nullable();
+  // The renderer confirms (production or preview) before calling this.
+  handle('build:deploy', z.tuple([team, z.boolean()]), (w, teamId, production) =>
+    build.deploy(ws(w).root, teamId, production),
+  );
+  handle('build:deployState', z.tuple([z.string().regex(/^dpl_[A-Za-z0-9]{1,64}$/), team]), (_w, id, teamId) =>
+    build.deployState(id, teamId),
+  );
+}
+
+function registerTasksIpc(): void {
+  const taskId = z.string().uuid();
+  const folderOf = (w: Win, folder?: string) => {
+    const root = folder ? resolve(folder) : w.workspace?.root;
+    if (!root) throw new Error('Abre una carpeta (un repositorio git) para crear tareas.');
+    return root;
+  };
+  handle('tasks:status', z.tuple([]), () => taskManager().status());
+  handle(
+    'tasks:create',
+    z.tuple([
+      z.object({
+        folder: z.string().min(1).max(4096).optional(),
+        prompt: big,
+        model: str.optional(),
+        mode: z.enum(['agent', 'auto']).optional(),
+        base: z.string().max(200).optional(),
+        copyChanges: z.boolean().optional(),
+        setup: z.boolean().optional(),
+        maxUsd: z.number().positive().max(10_000).optional(),
+        maxMinutes: z.number().int().positive().max(1440).optional(),
+      }),
+    ]),
+    (w, req) => taskManager().create({ ...req, folder: folderOf(w, req.folder) }),
+  );
+  handle('tasks:setupScript', z.tuple([z.string().min(1).max(4096).optional()]), (w, folder) => {
+    const file = join(folderOf(w, folder), SETUP_SCRIPT);
+    return existsSync(file) ? readFileSync(file, 'utf8').slice(0, 4000) : null;
+  });
+  handle(
+    'tasks:decide',
+    z.tuple([taskId, str, z.enum(['approve', 'deny', 'always'])]),
+    (_w, id, call, d) => taskManager().decide(id, call, d),
+  );
+  handle(
+    'tasks:answer',
+    z.tuple([taskId, str, z.array(z.string().max(2000)).max(10).nullable()]),
+    (_w, id, call, answer) => taskManager().answer(id, call, answer),
+  );
+  handle('tasks:reopen', z.tuple([taskId]), (_w, id) => taskManager().reopen(id));
+  handle('tasks:archiveIdle', z.tuple([]), () => taskManager().archiveIdle());
+  handle('tasks:usage', z.tuple([z.boolean().optional()]), (_w, fresh) =>
+    taskManager().usage(fresh),
+  );
+  handle('tasks:pause', z.tuple([taskId]), (_w, id) => taskManager().pause(id));
+  handle('tasks:cancel', z.tuple([taskId]), (_w, id) => taskManager().cancel(id));
+  handle('tasks:resume', z.tuple([taskId, big.optional()]), (_w, id, p) =>
+    taskManager().resume(id, p),
+  );
+  handle('tasks:merge', z.tuple([taskId]), (_w, id) => taskManager().merge(id));
+  handle('tasks:resolveWithAgent', z.tuple([taskId]), (_w, id) =>
+    taskManager().resolveWithAgent(id),
+  );
+  handle('tasks:openPr', z.tuple([taskId]), (_w, id) => taskManager().openPr(id));
+  handle('tasks:keep', z.tuple([taskId]), (_w, id) => taskManager().keep(id));
+  handle('tasks:discard', z.tuple([taskId]), (_w, id) => taskManager().discard(id));
+  handle('tasks:clearClosed', z.tuple([]), () => taskManager().clearClosed());
+  handle('tasks:openFolder', z.tuple([taskId]), async (_w, id) => {
+    const t = taskManager()
+      .status()
+      .tasks.find((x) => x.id === id);
+    if (t && !t.closed && existsSync(t.path)) await shell.openPath(t.path);
+  });
+}
+
 function registerDesignIpc(): void {
   const src = z.string().min(1).max(4096);
   const css = z.record(z.string().max(60), z.string().max(200).nullable());
@@ -2583,6 +2997,8 @@ async function createWindow(
     lspHosts.delete(w.id);
     void debugSessions.get(w.id)?.stop();
     debugSessions.delete(w.id);
+    testRuns.get(w.id)?.cancel();
+    testRuns.delete(w.id);
     w.browser.destroy();
     whatsapp.release(win);
     for (const r of w.requests) ai?.abort(r);
@@ -2731,6 +3147,9 @@ app.whenReady().then(async () => {
   registerProtocol();
   registerDesignProtocol();
   registerIpc();
+  registerTasksIpc();
+  registerPlaygroundIpc();
+  registerReviewIpc();
   buildMenu();
   // Start empty unless a folder is passed explicitly: the user drops or picks one.
   const initial = folderFromArgv(process.argv) ?? process.env.OMNI_OPEN_FOLDER;

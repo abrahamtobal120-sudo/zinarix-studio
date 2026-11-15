@@ -1,7 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Breakpoint, DebugVariable } from '../../shared/devtools.js';
 import { lineSplitter, type BackendEvents, type DebugBackend, type RawFrame } from './backend.js';
+import { loadSourceMap, pathKey, type SourceMap } from './sourceMap.js';
 
 interface RemoteObject {
   type: string;
@@ -17,6 +19,7 @@ interface RemoteObject {
 interface CdpEventParams {
   scriptId?: string;
   url?: string;
+  sourceMapURL?: string;
   callFrames?: CallFrame[];
   hitBreakpoints?: string[];
   reason?: string;
@@ -75,6 +78,16 @@ export class CdpBackend implements DebugBackend {
   private readonly bpIds = new Map<string, string[]>();
   private exited = false;
   private sawStartPause = false;
+  /** sourceMappingURL of each script that has one. */
+  private readonly mapUrls = new Map<string, string>();
+  /** Parsed maps by scriptId (null = could not be read). */
+  private readonly maps = new Map<string, Promise<SourceMap | null>>();
+  /** Breakpoints wanted per file (absolute path), to bind them in scripts that load later. */
+  private readonly wanted = new Map<string, Breakpoint[]>();
+  /** Breakpoint ids set by script id (through a source map), per file. */
+  private readonly mappedIds = new Map<string, string[]>();
+  /** Files whose own URL runs transformed code: their URL breakpoints would bind wrong lines. */
+  private readonly transformed = new Set<string>();
 
   constructor(
     private readonly opts: {
@@ -87,6 +100,11 @@ export class CdpBackend implements DebugBackend {
       host: string;
       port?: number;
       stopOnEntry: boolean;
+      /**
+       * Start this process and attach to the inspector it opens on `port` (a test runner run
+       * with --inspect-brk opens it in its worker). Stopping kills the whole process.
+       */
+      spawn?: { command: string; args: string[] };
     },
     private readonly ev: BackendEvents,
   ) {}
@@ -104,6 +122,7 @@ export class CdpBackend implements DebugBackend {
 
   private async wsUrl(): Promise<string> {
     const o = this.opts;
+    if (o.spawn) return this.spawnAndWait(o.spawn);
     if (o.request === 'attach') {
       const r = await fetch(`http://${o.host}:${o.port ?? 9229}/json/list`);
       const list = (await r.json()) as { webSocketDebuggerUrl?: string }[];
@@ -145,6 +164,44 @@ export class CdpBackend implements DebugBackend {
     });
   }
 
+  /** Runs the command and polls its inspector port until a target shows up. */
+  private async spawnAndWait(cmd: { command: string; args: string[] }): Promise<string> {
+    const o = this.opts;
+    // Vitest stops at the first line of the test file by itself: skipped like --inspect-brk.
+    const proc = spawn(cmd.command, cmd.args, {
+      cwd: o.cwd,
+      env: o.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    this.proc = proc;
+    proc.on('exit', (code) => this.finish(code ?? undefined));
+    proc.on('error', (e) => {
+      this.ev.output('stderr', `${e.message}\n`);
+      this.finish();
+    });
+    proc.stdout!.on('data', (d: Buffer) => this.ev.output('stdout', d.toString('utf8')));
+    const err = lineSplitter((line) => {
+      if (!INSPECTOR_NOISE.test(line)) this.ev.output('stderr', `${line}\n`);
+    });
+    proc.stderr!.on('data', (d: Buffer) => err.push(d.toString('utf8')));
+    proc.on('exit', () => err.flush());
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      if (this.exited) throw new Error('The program exited before the debugger could attach.');
+      try {
+        const r = await fetch(`http://${o.host}:${o.port ?? 9229}/json/list`);
+        const list = (await r.json()) as { webSocketDebuggerUrl?: string }[];
+        const url = list.find((x) => x.webSocketDebuggerUrl)?.webSocketDebuggerUrl;
+        if (url) return url;
+      } catch {
+        // not listening yet
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error('The program did not open its inspector.');
+  }
+
   async start(breakpoints: Map<string, Breakpoint[]>): Promise<void> {
     const url = await this.wsUrl();
     const ws = new WebSocket(url);
@@ -157,10 +214,14 @@ export class CdpBackend implements DebugBackend {
     ws.onclose = () => {
       for (const p of this.pending.values()) p.reject(new Error('inspector closed'));
       this.pending.clear();
-      if (this.opts.request === 'attach') this.finish();
+      if (this.opts.request === 'attach' && !this.opts.spawn) this.finish();
     };
     await this.send('Runtime.enable');
     await this.send('Debugger.enable');
+    // Pause each script that has a source map before it runs, to bind breakpoints in it.
+    await this.send('Debugger.setInstrumentationBreakpoint', {
+      instrumentation: 'beforeScriptWithSourceMapExecution',
+    }).catch(() => undefined);
     for (const [path, bps] of breakpoints) await this.setBreakpoints(path, bps).catch(() => []);
     await this.send('Runtime.runIfWaitingForDebugger');
   }
@@ -190,9 +251,18 @@ export class CdpBackend implements DebugBackend {
     switch (m.method) {
       case 'Debugger.scriptParsed':
         if (params.url && params.scriptId) this.scripts.set(params.scriptId, params.url);
+        if (params.scriptId && params.sourceMapURL)
+          this.mapUrls.set(params.scriptId, params.sourceMapURL);
         break;
       case 'Debugger.paused': {
         const frames = params.callFrames ?? [];
+        if (params.reason === 'instrumentation') {
+          const id = (params.data as { scriptId?: string } | undefined)?.scriptId;
+          void this.bindScript(id).finally(
+            () => void this.send('Debugger.resume').catch(() => undefined),
+          );
+          return;
+        }
         // --inspect-brk stops before the first line: go on unless asked to stop on entry.
         if (!this.sawStartPause && this.opts.request === 'launch') {
           this.sawStartPause = true;
@@ -242,11 +312,82 @@ export class CdpBackend implements DebugBackend {
     this.ev.exited(code);
   }
 
-  async setBreakpoints(absPath: string, bps: Breakpoint[]): Promise<number[]> {
-    for (const id of this.bpIds.get(absPath) ?? [])
-      await this.send('Debugger.removeBreakpoint', { breakpointId: id }).catch(() => undefined);
-    const ids: string[] = [];
+  private map(scriptId: string): Promise<SourceMap | null> | undefined {
+    const url = this.mapUrls.get(scriptId);
+    if (!url) return undefined;
+    let m = this.maps.get(scriptId);
+    if (!m) {
+      const scriptUrl = this.scripts.get(scriptId) ?? '';
+      m = loadSourceMap(url, scriptUrl, (p) => readFile(p, 'utf8'));
+      this.maps.set(scriptId, m);
+    }
+    return m;
+  }
+
+  /** A script with a source map is about to run: binds the wanted breakpoints of its sources. */
+  private async bindScript(scriptId: string | undefined): Promise<void> {
+    if (!scriptId || !this.wanted.size) return;
+    const map = await this.map(scriptId);
+    if (!map) return;
+    const own = this.pathOf(this.scripts.get(scriptId));
+    for (const [file, bps] of this.wanted) {
+      if (!map.hasSource(file)) continue;
+      if (own && pathKey(own) === pathKey(file) && !this.transformed.has(file)) {
+        // The file's own URL runs transformed code: drop the URL breakpoints (wrong lines).
+        this.transformed.add(file);
+        for (const id of this.bpIds.get(file) ?? [])
+          await this.send('Debugger.removeBreakpoint', { breakpointId: id }).catch(() => undefined);
+        this.bpIds.set(file, []);
+      }
+      await this.bindInScript(scriptId, map, file, bps);
+    }
+  }
+
+  private async bindInScript(
+    scriptId: string,
+    map: SourceMap,
+    file: string,
+    bps: Breakpoint[],
+  ): Promise<number[]> {
     const lines: number[] = [];
+    const ids = this.mappedIds.get(file) ?? [];
+    for (const b of bps) {
+      const at = map.generatedFor(file, b.line);
+      if (!at) continue;
+      const r = await this.send<{
+        breakpointId: string;
+        actualLocation: { lineNumber: number; columnNumber?: number };
+      }>('Debugger.setBreakpoint', {
+        location: { scriptId, lineNumber: at.line, columnNumber: at.column },
+        ...(b.condition ? { condition: b.condition } : {}),
+      }).catch(() => undefined);
+      if (!r) continue;
+      ids.push(r.breakpointId);
+      const orig = map.originalFor(r.actualLocation.lineNumber, r.actualLocation.columnNumber ?? 0);
+      lines.push(orig && pathKey(orig.path) === pathKey(file) ? orig.line : b.line);
+    }
+    this.mappedIds.set(file, ids);
+    return lines;
+  }
+
+  async setBreakpoints(absPath: string, bps: Breakpoint[]): Promise<number[]> {
+    this.wanted.set(absPath, bps);
+    for (const id of [...(this.bpIds.get(absPath) ?? []), ...(this.mappedIds.get(absPath) ?? [])])
+      await this.send('Debugger.removeBreakpoint', { breakpointId: id }).catch(() => undefined);
+    this.mappedIds.set(absPath, []);
+    // Scripts already loaded whose source map includes the file.
+    const mapped: number[] = [];
+    for (const scriptId of this.mapUrls.keys()) {
+      const map = await this.map(scriptId);
+      if (map?.hasSource(absPath))
+        mapped.push(...(await this.bindInScript(scriptId, map, absPath, bps)));
+    }
+    if (this.transformed.has(absPath)) {
+      this.bpIds.set(absPath, []);
+      return mapped;
+    }
+    const ids: string[] = [];
+    const lines: number[] = [...mapped];
     const urlRegex = urlRegexFor(absPath);
     for (const b of bps) {
       const r = await this.send<{
@@ -292,13 +433,19 @@ export class CdpBackend implements DebugBackend {
   }
 
   async frames(): Promise<RawFrame[]> {
-    return [...this.frameIds.entries()].map(([id, f]) => ({
-      id,
-      name: f.functionName || '(anonymous)',
-      absPath: this.pathOf(f.url || this.scripts.get(f.location.scriptId)),
-      line: f.location.lineNumber + 1,
-      column: (f.location.columnNumber ?? 0) + 1,
-    }));
+    const out: RawFrame[] = [];
+    for (const [id, f] of this.frameIds) {
+      const map = await this.map(f.location.scriptId);
+      const orig = map?.originalFor(f.location.lineNumber, f.location.columnNumber ?? 0);
+      out.push({
+        id,
+        name: f.functionName || '(anonymous)',
+        absPath: orig?.path ?? this.pathOf(f.url || this.scripts.get(f.location.scriptId)),
+        line: orig?.line ?? f.location.lineNumber + 1,
+        column: orig?.column ?? (f.location.columnNumber ?? 0) + 1,
+      });
+    }
+    return out;
   }
 
   private ref(objectId: string | undefined): number {
@@ -381,7 +528,16 @@ export class CdpBackend implements DebugBackend {
     } catch {
       // closed
     }
-    if (this.proc && this.proc.exitCode === null) this.proc.kill();
-    if (!this.proc) this.finish();
+    const proc = this.proc;
+    if (proc && proc.exitCode === null) {
+      // A test runner has workers: on Windows kill() would only end the parent.
+      if (this.opts.spawn && process.platform === 'win32' && proc.pid)
+        spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], {
+          windowsHide: true,
+          stdio: 'ignore',
+        }).on('error', () => proc.kill());
+      else proc.kill();
+    }
+    if (!proc) this.finish();
   }
 }

@@ -6,6 +6,7 @@ import type { DesignApplyResult, DesignOp, DesignSessionView } from './design.js
  */
 import type { ChatMessage, ModelInfo } from '@omni/shared';
 import type { LicenseStatus } from './plans.js';
+import type { TestDiscovery, TestEvent, TestRunRequest, TestRunSummary } from './testing.js';
 import type {
   Breakpoint,
   DebugConfig,
@@ -15,9 +16,21 @@ import type {
   ExtensionSearchItem,
   InstalledExtension,
 } from './devtools.js';
-import type { LspStatus, NextEditRequestView, NextEditView } from './lsp.js';
+import type { LspStatus, NextEditRequestView, NextEditResultView } from './lsp.js';
+import type { SuggestionStatsRow } from './nextEdit.js';
 import type { ExportOptions, MediaItem, VideoProject } from './video.js';
 export type { LicenseStatus } from './plans.js';
+import type { TaskCreateView, TaskView, TasksStatusView, TasksUsageView } from './tasks.js';
+export type { TaskCreateView, TaskView, TasksStatusView, TasksUsageView } from './tasks.js';
+import type {
+  PlaygroundEvent,
+  PlaygroundParams,
+  PlaygroundResult,
+  PlaygroundRunRequest,
+  PromptTemplate,
+} from './playground.js';
+import type { CodeLang } from './playgroundCode.js';
+import type { BuildDeployView, BuildView } from './build.js';
 
 export interface WorkspaceInfo {
   root: string;
@@ -110,6 +123,26 @@ export interface CatalogModelView {
 
 export type AiRole = 'chat' | 'agent' | 'inline';
 
+/** A file one agent exchange changed (Fase 2, diff review). */
+export interface TurnDiffFileView {
+  path: string;
+  /** null = the exchange created it. */
+  before: string | null;
+  /** null = the exchange deleted it. What that exchange left, not later ones. */
+  after: string | null;
+  /** The file changed after it (a later message or by hand). */
+  changedSince: boolean;
+}
+
+/** One file "Volver aquí" would write back (Fase 2). */
+export interface RewindFileView {
+  path: string;
+  /** delete = the agent created it. */
+  action: 'restore' | 'delete';
+  /** Changed after the agent's last write: that work is lost too. */
+  edited: boolean;
+}
+
 export interface ConversationView {
   id: string;
   title: string;
@@ -197,6 +230,8 @@ export interface Prefs {
   lspCommands: Record<string, string>;
   /** Predict the next edit (Tab jumps there); works together with inlineCompletions. */
   nextEdit: boolean;
+  /** Fase 8: add the missing imports when a suggestion is accepted. */
+  autoImport: boolean;
   /** The round "Ayuda de Zinarix" button (help assistant) in the corner. */
   helperBubble: boolean;
   /** Local Ollama model of the help assistant ("qwen2.5:1.5b"). */
@@ -222,6 +257,7 @@ export const DEFAULT_PREFS: Prefs = {
   lsp: true,
   lspCommands: {},
   nextEdit: true,
+  autoImport: true,
   helperBubble: true,
   helperModel: 'qwen2.5:1.5b',
 };
@@ -279,6 +315,107 @@ export interface GitHubPrView {
   /** Combined CI checks of the PR head. */
   checks: 'pass' | 'fail' | 'pending' | 'none';
 }
+/** Fase 6: what "Revisar cambios" reviews. */
+export type ReviewSourceView =
+  | { kind: 'local' }
+  | { kind: 'branch'; base: string }
+  | { kind: 'pr'; number: number };
+export interface ReviewRequestView {
+  source: ReviewSourceView;
+  /** Reviewer models ("provider/model"); empty = the default model. */
+  models: string[];
+  /** Verifier model (default: the first reviewer). */
+  verifier?: string;
+  /** false skips the verification pass. */
+  verify?: boolean;
+  /** false skips the security center scanners. */
+  security?: boolean;
+}
+export type ReviewSeverityView = 'critical' | 'high' | 'medium' | 'low';
+export interface ReviewFindingView {
+  id: string;
+  file: string;
+  line: number;
+  endLine?: number;
+  severity: ReviewSeverityView;
+  category: 'bug' | 'security' | 'performance' | 'reliability' | 'maintainability';
+  title: string;
+  detail: string;
+  fix?: string;
+  models: string[];
+  source: 'ai' | 'scanner';
+  verdict: 'confirmed' | 'plausible';
+  verifyNote?: string;
+  /** Stable id of the finding (ignore list, already posted on the PR). */
+  fingerprint?: string;
+}
+export interface ReviewFileView {
+  path: string;
+  status: 'added' | 'deleted' | 'modified' | 'renamed';
+  added: number;
+  removed: number;
+}
+export interface ReviewView {
+  id: string;
+  source: ReviewSourceView;
+  title: string;
+  prUrl?: string;
+  findings: ReviewFindingView[];
+  stats: {
+    files: number;
+    reviewedFiles: number;
+    skippedFiles: string[];
+    raw: number;
+    offDiff: number;
+    merged: number;
+    falsePositives: number;
+    /** Hidden by .zinarix/review-ignore.json. */
+    ignored?: number;
+  };
+  errors: { model: string; error: string }[];
+  models: string[];
+  verifier?: string;
+  usd: number;
+  files: ReviewFileView[];
+  /** Only reviews of a pull request can be published. */
+  canPublish: boolean;
+  /** URL of the GitHub review once published. */
+  published?: string;
+  at: number;
+  /** Guidance the reviewers got: ".zinarix/review.md" and/or "rules" (AGENTS.md…). */
+  guidance?: string[];
+}
+/** A saved review in the history list. */
+export interface ReviewHistoryView {
+  id: string;
+  title: string;
+  at: number;
+  findings: number;
+  published?: string;
+}
+/** What publishing the chosen findings would do. */
+export interface ReviewPublishPreview {
+  inline: number;
+  body: number;
+  /** Already on the PR (an earlier review): left out. */
+  already: number;
+  /** The PR got new commits after the review (comments may land on outdated lines). */
+  stale: boolean;
+  url: string;
+}
+export interface ReviewPrView {
+  number: number;
+  title: string;
+  url: string;
+  branch: string;
+  author: string;
+  draft: boolean;
+}
+export type ReviewProgressView =
+  | { phase: 'review'; done: number; total: number }
+  | { phase: 'verify'; done: number; total: number }
+  | { phase: 'done' };
+
 export interface GitHubStatus {
   installed: boolean;
   loggedIn: boolean;
@@ -708,6 +845,8 @@ export interface AgentKitView {
   agents: { name: string; description: string; model?: string; tools?: string[]; path: string }[];
   skills: { name: string; description: string; dir: string }[];
   hooks: { event: string; matcher: string; command: string; source: string }[];
+  /** The user approved this exact set of hooks "always" for the folder. */
+  hooksTrusted: boolean;
 }
 
 export interface ToolPreview {
@@ -725,6 +864,8 @@ export interface ToolPreview {
   noAlways?: boolean;
   /** delegate_to_ai: the AI that would receive the task, and whether it may act. */
   delegate?: { model: string; mode: 'agent' | 'chat' };
+  /** ask_user (Fase 3): a question with options instead of approve / deny. */
+  question?: { question: string; options: string[]; multiple: boolean };
 }
 
 export interface FindingView {
@@ -808,6 +949,8 @@ export interface BrowserTabsView {
 export interface ChatRequestView {
   /** Agent mode: the model may read files, search, edit (with approval) and run commands (with approval). */
   agent?: boolean;
+  /** Fase 3, with agent: plan = read-only until the plan is approved, auto = edits need no approval. */
+  mode?: 'plan' | 'agent' | 'auto';
   model?: string;
   history: ChatMessage[];
   prompt: string;
@@ -906,6 +1049,8 @@ export type AppEvent =
   | { type: 'watch:status'; status: WatchStatus }
   /** The debug session of this window changed (state, stop, output). */
   | { type: 'debug'; event: DebugEvent }
+  /** A test run of this window started, printed something or finished. */
+  | { type: 'tests'; event: TestEvent }
   /** Extensions were installed, removed, enabled or disabled (in any window). */
   | { type: 'extensions:changed' }
   /** Errors/warnings a language server found in a file (LSP Diagnostic[], zx-ws:/ URIs). */
@@ -921,7 +1066,13 @@ export type AppEvent =
   /** The help assistant (Ayuda de Zinarix) streamed part of an answer. */
   | { type: 'helper'; requestId: string; event: HelperEvent }
   /** Progress of a local model download for the help assistant. */
-  | { type: 'helper:pull'; event: HelperPullEvent };
+  | { type: 'helper:pull'; event: HelperPullEvent }
+  /** Fase 5: the background tasks changed (state, cost, an approval waiting…). */
+  | { type: 'tasks'; status: TasksStatusView }
+  /** Fase 6: progress of a code review. */
+  | { type: 'review:progress'; requestId: string; progress: ReviewProgressView }
+  /** Fase 9: stream of a Playground run (one per model when comparing). */
+  | { type: 'playground'; requestId: string; event: PlaygroundEvent };
 
 /** Whether the help assistant can answer locally (Ollama running and its model downloaded). */
 export interface HelperStatus {
@@ -1226,7 +1377,18 @@ export interface OmniApi {
     /** Inline completion (ghost text) at the cursor; '' when there is nothing to suggest. */
     complete(requestId: string, req: CompletionRequestView): Promise<string>;
     /** Predicts the next edit near the cursor (null = no suggestion). */
-    nextEdit(requestId: string, req: NextEditRequestView): Promise<NextEditView | null>;
+    nextEdit(requestId: string, req: NextEditRequestView): Promise<NextEditResultView>;
+    /** Fase 8: what the user did with a suggestion (feeds the acceptance metric). */
+    suggestionOutcome(
+      kind: 'inline' | 'nextEdit',
+      outcome: 'accepted' | 'dismissed',
+      count: number,
+    ): Promise<void>;
+    /** Acceptance rate and latency (p50 / p90) per suggestion kind and model. */
+    suggestionStats(): Promise<SuggestionStatsRow[]>;
+    suggestionStatsClear(): Promise<void>;
+    /** Fase 8: content of an @git / @web mention ("@git:HEAD~1", "@web:https://…"). */
+    mention(kind: 'git' | 'web', arg: string | null): Promise<string>;
     /** Commit message for the staged changes (or all changes when nothing is staged). */
     commitMessage(): Promise<string>;
     /** Project rules file in use (.zinarix/rules.md, AGENTS.md…) or null. */
@@ -1235,14 +1397,45 @@ export interface OmniApi {
     activeRules(sources: string[], prompt?: string, folder?: string): Promise<ActiveRulesView>;
     /** Subagents, skills, "/" commands and hooks of the project and the user. */
     agentKit(folder?: string): Promise<AgentKitView>;
+    /** New subagent / skill / command file from a template; returns its project path. */
+    createKitFile(
+      kind: 'agent' | 'skill' | 'command',
+      name: string,
+      folder?: string,
+    ): Promise<string>;
     /** Forget the agent's model-side transcript (regenerate / edit a message); keeps undo data. */
     resetContext(conversationId: string): Promise<void>;
     chat(requestId: string, req: ChatRequestView): Promise<void>;
     edit(requestId: string, req: EditRequestView): Promise<void>;
     abort(requestId: string): Promise<void>;
     toolDecision(requestId: string, toolCallId: string, decision: ToolDecision): Promise<void>;
+    /** The user's answer to an ask_user question (Fase 3); null = skipped. */
+    answerQuestion(requestId: string, toolCallId: string, answer: string[] | null): Promise<void>;
     /** Undo every file change the agent made in a conversation. Returns restored paths. */
     revert(conversationId: string, folder?: string): Promise<string[]>;
+    /** "Volver aquí": undo the file changes of these exchanges (request ids) and later ones. */
+    rewind(conversationId: string, turns: string[], folder?: string): Promise<string[]>;
+    /** What `rewind` would write back, without doing it. */
+    rewindPreview(
+      conversationId: string,
+      turns: string[],
+      folder?: string,
+    ): Promise<RewindFileView[]>;
+    /** Drops the saved conversation from its n-th user message (0-based) on. */
+    rewindConversation(conversationId: string, userIndex: number): Promise<number>;
+    /** Files one exchange changed: content before it and now (null = missing). */
+    turnDiff(conversationId: string, turn: string, folder?: string): Promise<TurnDiffFileView[]>;
+    /**
+     * Put back the rejected blocks (hunk numbers) of that exchange in one file, keeping later
+     * changes. Returns the new content (null = it deleted a file the exchange created).
+     */
+    applyReview(
+      conversationId: string,
+      turn: string,
+      path: string,
+      rejected: number[],
+      folder?: string,
+    ): Promise<string | null>;
   };
   git: {
     status(): Promise<GitStatusView>;
@@ -1519,7 +1712,14 @@ export interface OmniApi {
     search(
       query: string,
       limit?: number,
-    ): Promise<{ hits: KnowledgeHit[]; semantic: boolean; files: number }>;
+    ): Promise<{
+      hits: KnowledgeHit[];
+      semantic: boolean;
+      files: number;
+      chunks?: number;
+      embedded?: number;
+      ignored?: number;
+    }>;
     /** Best passages of the indexed docs (one source by name, or all). */
     searchDocs(query: string, source?: string): Promise<KnowledgeHit[]>;
     embedModel(): Promise<string | null>;
@@ -1552,6 +1752,18 @@ export interface OmniApi {
     variables(ref: number): Promise<DebugVariable[]>;
     evaluate(expression: string, frameId?: number): Promise<DebugVariable>;
     setBreakpoints(path: string, breakpoints: Breakpoint[]): Promise<void>;
+    /** Debugs a test (or a describe / file) of the Test Explorer with its runner. */
+    startTest(req: TestRunRequest, breakpoints: Record<string, Breakpoint[]>): Promise<void>;
+  };
+  /** Test Explorer: Vitest, Jest and Pytest. One run at a time per window. */
+  tests: {
+    discover(): Promise<TestDiscovery>;
+    run(req: TestRunRequest): Promise<TestRunSummary>;
+    cancel(): Promise<void>;
+    /** Merged results of the last runs in this folder (null = never run); kept between sessions. */
+    last(): Promise<TestRunSummary | null>;
+    /** Forgets the saved results of this folder. */
+    clear(): Promise<void>;
   };
   /** Extensions from Open VSX (themes, snippets, languages). */
   extensions: {
@@ -1690,6 +1902,80 @@ export interface OmniApi {
     pull(requestId: string, model: string): Promise<void>;
     abort(requestId: string): Promise<void>;
   };
+  /** Fase 5: background tasks, each in a git worktree of its own. */
+  /** Fase 6: AI code review of local changes, a branch or a pull request. */
+  review: {
+    run(requestId: string, req: ReviewRequestView): Promise<ReviewView>;
+    abort(requestId: string): Promise<void>;
+    /** Open pull requests of the folder's repository (through gh). */
+    prs(): Promise<ReviewPrView[]>;
+    /** How the chosen findings would be published (inline comments vs. the review body). */
+    preview(reviewId: string, ids: string[]): Promise<ReviewPublishPreview>;
+    /** Saved reviews of the folder, newest first. */
+    history(): Promise<ReviewHistoryView[]>;
+    get(reviewId: string): Promise<ReviewView>;
+    delete(reviewId: string): Promise<void>;
+    /** Marks findings "not a problem" in .zinarix/review-ignore.json; returns the updated review. */
+    ignore(reviewId: string, ids: string[], reason?: string): Promise<ReviewView>;
+    /** Posts the chosen findings as one review on the PR. Returns its URL. */
+    publish(reviewId: string, ids: string[]): Promise<string>;
+  };
+  /** Fase 9: model playground (one model or 2–4 side by side). */
+  playground: {
+    run(requestId: string, req: PlaygroundRunRequest): Promise<PlaygroundResult>;
+    abort(requestId: string): Promise<void>;
+    /** The same request as code for the model's provider (key read from its env var). */
+    code(lang: CodeLang, req: PlaygroundRunRequest): Promise<string>;
+    /** Catalog adapter of the model's provider (which attachments it takes). */
+    adapter(model: string): Promise<string | null>;
+    templates(): Promise<PromptTemplate[]>;
+    /** New version of template `id`, or a new template named `name`. */
+    saveTemplate(
+      params: PlaygroundParams,
+      opts: { id?: string; name?: string; model?: string; note?: string },
+    ): Promise<PromptTemplate>;
+    deleteTemplate(id: string): Promise<void>;
+  };
+  /** Fase 9: "describe your app" → a folder the agent fills, previewed and deployed. */
+  build: {
+    defaultParent(): Promise<string>;
+    pickParent(): Promise<string | null>;
+    create(parent: string, description: string): Promise<BuildView>;
+    /** Build data of the window's open folder (null when it was not made with Build). */
+    info(): Promise<BuildView | null>;
+    recent(): Promise<BuildView[]>;
+    /** Publishes the open folder to Vercel. */
+    deploy(teamId: string | null, production: boolean): Promise<BuildDeployView>;
+    deployState(id: string, teamId: string | null): Promise<string>;
+  };
+  tasks: {
+    status(): Promise<TasksStatusView>;
+    /** Queues a task on the window's folder (or `folder`). */
+    create(req: TaskCreateView): Promise<TaskView>;
+    /** The repository's .zinarix/worktree-setup script, to show it before running it. */
+    setupScript(folder?: string): Promise<string | null>;
+    decide(id: string, toolCallId: string, decision: ToolDecision): Promise<void>;
+    /** Answers a task's ask_user question (null = let the agent decide). */
+    answer(id: string, toolCallId: string, answer: string[] | null): Promise<void>;
+    pause(id: string): Promise<void>;
+    cancel(id: string): Promise<void>;
+    /** Interrupted / paused / failed: go on; done: a follow-up (`prompt`). */
+    resume(id: string, prompt?: string): Promise<void>;
+    merge(id: string): Promise<{ ok: true } | { ok: false; reason: string; files?: string[] }>;
+    resolveWithAgent(id: string): Promise<void>;
+    /** git push + gh pr create; returns the PR URL. */
+    openPr(id: string): Promise<string>;
+    keep(id: string): Promise<void>;
+    discard(id: string): Promise<void>;
+    clearClosed(): Promise<void>;
+    openFolder(id: string): Promise<void>;
+    /** A kept task gets its worktree back. */
+    reopen(id: string): Promise<void>;
+    /** Frees the worktrees of every idle task (work committed, branches kept); how many. */
+    archiveIdle(): Promise<number>;
+    /** Disk taken by the worktrees (cached a minute unless `fresh`). */
+    usage(fresh?: boolean): Promise<TasksUsageView>;
+  };
   on(listener: (ev: AppEvent) => void): () => void;
 }
 
@@ -1744,12 +2030,19 @@ export const CHANNELS = [
   'ai:edit',
   'ai:abort',
   'ai:toolDecision',
+  'ai:answerQuestion',
   'ai:revert',
+  'ai:rewind',
+  'ai:rewindPreview',
+  'ai:rewindConversation',
+  'ai:turnDiff',
+  'ai:applyReview',
   'ai:complete',
   'ai:commitMessage',
   'ai:rulesFile',
   'ai:activeRules',
   'ai:agentKit',
+  'ai:createKitFile',
   'ai:resetContext',
   'git:status',
   'git:init',
@@ -1937,6 +2230,12 @@ export const CHANNELS = [
   'debug:variables',
   'debug:evaluate',
   'debug:setBreakpoints',
+  'debug:startTest',
+  'tests:discover',
+  'tests:run',
+  'tests:cancel',
+  'tests:last',
+  'tests:clear',
   'ext:search',
   'ext:icon',
   'ext:install',
@@ -1944,6 +2243,10 @@ export const CHANNELS = [
   'ext:list',
   'ext:setEnabled',
   'ai:nextEdit',
+  'ai:suggestionOutcome',
+  'ai:suggestionStats',
+  'ai:suggestionStatsClear',
+  'ai:mention',
   'lsp:open',
   'lsp:change',
   'lsp:save',
@@ -2001,6 +2304,47 @@ export const CHANNELS = [
   'helper:ask',
   'helper:pull',
   'helper:abort',
+  'tasks:status',
+  'tasks:create',
+  'tasks:setupScript',
+  'tasks:decide',
+  'tasks:pause',
+  'tasks:cancel',
+  'tasks:resume',
+  'tasks:merge',
+  'tasks:resolveWithAgent',
+  'tasks:openPr',
+  'tasks:keep',
+  'tasks:discard',
+  'tasks:clearClosed',
+  'tasks:openFolder',
+  'tasks:answer',
+  'tasks:reopen',
+  'tasks:archiveIdle',
+  'tasks:usage',
+  'review:run',
+  'review:abort',
+  'review:prs',
+  'review:preview',
+  'review:publish',
+  'review:history',
+  'review:get',
+  'review:delete',
+  'review:ignore',
+  'playground:run',
+  'playground:abort',
+  'playground:code',
+  'playground:adapter',
+  'playground:templates',
+  'playground:saveTemplate',
+  'playground:deleteTemplate',
+  'build:defaultParent',
+  'build:pickParent',
+  'build:create',
+  'build:info',
+  'build:recent',
+  'build:deploy',
+  'build:deployState',
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 

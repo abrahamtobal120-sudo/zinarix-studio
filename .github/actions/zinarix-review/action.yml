@@ -1,0 +1,107 @@
+name: zinarix review
+description: >-
+  AI code review of a pull request with the Zinarix `omni` CLI: findings by severity, file and
+  line, a verification pass that drops false positives, and (optionally) one PR review with
+  inline comments.
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  models:
+    description: >-
+      Reviewer models, "provider/model", separated by commas or new lines. Empty = the CLI's
+      default model. Their API keys come from the job's environment (ANTHROPIC_API_KEY,
+      OPENAI_API_KEY, GEMINI_API_KEY…).
+    default: ''
+  verifier:
+    description: Model that verifies each finding (default the first reviewer).
+    default: ''
+  verify:
+    description: '"false" skips the verification pass.'
+    default: 'true'
+  base:
+    description: Base ref to diff against (default origin/<PR base branch>). Needs fetch-depth 0.
+    default: ''
+  post:
+    description: '"true" posts the findings as a review on the pull request.'
+    default: 'true'
+  fail-on:
+    description: Fail the step when a finding is at least this severe (critical, high, medium, low).
+    default: ''
+  security:
+    description: '"false" skips the secrets / insecure code scanners on the added lines.'
+    default: 'true'
+  project-files:
+    description: >-
+      "false" ignores the project's .zinarix/review.md, AGENTS.md and
+      .zinarix/review-ignore.json.
+    default: 'true'
+  lang:
+    description: Language of the review text (es or en).
+    default: 'es'
+  github-token:
+    description: Token gh uses to post the review (needs pull-requests write).
+    default: ${{ github.token }}
+
+outputs:
+  report:
+    description: Path of the review in Markdown.
+    value: ${{ steps.review.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      with:
+        package_json_file: ${{ github.action_path }}/../../../package.json
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version: 24
+    # The CLI is built from the same checkout of Zinarix as this action (no npm download).
+    - name: Build the omni CLI
+      shell: bash
+      working-directory: ${{ github.action_path }}/../../..
+      run: |
+        pnpm install --frozen-lockfile --filter "@omni/cli..."
+        pnpm --filter "@omni/cli..." build
+    - name: Review
+      id: review
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        OMNI_HOME: ${{ runner.temp }}/omni-home
+        OMNI_NO_KEYCHAIN: '1'
+        ZX_CLI: ${{ github.action_path }}/../../../apps/cli/dist/index.js
+        ZX_MODELS: ${{ inputs.models }}
+        ZX_VERIFIER: ${{ inputs.verifier }}
+        ZX_VERIFY: ${{ inputs.verify }}
+        ZX_BASE: ${{ inputs.base }}
+        ZX_PR_BASE: ${{ github.base_ref }}
+        ZX_POST: ${{ inputs.post }}
+        ZX_FAIL_ON: ${{ inputs.fail-on }}
+        ZX_LANG: ${{ inputs.lang }}
+        ZX_SECURITY: ${{ inputs.security }}
+        ZX_PROJECT: ${{ inputs.project-files }}
+      run: |
+        set -euo pipefail
+        args=(review --format github --out "$RUNNER_TEMP/zinarix-review.md")
+        base="${ZX_BASE:-${ZX_PR_BASE:+origin/$ZX_PR_BASE}}"
+        if [ -z "$base" ]; then
+          echo "::error::Set the 'base' input (or run on a pull_request event)."
+          exit 2
+        fi
+        args+=(--base "$base")
+        while IFS= read -r m; do
+          m="$(echo "$m" | xargs)"
+          [ -n "$m" ] && args+=(-m "$m")
+        done < <(printf '%s\n' "$ZX_MODELS" | tr ',' '\n')
+        [ -n "$ZX_VERIFIER" ] && args+=(--verifier "$ZX_VERIFIER")
+        [ "$ZX_VERIFY" = "false" ] && args+=(--no-verify)
+        [ "$ZX_POST" = "true" ] && args+=(--post)
+        [ -n "$ZX_FAIL_ON" ] && args+=(--fail-on "$ZX_FAIL_ON")
+        [ "$ZX_SECURITY" = "false" ] && args+=(--no-security)
+        [ "$ZX_PROJECT" = "false" ] && args+=(--no-project)
+        echo "report=$RUNNER_TEMP/zinarix-review.md" >> "$GITHUB_OUTPUT"
+        # --lang is a global option: it goes before the subcommand.
+        node "$ZX_CLI" --lang "$ZX_LANG" "${args[@]}"

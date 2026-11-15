@@ -192,6 +192,25 @@ export class History {
     }
   }
 
+  /**
+   * Drops the conversation from its `userIndex`-th user message (0-based) on: that question,
+   * its answer and everything after ("rewind here"). Returns how many messages were removed.
+   */
+  truncateAtUser(id: string, userIndex: number): number {
+    if (!Number.isInteger(userIndex) || userIndex < 0) return 0;
+    const row = this.db
+      .prepare(
+        "SELECT id FROM messages WHERE conversation_id = ? AND role = 'user' ORDER BY id LIMIT 1 OFFSET ?",
+      )
+      .get(id, userIndex) as { id: number } | undefined;
+    if (!row) return 0;
+    const r = this.db
+      .prepare('DELETE FROM messages WHERE conversation_id = ? AND id >= ?')
+      .run(id, row.id) as { changes: number | bigint };
+    this.db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(Date.now(), id);
+    return Number(r.changes);
+  }
+
   rename(id: string, title: string): void {
     this.db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);
   }

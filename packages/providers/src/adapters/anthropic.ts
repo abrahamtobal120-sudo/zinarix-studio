@@ -4,6 +4,7 @@ import { describeErrorBody, request, requestJson } from '../http.js';
 import { baseModel } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
+import { decodeText, isPdf, isTextual, unsupportedPart } from '../parts.js';
 import { normalizeStop, testViaModelsOrChat } from './openai-compatible.js';
 
 const VERSION_HEADERS = { 'anthropic-version': '2023-06-01' };
@@ -46,14 +47,22 @@ export function toAnthropic(messages: ChatMessage[]): {
           'user',
           typeof m.content === 'string'
             ? [{ type: 'text', text: m.content }]
-            : m.content.map((p) =>
-                p.type === 'text'
-                  ? { type: 'text', text: p.text }
-                  : {
-                      type: 'image',
-                      source: { type: 'base64', media_type: p.mediaType, data: p.data },
-                    },
-              ),
+            : m.content.map((p): Block => {
+                if (p.type === 'text') return { type: 'text', text: p.text };
+                if (p.type === 'image')
+                  return {
+                    type: 'image',
+                    source: { type: 'base64', media_type: p.mediaType, data: p.data },
+                  };
+                if (isPdf(p))
+                  return {
+                    type: 'document',
+                    source: { type: 'base64', media_type: 'application/pdf', data: p.data },
+                    ...(p.name ? { title: p.name } : {}),
+                  };
+                if (isTextual(p)) return { type: 'text', text: decodeText(p) };
+                return { type: 'text', text: unsupportedPart(p, 'Anthropic') };
+              }),
         );
         break;
       case 'assistant':
@@ -95,12 +104,18 @@ function buildBody(req: ChatRequest, maxTokens: number): Record<string, unknown>
     stream: true,
     ...(system ? { system } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+    ...(req.topP !== undefined ? { top_p: req.topP } : {}),
     // Current models think adaptively by default; when the caller asks for reasoning we
     // raise effort and request readable summaries so the UI can stream them.
-    ...(req.reasoning
+    ...(req.reasoning ? { thinking: { type: 'adaptive', display: 'summarized' } } : {}),
+    ...(req.reasoning || req.jsonSchema
       ? {
-          thinking: { type: 'adaptive', display: 'summarized' },
-          output_config: { effort: req.reasoning },
+          output_config: {
+            ...(req.reasoning ? { effort: req.reasoning } : {}),
+            ...(req.jsonSchema
+              ? { format: { type: 'json_schema', schema: req.jsonSchema.schema } }
+              : {}),
+          },
         }
       : {}),
     ...(req.tools?.length

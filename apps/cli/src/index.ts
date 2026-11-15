@@ -10,6 +10,7 @@ import { registerCompletion } from './commands/completion.js';
 import { registerMisc } from './commands/misc.js';
 import { registerModels } from './commands/models.js';
 import { registerProviders } from './commands/providers.js';
+import { registerReview } from './commands/review.js';
 import { closeOmni, omni } from './context.js';
 import { c, errln } from './io.js';
 
@@ -45,6 +46,7 @@ export function buildProgram(): Command {
   registerProviders(program);
   registerModels(program);
   registerAsk(program);
+  registerReview(program);
 
   program
     .command('chat')

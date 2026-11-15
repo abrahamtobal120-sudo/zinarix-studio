@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { loadLastRun } from './testing.js';
+import { failuresText } from '../shared/testing.js';
+import { existsSync, mkdtempSync, realpathSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
@@ -7,7 +9,29 @@ import type { OmniCore } from '@omni/core';
 import { untrusted, UNTRUSTED_NOTE } from '@omni/core';
 import type { ChatMessage, ToolCall, ToolDefinition } from '@omni/shared';
 import { StreamRedactor, redact, redactDeep, registerSecret } from '@omni/security';
-import type { ChatEventView, ToolDecision } from '../shared/api.js';
+import type {
+  ChatEventView,
+  RewindFileView,
+  ToolDecision,
+  TurnDiffFileView,
+} from '../shared/api.js';
+import type { RuleFeed } from '../shared/rules.js';
+import type { AgentRunMode } from '../shared/agentModes.js';
+import { taskCwd } from '../shared/tasks.js';
+import {
+  answerResult,
+  parseQuestion,
+  parseTodos,
+  PLAN_HELPER_PROMPT,
+  PLAN_PROMPT,
+  PLAN_REFUSAL,
+  planAllows,
+  TODO_PROMPT,
+  todoProgress,
+  todosResult,
+} from '../shared/agentModes.js';
+import { editedSince, hunks, revertHunks, rewindPlan, turnFiles } from '../shared/checkpoints.js';
+import { CheckpointStore } from './checkpointStore.js';
 import type { BrowserController, BrowserTab, PageSnapshot } from './browser.js';
 import { normalizeUrl, siteOf } from './browser.js';
 import {
@@ -99,6 +123,7 @@ import {
   hooksFingerprint,
   hooksFor,
   kitPrompt,
+  subagentModel,
   type AgentKit,
   type HookEvent,
 } from '../shared/agentKit.js';
@@ -221,6 +246,12 @@ export const TOOLS: ToolDefinition[] = [
         pattern: { type: 'string', description: 'Glob pattern, used when paths is not given' },
       },
     },
+  },
+  {
+    name: 'test_results',
+    description:
+      'Results of the last test run of the Test Explorer in this folder (Vitest, Jest or Pytest): counts, and each failing test with its file, line and error. Use it when the user asks which tests fail. It does not run tests: to run them use run_command.',
+    parameters: { type: 'object', properties: {} },
   },
   {
     name: 'list_dir',
@@ -399,7 +430,7 @@ export const KIT_TOOLS: ToolDefinition[] = [
   {
     name: 'task',
     description:
-      'Launch one of the project\'s subagents (listed in the system prompt) on a task. It works with its own context, model and allowed tools, and returns its final answer. It does not see this conversation: write a complete, self-contained prompt.',
+      "Launch one of the project's subagents (listed in the system prompt) on a task. It works with its own context, model and allowed tools, and returns its final answer. It does not see this conversation: write a complete, self-contained prompt.",
     parameters: {
       type: 'object',
       properties: {
@@ -413,11 +444,55 @@ export const KIT_TOOLS: ToolDefinition[] = [
   {
     name: 'use_skill',
     description:
-      'Load the full instructions of one of the project\'s skills (listed in the system prompt), with the files that come with it. Call it before doing that kind of task.',
+      "Load the full instructions of one of the project's skills (listed in the system prompt), with the files that come with it. Call it before doing that kind of task.",
     parameters: {
       type: 'object',
       properties: { name: { type: 'string', description: 'Name of the skill' } },
       required: ['name'],
+    },
+  },
+];
+
+/** Fase 3: the live task list and multiple-choice questions (main agent only). */
+export const MODE_TOOLS: ToolDefinition[] = [
+  {
+    name: 'todo_write',
+    description:
+      'Replace the task list the user sees live next to the chat (send the whole list every time). Use it for work of 3 or more steps: keep one task in_progress at a time and mark each one completed as soon as it is done.',
+    parameters: {
+      type: 'object',
+      properties: {
+        todos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              content: { type: 'string', description: 'The task, imperative ("Run the tests")' },
+              status: { type: 'string', enum: ['pending', 'in_progress', 'completed'] },
+              activeForm: {
+                type: 'string',
+                description: 'Shown while it is in progress ("Running the tests")',
+              },
+            },
+            required: ['content', 'status'],
+          },
+        },
+      },
+      required: ['todos'],
+    },
+  },
+  {
+    name: 'ask_user',
+    description:
+      'Ask the user a multiple-choice question and wait for the answer, when a decision is really theirs (which approach, library or scope) and it changes the work. 2 to 6 short options; the user may also answer in their own words. Never ask what you can find out by reading the project.',
+    parameters: {
+      type: 'object',
+      properties: {
+        question: { type: 'string' },
+        options: { type: 'array', items: { type: 'string' } },
+        multiple: { type: 'boolean', description: 'The user may pick several options' },
+      },
+      required: ['question', 'options'],
     },
   },
 ];
@@ -447,8 +522,12 @@ const CLI_TOOL_NAMES = new Set([
 const SYSTEM_TOOL_NAMES = new Set(SYSTEM_TOOLS.map((t) => t.name));
 
 const NEEDS_APPROVAL = new Set(['edit_file', 'write_file', 'run_command']);
+/** Tools on one project file: after them, the rules of that file reach the agent. */
+const FILE_RULE_TOOLS = new Set(['read_file', 'edit_file', 'write_file']);
 /** Tools that work without an open folder. */
 const NO_FOLDER = new Set([
+  'todo_write',
+  'ask_user',
   'list_ai_models',
   'delegate_to_ai',
   'task',
@@ -459,6 +538,7 @@ const NO_FOLDER = new Set([
 const BROWSER_APPROVAL = new Set(['browser_open', 'browser_click', 'browser_type']);
 /** Safe to run concurrently when the model asks for several in one turn. */
 const READ_ONLY = new Set([
+  'test_results',
   'tree',
   'glob',
   'list_dir',
@@ -660,6 +740,8 @@ export interface Checkpoint {
   path: string;
   /** null = the file did not exist before the agent touched it. */
   before: string | null;
+  /** What the agent wrote: tells a later hand edit apart (Fase 2). */
+  after?: string | null;
   /** A file outside the workspace (absolute path). */
   absolute?: boolean;
   /** Backup copy of `before` on disk (system files); removed once reverted. */
@@ -668,6 +750,8 @@ export interface Checkpoint {
   root?: string;
   /** Order across a conversation and its helpers (revert goes newest first). */
   seq?: number;
+  /** The exchange (request id) that made the change: "rewind here" (Fase 2). */
+  turn?: string;
 }
 
 let checkpointSeq = 0;
@@ -698,6 +782,37 @@ type Ask = (toolCallId: string) => Promise<ToolDecision>;
 export interface AgentScope {
   workspace?: () => Workspace | undefined;
   browser?: BrowserController;
+  /** Fase 5: a background task (its worktree is the workspace). */
+  task?: TaskScope;
+}
+
+/** What a background task may do: commands only inside its worktree, never as admin. */
+export interface TaskScope {
+  /** The worktree (absolute): run_command's cwd must stay inside it. */
+  root: string;
+  /** Extra variables for its commands (PORT of its own…). */
+  env?: Record<string, string>;
+  /** Limits: the run stops (and the task pauses) when it reaches one. */
+  maxUsd?: number;
+  /** Epoch ms. */
+  deadline?: number;
+}
+
+/** Notice kind a run emits when it stops at a task limit (cost or time). */
+export const TASK_LIMIT_NOTICE = 'task-limit';
+
+/** run_command inside a task: the folder it may use, or why it is refused. */
+export function taskCommand(
+  task: TaskScope,
+  a: Record<string, unknown>,
+): { cwd: string } | { error: string } {
+  if (a.admin === true) return { error: 'admin is not available in a background task.' };
+  return taskCwd(
+    task.root,
+    typeof a.cwd === 'string' ? a.cwd : undefined,
+    (p) => realpathSync.native(p),
+    process.platform === 'win32',
+  );
 }
 
 /** How the model gets its tools: native function calling, or the text protocol. */
@@ -718,12 +833,20 @@ interface LoopOpts {
   /** The plan includes AI-to-AI delegation. */
   delegation?: boolean;
   rules?: string;
+  /** Rules for files opened or edited after the first prompt (Fase 1). */
+  ruleFeed?: RuleFeed;
   /** Adds a helper's token usage to the caller's totals. */
   addCost?: (c: Totals) => void;
   /** Subagents, skills, commands and hooks of the project and the user (Fase 4). */
   kit?: AgentKit;
   /** A subagent: the only tools it may use. */
   allowed?: Set<string>;
+  /** The exchange this run belongs to (tags its checkpoints). */
+  turn?: string;
+  /** Fase 3: plan = read-only (changes refused), auto = project file edits need no approval. */
+  mode?: AgentRunMode;
+  /** Fase 3: waits for the user's answer to an ask_user question (null = no answer). */
+  answer?: (toolCallId: string) => Promise<string[] | null>;
 }
 
 /** Separates a helper's session (and browser tab) from the conversation that asked for it. */
@@ -781,6 +904,19 @@ export class Agent {
     private readonly browser?: BrowserController,
   ) {}
 
+  /** Checkpoints on disk (Fase 2): they outlive the app. Off when the core has no home. */
+  private store?: CheckpointStore | null;
+  /** Conversations whose saved checkpoints were already read in this process. */
+  private readonly hydrated = new Set<string>();
+
+  private checkpointStore(): CheckpointStore | null {
+    if (this.store === undefined) {
+      const home = (this.core as { paths?: { home?: string } }).paths?.home;
+      this.store = home ? new CheckpointStore(join(home, 'checkpoints')) : null;
+    }
+    return this.store;
+  }
+
   session(id: string): Session {
     let s = this.sessions.get(id);
     if (s)
@@ -788,8 +924,43 @@ export class Agent {
     else
       s = { messages: [], checkpoints: [], alwaysAllow: new Set(), env: {}, textModels: new Set() };
     this.sessions.set(id, s);
+    this.hydrate(id);
     this.trim();
     return s;
+  }
+
+  /**
+   * Reads the checkpoints a conversation saved in an earlier session of the app into its
+   * own session (helpers' included: they are all restored together anyway).
+   */
+  private hydrate(id: string): void {
+    const root = id.split(HELPER_SEP)[0]!;
+    if (this.hydrated.has(root)) return;
+    this.hydrated.add(root);
+    const saved = this.checkpointStore()?.load<Checkpoint>(root) ?? [];
+    if (!saved.length) return;
+    let s = this.sessions.get(root);
+    if (!s) {
+      s = { messages: [], checkpoints: [], alwaysAllow: new Set(), env: {}, textModels: new Set() };
+      this.sessions.set(root, s);
+    }
+    s.checkpoints.unshift(...saved);
+    for (const c of saved) checkpointSeq = Math.max(checkpointSeq, c.seq ?? 0);
+  }
+
+  /** Records a change before (or right after) it is written, in memory and on disk. */
+  private checkpoint(s: Session, sessionId: string, cp: Omit<Checkpoint, 'seq'>): void {
+    const c: Checkpoint = { seq: ++checkpointSeq, ...cp };
+    s.checkpoints.push(c);
+    this.checkpointStore()?.append(sessionId.split(HELPER_SEP)[0]!, c);
+  }
+
+  /** Saves the conversation's checkpoints as they are now (after a rewind, revert, review). */
+  private persist(conversationId: string): void {
+    const cps = this.allCheckpoints(conversationId)
+      .map((x) => x.cp)
+      .sort((x, y) => (x.seq ?? 0) - (y.seq ?? 0));
+    this.checkpointStore()?.replace(conversationId, cps);
   }
 
   /**
@@ -817,6 +988,8 @@ export class Agent {
     reasoning?: 'low' | 'medium' | 'high';
     /** Project rules block appended to the system prompt (may change between turns). */
     rules?: string;
+    /** Rules that start to apply when the run opens or edits a file (glob, sub-folder AGENTS.md). */
+    ruleFeed?: RuleFeed;
     userMessage: ChatMessage;
     fallbackHistory: ChatMessage[];
     signal: AbortSignal;
@@ -832,6 +1005,12 @@ export class Agent {
     /** A subagent: its role (after the base system prompt) and the tools it may use. */
     role?: string;
     allowed?: Set<string>;
+    /** The exchange (request id): its file changes can be rewound or reviewed together. */
+    turn?: string;
+    /** Fase 3: plan / agent / auto (default agent). */
+    mode?: AgentRunMode;
+    /** Fase 3: the user's answer to an ask_user question; without it the agent goes on alone. */
+    answer?: (toolCallId: string) => Promise<string[] | null>;
   }): Promise<string> {
     // A message sent while the conversation works runs alongside, in a transcript of its own
     // (two runs in one transcript would interleave their tool calls and approvals).
@@ -918,6 +1097,17 @@ ${r.context}
     }
   }
 
+  /** "provider/model" when Zinarix can run this model, else undefined. */
+  private resolvable(spec: string, connected: Set<string>): string | undefined {
+    try {
+      const ref = this.core.resolveModel(spec);
+      if (!connected.has(this.core.provider(ref.provider).id)) return undefined;
+      return `${ref.provider}/${ref.model}`;
+    } catch {
+      return undefined;
+    }
+  }
+
   /** Subagents, skills, commands and hooks for this run's folder (read fresh every turn). */
   private kit(opts: { scope?: AgentScope }): AgentKit {
     try {
@@ -928,10 +1118,13 @@ ${r.context}
   }
 
   private systemPrompt(
-    opts: { rules?: string; role?: string },
+    opts: { rules?: string; role?: string; mode?: AgentRunMode },
     kit: AgentKit,
     depth: number,
   ): string {
+    const main = depth === 0 && !opts.role;
+    const mode =
+      opts.mode === 'plan' ? (main ? PLAN_PROMPT : PLAN_HELPER_PROMPT) : main ? TODO_PROMPT : '';
     const role = opts.role
       ? `
 
@@ -939,7 +1132,7 @@ You are now working as a subagent. Your role and instructions:
 ${opts.role}
 When you finish, answer with a complete report: it is all the agent that launched you will see.`
       : '';
-    return AGENT_SYSTEM + role + (opts.rules ?? '') + kitPrompt(kit, depth === 0 && !opts.role);
+    return AGENT_SYSTEM + role + mode + (opts.rules ?? '') + kitPrompt(kit, main);
   }
 
   /**
@@ -976,12 +1169,22 @@ When you finish, answer with a complete report: it is all the agent that launche
       const decision = await opts.ask(id);
       if (decision === 'deny') {
         (s.hooksOff ??= new Set()).add(fp);
-        opts.emit({ type: 'tool_result', id, ok: false, summary: 'hooks desactivados en esta conversación' });
+        opts.emit({
+          type: 'tool_result',
+          id,
+          ok: false,
+          summary: 'hooks desactivados en esta conversación',
+        });
         return false;
       }
       if (decision === 'always') this.hookTrust?.add(root, fp);
       (s.hooksOk ??= new Set()).add(fp);
-      opts.emit({ type: 'tool_result', id, ok: true, summary: `${kit.hooks.length} hooks activos` });
+      opts.emit({
+        type: 'tool_result',
+        id,
+        ok: true,
+        summary: `${kit.hooks.length} hooks activos`,
+      });
       return true;
     })();
     s.hooksAsk = { fp, answer };
@@ -1013,6 +1216,12 @@ When you finish, answer with a complete report: it is all the agent that launche
     const context: string[] = [];
     for (const h of hooks) {
       const r = hookOutcome(await runHook(h, input, cwd, opts.signal));
+      if (r.notice)
+        opts.emit({
+          type: 'notice',
+          kind: 'hook',
+          message: `Hook ${event}: ${redact(r.notice).slice(0, 400)}`,
+        });
       if (r.block) return { block: true, message: redact(r.message).slice(0, 8000), context: '' };
       if (r.warning)
         opts.emit({
@@ -1073,13 +1282,37 @@ When you finish, answer with a complete report: it is all the agent that launche
     const kitTools = KIT_TOOLS.filter((t) =>
       t.name === 'task' ? opts.depth === 0 && kit.agents.length > 0 : kit.skills.length > 0,
     );
-    const all = [...base, ...kitTools, ...mcpTools];
+    const modeTools = opts.depth === 0 && !opts.allowed ? MODE_TOOLS : [];
+    const all = [...base, ...modeTools, ...kitTools, ...mcpTools];
     // A subagent only gets the tools its definition allows.
-    const tools = opts.allowed ? all.filter((t) => opts.allowed!.has(t.name)) : all;
+    const permitted = opts.allowed ? all.filter((t) => opts.allowed!.has(t.name)) : all;
+    // Plan mode: tools that change things are not even offered (execute refuses them anyway).
+    const tools =
+      opts.mode === 'plan'
+        ? permitted.filter((t) => t.name.startsWith(MCP_PREFIX) || planAllows(t.name, READ_ONLY))
+        : permitted;
     let mode = this.toolMode(opts.model, s);
     let stopRounds = 0;
     const run = Math.random().toString(36).slice(2, 7);
+    const task = opts.scope?.task;
     for (let step = 0; step < MAX_STEPS; step++) {
+      // Fase 5: a background task stops at its cost or time limit (the user decides to go on).
+      if (task && opts.depth === 0 && step > 0) {
+        const over =
+          task.maxUsd !== undefined && totals.usd !== null && totals.usd >= task.maxUsd
+            ? `tope de costo (US$${task.maxUsd})`
+            : task.deadline !== undefined && Date.now() >= task.deadline
+              ? 'tope de tiempo'
+              : null;
+        if (over) {
+          opts.emit({
+            type: 'notice',
+            kind: TASK_LIMIT_NOTICE,
+            message: `La tarea llegó a su ${over} y se pausó.`,
+          });
+          break;
+        }
+      }
       let text = '';
       let raw: { adapter: string; content: unknown } | undefined;
       const calls = new Map<string, ToolCall>();
@@ -1108,6 +1341,8 @@ When you finish, answer with a complete report: it is all the agent that launche
             tools: mode === 'text' ? undefined : tools,
             role: 'agent',
             cwd: this.ws(opts)?.root,
+            // CLI agents edit with their own tools: plan mode runs them read-only.
+            ...(opts.mode === 'plan' ? { readOnly: true } : {}),
           },
           opts.signal,
         )) {
@@ -1184,11 +1419,20 @@ When you finish, answer with a complete report: it is all the agent that launche
       }
       if (!toolCalls.length && !badCalls.length) {
         // Stop hooks: exit 2 sends the agent back to work with the hook's message.
-        if (opts.depth === 0 && !opts.allowed && !opts.signal.aborted && stopRounds < MAX_STOP_ROUNDS) {
+        if (
+          opts.depth === 0 &&
+          !opts.allowed &&
+          !opts.signal.aborted &&
+          stopRounds < MAX_STOP_ROUNDS
+        ) {
           const r = await this.runHooks(s, 'Stop', opts, { stopActive: stopRounds > 0 });
           if (r.block) {
             stopRounds++;
-            opts.emit({ type: 'notice', kind: 'hook', message: `Hook Stop: ${r.message.slice(0, 300)}` });
+            opts.emit({
+              type: 'notice',
+              kind: 'hook',
+              message: `Hook Stop: ${r.message.slice(0, 300)}`,
+            });
             s.messages.push({
               role: 'user',
               content: `<hook-feedback event="Stop">
@@ -1273,6 +1517,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
     const b = this.mcp?.binding(call.name);
     if (!b) return finish(false, `Unknown tool ${call.name}.`, 'herramienta MCP desconocida');
     const ann = b.tool.annotations ?? {};
+    if (opts.mode === 'plan' && !planAllows(call.name, READ_ONLY, ann.readOnlyHint === true))
+      return finish(false, PLAN_REFUSAL, 'bloqueado: modo Plan');
     const destructive = ann.destructiveHint === true && ann.readOnlyHint !== true;
     const key = destructive ? null : `mcp:${b.scope}:${b.server}:${b.tool.name}`;
     if (!key || !s.alwaysAllow.has(key)) {
@@ -1431,12 +1677,15 @@ A project hook did not let you finish yet. Address it, then answer.`,
       conversationId: helperId,
       model: target,
       rules: opts.rules,
+      ruleFeed: opts.ruleFeed?.fork(),
       userMessage: { role: 'user', content: task },
       fallbackHistory: [],
       signal: opts.signal,
       scope: opts.scope,
       depth: opts.depth + 1,
       addCost: opts.addCost,
+      turn: opts.turn,
+      mode: opts.mode,
       ask: (id) => opts.ask(`${call.id}>${id}`),
       emit: (ev) => {
         switch (ev.type) {
@@ -1478,7 +1727,9 @@ A project hook did not let you finish yet. Address it, then answer.`,
         'A subagent cannot launch other subagents. Do the task yourself.',
         'no permitido',
       );
-    const name = str(a.subagent ?? a.subagent_type, 'subagent').trim().toLowerCase();
+    const name = str(a.subagent ?? a.subagent_type, 'subagent')
+      .trim()
+      .toLowerCase();
     const def = opts.kit?.agents.find((d) => d.name === name);
     if (!def)
       return finish(
@@ -1488,17 +1739,27 @@ A project hook did not let you finish yet. Address it, then answer.`,
       );
     const prompt = str(a.prompt, 'prompt');
     let model = opts.model;
-    if (def.model)
-      try {
-        const ref = this.core.resolveModel(def.model);
-        model = `${ref.provider}/${ref.model}`;
-      } catch (e) {
-        return finish(
-          false,
-          `Subagent "${def.name}" asks for model "${def.model}", which is not available: ${e instanceof Error ? e.message : String(e)}.`,
-          'modelo no disponible',
-        );
-      }
+    // A model Zinarix does not have (Claude Code's "sonnet", a provider not connected…) is not
+    // a reason to fail the task: the subagent runs on the model of the agent that launched it.
+    const connected = def.model
+      ? new Set(
+          (
+            await Promise.resolve()
+              .then(() => this.core.connectedProviders())
+              .catch(() => [])
+          ).map((p) => p.id),
+        )
+      : new Set<string>();
+    const wanted = def.model
+      ? subagentModel(def.model, (m) => this.resolvable(m, connected))
+      : undefined;
+    if (wanted) model = wanted;
+    else if (def.model)
+      opts.emit({
+        type: 'notice',
+        kind: 'hook',
+        message: `Subagente ${def.name}: el modelo "${def.model}" no está disponible; usa el del agente principal.`,
+      });
     const key = `task:${def.name}`;
     if (!s.alwaysAllow.has(key)) {
       opts.emit({
@@ -1542,6 +1803,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
         model,
         reasoning: opts.reasoning,
         rules: opts.rules,
+        ruleFeed: opts.ruleFeed?.fork(),
         role: def.prompt || def.description,
         allowed,
         userMessage: { role: 'user', content: prompt },
@@ -1550,6 +1812,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
         scope: opts.scope,
         depth: 1,
         addCost: opts.addCost,
+        turn: opts.turn,
+        mode: opts.mode,
         ask: (id) => opts.ask(`${call.id}>${id}`),
         emit: (ev) => {
           switch (ev.type) {
@@ -1606,6 +1870,12 @@ A project hook did not let you finish yet. Address it, then answer.`,
         `Tool ${call.name} is not allowed for this subagent. Use only the tools you were given, or say in your answer what is missing.`,
         'no permitida para este subagente',
       );
+    if (
+      opts.mode === 'plan' &&
+      !call.name.startsWith(MCP_PREFIX) &&
+      !planAllows(call.name, READ_ONLY)
+    )
+      return refuse(PLAN_REFUSAL, 'bloqueado: modo Plan');
     const ws = this.ws(opts);
     let absPath: string | undefined;
     if (ws && typeof a.path === 'string')
@@ -1624,12 +1894,21 @@ A project hook did not let you finish yet. Address it, then answer.`,
     const result = await this.executeTool(s, call, opts);
     if (!result.ok || opts.signal.aborted) return result;
     const post = await this.runHooks(s, 'PostToolUse', opts, { ...hookFields, response: result });
+    // A file the first prompt did not know may bring rules of its own (glob, folder AGENTS.md).
+    const rules =
+      FILE_RULE_TOOLS.has(call.name) && typeof a.path === 'string'
+        ? (opts.ruleFeed?.forFile(a.path) ?? '')
+        : '';
     if (post.block)
       return {
         ...result,
-        content: `${result.content}\n\n<hook-feedback event="PostToolUse">\n${post.message}\n</hook-feedback>`,
+        content: `${result.content}\n\n<hook-feedback event="PostToolUse">\n${post.message}\n</hook-feedback>${rules}`,
       };
-    return result;
+    // exit 0 with output (or additionalContext): extra context for the model, like Claude Code.
+    const extra = post.context
+      ? `\n\n<hook-context event="PostToolUse">\n${post.context}\n</hook-context>`
+      : '';
+    return rules || extra ? { ...result, content: result.content + extra + rules } : result;
   }
 
   private async executeTool(
@@ -1675,8 +1954,13 @@ A project hook did not let you finish yet. Address it, then answer.`,
               : KNOWLEDGE_TOOL_NAMES.has(call.name)
                 ? knowledgePreview(call.name, a, this.knowledge)
                 : call.name === 'run_command'
-                  ? commandWarning(a, ws?.root)
+                  ? commandWarning(opts.scope?.task ? { ...a, cwd: undefined } : a, ws?.root)
                   : null;
+      // Fase 5: refused before asking (approving it would not make it run anyway).
+      if (call.name === 'run_command' && opts.scope?.task) {
+        const c = taskCommand(opts.scope.task, a);
+        if ('error' in c) return finish(false, c.error, 'fuera del worktree');
+      }
       if (sys) {
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));
@@ -1703,7 +1987,9 @@ A project hook did not let you finish yet. Address it, then answer.`,
       } else if (
         ws &&
         NEEDS_APPROVAL.has(call.name) &&
-        !s.alwaysAllow.has(approvalKey(call.name, a) ?? '')
+        !s.alwaysAllow.has(approvalKey(call.name, a) ?? '') &&
+        // Auto-approve: edits of ordinary project files; commands and protected files still ask.
+        !(opts.mode === 'auto' && call.name !== 'run_command' && approvalKey(call.name, a))
       ) {
         // "Always" covers the same command, or ordinary project files; never files that make
         // other programs run code or hold secrets (a later injection could abuse it).
@@ -1797,6 +2083,31 @@ A project hook did not let you finish yet. Address it, then answer.`,
         return finish(true, r.content, r.summary);
       }
 
+      if (call.name === 'todo_write') {
+        const r = parseTodos(a.todos);
+        if ('error' in r) return finish(false, r.error, 'lista no válida');
+        const p = todoProgress(r.todos);
+        opts.emit({ type: 'tool_result', id: call.id, ok: true, summary: `${p.done}/${p.total}` });
+        return { ok: true, content: todosResult(r.todos) };
+      }
+      if (call.name === 'ask_user') {
+        const q = parseQuestion(a);
+        if ('error' in q) return finish(false, q.error, 'pregunta no válida');
+        let answer: string[] | null = null;
+        if (opts.answer) {
+          opts.emit({
+            type: 'tool_approval',
+            id: call.id,
+            name: call.name,
+            args: viewArgs(call.name, a),
+            preview: { question: q },
+          });
+          answer = await opts.answer(call.id);
+        }
+        const summary = answer?.length ? answer.join(', ').slice(0, 120) : 'sin respuesta';
+        opts.emit({ type: 'tool_result', id: call.id, ok: true, summary: redact(summary) });
+        return { ok: true, content: answerResult(q, answer) };
+      }
       if (call.name === 'list_ai_models') {
         const text = await this.modelList(this.modelKey(opts.model));
         return finish(
@@ -2013,10 +2324,14 @@ A project hook did not let you finish yet. Address it, then answer.`,
             a,
             join(this.core.paths.home, 'backups'),
           );
-          s.checkpoints.push({
-            seq: ++checkpointSeq,
+          const written = existsSync(r.abs)
+            ? await readFile(r.abs, 'utf8').catch(() => undefined)
+            : null;
+          this.checkpoint(s, opts.conversationId, {
+            turn: opts.turn,
             path: r.abs,
             before: r.before,
+            ...(written !== undefined ? { after: written } : {}),
             absolute: true,
             backup: r.backup,
           });
@@ -2045,14 +2360,17 @@ A project hook did not let you finish yet. Address it, then answer.`,
           }
           const file = profileFile();
           const before = existsSync(file) ? await readFile(file, 'utf8') : null;
-          s.checkpoints.push({ seq: ++checkpointSeq, path: file, before, absolute: true });
+          const after = profileWithVar(before ?? '', name, value, file.endsWith('.fish'));
+          this.checkpoint(s, opts.conversationId, {
+            turn: opts.turn,
+            path: file,
+            before,
+            after,
+            absolute: true,
+          });
           opts.emit({ type: 'file_changed', path: file });
           await mkdir(dirname(file), { recursive: true });
-          await writeFile(
-            file,
-            profileWithVar(before ?? '', name, value, file.endsWith('.fish')),
-            'utf8',
-          );
+          await writeFile(file, after, 'utf8');
           return finish(
             true,
             `${name} saved permanently in ${file}. New terminals will have it; this conversation already uses it.`,
@@ -2193,6 +2511,16 @@ A project hook did not let you finish yet. Address it, then answer.`,
             `${read} archivos · ${Math.round(total / 1000)}k caracteres`,
           );
         }
+        case 'test_results': {
+          const run = await loadLastRun(w.root);
+          if (!run)
+            return finish(
+              true,
+              'No tests were run yet from the Test Explorer in this folder. Run them with run_command (for example "npx vitest run"), or ask the user to run them from the Test Explorer.',
+              'sin resultados',
+            );
+          return finish(true, failuresText(run), `${run.failed} fallan · ${run.passed} pasan`);
+        }
         case 'list_dir': {
           const p = typeof a.path === 'string' && a.path !== '.' ? a.path : '';
           const entries = await w.readDir(p);
@@ -2251,12 +2579,15 @@ A project hook did not let you finish yet. Address it, then answer.`,
               `${path}: no aplicado`,
             );
           }
-          s.checkpoints.push({ seq: ++checkpointSeq, path, before, root: w.root });
-          await writeFile(
-            abs,
-            before.replace(oldS, () => newS),
-            'utf8',
-          );
+          const after = before.replace(oldS, () => newS);
+          this.checkpoint(s, opts.conversationId, {
+            turn: opts.turn,
+            path,
+            before,
+            after,
+            root: w.root,
+          });
+          await writeFile(abs, after, 'utf8');
           opts.emit({ type: 'file_changed', path });
           return finish(true, `Edited ${path}.`, `${path} editado`);
         }
@@ -2267,7 +2598,13 @@ A project hook did not let you finish yet. Address it, then answer.`,
           const denied = deniedPath(abs, 'write');
           if (denied) return finish(false, denied, `${path}: protegido`);
           const before = existsSync(abs) ? await readFile(abs, 'utf8') : null;
-          s.checkpoints.push({ seq: ++checkpointSeq, path, before, root: w.root });
+          this.checkpoint(s, opts.conversationId, {
+            turn: opts.turn,
+            path,
+            before,
+            after: content,
+            root: w.root,
+          });
           await mkdir(dirname(abs), { recursive: true });
           await writeFile(abs, content, 'utf8');
           opts.emit({ type: 'file_changed', path });
@@ -2281,14 +2618,21 @@ A project hook did not let you finish yet. Address it, then answer.`,
           const command = str(a.command, 'command');
           const timeout =
             Math.min(900, Math.max(5, Number(a.timeout_seconds) || COMMAND_TIMEOUT / 1000)) * 1000;
-          const cwd = typeof a.cwd === 'string' && a.cwd.trim() ? expandPath(a.cwd) : w.root;
+          const task = opts.scope?.task;
+          let cwd: string;
+          if (task) {
+            // Fase 5: a task never leaves its worktree and never runs as admin.
+            const c = taskCommand(task, a);
+            if ('error' in c) return finish(false, c.error, 'fuera del worktree');
+            cwd = c.cwd;
+          } else cwd = typeof a.cwd === 'string' && a.cwd.trim() ? expandPath(a.cwd) : w.root;
           const r = await runCommand(
             command,
             cwd,
             timeout,
             opts.signal,
             (chunk) => opts.emit({ type: 'tool_output', id: call.id, chunk: redact(chunk) }),
-            { env: s.env, admin: a.admin === true },
+            { env: { ...s.env, ...task?.env }, admin: !task && a.admin === true },
           );
           const out = redact(truncate(r.output));
           return finish(
@@ -2334,6 +2678,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
    * the same relative path is a different file and is never overwritten or deleted.
    */
   async revert(conversationId: string, workspace = this.workspace): Promise<string[]> {
+    this.hydrate(conversationId);
     // The conversation's own changes and those of the helpers it delegated to, in order.
     const own = this.sessions.get(conversationId);
     const helpers = [...this.sessions.entries()]
@@ -2368,14 +2713,206 @@ A project hook did not let you finish yet. Address it, then answer.`,
     }
     if (own) own.checkpoints = [];
     for (const h of helpers) h.checkpoints = [];
+    this.checkpointStore()?.remove(conversationId);
     return restored;
   }
 
-  changedFiles(conversationId: string): number {
-    const paths = [...this.sessions.entries()]
+  /** The checkpoints of a conversation and its helpers, with the session that holds each. */
+  private allCheckpoints(conversationId: string): { owner: Session; cp: Checkpoint }[] {
+    this.hydrate(conversationId);
+    return [...this.sessions.entries()]
       .filter(([id]) => id === conversationId || id.startsWith(conversationId + HELPER_SEP))
-      .flatMap(([, s]) => s.checkpoints.map((c) => c.path));
-    return new Set(paths).size;
+      .flatMap(([, s]) => s.checkpoints.map((cp) => ({ owner: s, cp })));
+  }
+
+  /** The open folder, when the project files to restore were changed in it. */
+  private folderFor(
+    files: { absolute: boolean; root?: string }[],
+    workspace: () => Workspace | undefined,
+  ): Workspace | undefined {
+    const ws = workspace();
+    const roots = [...new Set(files.filter((f) => !f.absolute).map((f) => f.root))];
+    if (!roots.length) return ws;
+    const where = roots.filter(Boolean).join(', ') || 'otra carpeta';
+    if (!ws)
+      throw new Error(`Abre la carpeta ${where} para revertir los cambios de esta conversación.`);
+    if (roots.some((r) => r !== undefined && r !== ws.root))
+      throw new Error(
+        `Los cambios de esta conversación se hicieron en ${where}, no en la carpeta abierta (${ws.root}). Abre esa carpeta para revertirlos.`,
+      );
+    return ws;
+  }
+
+  private busy(conversationId: string): boolean {
+    return [...this.active].some(
+      (id) => id === conversationId || id.startsWith(conversationId + HELPER_SEP),
+    );
+  }
+
+  /** The file now (null = missing), or undefined when it cannot be read. */
+  private async onDisk(abs: string): Promise<string | null | undefined> {
+    if (!existsSync(abs)) return null;
+    return readFile(abs, 'utf8').catch(() => undefined);
+  }
+
+  /**
+   * What "Volver aquí" from `turns` would do (Fase 2), without doing it: each file to put back
+   * or delete, and whether it was changed after the agent's last write (that work is lost).
+   */
+  async rewindPreview(
+    conversationId: string,
+    turns: string[],
+    workspace = this.workspace,
+  ): Promise<RewindFileView[]> {
+    const { restore } = rewindPlan(
+      this.allCheckpoints(conversationId).map((x) => x.cp),
+      turns,
+    );
+    if (!restore.length) return [];
+    const ws = this.folderFor(restore, workspace);
+    const out: RewindFileView[] = [];
+    for (const r of restore) {
+      const now = await this.onDisk(r.absolute ? r.path : ws!.resolve(r.path));
+      if (now === r.before) continue; // already as it was
+      out.push({
+        path: r.path,
+        action: r.before === null ? 'delete' : 'restore',
+        edited: now !== undefined && editedSince(r, now),
+      });
+    }
+    return out;
+  }
+
+  /**
+   * "Volver aquí" (Fase 2): puts every file back as it was before the first of `turns` (that
+   * exchange and all later ones, helpers included) and forgets their checkpoints. What
+   * run_command did is not undone. Returns the paths it wrote or deleted.
+   */
+  async rewind(
+    conversationId: string,
+    turns: string[],
+    workspace = this.workspace,
+  ): Promise<string[]> {
+    if (this.busy(conversationId))
+      throw new Error('Espera a que el agente termine (o detenlo) antes de volver atrás.');
+    const all = this.allCheckpoints(conversationId);
+    const { restore, keep } = rewindPlan(
+      all.map((x) => x.cp),
+      turns,
+    );
+    if (!restore.length) return [];
+    const ws = this.folderFor(restore, workspace);
+    const kept = new Set(keep);
+    const restored: string[] = [];
+    for (const r of restore) {
+      const abs = r.absolute ? r.path : ws!.resolve(r.path);
+      if ((await this.onDisk(abs)) !== r.before) {
+        if (r.before === null) await rm(abs, { force: true });
+        else {
+          await mkdir(dirname(abs), { recursive: true });
+          await writeFile(abs, r.before, 'utf8');
+        }
+        restored.push(r.path);
+      }
+      for (const b of r.backups) await rm(b, { force: true });
+    }
+    for (const { owner } of all) owner.checkpoints = owner.checkpoints.filter((c) => kept.has(c));
+    this.persist(conversationId);
+    return restored;
+  }
+
+  /**
+   * Files one exchange changed: their content before it and after it (what that exchange
+   * left, not what later ones did on top), and whether the file changed since.
+   */
+  async turnDiff(
+    conversationId: string,
+    turn: string,
+    workspace = this.workspace,
+  ): Promise<TurnDiffFileView[]> {
+    const files = turnFiles(
+      this.allCheckpoints(conversationId).map((x) => x.cp),
+      turn,
+    );
+    if (!files.length) return [];
+    const ws = this.folderFor(files, workspace);
+    const out: TurnDiffFileView[] = [];
+    for (const f of files) {
+      const now = await this.onDisk(f.absolute ? f.path : ws!.resolve(f.path));
+      // Older checkpoints (no `after` recorded) fall back to the file now.
+      const after = f.after !== undefined ? f.after : (now ?? null);
+      if (after === f.before) continue;
+      out.push({
+        path: f.path,
+        before: f.before,
+        after,
+        changedSince: now !== undefined && editedSince(f, now),
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Puts back the rejected blocks (0-based, as `hunks` numbers them) of the exchange's change
+   * to one file (Fase 2). The file is rebuilt from what is on disk, so later messages' and
+   * hand edits stay; blocks that are no longer there are refused. Its checkpoint stays, so
+   * "rewind" and "revert" still restore the content from before the exchange. Returns the
+   * new content (null = the file was deleted).
+   */
+  async applyReview(
+    conversationId: string,
+    turn: string,
+    path: string,
+    rejected: number[],
+    workspace = this.workspace,
+  ): Promise<string | null> {
+    if (this.busy(conversationId))
+      throw new Error('Espera a que el agente termine (o detenlo) antes de aplicar la revisión.');
+    const all = this.allCheckpoints(conversationId);
+    const f = turnFiles(
+      all.map((x) => x.cp),
+      turn,
+    ).find((x) => x.path === path);
+    if (!f) throw new Error(`${path} no lo cambió ese mensaje.`);
+    const ws = this.folderFor([f], workspace);
+    const abs = f.absolute ? f.path : ws!.resolve(f.path);
+    const now = await this.onDisk(abs);
+    if (now === undefined) throw new Error(`No se pudo leer ${path}.`);
+    const after = f.after !== undefined ? f.after : now;
+    const before = f.before ?? '';
+    const rej = new Set(rejected);
+    const blocks = hunks(before, after ?? '').length;
+    let content: string | null;
+    if (f.before === null && now === after && blocks > 0 && rej.size >= blocks) {
+      content = null; // a file the exchange created, rejected whole, goes away again
+    } else {
+      const r = revertHunks(now ?? '', before, after ?? '', rej);
+      if (r.failed.length)
+        throw new Error(
+          `${path}: ${r.failed.length === 1 ? 'el bloque' : 'los bloques'} ${r.failed.map((b) => b + 1).join(', ')} cambiaron después de ese mensaje y no se pueden deshacer aquí. Usa "Volver aquí".`,
+        );
+      content = r.text;
+    }
+    if (content === now) return content;
+    if (content === null) await rm(abs, { force: true });
+    else {
+      await mkdir(dirname(abs), { recursive: true });
+      await writeFile(abs, content, 'utf8');
+    }
+    // The file now holds what the review left: later checks must not take it for a hand edit.
+    const latest = all
+      .map((x) => x.cp)
+      .filter((c) => c.path === f.path && !!c.absolute === f.absolute && c.root === f.root)
+      .sort((x, y) => (y.seq ?? 0) - (x.seq ?? 0))[0];
+    if (latest && latest.after !== undefined && latest.after === now) {
+      latest.after = content;
+      this.persist(conversationId);
+    }
+    return content;
+  }
+
+  changedFiles(conversationId: string): number {
+    return new Set(this.allCheckpoints(conversationId).map((x) => x.cp.path)).size;
   }
 
   /**
@@ -2393,6 +2930,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
     for (const id of [...this.sessions.keys()])
       if (id === conversationId || id.startsWith(conversationId + HELPER_SEP))
         this.sessions.delete(id);
+    this.hydrated.delete(conversationId);
+    this.checkpointStore()?.remove(conversationId);
   }
 }
 

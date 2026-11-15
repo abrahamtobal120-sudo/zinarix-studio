@@ -21,6 +21,8 @@ import {
   rank,
 } from './knowledgeText.js';
 import type { Bm25Index, Chunk } from './knowledgeText.js';
+import { ignoreBase, ignoreFilesIn, isIgnored, parseIgnore } from '../shared/ignore.js';
+import type { IgnoreRule } from '../shared/ignore.js';
 
 const MAX_MEMORIES = 300;
 const MAX_MEMORY_CHARS = 600;
@@ -56,6 +58,13 @@ function unpackVector(s: string): Float32Array {
 interface StoredChunk extends Chunk {
   /** base64 Float32 embedding (of `vecModel`). */
   vec?: string;
+  /** Fase 8: hash of the embedded text, so an unchanged chunk keeps its vector when its file changes. */
+  h?: string;
+}
+
+/** Hash of what gets embedded for a chunk. */
+function chunkHash(c: Chunk): string {
+  return createHash('sha1').update(`${c.title ?? c.source}\n${c.text}`).digest('base64').slice(0, 16);
 }
 
 interface CodeFile {
@@ -117,7 +126,16 @@ export class Knowledge {
   private readonly crawls = new Map<string, AbortController>();
   private readonly code = new Map<
     string,
-    { file: CodeIndexFile; ranked?: Ranked; checked: number; busy?: Promise<void> }
+    {
+      file: CodeIndexFile;
+      ranked?: Ranked;
+      checked: number;
+      busy?: Promise<void>;
+      /** Files left out by .gitignore / .zinarixignore at the last refresh. */
+      ignored?: number;
+      /** Chunks whose vector was reused (not embedded again) at the last refresh. */
+      reused?: number;
+    }
   >();
   /** Told when memories or docs change (main broadcasts to the windows). */
   onChange?: () => void;
@@ -422,9 +440,20 @@ export class Knowledge {
     if (st.busy) return st.busy;
     if (!force && st.ranked && Date.now() - st.checked < REFRESH_EVERY) return;
     st.busy = (async () => {
-      const files = (await ws.listFiles(CODE_MAX_FILES)).filter(
-        (p) => !SKIP_EXT.test(p) && !SKIP_NAME.test(p) && !isSecretFile(p),
+      const listed = await ws.listFiles(CODE_MAX_FILES);
+      // ripgrep already honours .gitignore, but not .zinarixignore, and without ripgrep
+      // nothing is honoured: the rules are applied here in every case.
+      const rules = await ignoreRules(ws, listed);
+      const files = listed.filter(
+        (p) =>
+          !SKIP_EXT.test(p) &&
+          !SKIP_NAME.test(p) &&
+          !isSecretFile(p) &&
+          p !== '.zinarixignore' &&
+          !isIgnored(p, rules),
       );
+      st.ignored = listed.length - files.length;
+      let reused = 0;
       let dirty = !st.ranked;
       const keep = new Set(files);
       for (const p of Object.keys(st.file.files))
@@ -448,7 +477,19 @@ export class Knowledge {
           continue;
         }
         const f = await ws.readFile(p).catch(() => undefined);
-        const chunks = f && !f.binary && !f.tooLarge ? chunkLines(p, f.content) : [];
+        const chunks: StoredChunk[] = f && !f.binary && !f.tooLarge ? chunkLines(p, f.content) : [];
+        // Incremental: a chunk whose text did not change keeps its vector (only the edited
+        // parts of the file are embedded again).
+        const prev = new Map<string, string>();
+        for (const c of old?.chunks ?? []) if (c.vec) prev.set(c.h ?? chunkHash(c), c.vec);
+        for (const c of chunks) {
+          c.h = chunkHash(c);
+          const v = prev.get(c.h);
+          if (v) {
+            c.vec = v;
+            reused++;
+          }
+        }
         st.file.files[p] = { mtime: s.mtimeMs, size: s.size, chunks };
       }
       const all = Object.values(st.file.files).flatMap((f) => f.chunks);
@@ -466,6 +507,7 @@ export class Knowledge {
         await mkdir(join(this.dir, 'code'), { recursive: true });
         await writeFile(this.codePath(ws.root), JSON.stringify(st.file)).catch(() => undefined);
       }
+      st.reused = reused;
       st.checked = Date.now();
     })().finally(() => {
       st.busy = undefined;
@@ -479,7 +521,14 @@ export class Knowledge {
     query: string,
     limit = 8,
     signal: AbortSignal = new AbortController().signal,
-  ): Promise<{ hits: KnowledgeHit[]; semantic: boolean; files: number }> {
+  ): Promise<{
+    hits: KnowledgeHit[];
+    semantic: boolean;
+    files: number;
+    chunks?: number;
+    embedded?: number;
+    ignored?: number;
+  }> {
     await this.refreshCode(ws, signal);
     const st = this.codeState(ws.root);
     const r = st.ranked!;
@@ -488,6 +537,9 @@ export class Knowledge {
       hits: this.rankIndex(r, query, qv, limit),
       semantic: !!qv,
       files: Object.keys(st.file.files).length,
+      chunks: r.chunks.length,
+      embedded: r.vecs.filter(Boolean).length,
+      ignored: st.ignored ?? 0,
     };
   }
 
@@ -558,6 +610,16 @@ export class Knowledge {
     this.core.saveConfig({ ...this.core.config, roles });
     this.onChange?.();
   }
+}
+
+/** .gitignore files (root and nested) and the root .zinarixignore of a project, as rules. */
+async function ignoreRules(ws: Workspace, listed: string[]): Promise<IgnoreRule[]> {
+  const rules: IgnoreRule[] = [];
+  for (const p of ignoreFilesIn(listed)) {
+    const f = await ws.readFile(p).catch(() => undefined);
+    if (f && !f.binary && !f.tooLarge) rules.push(...parseIgnore(f.content, ignoreBase(p)));
+  }
+  return rules;
 }
 
 /** One docs page (HTML or plain text/markdown), redirects followed only inside the docs site. */

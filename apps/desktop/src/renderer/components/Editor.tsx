@@ -4,13 +4,16 @@ import { tabKeyDown } from '../a11y';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
 import { registerInlineCompletions } from '../inline';
+import { attachNextEdit } from '../nextEdit';
 import { installLsp } from '../lsp';
 import { attachDebugToEditor, installDebug } from '../debug';
+import { installTests } from '../testExplorer';
 import { DebugToolbar } from './DebugPanel';
 import { monacoTheme } from '../themes';
 import type { Prefs } from '../../shared/api';
 import {
   BROWSER_TAB,
+  PLAYGROUND_TAB,
   SECURITY_TAB,
   WHATSAPP_TAB,
   activate,
@@ -23,6 +26,7 @@ import {
   useStore,
 } from '../store';
 import { BrowserPane } from './Browser';
+import { PlaygroundPane } from './Playground';
 import { WhatsAppPane } from './WhatsApp';
 import { SecuritySection } from './SecuritySection';
 import { Welcome } from './Chrome';
@@ -53,6 +57,7 @@ export function EditorArea() {
     registerInlineCompletions();
     installLsp();
     installDebug();
+    installTests();
     const ed = monaco.editor.create(host.current, {
       model: null,
       ...prefOptions(getState().prefs),
@@ -72,6 +77,8 @@ export function EditorArea() {
       glyphMargin: true,
     });
     const dbg = attachDebugToEditor(ed);
+    // Fase 8: next-edit prediction (Tab jumps / applies).
+    const nextEdit = attachNextEdit(ed);
     editorRef.current = ed;
     attachEditor(ed);
     const sub = ed.onDidChangeCursorPosition((e) =>
@@ -80,6 +87,7 @@ export function EditorArea() {
     return () => {
       sub.dispose();
       dbg.dispose();
+      nextEdit.dispose();
       attachEditor(null);
       ed.dispose();
     };
@@ -105,9 +113,10 @@ export function EditorArea() {
   const hasBrowserTab = tabs.some((x) => x.path === BROWSER_TAB);
   const isWhatsApp = active === WHATSAPP_TAB;
   const hasWhatsAppTab = tabs.some((x) => x.path === WHATSAPP_TAB);
-  const showEditor = Boolean(
-    activeTab && !activeTab.notice && !activeTab.viewer && !isBrowser && !isSecurity && !isWhatsApp,
-  );
+  const isPlayground = active === PLAYGROUND_TAB;
+  const hasPlaygroundTab = tabs.some((x) => x.path === PLAYGROUND_TAB);
+  const special = isBrowser || isSecurity || isWhatsApp || isPlayground;
+  const showEditor = Boolean(activeTab && !activeTab.notice && !activeTab.viewer && !special);
   return (
     <div className="editor-area" id="editor-tabpanel" role="tabpanel">
       {tabs.length > 0 && (
@@ -139,6 +148,7 @@ export function EditorArea() {
               <span className="tab-name">
                 {tab.path === SECURITY_TAB && <Icon name="shield" size={13} />}
                 {tab.path === WHATSAPP_TAB && <Icon name="whatsapp" size={13} />}
+                {tab.path === PLAYGROUND_TAB && <Icon name="sparkle" size={13} />}
                 {tab.path === BROWSER_TAB && (
                   <svg
                     className="tab-globe"
@@ -181,7 +191,7 @@ export function EditorArea() {
           </button>
         </div>
       )}
-      {activeTab && !isBrowser && !isSecurity && !isWhatsApp && (
+      {activeTab && !special && (
         <div className="breadcrumbs">{activeTab.path.split('/').join(' › ')}</div>
       )}
       <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />
@@ -192,6 +202,8 @@ export function EditorArea() {
       {activeTab?.viewer && <FileViewerPane key={activeTab.path} tab={activeTab} />}
       {hasBrowserTab && <BrowserPane visible={isBrowser} />}
       {hasWhatsAppTab && <WhatsAppPane visible={isWhatsApp} />}
+      {/* Kept mounted while open so runs keep streaming when you switch tabs. */}
+      {hasPlaygroundTab && <PlaygroundPane visible={isPlayground} />}
       {isSecurity && <SecuritySection />}
       {!activeTab && <Welcome />}
     </div>

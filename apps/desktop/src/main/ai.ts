@@ -16,25 +16,30 @@ import type { OmniEvent } from '@omni/core';
 import { CatalogEntry, CliProfile, OmniError, t } from '@omni/shared';
 import type { ChatMessage, MessageKey, ModelInfo } from '@omni/shared';
 import { redact, StreamRedactor } from '@omni/security';
-import { Agent, IDENTITY_PROMPT, cliIdentityBlock } from './agent.js';
+import { Agent, IDENTITY_PROMPT, cliIdentityBlock, type TaskScope } from './agent.js';
 import { withProtocol } from './textTools.js';
 import { MAX_IMAGES, addImageParts, imagesAsFiles, visionMode } from './chatImages.js';
 import { RunJournal } from './runJournal.js';
-import { predictNextEdit } from './nextEdit.js';
-import type { NextEditRequestView, NextEditView } from '../shared/lsp.js';
+import { SuggestionMetrics, predictNextEdit } from './nextEdit.js';
+import type { NextEditRequestView, NextEditResultView } from '../shared/lsp.js';
+import type { SuggestionKind, SuggestionOutcome, SuggestionStatsRow } from '../shared/nextEdit.js';
 import {
   ROOT_FILES,
   RULE_DIRS,
+  RuleTracker,
   availableRules,
   contextPaths,
+  expandImports,
   hierarchyCandidates,
   mentionedRules,
   parseRule,
   rulesPrompt,
+  rulesUpdate,
   selectRules,
 } from '../shared/rules.js';
-import type { ActiveRule, Rule } from '../shared/rules.js';
-import { loadKit } from './hooks.js';
+import type { ActiveRule, Rule, RuleFeed } from '../shared/rules.js';
+import { createKitFile, loadKit } from './hooks.js';
+import { hooksFingerprint, type KitKind } from '../shared/agentKit.js';
 import { setCredentialEnvNames } from './env.js';
 import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
@@ -137,6 +142,8 @@ type Emit = (requestId: string, ev: ChatEventView) => void;
 export interface Scope {
   workspace: () => Workspace | undefined;
   browser?: BrowserController;
+  /** Fase 5: a background task (run_command stays in its worktree, limits apply). */
+  task?: TaskScope;
 }
 
 /**
@@ -171,6 +178,8 @@ export class AiService {
   readonly core: OmniCore;
   private readonly running = new Map<string, AbortController>();
   private readonly decisions = new Map<string, (d: ToolDecision) => void>();
+  /** ask_user questions waiting for the user (Fase 3). */
+  private readonly answers = new Map<string, (a: string[] | null) => void>();
   readonly agent: Agent;
   /** Agent runs in progress, on disk (continued after a shutdown). */
   private readonly journal: RunJournal;
@@ -184,6 +193,11 @@ export class AiService {
   /** Used when a call does not say which window it comes from (CLI tests, one window). */
   private readonly scope: Scope;
 
+  /** Fase 8: acceptance and latency of the editor suggestions, per model. */
+  readonly metrics: SuggestionMetrics;
+  /** Model that answered the last suggestion of each kind (accept/dismiss events use it). */
+  private lastSuggestModel: Record<SuggestionKind, string> = { inline: '', nextEdit: '' };
+
   constructor(
     workspace: () => Workspace | undefined = () => undefined,
     home = omniHome(),
@@ -193,6 +207,7 @@ export class AiService {
     this.core = OmniCore.open({ home, askPassword: vaultPassword(home) });
     this.agent = new Agent(this.core, workspace, browser);
     this.journal = new RunJournal(join(this.core.paths.home, 'runs-in-progress.json'));
+    this.metrics = new SuggestionMetrics(join(this.core.paths.home, 'suggestion-metrics.json'));
     // Child shells never get the provider keys the app can read from the environment.
     setAppDataDirs([this.core.paths.home, dirname(this.core.paths.config)]);
     setCredentialEnvNames(this.core.providers().flatMap((p) => envVarNames(p)));
@@ -654,7 +669,7 @@ export class AiService {
   ): Promise<void> {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
-    const rec = new TurnRecorder(requestId);
+    const rec = new TurnRecorder(requestId, req.mode);
     const at = Date.now();
     let convId: string | undefined;
     const send = (ev: ChatEventView) => {
@@ -688,14 +703,26 @@ export class AiService {
       );
       await this.agent.run({
         conversationId: convId,
+        turn: requestId,
         model: req.model,
         reasoning: req.reasoning,
+        mode: req.mode,
         scope,
         delegation: this.features().delegation,
         rules: this.rulesBlock(
           scope,
           req.context.map((c) => c.source),
           req.prompt,
+        ),
+        ruleFeed: this.ruleFeed(
+          scope,
+          new RuleTracker(
+            this.rulesFor(
+              scope,
+              req.context.map((c) => c.source),
+              req.prompt,
+            ).active,
+          ),
         ),
         userMessage,
         fallbackHistory: recentHistory(req.history),
@@ -713,6 +740,20 @@ export class AiService {
             this.decisions.set(key, (d) => {
               ctrl.signal.removeEventListener('abort', onAbort);
               resolve(d);
+            });
+            ctrl.signal.addEventListener('abort', onAbort, { once: true });
+          }),
+        answer: (toolCallId) =>
+          new Promise<string[] | null>((resolve) => {
+            if (ctrl.signal.aborted) return resolve(null);
+            const key = `${requestId}:${toolCallId}`;
+            const onAbort = () => {
+              this.answers.delete(key);
+              resolve(null);
+            };
+            this.answers.set(key, (a) => {
+              ctrl.signal.removeEventListener('abort', onAbort);
+              resolve(a);
             });
             ctrl.signal.addEventListener('abort', onAbort, { once: true });
           }),
@@ -788,13 +829,18 @@ export class AiService {
       }
     };
     const out: Rule[] = [];
+    // "@docs/style.md" lines pull that file in (a CLAUDE.md that only says "@AGENTS.md").
+    const rule = (rel: string, text: string, kind: Rule['kind']): Rule => {
+      const r = parseRule(rel, text, kind);
+      return { ...r, body: expandImports(r.body, rel, read).trim() };
+    };
     for (const f of ROOT_FILES) {
       const text = read(f.path);
-      if (text !== null) out.push(parseRule(f.path, text, f.kind));
+      if (text !== null) out.push(rule(f.path, text, f.kind));
     }
     for (const rel of hierarchyCandidates(paths)) {
       const text = read(rel);
-      if (text !== null) out.push(parseRule(rel, text, 'instructions'));
+      if (text !== null) out.push(rule(rel, text, 'instructions'));
     }
     for (const d of RULE_DIRS) {
       let names: string[] = [];
@@ -808,7 +854,7 @@ export class AiService {
       for (const n of names.sort().slice(0, 200)) {
         const rel = `${d.dir}/${n}`;
         const text = read(rel);
-        if (text !== null) out.push(parseRule(rel, text, d.kind));
+        if (text !== null) out.push(rule(rel, text, d.kind));
       }
     }
     return out;
@@ -824,6 +870,19 @@ export class AiService {
     const rules = this.loadRules(scope, paths);
     const active = selectRules(rules, paths, mentionedRules(prompt));
     return { active, available: availableRules(rules, active) };
+  }
+
+  /** Rules for the files an agent run opens or edits after its first prompt (see RuleTracker). */
+  private ruleFeed(scope: Scope, tracker: RuleTracker): RuleFeed {
+    return {
+      forFile: (path) => {
+        if (!this.useRules) return '';
+        const [rel] = contextPaths([`file:${path}`], scope.workspace()?.root);
+        if (!rel) return '';
+        return rulesUpdate(rel, tracker.next(this.loadRules(scope, [rel]), [rel]), redact);
+      },
+      fork: () => this.ruleFeed(scope, tracker.fork()),
+    };
   }
 
   /** What the "active rules" panel shows for a chat about to send this context. */
@@ -873,7 +932,19 @@ export class AiService {
         command: h.command,
         source: h.source,
       })),
+      hooksTrusted:
+        kit.hooks.length > 0 &&
+        Boolean(
+          this.agent.hookTrust?.has(scope.workspace()?.root ?? '', hooksFingerprint(kit.hooks)),
+        ),
     };
+  }
+
+  /** "Nuevo subagente / skill / comando" of the kit panel: the file, ready to edit. */
+  createKitFile(scope: Scope, kind: KitKind, name: string): string {
+    const ws = scope.workspace();
+    if (!ws) throw new OmniError('config', 'Abre una carpeta para crear archivos del agente.');
+    return createKitFile(ws, kind, name);
   }
 
   /** System-prompt block with the project rules (style and conventions, never safety overrides). */
@@ -892,6 +963,7 @@ export class AiService {
   async complete(requestId: string, req: CompletionRequestView): Promise<string> {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
+    const t0 = Date.now();
     try {
       const prefix = req.prefix.slice(-4000);
       const suffix = req.suffix.slice(0, 1500);
@@ -914,8 +986,20 @@ export class AiService {
         },
         ctrl.signal,
       );
-      return cleanCompletion(r.text, prefix, suffix);
+      const text = cleanCompletion(r.text, prefix, suffix);
+      const model = r.provider && r.model ? `${r.provider}/${r.model}` : r.model;
+      if (model) {
+        this.lastSuggestModel.inline = model;
+        void this.metrics.record([
+          { kind: 'inline', model, outcome: text ? 'shown' : 'empty', latencyMs: Date.now() - t0 },
+        ]);
+      }
+      return text;
     } catch {
+      if (!ctrl.signal.aborted && this.lastSuggestModel.inline)
+        void this.metrics.record([
+          { kind: 'inline', model: this.lastSuggestModel.inline, outcome: 'error' },
+        ]);
       return '';
     } finally {
       this.running.delete(requestId);
@@ -923,14 +1007,43 @@ export class AiService {
   }
 
   /** Next-edit prediction ("Tab" jumps to it); null = no suggestion. Abortable like complete. */
-  async nextEdit(requestId: string, req: NextEditRequestView): Promise<NextEditView | null> {
+  async nextEdit(requestId: string, req: NextEditRequestView): Promise<NextEditResultView> {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
     try {
-      return await predictNextEdit(this.core, req, ctrl.signal);
+      const r = await predictNextEdit(this.core, req, ctrl.signal);
+      // Cancelled requests (the user kept typing) say nothing about the model.
+      if (!ctrl.signal.aborted && r.model) {
+        this.lastSuggestModel.nextEdit = r.model;
+        void this.metrics.record([
+          {
+            kind: 'nextEdit',
+            model: r.model,
+            outcome: r.error ? 'error' : r.hunks.length ? 'shown' : 'empty',
+            latencyMs: r.latencyMs,
+          },
+        ]);
+      }
+      return r;
     } finally {
       this.running.delete(requestId);
     }
+  }
+
+  /** The editor reports what the user did with a suggestion (accepted / dismissed). */
+  suggestionOutcome(
+    kind: SuggestionKind,
+    outcome: Extract<SuggestionOutcome, 'accepted' | 'dismissed'>,
+    count = 1,
+  ): void {
+    const model = this.lastSuggestModel[kind];
+    if (!model) return;
+    const n = Math.max(1, Math.min(8, Math.trunc(count)));
+    void this.metrics.record(Array.from({ length: n }, () => ({ kind, model, outcome })));
+  }
+
+  suggestionStats(): Promise<SuggestionStatsRow[]> {
+    return this.metrics.stats();
   }
 
   async commitMessage(patch: string): Promise<string> {
@@ -1040,12 +1153,51 @@ export class AiService {
     this.decisions.delete(key);
   }
 
+  answerQuestion(requestId: string, toolCallId: string, answer: string[] | null): void {
+    const key = `${requestId}:${toolCallId}`;
+    this.answers.get(key)?.(answer);
+    this.answers.delete(key);
+  }
+
   resetContext(conversationId: string): void {
     this.agent.resetMessages(conversationId);
   }
 
   revert(conversationId: string, scope: Scope = this.scope): Promise<string[]> {
     return this.agent.revert(conversationId, scope.workspace);
+  }
+
+  /**
+   * "Volver aquí" on the conversation (Fase 2): the saved history loses that question and
+   * everything after it, and the agent rebuilds its context from what is left.
+   */
+  rewindConversation(conversationId: string, userIndex: number): number {
+    const n = this.core.history.truncateAtUser(conversationId, userIndex);
+    this.agent.resetMessages(conversationId);
+    return n;
+  }
+
+  /** "Volver aquí": files back to before the first of these exchanges (Fase 2). */
+  rewind(conversationId: string, turns: string[], scope: Scope = this.scope): Promise<string[]> {
+    return this.agent.rewind(conversationId, turns, scope.workspace);
+  }
+
+  rewindPreview(conversationId: string, turns: string[], scope: Scope = this.scope) {
+    return this.agent.rewindPreview(conversationId, turns, scope.workspace);
+  }
+
+  turnDiff(conversationId: string, turn: string, scope: Scope = this.scope) {
+    return this.agent.turnDiff(conversationId, turn, scope.workspace);
+  }
+
+  applyReview(
+    conversationId: string,
+    turn: string,
+    path: string,
+    rejected: number[],
+    scope: Scope = this.scope,
+  ): Promise<string | null> {
+    return this.agent.applyReview(conversationId, turn, path, rejected, scope.workspace);
   }
 
   async edit(requestId: string, req: EditRequestView, emitRaw: Emit): Promise<void> {
@@ -1219,6 +1371,8 @@ export interface TurnDisplay {
   error?: string;
   /** Request that produced it (the same one is on its question): pairs answers sent alongside. */
   request?: string;
+  /** Fase 3: the agent mode it ran in (a plan-mode answer is a plan to approve). */
+  mode?: 'plan' | 'agent' | 'auto';
 }
 
 const MAX_SAVED_OUTPUT = 8000;
@@ -1228,8 +1382,8 @@ export class TurnRecorder {
   private readonly d: TurnDisplay;
   private text = '';
 
-  constructor(request?: string) {
-    this.d = { parts: [], ...(request ? { request } : {}) };
+  constructor(request?: string, mode?: TurnDisplay['mode']) {
+    this.d = { parts: [], ...(request ? { request } : {}), ...(mode ? { mode } : {}) };
   }
 
   add(ev: ChatEventView): void {

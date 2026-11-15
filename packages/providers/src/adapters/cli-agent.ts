@@ -176,7 +176,7 @@ function contentText(m: ChatMessage): string {
   if (m.role !== 'user') return m.content;
   return typeof m.content === 'string'
     ? m.content
-    : m.content.map((p) => (p.type === 'text' ? p.text : '[imagen omitida]')).join('\n');
+    : m.content.map((p) => (p.type === 'text' ? p.text : p.type === 'image' ? '[imagen omitida]' : '[adjunto omitido]')).join('\n');
 }
 
 /**
@@ -210,7 +210,7 @@ export function cliPrompt(messages: ChatMessage[]): string {
  * open project with the permission level chosen in the provider settings.
  */
 export function cliMode(cfg: ProviderConfig, req: ChatRequest): CliMode {
-  if (!req.tools?.length || !req.cwd) return 'read';
+  if (!req.tools?.length || !req.cwd || req.readOnly) return 'read';
   const m = cfg.params?.mode;
   return m === 'read' || m === 'full' ? m : 'edit';
 }
@@ -228,6 +228,8 @@ export function cliDeniedHint(cfg: ProviderConfig, req: ChatRequest): string {
     );
   if (!req.cwd)
     return 'No hay una carpeta abierta: abre la carpeta del proyecto para que el agente pueda editarla.';
+  if (req.readOnly)
+    return 'Estás en modo **Plan**: el agente solo lee hasta que apruebes el plan. Apruébalo o cambia al modo **Agente**.';
   if (cliMode(cfg, req) === 'read')
     return (
       'El modo del proveedor es **read** (solo lectura). Cámbialo a **edit** para editar ' +

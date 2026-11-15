@@ -78,6 +78,17 @@ export function listTerminals(): TerminalSession[] {
   }));
 }
 
+/** Fase 8 (@terminal): the session shown in the panel, or the last one opened. */
+export function activeTerminalId(): number | null {
+  if (activeId !== null && terms.has(activeId)) return activeId;
+  return [...terms.keys()].at(-1) ?? null;
+}
+
+/** Fase 8: the id of session number n (as shown on its tab, 1-based). */
+export function terminalIdByNumber(n: number): number | null {
+  return [...terms.keys()][n - 1] ?? null;
+}
+
 /** True when the keyboard focus is inside the terminal panel. */
 export function terminalFocused(): boolean {
   return Boolean(document.activeElement?.closest('.terminal-host'));

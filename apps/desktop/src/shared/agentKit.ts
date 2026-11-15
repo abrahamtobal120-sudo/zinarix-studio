@@ -200,7 +200,14 @@ const TOOL_GROUPS: Record<string, string[]> = {
   bash: ['run_command'],
   terminal: ['run_command'],
   command: ['run_command'],
-  web: ['browser_open', 'browser_read', 'browser_click', 'browser_type', 'browser_scroll', 'browser_back'],
+  web: [
+    'browser_open',
+    'browser_read',
+    'browser_click',
+    'browser_type',
+    'browser_scroll',
+    'browser_back',
+  ],
   webfetch: ['browser_open', 'browser_read'],
   websearch: ['browser_open', 'browser_read'],
   docs: ['docs_list', 'docs_search'],
@@ -330,24 +337,157 @@ export interface HookResult {
  * to the model · anything else = a warning for the user, the action goes on.
  * stdout JSON {"decision":"block","reason":"…"} also blocks.
  */
-export function hookOutcome(r: HookResult): { block: boolean; message: string; warning?: string } {
+export function hookOutcome(r: HookResult): HookOutcome {
   const out = r.stdout.trim();
   const err = r.stderr.trim();
   if (r.timedOut) return { block: false, message: '', warning: 'timeout' };
   if (r.code === 2) return { block: true, message: err || out || 'Blocked by a hook.' };
   if (r.code === 0) {
     if (out.startsWith('{')) {
+      let j: Record<string, unknown> | null = null;
       try {
-        const j = JSON.parse(out) as { decision?: unknown; reason?: unknown };
-        if (j.decision === 'block')
-          return { block: true, message: text(j.reason) || 'Blocked by a hook.' };
+        const v = JSON.parse(out) as unknown;
+        if (v && typeof v === 'object' && !Array.isArray(v)) j = v as Record<string, unknown>;
       } catch {
         // plain text that starts with "{"
       }
+      if (j) return jsonOutcome(j);
     }
     return { block: false, message: out };
   }
   return { block: false, message: '', warning: err || out || `exit ${String(r.code)}` };
+}
+
+export interface HookOutcome {
+  block: boolean;
+  /** block: why (for the model); otherwise extra context for the model ("" = none). */
+  message: string;
+  /** Something went wrong with the hook itself (shown to the user, the action goes on). */
+  warning?: string;
+  /** systemMessage of the JSON output: shown to the user, the model does not see it. */
+  notice?: string;
+}
+
+/**
+ * Claude Code's JSON output (exit 0): {"decision":"block","reason"} ·
+ * {"continue":false,"stopReason"} · {"hookSpecificOutput":{"permissionDecision":"deny",
+ * "permissionDecisionReason","additionalContext"}} · {"systemMessage"}.
+ * "allow" / "ask" never skip Zinarix's own approval: a hook can only add restrictions.
+ */
+function jsonOutcome(j: Record<string, unknown>): HookOutcome {
+  const spec =
+    j.hookSpecificOutput && typeof j.hookSpecificOutput === 'object'
+      ? (j.hookSpecificOutput as Record<string, unknown>)
+      : {};
+  const notice = text(j.systemMessage);
+  const extra = notice ? { notice } : {};
+  if (j.decision === 'block')
+    return { block: true, message: text(j.reason) || 'Blocked by a hook.', ...extra };
+  if (spec.permissionDecision === 'deny')
+    return {
+      block: true,
+      message: text(spec.permissionDecisionReason) || text(j.reason) || 'Blocked by a hook.',
+      ...extra,
+    };
+  if (j.continue === false)
+    return {
+      block: true,
+      message: text(j.stopReason) || text(j.reason) || 'Stopped by a hook.',
+      ...extra,
+    };
+  return { block: false, message: text(spec.additionalContext), ...extra };
+}
+
+/* --------------------------------------------------------------------- new kit files */
+
+export type KitKind = 'agent' | 'skill' | 'command';
+
+/**
+ * Where a new subagent / skill / command of the project goes, and what it starts with.
+ * `taken` = names already used, so "nuevo" becomes "nuevo-2" instead of overwriting.
+ */
+export function kitTemplate(
+  kind: KitKind,
+  rawName: string,
+  taken: Iterable<string> = [],
+): { name: string; path: string; content: string } {
+  const used = new Set(taken);
+  const base = kitName(rawName) || kind;
+  let name = base;
+  for (let i = 2; used.has(name); i++) name = `${base.slice(0, 60)}-${i}`;
+  if (kind === 'agent')
+    return {
+      name,
+      path: `.zinarix/agents/${name}.md`,
+      content: `---
+name: ${name}
+description: Cuándo usar este subagente (el agente principal lo lee para decidir)
+tools: read, grep
+# model: openai/gpt-5   (sin "model" usa el mismo modelo que el agente principal)
+---
+
+Eres un subagente especializado. Describe aquí su rol, cómo trabaja y qué debe
+entregar en su respuesta final (es lo único que verá el agente que lo lanzó).
+`,
+    };
+  if (kind === 'skill')
+    return {
+      name,
+      path: `.zinarix/skills/${name}/SKILL.md`,
+      content: `---
+name: ${name}
+description: Qué hace esta skill y cuándo usarla (solo esto se carga hasta que se usa)
+---
+
+# ${name}
+
+Instrucciones paso a paso. Puedes poner scripts o plantillas en esta misma carpeta
+y mencionarlos aquí: el agente recibe la lista de archivos al cargar la skill.
+`,
+    };
+  return {
+    name,
+    path: `.zinarix/commands/${name}.md`,
+    content: `---
+description: Qué hace /${name}
+argument-hint: <texto>
+---
+
+Escribe aquí el prompt. $ARGUMENTS se cambia por lo que escribas después de /${name}
+($1, $2… por cada palabra).
+`,
+  };
+}
+
+/** Claude Code's model aliases in subagent files → the Anthropic models they stand for. */
+const CLAUDE_ALIASES: Record<string, string> = {
+  sonnet: 'claude-sonnet-5-5',
+  opus: 'claude-opus-5-5',
+  haiku: 'claude-haiku-5-5',
+};
+
+/**
+ * The model a subagent runs on: its "model:" when Zinarix can run it ("provider/model", or a
+ * Claude Code alias like "sonnet" when Anthropic is set up). undefined = the launching agent's.
+ */
+export function subagentModel(
+  spec: string,
+  resolve: (m: string) => string | undefined,
+): string | undefined {
+  const m = spec.trim();
+  if (!m || m === 'inherit') return undefined;
+  if (m.includes('/')) return resolve(m);
+  const alias = CLAUDE_ALIASES[m.toLowerCase()];
+  if (alias) return resolve(`anthropic/${alias}`);
+  if (/^claude-/i.test(m)) return resolve(`anthropic/${m}`);
+  return undefined;
+}
+
+/** The prompt sent when the user types /<skill> in the chat. */
+export function skillPrompt(name: string, args: string): string {
+  const rest = args.trim();
+  const what = rest ? ` for this:\n\n${rest}` : ' now.';
+  return `Use the skill "${name}" (call use_skill first to load it)${what}`;
 }
 
 /** The JSON a hook gets on stdin. file_path is added for tools that take a path. */
@@ -371,10 +511,16 @@ export function hookInput(
   };
   if (fields.tool !== undefined) {
     base.tool_name = fields.tool;
-    base.tool_input = { ...(fields.input ?? {}), ...(fields.absPath ? { file_path: fields.absPath } : {}) };
+    base.tool_input = {
+      ...(fields.input ?? {}),
+      ...(fields.absPath ? { file_path: fields.absPath } : {}),
+    };
   }
   if (fields.response)
-    base.tool_response = { success: fields.response.ok, output: fields.response.content.slice(0, 20_000) };
+    base.tool_response = {
+      success: fields.response.ok,
+      output: fields.response.content.slice(0, 20_000),
+    };
   if (fields.prompt !== undefined) base.prompt = fields.prompt;
   if (fields.stopActive !== undefined) base.stop_hook_active = fields.stopActive;
   return base;

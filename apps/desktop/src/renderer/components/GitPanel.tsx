@@ -17,6 +17,7 @@ import { api, askText, openFile, setState, toast, useStore } from '../store';
 import { openLink } from '../links';
 import { runInTerminal } from './Terminal';
 import { fileIcon } from './icons';
+import { CodeReview } from './CodeReview';
 
 /** Letter and color class for a porcelain status. */
 function badge(f: GitFileView, staged: boolean): { letter: string; cls: string } {
@@ -74,6 +75,7 @@ export function GitPanel() {
   // A list (history, branches, stash) that failed to load: shown with a retry, not as empty.
   const [listErr, setListErr] = useState<string | null>(null);
   const [listTry, setListTry] = useState(0);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!workspace) return;
@@ -278,12 +280,20 @@ export function GitPanel() {
 
   return (
     <div className="explorer git-panel">
+      {reviewOpen && (
+        <CodeReview onClose={() => setReviewOpen(false)} branch={st?.branch ?? undefined} />
+      )}
       <div className="sidebar-title">
         <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
         <span className="sidebar-actions">
           <button title={t('gitRefresh')} onClick={() => void refresh()}>
             <Icon name="refresh" size={15} />
           </button>
+          {st?.isRepo && (
+            <button title={t('gitReviewAi')} onClick={() => setReviewOpen(true)}>
+              <Icon name="shield" size={15} />
+            </button>
+          )}
           {hasRemote && (
             <>
               <button

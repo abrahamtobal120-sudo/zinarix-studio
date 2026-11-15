@@ -14,6 +14,8 @@ import {
   toggleBreakpointAtCursor,
 } from './debug';
 import { td } from './i18nDebug';
+import { tp } from './i18nPlayground';
+import { rerunFailed, runAll as runAllTests, runAtCursor } from './testExplorer';
 import { studioCommand, videoCommands } from './components/video/videoCommands';
 import { lang, setLang, t } from './i18n';
 import { comboFromEvent } from './keys';
@@ -35,6 +37,7 @@ import {
   openBrowserTab,
   openFile,
   openSecurityTab,
+  openPlaygroundTab,
   refreshSettings,
   updatePrefs,
   save,
@@ -111,6 +114,21 @@ function baseCommands(): Command[] {
       keys: `${mod}+P`,
       run: () => setState({ modal: { kind: 'quickOpen' } }),
     },
+    {
+      id: 'tasks.run',
+      label: t('cmdRunTask'),
+      run: () =>
+        getState().workspace ? setState({ modal: { kind: 'tasks' } }) : toast(t('noFolder')),
+    },
+    {
+      id: 'tests.open',
+      label: t('cmdTestsOpen'),
+      run: () => setState({ sidebar: 'testing' }),
+    },
+    { id: 'tests.runAll', label: t('cmdTestsRunAll'), run: () => runAllTests() },
+    { id: 'tests.rerunFailed', label: t('cmdTestsRerunFailed'), run: () => rerunFailed() },
+    { id: 'tests.runAtCursor', label: t('cmdTestsRunCursor'), run: () => runAtCursor() },
+    { id: 'tests.debugAtCursor', label: t('cmdTestsDebugCursor'), run: () => runAtCursor(true) },
     {
       id: 'palette',
       label: t('cmdPalette'),
@@ -354,6 +372,21 @@ function baseCommands(): Command[] {
       id: 'security.center',
       label: t('securityTitle'),
       run: () => openSecurityTab(),
+    },
+    {
+      id: 'view.playground',
+      label: tp('pgOpen'),
+      run: () => openPlaygroundTab(),
+    },
+    {
+      id: 'view.playgroundCompare',
+      label: `Playground: ${tp('pgModeCompare')}`,
+      run: () => openPlaygroundTab('compare'),
+    },
+    {
+      id: 'view.build',
+      label: tp('pgOpenBuild'),
+      run: () => openPlaygroundTab('build'),
     },
     {
       id: 'view.browser',

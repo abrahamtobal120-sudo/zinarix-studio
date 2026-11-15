@@ -106,7 +106,7 @@ function imagesOf(messages: ChatMessage[]): string[] {
   for (const m of messages) {
     if (m.role !== 'user' || typeof m.content === 'string') continue;
     for (const p of m.content)
-      if (p.type !== 'text') out.push(`data:${p.mediaType};base64,${p.data}`);
+      if (p.type === 'image') out.push(`data:${p.mediaType};base64,${p.data}`);
   }
   return out;
 }

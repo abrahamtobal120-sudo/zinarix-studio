@@ -18,8 +18,31 @@ const es = {
   lspNoDefinition: 'No se encontró la definición.',
   nextEditSetting: 'Predecir la siguiente edición (Tab)',
   nextEditSettingHint:
-    'Tras un cambio, la IA adivina la siguiente línea a editar: Tab salta ahí y la aplica, Esc la descarta. Requiere el autocompletado con IA.',
+    'Tras un cambio, la IA propone las siguientes ediciones (pueden ser de varias líneas): Tab salta a la primera, Tab otra vez la aplica y salta a la siguiente; Esc las descarta. Requiere el autocompletado con IA.',
   nextEditHint: '⇥ Tab',
+  nextEditApply: '⇥ Tab para aplicar',
+  nextEditJump: '⇥ Tab → línea {line}',
+  nextEditCount: '{i} de {n}',
+  nextEditImports: 'Se agregó {n} importación',
+  nextEditImportsMany: 'Se agregaron {n} importaciones',
+  autoImportSetting: 'Agregar importaciones al aceptar una sugerencia',
+  autoImportSettingHint:
+    'Si lo que aceptas usa un nombre sin importar, se agrega la importación (TypeScript/JavaScript, o el servidor de lenguaje). Solo cuando hay una sola opción clara.',
+  statsTitle: 'Métrica de sugerencias',
+  statsHint:
+    'Cuántas sugerencias aceptas y cuánto tarda cada modelo. Con esto se ajusta la pausa antes de pedir otra.',
+  statsEmpty: 'Todavía no hay datos: activa el autocompletado y escribe un poco.',
+  statsKindInline: 'Autocompletado',
+  statsKindNextEdit: 'Siguiente edición',
+  statsModel: 'Modelo',
+  statsRequests: 'Pedidas',
+  statsShown: 'Mostradas',
+  statsAccepted: 'Aceptadas',
+  statsRate: 'Aceptación',
+  statsSlow: 'p50 sobre {ms} ms: prueba un modelo más rápido para el rol "inline".',
+  statsLowAccept: 'Casi no se aceptan: prueba otro modelo para el rol "inline".',
+  statsClear: 'Borrar métrica',
+  statsRefresh: 'Actualizar',
 };
 
 const en: Record<keyof typeof es, string> = {
@@ -39,8 +62,31 @@ const en: Record<keyof typeof es, string> = {
   lspNoDefinition: 'Definition not found.',
   nextEditSetting: 'Predict the next edit (Tab)',
   nextEditSettingHint:
-    'After a change, the AI guesses the next line to edit: Tab jumps there and applies it, Esc dismisses it. Needs AI autocomplete.',
+    'After a change, the AI proposes the next edits (they may span several lines): Tab jumps to the first one, Tab again applies it and jumps to the next; Esc dismisses them. Needs AI autocomplete.',
   nextEditHint: '⇥ Tab',
+  nextEditApply: '⇥ Tab to apply',
+  nextEditJump: '⇥ Tab → line {line}',
+  nextEditCount: '{i} of {n}',
+  nextEditImports: 'Added {n} import',
+  nextEditImportsMany: 'Added {n} imports',
+  autoImportSetting: 'Add imports when accepting a suggestion',
+  autoImportSettingHint:
+    'If what you accept uses a name that is not imported, the import is added (TypeScript/JavaScript, or the language server). Only when there is one clear choice.',
+  statsTitle: 'Suggestion metric',
+  statsHint:
+    'How many suggestions you accept and how long each model takes. The pause before asking again is tuned from it.',
+  statsEmpty: 'No data yet: turn on autocomplete and type a little.',
+  statsKindInline: 'Autocomplete',
+  statsKindNextEdit: 'Next edit',
+  statsModel: 'Model',
+  statsRequests: 'Requested',
+  statsShown: 'Shown',
+  statsAccepted: 'Accepted',
+  statsRate: 'Acceptance',
+  statsSlow: 'p50 above {ms} ms: try a faster model for the "inline" role.',
+  statsLowAccept: 'Hardly ever accepted: try another model for the "inline" role.',
+  statsClear: 'Clear metric',
+  statsRefresh: 'Refresh',
 };
 
 export type LspKey = keyof typeof es;

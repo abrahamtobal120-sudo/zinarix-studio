@@ -21,7 +21,9 @@ import type {
   ToolDecision,
   ToolPreview,
 } from '../../shared/api';
-import { expandCommand } from '../../shared/agentKit';
+import { expandCommand, skillPrompt } from '../../shared/agentKit';
+import { AgentKitMenu, type KitKind } from './AgentKitMenu';
+import { TasksPanel, taskBadge, useTasks } from './TasksPanel';
 import { pressable } from '../a11y';
 import { confirmDialog } from '../confirm';
 import { errText } from '../errText';
@@ -49,6 +51,7 @@ import {
   reloadFromDisk,
   refreshSettings,
   saveAgentMode,
+  saveChatMode,
   selectChat,
   setState,
   toast,
@@ -68,12 +71,53 @@ import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory, when } from './ChatHistory';
 import { SendButton, useDismiss, menuArrows } from './ChatSendMenu';
 import { Markdown } from './Markdown';
-import { listTerminals, sendTerminalToChat, type TerminalSession } from './Terminal';
+import { DiffReview, RewindDialog, type RewindMode } from './DiffReview';
+import {
+  latestTodos,
+  ModeMenu,
+  modeHint,
+  modeLabel,
+  PlanBar,
+  PlanEditor,
+  QuestionCard,
+  TaskList,
+} from './AgentPlan';
+import type { ChatMode } from '../../shared/agentModes';
+import {
+  modeFrom,
+  nextMode,
+  planApprovedPrompt,
+  planStates,
+  usesAgent,
+  type PlanState,
+} from '../../shared/agentModes';
+import {
+  activeTerminalId,
+  listTerminals,
+  sendTerminalToChat,
+  terminalContext,
+  terminalIdByNumber,
+  type TerminalSession,
+} from './Terminal';
+import { currentProblems } from './Problems';
+import {
+  MENTION_KINDS,
+  formatProblems,
+  mentionSource,
+  parseMentions,
+  stripMentions,
+} from '../../shared/mentions';
+import type { MentionKind } from '../../shared/mentions';
+
+const NO_KIT_COMMANDS: AgentKitView['commands'] = [];
+const NO_KIT_SKILLS: AgentKitView['skills'] = [];
 
 /** Readable label for a context source ("file:src/a.ts", "terminal:2:selection", …). */
 function contextLabel(source: string): string {
   const term = /^terminal:(\d+)(:selection)?$/.exec(source);
   if (term) return t(term[2] ? 'termSelection' : 'termSession', { n: term[1]! });
+  // Fase 8 mentions: "@git", "@git:HEAD~1", "@problems", "@web:https://…", "@docs:react".
+  if (/^(git|problems|web|docs)(:|$)/.test(source)) return `@${source}`;
   return source.replace(/^(file|selection):/, '');
 }
 
@@ -107,6 +151,9 @@ interface Turn {
   images?: string[];
   /** Request of the exchange (question and answer share it): several can run at once. */
   rid?: string;
+  /** Fase 3: answered in plan mode (it ends with a plan to approve), and the user's verdict. */
+  mode?: ChatMode;
+  plan?: 'approved' | 'rejected';
 }
 
 /** An image pasted, dropped or picked for the next message. */
@@ -148,7 +195,7 @@ interface Slash {
   hint: string;
   prompt?: string;
   agent?: boolean;
-  action?: 'new' | 'agent' | 'chat' | 'rules' | 'commit' | 'docs';
+  action?: 'new' | 'agent' | 'chat' | 'plan' | 'rules' | 'commit' | 'docs';
 }
 function slashCommands(): Slash[] {
   return [
@@ -179,6 +226,7 @@ function slashCommands(): Slash[] {
     { name: 'reglas', en: 'rules', hint: t('rulesEdit'), action: 'rules' },
     { name: 'init', en: 'init', hint: t('slashInit'), prompt: t('slashInitPrompt'), agent: true },
     { name: 'agente', en: 'agent', hint: t('slashAgent'), action: 'agent' },
+    { name: 'plan', en: 'plan', hint: t('slashPlan'), action: 'plan' },
     { name: 'chat', en: 'chat', hint: t('slashChat'), action: 'chat' },
     { name: 'nuevo', en: 'new', hint: t('newChat'), action: 'new' },
     { name: 'indexar', en: 'index', hint: t('slashIndexDocs'), action: 'docs' },
@@ -215,12 +263,22 @@ function mentionedFiles(prompt: string, files: string[]): string[] {
   return out.slice(0, 12);
 }
 
+/** i18n key of each special mention's hint in the "@" menu. */
+const MENTION_HINT = {
+  git: 'mentionGit',
+  terminal: 'mentionTerminal',
+  problems: 'mentionProblems',
+  web: 'mentionWeb',
+  docs: 'mentionDocs',
+} as const satisfies Record<MentionKind, string>;
+
 interface Suggest {
   kind: 'slash' | 'file';
   /** Text range of the input being completed. */
   from: number;
   to: number;
-  items: { id: string; label: string; hint?: string }[];
+  /** `insert`: text put in the box instead of "@id " (e.g. "@web:" waits for the address). */
+  items: { id: string; label: string; hint?: string; insert?: string; special?: boolean }[];
   index: number;
 }
 
@@ -384,6 +442,8 @@ interface SavedDisplay {
   error?: string;
   context?: string[];
   request?: string;
+  /** Fase 3: the agent mode the answer ran in. */
+  mode?: ChatMode;
 }
 
 /**
@@ -617,10 +677,12 @@ const ToolCard = memo(function ToolCard({
   step,
   rid,
   onDecide: decideFor,
+  onAnswer,
 }: {
   step: ToolStep;
   rid?: string;
   onDecide: (toolCallId: string, d: ToolDecision, rid?: string) => void;
+  onAnswer: (toolCallId: string, answer: string[] | null, rid?: string) => void;
 }) {
   const onDecide = (d: ToolDecision) => decideFor(step.id, d, rid);
   const [open, setOpen] = useState(step.status === 'approval');
@@ -716,7 +778,10 @@ const ToolCard = memo(function ToolCard({
             ))}
         </div>
       )}
-      {step.status === 'approval' && (
+      {step.status === 'approval' && step.name === 'ask_user' && p?.question && (
+        <QuestionCard q={p.question} onAnswer={(a) => onAnswer(step.id, a, rid)} />
+      )}
+      {step.status === 'approval' && step.name !== 'ask_user' && (
         <div className="tool-actions" role="alert" aria-label={t('approve')}>
           <button className="primary" onClick={() => onDecide('approve')}>
             <Icon name="check" size={14} /> {t('approve')}
@@ -755,6 +820,16 @@ interface TurnActions {
   quote: (turn: Turn) => void;
   handoff: (turn: Turn) => void;
   decide: (toolCallId: string, d: ToolDecision, rid?: string) => void;
+  /** The user's answer to an ask_user question (Fase 3). */
+  answer: (toolCallId: string, answer: string[] | null, rid?: string) => void;
+  /** Fase 3: approve (and run, in agent or auto-approve mode), edit or reject a plan. */
+  approvePlan: (turn: Turn, mode?: 'agent' | 'auto') => void;
+  editPlan: (turn: Turn) => void;
+  rejectPlan: (turn: Turn) => void;
+  /** "Volver aquí" on a user message (Fase 2). */
+  rewind: (turn: Turn) => void;
+  /** Diff of the files an answer changed, by blocks (Fase 2). */
+  review: (turn: Turn) => void;
 }
 
 /**
@@ -827,19 +902,32 @@ const AUTH_ERROR =
 /** Errors of a model that cannot call tools (agent mode then needs another model). */
 const TOOLS_ERROR = /tool|function|herramienta/i;
 
+/** Tools whose file changes are checkpointed (rewind / review, Fase 2). */
+const EDIT_TOOLS = new Set(['edit_file', 'write_file', 'write_system_file', 'set_env_var']);
+const stepsOf = (turn: Turn, names: ReadonlySet<string>) =>
+  (turn.parts ?? []).filter(
+    (p): p is ToolStep => p.kind === 'tool' && names.has(p.name) && p.status === 'ok',
+  ).length;
+
 const TurnView = memo(function TurnView({
   turn,
   live,
   last,
   canEdit,
+  idle,
+  planState,
   defaultModel,
   agentMode,
   actions,
 }: {
   turn: Turn;
+  /** Fase 3: the state of the plan this answer proposed (null = none to show). */
+  planState?: PlanState;
   live: boolean;
   last: boolean;
   canEdit: boolean;
+  /** Nothing runs in this chat: rewind and review are possible. */
+  idle: boolean;
   defaultModel: string | null;
   agentMode: boolean;
   actions: TurnActions;
@@ -856,11 +944,18 @@ const TurnView = memo(function TurnView({
               ))}
             </div>
           )}
-          {canEdit && (
+          {(canEdit || (idle && turn.rid)) && (
             <div className="turn-actions user">
-              <button title={t('chatEdit')} onClick={actions.editLast}>
-                <Icon name="edit" size={13} /> {t('chatEdit')}
-              </button>
+              {canEdit && (
+                <button title={t('chatEdit')} onClick={actions.editLast}>
+                  <Icon name="edit" size={13} /> {t('chatEdit')}
+                </button>
+              )}
+              {idle && turn.rid && (
+                <button title={t('rewindHereTitle')} onClick={() => actions.rewind(turn)}>
+                  <Icon name="undo" size={13} /> {t('rewindHere')}
+                </button>
+              )}
             </div>
           )}
           {turn.context && turn.context.length > 0 && (
@@ -901,7 +996,13 @@ const TurnView = memo(function TurnView({
                 streaming={live && j === (turn.parts?.length ?? 0) - 1}
               />
             ) : (
-              <ToolCard key={p.id} step={p} rid={turn.rid} onDecide={actions.decide} />
+              <ToolCard
+                key={p.id}
+                step={p}
+                rid={turn.rid}
+                onDecide={actions.decide}
+                onAnswer={actions.answer}
+              />
             ),
           )}
           {live && !turn.content && !turn.parts?.length && !turn.error && (
@@ -924,6 +1025,15 @@ const TurnView = memo(function TurnView({
               )}
             </div>
           )}
+          {!live && planState && (planState !== 'open' || idle) && (
+            <PlanBar
+              state={planState === 'open' ? undefined : planState}
+              onApprove={() => actions.approvePlan(turn)}
+              onApproveAuto={() => actions.approvePlan(turn, 'auto')}
+              onEdit={() => actions.editPlan(turn)}
+              onReject={() => actions.rejectPlan(turn)}
+            />
+          )}
           {turn.meta && <div className="turn-meta">{turn.meta}</div>}
           {!live && (turn.content || turn.error) && (
             <div className="turn-actions">
@@ -943,6 +1053,12 @@ const TurnView = memo(function TurnView({
                 <button title={t('chatHandoffTitle')} onClick={() => actions.handoff(turn)}>
                   <Icon name="handoff" size={13} />
                   <span className="turn-action-label">{t('chatHandoff')}</span>
+                </button>
+              )}
+              {idle && turn.rid && stepsOf(turn, EDIT_TOOLS) > 0 && (
+                <button title={t('reviewChangesTitle')} onClick={() => actions.review(turn)}>
+                  <Icon name="edit" size={13} />
+                  <span className="turn-action-label">{t('reviewChanges')}</span>
                 </button>
               )}
               {last && (
@@ -1008,11 +1124,16 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
   const [includeFile, setIncludeFile] = useState(true);
   const [reasoning, setReasoning] = useState<ReasoningLevel | ''>(loadReasoning);
-  const agentMode = meta?.agent ?? true;
-  const setAgentMode = (on: boolean) => {
-    updateChat(id, { agent: on });
-    saveAgentMode(on);
+  const chatMode: ChatMode = meta ? modeFrom(meta.mode, meta.agent) : 'agent';
+  const agentMode = usesAgent(chatMode);
+  const setChatMode = (m: ChatMode, announce = false) => {
+    updateChat(id, { mode: m });
+    saveChatMode(m);
+    if (announce) toast(t('modeToast', { mode: modeLabel(m), hint: modeHint(m) }));
   };
+  const setAgentMode = (on: boolean) => setChatMode(on ? (agentMode ? chatMode : 'agent') : 'ask');
+  /** The plan being edited before it runs (Fase 3). */
+  const [planEdit, setPlanEdit] = useState<Turn | null>(null);
   /** Model of this chat; undefined = the app default for the mode. */
   const chatModel = meta?.model ?? undefined;
   /** Requests answering right now (a message sent while others work runs alongside them). */
@@ -1046,6 +1167,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   /** The requests streaming into their turns, with their event unsubscribe. */
   const runs = useRef(new Map<string, () => void>());
   const [suggest, setSuggest] = useState<Suggest | null>(null);
+  /** Fase 8: names of the indexed docs, for the "@docs:" menu (loaded on first use). */
+  const docNamesRef = useRef<string[]>([]);
+  const loadDocNames = async () => {
+    try {
+      docNamesRef.current = (await api().knowledge.docs()).map((d) => d.name);
+    } catch {
+      // no docs: the menu just shows nothing
+    }
+  };
   const [files, setFiles] = useState<string[]>([]);
   const [rulesView, setRulesView] = useState<ActiveRulesView | null>(null);
   const [rulesMenu, setRulesMenu] = useState(false);
@@ -1110,17 +1240,42 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     };
   }, [root, ownFolder, fsVersion, projectRules, ruleSources, ruleMentions]);
   /** The project's own "/" commands (.zinarix/commands/*.md) and the user's (~/.zinarix). */
-  const [kitCommands, setKitCommands] = useState<AgentKitView['commands']>([]);
+  const [kit, setKit] = useState<AgentKitView | null>(null);
+  const [kitTick, setKitTick] = useState(0);
   useEffect(() => {
     let live = true;
     void api()
       .ai.agentKit(noFolder ? undefined : ownFolder)
-      .then((v) => live && setKitCommands(v.commands))
-      .catch(() => live && setKitCommands([]));
+      .then((v) => live && setKit(v))
+      .catch(() => live && setKit(null));
     return () => {
       live = false;
     };
-  }, [root, ownFolder, noFolder, fsVersion]);
+  }, [root, ownFolder, noFolder, fsVersion, kitTick]);
+  const kitCommands = kit?.commands ?? NO_KIT_COMMANDS;
+  const kitSkills = kit?.skills ?? NO_KIT_SKILLS;
+  const [kitMenu, setKitMenu] = useState(false);
+  // Fase 5: background tasks (worktrees).
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const tasksStatus = useTasks();
+  const tasksNow = taskBadge(tasksStatus);
+  const kitMenuEl = useRef<HTMLDivElement>(null);
+  const kitMenuBtn = useRef<HTMLButtonElement>(null);
+  const closeKitMenu = useCallback(() => setKitMenu(false), []);
+  useDismiss(kitMenu, closeKitMenu, [kitMenuEl, kitMenuBtn], kitMenuBtn);
+  /** "Nuevo subagente / skill / comando": the file from a template, open in the editor. */
+  const createKit = async (kind: KitKind) => {
+    setKitMenu(false);
+    const name = { agent: 'nuevo-subagente', skill: 'nueva-skill', command: 'nuevo-comando' }[kind];
+    try {
+      const path = await api().ai.createKitFile(kind, name, ownFolder);
+      setKitTick((n) => n + 1);
+      await openFile(path);
+      toast(t('kitCreated', { path }));
+    } catch (err) {
+      toast(errText(err));
+    }
+  };
 
   /** Aborts the in-flight requests (if any) and stops listening to their events. */
   const cancelCurrent = () => {
@@ -1168,6 +1323,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           error: d.error,
           notices: d.notices,
           reasoning: d.reasoning,
+          ...(d.mode ? { mode: d.mode } : {}),
         };
       }),
     );
@@ -1290,23 +1446,48 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   /** Reads the files mentioned with "@" so they travel as context. */
   const mentionContext = async (prompt: string): Promise<ChatContext[]> => {
     const out: ChatContext[] = [];
-    // "@docs:name": the passages of that indexed documentation closest to the question.
-    const docNames = [...prompt.matchAll(/(^|\s)@docs:([\w.-]+)/gi)].map((m) => m[2]!);
-    if (docNames.length) {
-      const question = prompt.replace(/(^|\s)@docs:[\w.-]+/gi, ' ').trim() || prompt;
-      for (const name of [...new Set(docNames)].slice(0, 4)) {
-        try {
-          const hits = await api().knowledge.searchDocs(question, name);
+    // Fase 8: @git, @terminal, @problems, @web and @docs. A mention that cannot be filled
+    // (no terminal, page down, unknown docs) stays as plain text and a toast says why.
+    const question = stripMentions(prompt) || prompt;
+    let docsUsed = 0;
+    for (const m of parseMentions(prompt)) {
+      const source = mentionSource(m);
+      try {
+        if (m.kind === 'git' || m.kind === 'web') {
+          const content = await api().ai.mention(m.kind, m.arg ?? null);
+          if (content.trim()) out.push({ source, content });
+        } else if (m.kind === 'terminal') {
+          const tid = m.arg ? terminalIdByNumber(Number(m.arg)) : activeTerminalId();
+          const ctx = tid === null ? null : terminalContext(tid, 'session');
+          if (ctx) out.push(ctx);
+          else toast(t('termNone'));
+        } else if (m.kind === 'problems') {
+          const sev = (v: monaco.MarkerSeverity) =>
+            v >= monaco.MarkerSeverity.Error
+              ? 'error'
+              : v >= monaco.MarkerSeverity.Warning
+                ? 'warning'
+                : 'info';
+          const text = formatProblems(
+            currentProblems().map((p) => ({ ...p, severity: sev(p.severity) })),
+            m.arg?.toLowerCase() === 'errors' ? 'errors' : 'all',
+          );
+          out.push({ source, content: text || '(no problems)' });
+        } else if (m.kind === 'docs' && docsUsed < 4) {
+          // "@docs:name" searches that documentation; bare "@docs" searches all of it.
+          docsUsed++;
+          const hits = await api().knowledge.searchDocs(question, m.arg);
           if (hits.length)
             out.push({
-              source: `docs:${name}`,
+              source,
               content: hits
                 .map((h) => `## ${h.title ?? ''}\n${h.source}\n\n${h.text}`)
                 .join('\n\n---\n\n'),
             });
-        } catch {
-          // unknown name: the mention stays as plain text (the agent can call docs_search)
         }
+      } catch (e) {
+        // unknown name / unreachable: the mention stays as plain text (the agent can still look)
+        if (m.kind !== 'docs') toast(`@${source}: ${errText(e)}`);
       }
     }
     for (const path of mentionedFiles(prompt, files)) {
@@ -1329,6 +1510,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     base?: Turn[],
     /** A queued message: what the user is typing meanwhile stays in the box. */
     fromQueue = false,
+    /** Fase 3: this request's mode instead of the chat's (an approved plan runs as agent). */
+    modeOverride?: ChatMode,
   ) => {
     if (!prompt.trim()) return;
     setShowHistory(false);
@@ -1363,7 +1546,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       await new Promise((ok) => setTimeout(ok, 50));
     const requestId = newRequestId();
     // Agent mode also works without a folder (system, network, browser and security tools).
-    const useAgent = forceAgent || agentMode;
+    const runMode: ChatMode = modeOverride ?? (forceAgent && !agentMode ? 'agent' : chatMode);
+    const useAgent = forceAgent || usesAgent(runMode);
+    const agentRun = runMode === 'ask' ? 'agent' : runMode;
     stick.current = true;
     setTurns((x) => [
       ...x,
@@ -1377,7 +1562,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           : {}),
         rid: requestId,
       },
-      { id: newTurnId(), role: 'assistant', content: '', parts: [], rid: requestId },
+      {
+        id: newTurnId(),
+        role: 'assistant',
+        content: '',
+        parts: [],
+        rid: requestId,
+        ...(useAgent && agentRun === 'plan' ? { mode: 'plan' as const } : {}),
+      },
     ]);
     if (!fromQueue) setInput('');
     setRunning((r) => [...r, requestId]);
@@ -1512,6 +1704,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     try {
       await api().ai.chat(requestId, {
         agent: useAgent,
+        ...(useAgent ? { mode: agentRun } : {}),
         // This chat's own model, or (undefined) the one main resolves for the role.
         model: chatModel,
         history,
@@ -1728,11 +1921,20 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     const cmd = findSlash(m[1]!);
     if (!cmd) {
       // A "/" command of the project (or the user): its file is the prompt.
-      const own = kitCommands.find((c) => c.name === m[1]!.toLowerCase());
-      if (!own) return false;
+      const name = m[1]!.toLowerCase();
+      const own = kitCommands.find((c) => c.name === name);
+      if (own) {
+        setInput('');
+        setSuggest(null);
+        void send(expandCommand(own.body, m[2]!), [], own.agent === true);
+        return true;
+      }
+      // /<skill>: the agent loads that skill and applies it (skills need agent mode).
+      const skill = kitSkills.find((k) => k.name === name);
+      if (!skill) return false;
       setInput('');
       setSuggest(null);
-      void send(expandCommand(own.body, m[2]!), [], own.agent === true);
+      void send(skillPrompt(skill.name, m[2]!), [], true);
       return true;
     }
     const rest = m[2]!.trim();
@@ -1750,6 +1952,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       case 'chat':
         setAgentMode(false);
         toast(t('agentOffToast'));
+        return true;
+      case 'plan':
+        setChatMode('plan', true);
         return true;
       case 'rules':
         void runCommand('ai.rules');
@@ -1819,13 +2024,44 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             label: `/${c.name}`,
             hint: `${c.argumentHint ? `${c.argumentHint} · ` : ''}${c.description || t('slashCustom')}`,
           });
+      for (const k of kitSkills)
+        if (
+          k.name.startsWith(q) &&
+          !findSlash(k.name) &&
+          !kitCommands.some((c) => c.name === k.name)
+        )
+          items.push({
+            id: k.name,
+            label: `/${k.name}`,
+            hint: `${t('slashSkill')} · ${k.description}`,
+          });
       return setSuggest(
         items.length ? { kind: 'slash', from: 0, to: caret, items, index: 0 } : null,
       );
     }
     const at = /(^|\s)@([^\s@]*)$/.exec(left);
-    if (at && files.length) {
+    if (at) {
       const q = at[2]!.toLowerCase();
+      const from = caret - at[2]!.length - 1;
+      // "@docs:" — the names of the indexed documentation.
+      if (q.startsWith('docs:')) {
+        const dq = q.slice(5);
+        const items = docNamesRef.current
+          .filter((n) => n.toLowerCase().startsWith(dq))
+          .slice(0, 12)
+          .map((n) => ({ id: `docs:${n}`, label: `@docs:${n}`, special: true }));
+        if (!docNamesRef.current.length) void loadDocNames();
+        return setSuggest(items.length ? { kind: 'file', from, to: caret, items, index: 0 } : null);
+      }
+      // Fase 8: the special mentions first, then the files.
+      const specials = MENTION_KINDS.filter((k) => k.startsWith(q)).map((k: MentionKind) => ({
+        id: k,
+        label: `@${k}`,
+        hint: t(MENTION_HINT[k]),
+        insert: k === 'web' || k === 'docs' ? `@${k}:` : undefined,
+        special: true,
+      }));
+      if (q === '' || 'docs'.startsWith(q)) void loadDocNames();
       const scored = files
         .map((f) => {
           const lower = f.toLowerCase();
@@ -1844,16 +2080,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         .filter((x) => x.score > 0)
         .sort((a, b) => b.score - a.score || a.f.length - b.f.length)
         .slice(0, 12);
-      const items = scored.map(({ f }) => ({
-        id: f,
-        label: f.slice(f.lastIndexOf('/') + 1),
-        hint: f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '',
-      }));
-      return setSuggest(
-        items.length
-          ? { kind: 'file', from: caret - at[2]!.length - 1, to: caret, items, index: 0 }
-          : null,
-      );
+      const items = [
+        ...specials,
+        ...scored.slice(0, 12 - Math.min(specials.length, 5)).map(({ f }) => ({
+          id: f,
+          label: f.slice(f.lastIndexOf('/') + 1),
+          hint: f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '',
+        })),
+      ];
+      return setSuggest(items.length ? { kind: 'file', from, to: caret, items, index: 0 } : null);
     }
     setSuggest(null);
   };
@@ -1861,7 +2096,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const pickSuggest = (s: Suggest, i = s.index) => {
     const item = s.items[i];
     if (!item) return;
-    const insert = s.kind === 'slash' ? `/${item.id} ` : `@${item.id} `;
+    const insert = s.kind === 'slash' ? `/${item.id} ` : (item.insert ?? `@${item.id} `);
     const next = input.slice(0, s.from) + insert + input.slice(s.to);
     setInput(next);
     setSuggest(null);
@@ -1906,6 +2141,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
 
   const onInputKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab' && e.shiftKey && !suggest && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      setChatMode(nextMode(chatMode), true);
+      return;
+    }
     if (e.key === 'Escape' && busy && !suggest) {
       e.preventDefault();
       stop();
@@ -1967,6 +2207,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
 
   /** Answers an approval; `rid` is the answer it belongs to (several may be running). */
   const decide = (toolCallId: string, d: ToolDecision, rid?: string) => {
+    // ask_user waits for an answer (QuestionCard), never for approve / deny (e.g. a shortcut).
+    if (
+      turnsNow.current.some((x) =>
+        x.parts?.some((p) => p.kind === 'tool' && p.id === toolCallId && p.name === 'ask_user'),
+      )
+    )
+      return;
     const asks = (turn: Turn) =>
       turn.role === 'assistant' &&
       turn.parts?.some((p) => p.kind === 'tool' && p.id === toolCallId && p.status === 'approval');
@@ -1992,6 +2239,65 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     );
   };
 
+  /** Answers an ask_user question (Fase 3); null = let the agent decide. */
+  const answer = (toolCallId: string, a: string[] | null, rid?: string) => {
+    const owner =
+      rid ??
+      turnsNow.current.find(
+        (x) =>
+          x.rid &&
+          running.includes(x.rid) &&
+          x.parts?.some((p) => p.kind === 'tool' && p.id === toolCallId),
+      )?.rid;
+    if (!owner || !running.includes(owner)) return;
+    void api().ai.answerQuestion(owner, toolCallId, a);
+    setTurns((x) =>
+      x.map((turn) =>
+        turn.role === 'assistant' && turn.rid === owner
+          ? {
+              ...turn,
+              parts: (turn.parts ?? []).map((p) =>
+                p.kind === 'tool' && p.id === toolCallId && p.status === 'approval'
+                  ? { ...p, status: 'running' }
+                  : p,
+              ),
+            }
+          : turn,
+      ),
+    );
+  };
+
+  /** The plan of an answer: its last block of text (what came before is the investigation). */
+  const planOf = (turn: Turn) =>
+    [...(turn.parts ?? [])]
+      .reverse()
+      .find((p): p is { kind: 'text'; text: string } => p.kind === 'text' && Boolean(p.text.trim()))
+      ?.text.trim() ?? turn.content.trim();
+  const markPlan = (turn: Turn, plan: 'approved' | 'rejected') =>
+    setTurns((x) => x.map((y) => (y.id === turn.id ? { ...y, plan } : y)));
+  /** Approved: the chat goes to agent mode and the plan (maybe edited) starts the work. */
+  const approvePlan = (turn: Turn, edited?: string, run: 'agent' | 'auto' = 'agent') => {
+    if (busy) return;
+    const plan = (edited ?? planOf(turn)).trim();
+    if (!plan) return;
+    markPlan(turn, 'approved');
+    setPlanEdit(null);
+    setChatMode(run, run === 'auto');
+    // As a queued message: what the user is typing stays in the box.
+    void send(
+      planApprovedPrompt(plan, lang === 'en' ? 'en' : 'es'),
+      [],
+      true,
+      undefined,
+      true,
+      run,
+    );
+  };
+  const rejectPlan = (turn: Turn) => {
+    markPlan(turn, 'rejected');
+    textarea.current?.focus();
+  };
+
   const revert = async () => {
     if (!conversationId) return;
     if (!(await confirmDialog(t('revertConfirm', { n: changed.length }), { danger: true }))) return;
@@ -2005,6 +2311,56 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     for (const p of restored) await reloadFromDisk(p);
     setChanged([]);
     toast(t('reverted', { n: restored.length }));
+  };
+
+  // Fase 2 — "volver aquí" (index of the user message) and the review of one answer's diff.
+  const [rewindAt, setRewindAt] = useState<number | null>(null);
+  const [reviewTurn, setReviewTurn] = useState<string | null>(null);
+  const RUN_TOOLS = useMemo(() => new Set(['run_command']), []);
+
+  // What "volver aquí" would write back: loaded once per opened dialog.
+  const rewindPreview = useMemo(() => {
+    if (rewindAt === null || !conversationId) return undefined;
+    const rids = [...new Set(turns.slice(rewindAt).flatMap((x) => (x.rid ? [x.rid] : [])))];
+    return () => api().ai.rewindPreview(conversationId, rids, ownFolder);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the dialog opens
+  }, [rewindAt, conversationId]);
+
+  const openRewind = (turn: Turn) => {
+    if (busy || !conversationId) return;
+    const i = turns.indexOf(turn);
+    if (i >= 0) setRewindAt(i);
+  };
+
+  const rewindTo = async (i: number, mode: RewindMode) => {
+    const turn = turns[i];
+    if (busy || !conversationId || !turn || turn.role !== 'user') return;
+    if (mode !== 'chat') {
+      // That exchange and every later one (the agent cuts by order, helpers included).
+      const rids = [...new Set(turns.slice(i).flatMap((x) => (x.rid ? [x.rid] : [])))];
+      let restored: string[];
+      try {
+        restored = await api().ai.rewind(conversationId, rids, ownFolder);
+      } catch (err) {
+        toast(errText(err));
+        return;
+      }
+      for (const p of restored) await reloadFromDisk(p);
+      setChanged((c) => c.filter((p) => !restored.includes(p)));
+      toast(restored.length ? t('rewoundFiles', { n: restored.length }) : t('rewoundNoFiles'));
+    }
+    if (mode !== 'code') {
+      const userIndex = turns.slice(0, i).filter((x) => x.role === 'user').length;
+      try {
+        await api().ai.rewindConversation(conversationId, userIndex);
+      } catch (err) {
+        toast(errText(err));
+        return;
+      }
+      setTurns(turns.slice(0, i));
+      setInput(turn.content);
+      setTimeout(() => textarea.current?.focus(), 30);
+    }
   };
 
   const noProviders = models.length === 0 && !settings.defaultModel;
@@ -2032,6 +2388,12 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     quote: quoteTurn,
     handoff,
     decide,
+    answer,
+    approvePlan: (turn, mode) => approvePlan(turn, undefined, mode),
+    editPlan: (turn) => setPlanEdit(turn),
+    rejectPlan,
+    rewind: openRewind,
+    review: (turn) => turn.rid && setReviewTurn(turn.rid),
   };
   const turnActions = useMemo<TurnActions>(
     () => ({
@@ -2043,9 +2405,20 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       quote: (turn) => latest.current!.quote(turn),
       handoff: (turn) => latest.current!.handoff(turn),
       decide: (toolCallId, d, rid) => latest.current!.decide(toolCallId, d, rid),
+      answer: (toolCallId, a, rid) => latest.current!.answer(toolCallId, a, rid),
+      approvePlan: (turn, mode) => latest.current!.approvePlan(turn, mode),
+      editPlan: (turn) => latest.current!.editPlan(turn),
+      rejectPlan: (turn) => latest.current!.rejectPlan(turn),
+      rewind: (turn) => latest.current!.rewind(turn),
+      review: (turn) => latest.current!.review(turn),
     }),
     [],
   );
+
+  /** The agent's live task list (its last todo_write in this chat), Fase 3. */
+  const todos = useMemo(() => latestTodos(turns), [turns]);
+  /** Which answers are plans, and the user's verdict on each (also after reopening). */
+  const plans = useMemo(() => planStates(turns), [turns]);
 
   const shownModel =
     chatModel ?? (agentMode ? settings.roles.agent : undefined) ?? settings.defaultModel;
@@ -2169,6 +2542,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             // Last exchange with nothing running: regenerate / continue apply to it.
             last={i === turns.length - 1 && !busy}
             canEdit={!busy && i === lastUser}
+            idle={!busy}
+            planState={plans[i]}
             defaultModel={settings.defaultModel}
             agentMode={agentMode}
             actions={turnActions}
@@ -2191,6 +2566,30 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         >
           <Icon name="arrowDown" size={15} />
         </button>
+      )}
+      {rewindAt !== null && turns[rewindAt] && (
+        <RewindDialog
+          edits={turns.slice(rewindAt).reduce((n, x) => n + stepsOf(x, EDIT_TOOLS), 0)}
+          commands={turns.slice(rewindAt).reduce((n, x) => n + stepsOf(x, RUN_TOOLS), 0)}
+          preview={rewindPreview}
+          onPick={(mode) => void rewindTo(rewindAt, mode)}
+          onClose={() => setRewindAt(null)}
+        />
+      )}
+      {planEdit && (
+        <PlanEditor
+          plan={planOf(planEdit)}
+          onClose={() => setPlanEdit(null)}
+          onRun={(p, run) => approvePlan(planEdit, p, run)}
+        />
+      )}
+      {reviewTurn && conversationId && (
+        <DiffReview
+          conversationId={conversationId}
+          turn={reviewTurn}
+          folder={ownFolder}
+          onClose={() => setReviewTurn(null)}
+        />
       )}
       {changed.length > 0 && !busy && (
         <div className="agent-changes">
@@ -2258,6 +2657,34 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               </span>
             ))}
           </div>
+        )}
+        {tasksOpen && (
+          <TasksPanel
+            status={tasksStatus}
+            model={chatModel}
+            onClose={() => setTasksOpen(false)}
+            onOpenChat={(cid, folder) => {
+              setTasksOpen(false);
+              openConversation(cid, folder);
+            }}
+          />
+        )}
+        {kitMenu && kit && (
+          <AgentKitMenu
+            kit={kit}
+            menuRef={kitMenuEl}
+            canEdit={!noFolder && !ownFolder && Boolean(root)}
+            onOpen={(path) => {
+              setKitMenu(false);
+              void openFile(path).catch((err: unknown) => toast(errText(err)));
+            }}
+            onInsert={(name) => {
+              setKitMenu(false);
+              setInput(`/${name} `);
+              textarea.current?.focus();
+            }}
+            onCreate={(kind) => void createKit(kind)}
+          />
         )}
         {rulesMenu && rulesView && (
           <div
@@ -2403,13 +2830,16 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                 }}
               >
                 <span className="chat-suggest-label">
-                  {suggest.kind === 'file' ? fileIcon(it.id) : null}
+                  {suggest.kind === 'file' && !it.special ? fileIcon(it.id) : null}
                   {it.label}
                 </span>
                 {it.hint && <span className="chat-suggest-hint">{it.hint}</span>}
               </div>
             ))}
           </div>
+        )}
+        {todos && (busy || todos.some((x) => x.status !== 'completed')) && (
+          <TaskList todos={todos} live={Boolean(busy)} />
         )}
         {queued.length > 0 && (
           <div className="chat-queue" aria-label={t('chatQueued')}>
@@ -2449,7 +2879,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           ref={textarea}
           value={input}
           rows={3}
-          placeholder={agentMode && root ? t('agentPlaceholder') : t('askPlaceholder')}
+          placeholder={
+            chatMode === 'plan'
+              ? t('planPlaceholder')
+              : agentMode && root
+                ? t('agentPlaceholder')
+                : t('askPlaceholder')
+          }
           aria-label={t('chatInputLabel')}
           onChange={(e) => {
             setInput(e.target.value);
@@ -2465,17 +2901,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           }}
         />
         <div className="chat-input-bar">
-          <label
-            className={`check agent-toggle pill ${agentMode ? 'on' : ''}`}
-            title={t('agentTitle')}
-          >
-            <input
-              type="checkbox"
-              checked={agentMode}
-              onChange={(e) => setAgentMode(e.target.checked)}
-            />
-            <Icon name="prompt" size={14} /> {t('agent')}
-          </label>
+          <ModeMenu mode={chatMode} onChange={(m) => setChatMode(m)} />
           <label
             className={`pill reasoning-pick ${reasoning ? 'on' : ''}`}
             title={t('reasoningTitle')}
@@ -2542,6 +2968,39 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               e.target.value = '';
             }}
           />
+          {(Boolean(root) || tasksNow.active > 0) && (
+            <button
+              className={`rules-chip ${tasksOpen ? 'on' : ''} ${tasksNow.waiting ? 'warn' : ''}`}
+              title={t('tasksChip', tasksNow)}
+              aria-label={t('tasksPanel')}
+              aria-haspopup="dialog"
+              onClick={() => setTasksOpen(true)}
+            >
+              <Icon name="layers" size={15} />
+              {tasksNow.active > 0 && <span className="rules-count">{tasksNow.active}</span>}
+            </button>
+          )}
+          {kit && (!noFolder || kitCommands.length + kitSkills.length + kit.agents.length > 0) && (
+            <button
+              ref={kitMenuBtn}
+              className={`rules-chip ${kitMenu ? 'on' : ''}`}
+              title={t('kitChip', {
+                agents: kit.agents.length,
+                skills: kit.skills.length,
+                commands: kit.commands.length,
+                hooks: kit.hooks.length,
+              })}
+              aria-label={t('kitPanel')}
+              aria-haspopup="menu"
+              aria-expanded={kitMenu}
+              onClick={() => setKitMenu((v) => !v)}
+            >
+              <Icon name="package" size={15} />
+              {kit.agents.length + kit.skills.length > 0 && (
+                <span className="rules-count">{kit.agents.length + kit.skills.length}</span>
+              )}
+            </button>
+          )}
           {rulesView?.enabled && rulesView.active.length + rulesView.available.length > 0 && (
             <button
               ref={rulesMenuBtn}

@@ -7,6 +7,7 @@ import { abortError, providerMessage, request, requestJson } from '../http.js';
 import { baseModel } from '../models.js';
 import type { ConnectionTest, ProviderAdapter, ProviderConfig } from '../types.js';
 import { normalizeStop } from './openai-compatible.js';
+import { decodeText, isPdf, isTextual, unsupportedPart } from '../parts.js';
 
 /**
  * Amazon Bedrock through the Converse API (`/model/{modelId}/converse-stream`).
@@ -481,6 +482,11 @@ function parseArgs(json: string): unknown {
   }
 }
 
+/** Converse document names allow letters, digits, spaces, hyphens, parentheses and brackets. */
+function docName(name: string | undefined): string {
+  return (name ?? '').replace(/[^\w\s()[\]-]+/g, ' ').trim().slice(0, 60) || 'document';
+}
+
 function imageFormat(mediaType: string): string {
   const t = mediaType.toLowerCase().replace(/^image\//, '');
   return t === 'jpg' ? 'jpeg' : t;
@@ -525,7 +531,11 @@ export function toConverse(
                   ? p.text
                     ? [{ text: p.text }]
                     : []
-                  : [{ image: { format: imageFormat(p.mediaType), source: { bytes: p.data } } }],
+                  : p.type === 'image'
+                    ? [{ image: { format: imageFormat(p.mediaType), source: { bytes: p.data } } }]
+                    : isPdf(p)
+                      ? [{ document: { format: 'pdf', name: docName(p.name), source: { bytes: p.data } } }]
+                      : [{ text: isTextual(p) ? decodeText(p) : unsupportedPart(p, 'Bedrock') }],
               ),
         );
         break;

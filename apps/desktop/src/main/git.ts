@@ -251,6 +251,13 @@ export class Git {
     return out.length > 200_000 ? `${out.slice(0, 200_000)}\n…` : out;
   }
 
+  /** Fase 8 (@git:HEAD~1): a commit by hash or HEAD~n, as `show` prints it. */
+  async showRef(ref: string): Promise<string> {
+    if (!/^(?:[0-9a-f]{4,40}|HEAD(?:~\d{1,3})?)$/i.test(ref)) throw new Error('commit no válido');
+    const hash = (await this.git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])).trim();
+    return this.show(hash);
+  }
+
   async branches(): Promise<GitBranchView[]> {
     const out = await this.git([
       'branch',

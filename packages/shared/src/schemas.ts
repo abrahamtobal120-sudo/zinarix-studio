@@ -179,7 +179,25 @@ export type ModelInfo = z.infer<typeof ModelInfo>;
 // ---------- Chat ----------
 
 export type ContentPart =
-  { type: 'text'; text: string } | { type: 'image'; mediaType: string; data: string /* base64 */ };
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: string; data: string /* base64 */ }
+  /**
+   * A non-image attachment (PDF, audio, video, plain text) as base64. Each adapter sends the
+   * kinds its provider accepts natively and replaces the rest with a short text note.
+   */
+  | { type: 'file'; mediaType: string; data: string /* base64 */; name?: string };
+
+/** JSON Schema the response must follow (structured output). */
+export interface ResponseSchema {
+  /** Identifier some providers require (letters, digits, _ and -). */
+  name: string;
+  schema: Record<string, unknown>;
+  /**
+   * Ask for exact enforcement where the provider has it (OpenAI `strict`). Only valid when
+   * every object sets additionalProperties:false and lists all its properties as required.
+   */
+  strict?: boolean;
+}
 
 export interface ToolCall {
   id: string;
@@ -217,11 +235,17 @@ export interface ChatRequest {
   tools?: ToolDefinition[];
   maxTokens?: number;
   temperature?: number;
+  /** Nucleus sampling (0–1). Sent only when set. */
+  topP?: number;
   /** Ask the model to reason more (maps to effort / reasoning params where supported). */
   reasoning?: 'low' | 'medium' | 'high';
   jsonMode?: boolean;
+  /** Structured output: the reply must be JSON following this schema (implies jsonMode). */
+  jsonSchema?: ResponseSchema;
   /** Project folder the request is about. Only CLI agents use it (as their working directory). */
   cwd?: string;
+  /** Plan mode: CLI agents run read-only whatever their provider mode says. */
+  readOnly?: boolean;
 }
 
 export interface FimRequest {

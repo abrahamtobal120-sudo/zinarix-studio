@@ -1,0 +1,304 @@
+/* Fase 6 — "Revisar cambios": AI review of local changes, a branch or a pull request. */
+
+.code-review {
+  width: min(900px, 95vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  color: var(--fg);
+}
+.code-review .spacer {
+  flex: 1;
+}
+.cr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cr-head h2 {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-strong);
+}
+.cr-setup {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cr-sources {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.cr-sources button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 26px;
+}
+.cr-sources button.on {
+  border-color: var(--accent);
+  background: var(--sel-soft);
+  color: var(--fg-strong);
+}
+.cr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.cr-field select {
+  max-width: 100%;
+}
+.cr-row {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cr-models {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cr-models select {
+  min-width: 200px;
+}
+.cr-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.cr-dim {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+.cr-warn {
+  color: var(--warn);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 14px;
+}
+.cr-field .cr-warn {
+  padding: 0;
+}
+.cr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+.cr-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.cr-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-4);
+  overflow: hidden;
+}
+.cr-bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cr-bar > div {
+    transition: none;
+  }
+}
+.cr-error {
+  margin: 0 14px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cr-results {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+.cr-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+}
+.cr-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 24px;
+}
+.cr-chip.on {
+  border-color: var(--accent);
+  color: var(--fg-strong);
+}
+.cr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 8px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cr-finding {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--fg-dim);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cr-finding.sev-critical,
+.cr-finding.sev-high {
+  border-left-color: var(--danger);
+}
+.cr-finding.sev-medium {
+  border-left-color: var(--warn);
+}
+.cr-finding.sev-low {
+  border-left-color: var(--accent);
+}
+.cr-finding-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cr-sev {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+}
+.cr-sev.sev-critical,
+.cr-sev.sev-high {
+  color: var(--danger);
+}
+.cr-sev.sev-medium {
+  color: var(--warn);
+}
+.cr-sev.sev-low {
+  color: var(--accent);
+}
+.cr-cat {
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.cr-ftitle {
+  color: var(--fg-strong);
+}
+.cr-where {
+  align-self: flex-start;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+}
+.cr-detail,
+.cr-fix {
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cr-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.cr-verdict {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--bg-3);
+}
+.cr-verdict.confirmed {
+  color: var(--ok);
+}
+.cr-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ok);
+  padding: 16px 14px;
+}
+.cr-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* Saved reviews, "not a problem" and the guidance line */
+.cr-history {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+  color: var(--fg-dim);
+}
+.cr-history select {
+  flex: 1;
+  min-width: 0;
+}
+.cr-guidance {
+  font-size: 11.5px;
+}
+.cr-ignore {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.cr-ignore input {
+  flex: 1;
+  min-width: 180px;
+}
+.cr-ignore .cr-dim {
+  flex-basis: 100%;
+  font-size: 11.5px;
+}

@@ -37,6 +37,7 @@ describe('agent safety', () => {
       'tree',
       'glob',
       'read_many_files',
+      'test_results',
       'list_dir',
       'read_file',
       'search',

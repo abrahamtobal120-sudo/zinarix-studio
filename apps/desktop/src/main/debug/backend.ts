@@ -73,3 +73,20 @@ export function lineSplitter(emit: (line: string) => void): {
     },
   };
 }
+
+/** Python executable (+ launcher args), preferring one that has debugpy. */
+export function findPython(): { cmd: string; pre: string[] } | null {
+  const candidates: { cmd: string; pre: string[] }[] = [];
+  for (const name of ['python', 'python3']) {
+    const p = which(name);
+    if (p && !/WindowsApps/i.test(p)) candidates.push({ cmd: p, pre: [] });
+  }
+  const py = which('py');
+  if (py) candidates.push({ cmd: py, pre: ['-3'] });
+  // The Microsoft Store stub opens the Store instead of running: only as a last resort.
+  for (const name of ['python', 'python3']) {
+    const p = which(name);
+    if (p && /WindowsApps/i.test(p)) candidates.push({ cmd: p, pre: [] });
+  }
+  return candidates[0] ?? null;
+}

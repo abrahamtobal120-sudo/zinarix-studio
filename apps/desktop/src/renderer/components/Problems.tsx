@@ -58,6 +58,12 @@ function install(): void {
   collect();
 }
 
+/** Fase 8 (@problems): the current list, read fresh from the markers. */
+export function currentProblems(): Problem[] {
+  collect();
+  return problems;
+}
+
 export function useProblems(): Problem[] {
   install();
   return useSyncExternalStore(

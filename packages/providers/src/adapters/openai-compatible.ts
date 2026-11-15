@@ -4,6 +4,7 @@ import { describeErrorBody, request, requestJson } from '../http.js';
 import { baseModel, catalogModels } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ConnectionTest, ProviderAdapter, ProviderConfig } from '../types.js';
+import { audioFormat, decodeText, isPdf, isTextual, schemaName, unsupportedPart } from '../parts.js';
 
 type OaiMessage = Record<string, unknown>;
 
@@ -16,11 +17,26 @@ export function toOpenAiMessages(messages: ChatMessage[]): OaiMessage[] {
         if (typeof m.content === 'string') return { role: 'user', content: m.content };
         return {
           role: 'user',
-          content: m.content.map((p) =>
-            p.type === 'text'
-              ? { type: 'text', text: p.text }
-              : { type: 'image_url', image_url: { url: `data:${p.mediaType};base64,${p.data}` } },
-          ),
+          content: m.content.map((p) => {
+            if (p.type === 'text') return { type: 'text', text: p.text };
+            if (p.type === 'image')
+              return {
+                type: 'image_url',
+                image_url: { url: `data:${p.mediaType};base64,${p.data}` },
+              };
+            if (isPdf(p))
+              return {
+                type: 'file',
+                file: {
+                  filename: p.name ?? 'document.pdf',
+                  file_data: `data:application/pdf;base64,${p.data}`,
+                },
+              };
+            const audio = audioFormat(p.mediaType);
+            if (audio) return { type: 'input_audio', input_audio: { data: p.data, format: audio } };
+            if (isTextual(p)) return { type: 'text', text: decodeText(p) };
+            return { type: 'text', text: unsupportedPart(p, 'Este proveedor') };
+          }),
         };
       case 'assistant':
         return {
@@ -90,8 +106,22 @@ function buildBody(req: ChatRequest, withUsage: boolean): Record<string, unknown
     ...(withUsage ? { stream_options: { include_usage: true } } : {}),
     ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+    ...(req.topP !== undefined ? { top_p: req.topP } : {}),
     ...(req.reasoning ? { reasoning_effort: req.reasoning } : {}),
-    ...(req.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+    ...(req.jsonSchema
+      ? {
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: schemaName(req.jsonSchema.name),
+              schema: req.jsonSchema.schema,
+              strict: req.jsonSchema.strict === true,
+            },
+          },
+        }
+      : req.jsonMode
+        ? { response_format: { type: 'json_object' } }
+        : {}),
     ...(req.tools?.length
       ? {
           tools: req.tools.map((t) => ({

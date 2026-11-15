@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_RULES_CHARS,
   MAX_RULE_CHARS,
+  RuleTracker,
   availableRules,
   contextPaths,
+  expandImports,
   hierarchyCandidates,
   mentionedRules,
   parseFrontmatter,
   parseRule,
   rulesPrompt,
+  rulesUpdate,
   selectRules,
 } from '../src/shared/rules';
 
@@ -187,5 +190,102 @@ describe('rulesPrompt', () => {
   it('lists the available rules with their description', () => {
     const r = parseRule('.cursor/rules/api.mdc', '---\ndescription: API style\n---\nx', 'cursor');
     expect(rulesPrompt([], [r]).text).toContain('- .cursor/rules/api.mdc: API style');
+  });
+});
+
+describe('Copilot path-specific instructions', () => {
+  const g = (text: string) =>
+    parseRule('.github/instructions/react.instructions.md', text, 'copilot');
+
+  it('applyTo works like globs, and "**" means always', () => {
+    expect(g('---\napplyTo: "src/**/*.tsx,test/*.tsx"\n---\nx')).toMatchObject({
+      name: 'react',
+      applies: 'glob',
+      globs: ['src/**/*.tsx', 'test/*.tsx'],
+    });
+    expect(g('---\napplyTo: "**"\n---\nx').applies).toBe('always');
+    // No applyTo: only when asked for, like Cursor's agent-requested rules.
+    expect(g('x').applies).toBe('manual');
+  });
+});
+
+describe('expandImports', () => {
+  const files: Record<string, string> = {
+    'AGENTS.md': 'Use pnpm.',
+    'docs/style.md': '---\ntitle: x\n---\nTabs.\n@../AGENTS.md',
+    'docs/loop.md': '@loop.md',
+  };
+  const read = (rel: string) => files[rel] ?? null;
+
+  it('replaces "@file" lines, relative to the rule, nested, without frontmatter', () => {
+    expect(expandImports('@AGENTS.md', 'CLAUDE.md', read)).toBe('Use pnpm.');
+    expect(expandImports('Intro\n@docs/style.md', 'CLAUDE.md', read)).toBe(
+      'Intro\nTabs.\nUse pnpm.',
+    );
+    expect(expandImports('@/AGENTS.md', 'src/CLAUDE.md', read)).toBe('Use pnpm.');
+  });
+
+  it('leaves code, inline mentions, loops, missing and escaping paths alone', () => {
+    expect(expandImports('```\n@AGENTS.md\n```', 'CLAUDE.md', read)).toBe('```\n@AGENTS.md\n```');
+    expect(expandImports('See @AGENTS.md here', 'CLAUDE.md', read)).toBe('See @AGENTS.md here');
+    expect(expandImports('@docs/loop.md', 'CLAUDE.md', read)).toBe('@loop.md');
+    expect(expandImports('@nope.md', 'CLAUDE.md', read)).toBe('@nope.md');
+    expect(expandImports('@../../etc/passwd.txt', 'CLAUDE.md', read)).toBe('@../../etc/passwd.txt');
+  });
+
+  it('a CLAUDE.md that only imports AGENTS.md counts once', () => {
+    const rules = [
+      parseRule('AGENTS.md', 'Use pnpm.', 'instructions'),
+      {
+        ...parseRule('CLAUDE.md', '@AGENTS.md', 'instructions'),
+        body: expandImports('@AGENTS.md', 'CLAUDE.md', read),
+      },
+    ];
+    expect(selectRules(rules, []).map((r) => r.path)).toEqual(['AGENTS.md']);
+  });
+});
+
+describe('RuleTracker (rules of files the agent opens later)', () => {
+  const rules = [
+    parseRule('AGENTS.md', 'root', 'instructions'),
+    parseRule('src/ui/AGENTS.md', 'ui folder', 'instructions'),
+    parseRule('.zinarix/rules/react.md', '---\nglobs: ["**/*.tsx"]\n---\nhooks rule', 'zinarix'),
+    parseRule('.zinarix/rules/py.md', '---\nglobs: ["*.py"]\n---\npython rule', 'zinarix'),
+  ];
+
+  it('sends each new rule once, never the ones of the first prompt', () => {
+    const t = new RuleTracker(selectRules(rules, ['README.md']));
+    expect(t.next(rules, ['src/ui/App.tsx']).map((r) => r.path)).toEqual([
+      'src/ui/AGENTS.md',
+      '.zinarix/rules/react.md',
+    ]);
+    expect(t.next(rules, ['src/ui/Other.tsx'])).toEqual([]);
+    expect(t.next(rules, ['tool.py']).map((r) => r.reason)).toEqual(['*.py']);
+  });
+
+  it('a fork starts from what was sent and does not tell the parent', () => {
+    const t = new RuleTracker(selectRules(rules, []));
+    const sub = t.fork();
+    expect(sub.next(rules, ['a.tsx'])).toHaveLength(1);
+    expect(t.next(rules, ['a.tsx'])).toHaveLength(1);
+  });
+
+  it('keeps the extra rules of a run within one budget', () => {
+    const big = (n: number) =>
+      parseRule(
+        `.zinarix/rules/r${n}.md`,
+        `---\nglobs: ["*.ts"]\n---\n${String(n).repeat(MAX_RULE_CHARS)}`,
+        'zinarix',
+      );
+    const t = new RuleTracker();
+    expect(t.next([big(1), big(2), big(3)], ['a.ts'])).toHaveLength(1);
+  });
+
+  it('rulesUpdate wraps them for the tool result', () => {
+    const t = new RuleTracker();
+    const text = rulesUpdate('src/ui/App.tsx', t.next(rules, ['src/ui/App.tsx']));
+    expect(text).toContain('now that you work on src/ui/App.tsx');
+    expect(text).toContain('reason="**/*.tsx"');
+    expect(rulesUpdate('x.md', [])).toBe('');
   });
 });

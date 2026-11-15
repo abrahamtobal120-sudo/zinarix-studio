@@ -22,6 +22,7 @@ import { McpSection } from './McpSettings';
 import { DocsSection, MemoriesSection } from './KnowledgeSettings';
 import { HelperSettings } from './helper/HelperSettings';
 import { CloudSection } from './CloudSettings';
+import { SuggestionSettings } from './SuggestionSettings';
 import { ModalShell } from './ModalShell';
 
 const close = () => setState({ modal: null });
@@ -566,6 +567,7 @@ export function SettingsPanel() {
                 {settings.roles.inline ?? settings.defaultModel ?? t('noModel')}
               </button>
             </div>
+            <SuggestionSettings />
             <Toggle
               label={t('setRules')}
               hint={t('setRulesHint')}

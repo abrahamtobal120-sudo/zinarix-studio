@@ -14,6 +14,7 @@ import { MailPanel } from './components/MailPanel';
 import { WatchPanel } from './components/WatchPanel';
 import { RunPanel } from './components/RunPanel';
 import { DebugPanel } from './components/DebugPanel';
+import { TestExplorer } from './components/TestExplorer';
 import { SupabasePanel } from './components/SupabasePanel';
 import { VercelPanel } from './components/VercelPanel';
 import { GCloudPanel } from './components/GCloudPanel';
@@ -471,6 +472,8 @@ export function App() {
                 <RunPanel />
               ) : sidebar === 'debug' ? (
                 <DebugPanel />
+              ) : sidebar === 'testing' ? (
+                <TestExplorer />
               ) : sidebar === 'vercel' ? (
                 <VercelPanel />
               ) : sidebar === 'supabase' ? (

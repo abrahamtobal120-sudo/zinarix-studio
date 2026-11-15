@@ -32,6 +32,7 @@ import { clearProvidersOptions, peekProvidersOptions } from './providersNav';
 import { fileIcon } from './icons';
 import { fuzzyMarks } from './Search';
 import { QuickPick } from './QuickPick';
+import { describeTask, detectRunTasks, runTask, type RunTask } from './RunPanel';
 import { ProviderLogo } from './ProviderLogo';
 import type { PickItem } from './QuickPick';
 import { LicensePanel, Onboarding, UpgradeModal, WhatsNew } from './Plan';
@@ -81,6 +82,7 @@ export function Modals() {
   return (
     <>
       {modal?.kind === 'palette' && <Palette />}
+      {modal?.kind === 'tasks' && <TaskPick />}
       {modal?.kind === 'quickOpen' && <QuickOpen />}
       {modal?.kind === 'models' && <ModelPicker role={modal.role} pick={modal.pick} />}
       {modal?.kind === 'providers' && <Providers focus={modal.focus} />}
@@ -113,6 +115,43 @@ function Palette() {
       onPick={(it) => {
         close();
         void runCommand(it.id);
+      }}
+    />
+  );
+}
+
+function TaskPick() {
+  const [tasks, setTasks] = useState<RunTask[] | null>(null);
+  useEffect(() => {
+    void detectRunTasks()
+      .then((d) => {
+        if (!d.tasks.length) {
+          close();
+          toast(t('taskNone'));
+        } else setTasks(d.tasks);
+      })
+      .catch(() => setTasks([]));
+  }, []);
+  const items = useMemo(
+    () =>
+      (tasks ?? []).map((task, i) => ({
+        id: String(i),
+        label: task.label,
+        detail: describeTask(task),
+        hint: task.file,
+      })),
+    [tasks],
+  );
+  if (!tasks) return null;
+  return (
+    <QuickPick
+      placeholder={t('taskPick')}
+      items={items}
+      onClose={close}
+      onPick={(it) => {
+        close();
+        const task = tasks[Number(it.id)];
+        if (task) runTask(task);
       }}
     />
   );

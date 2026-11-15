@@ -18,10 +18,13 @@ import {
   parseCommand,
   parseHookSettings,
   parseSkill,
+  kitTemplate,
+  skillPrompt,
   splitArgs,
+  subagentModel,
 } from '../src/shared/agentKit.js';
 import { Agent } from '../src/main/agent.js';
-import { HookTrust, loadKit } from '../src/main/hooks.js';
+import { HookTrust, createKitFile, loadKit } from '../src/main/hooks.js';
 import { Workspace } from '../src/main/workspace.js';
 
 describe('subagent, skill and command files', () => {
@@ -56,7 +59,9 @@ describe('subagent, skill and command files', () => {
   });
 
   it('reads a skill and a command', () => {
-    expect(parseSkill('.zinarix/skills/pdf', '---\nname: pdf\ndescription: Fill PDF forms\n---\nSteps')).toEqual({
+    expect(
+      parseSkill('.zinarix/skills/pdf', '---\nname: pdf\ndescription: Fill PDF forms\n---\nSteps'),
+    ).toEqual({
       name: 'pdf',
       description: 'Fill PDF forms',
       dir: '.zinarix/skills/pdf',
@@ -72,7 +77,9 @@ describe('subagent, skill and command files', () => {
   });
 
   it('expands $ARGUMENTS and $1…$9; appends the arguments when the command uses neither', () => {
-    expect(expandCommand('Fix #$1 ($ARGUMENTS)', '42 "high prio"')).toBe('Fix #42 (42 "high prio")');
+    expect(expandCommand('Fix #$1 ($ARGUMENTS)', '42 "high prio"')).toBe(
+      'Fix #42 (42 "high prio")',
+    );
     expect(expandCommand('Review $2', 'a "b c"')).toBe('Review b c');
     expect(expandCommand('Write tests', 'for utils.ts')).toBe('Write tests\n\nfor utils.ts');
     expect(expandCommand('Write tests', '')).toBe('Write tests');
@@ -100,7 +107,14 @@ describe('subagent tools', () => {
 
   it('"read" only gives read tools', () => {
     const s = allowedTools(['read'], all);
-    expect([...s].sort()).toEqual(['glob', 'list_dir', 'read_file', 'read_many_files', 'search', 'tree']);
+    expect([...s].sort()).toEqual([
+      'glob',
+      'list_dir',
+      'read_file',
+      'read_many_files',
+      'search',
+      'tree',
+    ]);
     expect(s.has('write_file')).toBe(false);
     expect(s.has('run_command')).toBe(false);
   });
@@ -122,7 +136,9 @@ describe('subagent tools', () => {
 describe('hooks', () => {
   const settings = JSON.stringify({
     hooks: {
-      PostToolUse: [{ matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'prettier --write' }] }],
+      PostToolUse: [
+        { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'prettier --write' }] },
+      ],
       PreToolUse: [
         { matcher: 'run_command', hooks: [{ command: 'check.sh', timeout: 5 }] },
         { matcher: '*', command: 'log.sh' },
@@ -141,7 +157,9 @@ describe('hooks', () => {
       'Stop::tests.sh:60',
     ]);
     expect(parseHookSettings('not json', 'x')).toEqual([]);
-    expect(parseHookSettings('{"hooks":{"Stop":[{"hooks":[{"type":"prompt","command":"x"}]}]}}', 'x')).toEqual([]);
+    expect(
+      parseHookSettings('{"hooks":{"Stop":[{"hooks":[{"type":"prompt","command":"x"}]}]}}', 'x'),
+    ).toEqual([]);
   });
 
   it('matches Zinarix and Claude Code tool names', () => {
@@ -153,7 +171,10 @@ describe('hooks', () => {
     expect(hookMatches('', 'anything')).toBe(true);
     expect(hookMatches('([', '([')).toBe(true); // bad regex: exact name
     const h = parseHookSettings(settings, 's');
-    expect(hooksFor(h, 'PreToolUse', 'run_command').map((x) => x.command)).toEqual(['check.sh', 'log.sh']);
+    expect(hooksFor(h, 'PreToolUse', 'run_command').map((x) => x.command)).toEqual([
+      'check.sh',
+      'log.sh',
+    ]);
     expect(hooksFor(h, 'PreToolUse', 'read_file').map((x) => x.command)).toEqual(['log.sh']);
   });
 
@@ -171,7 +192,9 @@ describe('hooks', () => {
       block: false,
       message: 'extra context',
     });
-    expect(hookOutcome({ code: 0, stdout: '{"decision":"block","reason":"lint"}', stderr: '' }).block).toBe(true);
+    expect(
+      hookOutcome({ code: 0, stdout: '{"decision":"block","reason":"lint"}', stderr: '' }).block,
+    ).toBe(true);
     expect(hookOutcome({ code: null, stdout: '', stderr: '', timedOut: true }).block).toBe(false);
   });
 
@@ -269,8 +292,7 @@ async function run(
     ask: (id) => {
       const leaf = id.split('>').pop()!;
       const ev = events.find((e) => e.type === 'tool_call' && e.id.split('>').pop() === leaf) as
-        | { name: string }
-        | undefined;
+        { name: string } | undefined;
       asked.push(ev?.name ?? id);
       return Promise.resolve(decide(ev?.name ?? ''));
     },
@@ -316,7 +338,10 @@ describe('subagents in the agent loop', () => {
   it('use_skill loads the SKILL.md body and lists its files', async () => {
     const dir = join(ws, '.zinarix', 'skills', 'release');
     mkdirSync(join(dir, 'scripts'), { recursive: true });
-    writeFileSync(join(dir, 'SKILL.md'), '---\ndescription: Ship a release\n---\nRun scripts/bump.sh');
+    writeFileSync(
+      join(dir, 'SKILL.md'),
+      '---\ndescription: Ship a release\n---\nRun scripts/bump.sh',
+    );
     writeFileSync(join(dir, 'scripts', 'bump.sh'), 'echo');
     const r = await run([[{ name: 'use_skill', args: { name: 'release' } }], []]);
     expect(r.results[0]).toMatchObject({ ok: true, summary: 'skill release' });
@@ -333,11 +358,18 @@ describe('hooks in the agent loop', () => {
     );
     writeFileSync(
       join(ws, '.zinarix', 'settings.json'),
-      JSON.stringify({ hooks: { PostToolUse: [{ matcher: 'Edit|Write', hooks: [{ command: fmt }] }] } }),
+      JSON.stringify({
+        hooks: { PostToolUse: [{ matcher: 'Edit|Write', hooks: [{ command: fmt }] }] },
+      }),
     );
     const r = await run([
       [{ name: 'write_file', args: { path: 'a.txt', content: '  hello  ' } }],
-      [{ name: 'edit_file', args: { path: 'a.txt', old_string: 'HELLO', new_string: 'HELLO world' } }],
+      [
+        {
+          name: 'edit_file',
+          args: { path: 'a.txt', old_string: 'HELLO', new_string: 'HELLO world' },
+        },
+      ],
       [],
     ]);
     expect(readFileSync(join(ws, 'a.txt'), 'utf8')).toBe('HELLO WORLD\n');
@@ -346,7 +378,10 @@ describe('hooks in the agent loop', () => {
   }, 30_000);
 
   it('PreToolUse exit 2 blocks the action and the message reaches the model', async () => {
-    const deny = nodeHook('deny.cjs', `process.stderr.write('No writes on Fridays');process.exit(2);`);
+    const deny = nodeHook(
+      'deny.cjs',
+      `process.stderr.write('No writes on Fridays');process.exit(2);`,
+    );
     writeFileSync(
       join(ws, '.zinarix', 'settings.json'),
       JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Write', hooks: [{ command: deny }] }] } }),
@@ -360,14 +395,16 @@ describe('hooks in the agent loop', () => {
 
   it('hooks the user turns down do not run', async () => {
     const marker = join(root, 'ran.txt');
-    const hook = nodeHook('mark.cjs', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x');`);
+    const hook = nodeHook(
+      'mark.cjs',
+      `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x');`,
+    );
     writeFileSync(
       join(ws, '.zinarix', 'settings.json'),
       JSON.stringify({ hooks: { PostToolUse: [{ hooks: [{ command: hook }] }] } }),
     );
-    await run(
-      [[{ name: 'write_file', args: { path: 'c.txt', content: 'x' } }], []],
-      (name) => (name === 'project_hooks' ? 'deny' : 'approve'),
+    await run([[{ name: 'write_file', args: { path: 'c.txt', content: 'x' } }], []], (name) =>
+      name === 'project_hooks' ? 'deny' : 'approve',
     );
     expect(existsSync(join(ws, 'c.txt'))).toBe(true);
     expect(existsSync(marker)).toBe(false);
@@ -384,12 +421,24 @@ describe('hooks in the agent loop', () => {
       );
     settings(hook);
     const decide = (n: string): ToolDecision => (n === 'project_hooks' ? 'always' : 'approve');
-    const first = await run([[{ name: 'list_dir', args: { path: '.' } }], []], decide, new HookTrust(trustDir));
+    const first = await run(
+      [[{ name: 'list_dir', args: { path: '.' } }], []],
+      decide,
+      new HookTrust(trustDir),
+    );
     expect(first.asked).toEqual(['project_hooks']);
-    const again = await run([[{ name: 'list_dir', args: { path: '.' } }], []], decide, new HookTrust(trustDir));
+    const again = await run(
+      [[{ name: 'list_dir', args: { path: '.' } }], []],
+      decide,
+      new HookTrust(trustDir),
+    );
     expect(again.asked).toEqual([]);
     settings(`${hook} --changed`);
-    const changed = await run([[{ name: 'list_dir', args: { path: '.' } }], []], decide, new HookTrust(trustDir));
+    const changed = await run(
+      [[{ name: 'list_dir', args: { path: '.' } }], []],
+      decide,
+      new HookTrust(trustDir),
+    );
     expect(changed.asked).toEqual(['project_hooks']);
   }, 30_000);
 
@@ -403,5 +452,161 @@ describe('hooks in the agent loop', () => {
     // 1 normal end + 3 rounds sent back, then it stops anyway
     expect(r.offered).toHaveLength(4);
     expect(r.events.filter((e) => e.type === 'notice' && e.kind === 'hook')).toHaveLength(3);
+  }, 30_000);
+});
+
+/* -------------------------------------------------------------- Fase 4, improvements */
+
+describe('Claude Code hook JSON output', () => {
+  const ok = (stdout: string) => hookOutcome({ code: 0, stdout, stderr: '' });
+
+  it('permissionDecision "deny" blocks with its reason', () => {
+    expect(
+      ok(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: 'No .env edits',
+          },
+        }),
+      ),
+    ).toMatchObject({ block: true, message: 'No .env edits' });
+  });
+
+  it('"allow" never skips approval: it is just "go on"', () => {
+    expect(ok(JSON.stringify({ hookSpecificOutput: { permissionDecision: 'allow' } }))).toEqual({
+      block: false,
+      message: '',
+    });
+  });
+
+  it('continue:false stops with stopReason; systemMessage is a notice for the user', () => {
+    expect(
+      ok(JSON.stringify({ continue: false, stopReason: 'Build broken', systemMessage: 'hey' })),
+    ).toEqual({ block: true, message: 'Build broken', notice: 'hey' });
+  });
+
+  it('additionalContext becomes context for the model', () => {
+    expect(
+      ok(JSON.stringify({ hookSpecificOutput: { additionalContext: 'Lint: 2 warnings' } })),
+    ).toEqual({ block: false, message: 'Lint: 2 warnings' });
+  });
+
+  it('text that only looks like JSON stays plain text', () => {
+    expect(ok('{not json')).toEqual({ block: false, message: '{not json' });
+  });
+});
+
+describe('subagent model', () => {
+  const have = new Set(['anthropic/claude-sonnet-5-5', 'openai/gpt-5']);
+  const resolve = (m: string) => (have.has(m) ? m : undefined);
+
+  it('takes provider/model when it is available, else inherits', () => {
+    expect(subagentModel('openai/gpt-5', resolve)).toBe('openai/gpt-5');
+    expect(subagentModel('groq/llama', resolve)).toBeUndefined();
+  });
+
+  it('maps the Claude Code aliases to Anthropic models', () => {
+    expect(subagentModel('sonnet', resolve)).toBe('anthropic/claude-sonnet-5-5');
+    expect(subagentModel('Opus', resolve)).toBeUndefined(); // not connected
+    expect(subagentModel('inherit', resolve)).toBeUndefined();
+    expect(subagentModel('gpt-5', resolve)).toBeUndefined(); // no provider: cannot guess
+  });
+});
+
+describe('new kit files and /skill', () => {
+  it('kitTemplate picks a free name and a path per kind', () => {
+    expect(kitTemplate('agent', 'Mi Revisor')).toMatchObject({
+      name: 'mi-revisor',
+      path: '.zinarix/agents/mi-revisor.md',
+    });
+    expect(kitTemplate('skill', 'pdf', ['pdf', 'pdf-2']).path).toBe(
+      '.zinarix/skills/pdf-3/SKILL.md',
+    );
+    expect(kitTemplate('command', '', []).path).toBe('.zinarix/commands/command.md');
+  });
+
+  it('templates parse back into valid definitions', () => {
+    const a = kitTemplate('agent', 'rev');
+    expect(parseAgentDef(a.path, a.content)).toMatchObject({
+      name: 'rev',
+      tools: ['read', 'grep'],
+    });
+    const s = kitTemplate('skill', 'pdf');
+    expect(parseSkill('.zinarix/skills/pdf', s.content)?.name).toBe('pdf');
+    const c = kitTemplate('command', 'fix');
+    expect(parseCommand(c.path, c.content)?.argumentHint).toBe('<texto>');
+  });
+
+  it('createKitFile writes the file and never overwrites', () => {
+    const w = new Workspace(ws);
+    const first = createKitFile(w, 'command', 'deploy');
+    expect(first).toBe('.zinarix/commands/deploy.md');
+    writeFileSync(join(ws, first), '---\ndescription: mine\n---\nkeep me');
+    const second = createKitFile(w, 'command', 'deploy');
+    expect(second).toBe('.zinarix/commands/deploy-2.md');
+    expect(readFileSync(join(ws, first), 'utf8')).toContain('keep me');
+    expect(createKitFile(w, 'skill', 'pdf')).toBe('.zinarix/skills/pdf/SKILL.md');
+    expect(loadKit(w, null).skills.map((k) => k.name)).toEqual(['pdf']);
+  });
+
+  it('skillPrompt asks the agent to load the skill first', () => {
+    expect(skillPrompt('pdf', '  fill form.pdf ')).toBe(
+      'Use the skill "pdf" (call use_skill first to load it) for this:\n\nfill form.pdf',
+    );
+    expect(skillPrompt('pdf', '')).toContain('now.');
+  });
+});
+
+describe('Fase 4 improvements in the agent loop', () => {
+  it('a subagent whose model is not available runs on the main model (with a notice)', async () => {
+    writeFileSync(
+      join(ws, '.zinarix', 'agents', 'fast.md'),
+      '---\ndescription: Fast\nmodel: haiku\n---\nBe quick.\n',
+    );
+    const r = await run([
+      [{ name: 'task', args: { subagent: 'fast', prompt: 'Say hi' } }],
+      [], // subagent ends
+      [], // main agent ends
+    ]);
+    expect(r.results.find((e) => e.summary === 'fast terminó')).toBeTruthy();
+    expect(
+      r.events.some((e) => e.type === 'notice' && e.message.includes('"haiku" no está disponible')),
+    ).toBe(true);
+  });
+
+  it('PostToolUse output on exit 0 reaches the model as context', async () => {
+    const lint = nodeHook('lint.cjs', `process.stdout.write('Lint: 1 warning in a.txt');`);
+    writeFileSync(
+      join(ws, '.zinarix', 'settings.json'),
+      JSON.stringify({
+        hooks: { PostToolUse: [{ matcher: 'Write', hooks: [{ command: lint }] }] },
+      }),
+    );
+    let seen = '';
+    const offered: string[][] = [];
+    const core = fakeCore(
+      [[{ name: 'write_file', args: { path: 'a.txt', content: 'x' } }], []],
+      offered,
+    ) as unknown as { stream: (req: { messages: ChatMessage[] }) => AsyncGenerator<unknown> };
+    const inner = core.stream.bind(core);
+    core.stream = async function* (req) {
+      seen = req.messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
+      yield* inner(req);
+    };
+    const workspace = new Workspace(ws);
+    const agent = new Agent(core as unknown as OmniCore, () => workspace);
+    agent.userKitRoot = null;
+    await agent.run({
+      conversationId: 'c',
+      userMessage: { role: 'user', content: 'go' },
+      fallbackHistory: [],
+      signal: new AbortController().signal,
+      emit: () => undefined,
+      ask: () => Promise.resolve('approve'),
+    });
+    expect(seen).toContain('<hook-context event="PostToolUse">');
+    expect(seen).toContain('Lint: 1 warning in a.txt');
   }, 30_000);
 });

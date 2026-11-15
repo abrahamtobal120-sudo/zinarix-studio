@@ -419,11 +419,31 @@ function toSymbol(s: LspSymbol): monaco.languages.DocumentSymbol {
   };
 }
 
-interface LspCodeAction {
+export interface LspCodeAction {
   title: string;
   kind?: string;
   isPreferred?: boolean;
   edit?: unknown;
+}
+
+/**
+ * Fase 8 (auto-import): the server's quick fixes for some markers of a model, or null when the
+ * model has no language server open.
+ */
+export async function lspQuickFixes(
+  model: monaco.editor.ITextModel,
+  range: monaco.IRange,
+  markers: monaco.editor.IMarker[],
+): Promise<LspCodeAction[] | null> {
+  const path = modelPath(model);
+  if (!path || !opened.has(path)) return null;
+  const diagnostics = markers.map(
+    (m) => (m as unknown as { _lsp?: unknown })._lsp ?? markerToDiagnostic(m),
+  );
+  return request<LspCodeAction[]>(model, 'textDocument/codeAction', {
+    range: toLspRange(range),
+    context: { diagnostics, only: ['quickfix'] },
+  });
 }
 
 function markerToDiagnostic(m: monaco.editor.IMarkerData) {

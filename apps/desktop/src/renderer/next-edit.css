@@ -1,0 +1,30 @@
+/* Fase 8 — next-edit suggestion in the editor (theme variables only). */
+.monaco-editor .zx-ne-old {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.monaco-editor .zx-ne-old-text {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  opacity: 0.75;
+}
+.monaco-editor .zx-ne-del-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+  opacity: 0.6;
+}
+.monaco-editor .zx-ne-hint {
+  color: var(--accent);
+  font-style: italic;
+  opacity: 0.9;
+}
+.monaco-editor .zx-ne-zone {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border-left: 2px solid var(--ok);
+  color: var(--fg);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+.monaco-editor .zx-ne-new {
+  padding-left: 2px;
+}

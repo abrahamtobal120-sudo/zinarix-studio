@@ -14,6 +14,8 @@ import type {
   WorkspaceInfo,
 } from '../shared/api';
 import { DEFAULT_PREFS } from '../shared/api';
+import type { ChatMode } from '../shared/agentModes';
+import { isChatMode, modeFrom, usesAgent } from '../shared/agentModes';
 import type { LicenseStatus, ProFeature, RemoteNotice } from '../shared/plans';
 import { BUY_URL, FREE_FEATURES, PRO_FEATURES } from '../shared/plans';
 import { languageFor, monaco } from './monaco';
@@ -59,6 +61,8 @@ async function viewerFor(
 
 export type Modal =
   | { kind: 'palette' }
+  /** "Run task…": the detected tasks (tasks.json, package.json scripts…) in a quick pick. */
+  | { kind: 'tasks' }
   | { kind: 'quickOpen' }
   | {
       kind: 'models';
@@ -104,6 +108,8 @@ export interface State {
     | 'apps'
     /** Run and debug (launch configs, call stack, variables, watch, breakpoints). */
     | 'debug'
+    /** Test Explorer (Vitest, Jest, Pytest). */
+    | 'testing'
     /** Panel de Edición: takes the whole editor area (the chat stays beside it). */
     | 'design'
     | null;
@@ -162,7 +168,10 @@ export interface ChatTab {
   conversationId?: string;
   /** Model of this chat ("provider/model"); null = the app default for the mode. */
   model: string | null;
+  /** The agent runs (any mode but "ask"); kept in step with `mode`. */
   agent: boolean;
+  /** Fase 3: ask / plan / agent / auto-approve. */
+  mode: ChatMode;
   /** Folder this chat works in (absolute); undefined = the window's open folder. */
   folder?: string;
   /** Works in no folder at all (questions only): not even the window's open folder. */
@@ -412,6 +421,21 @@ export function openWhatsAppTab(): void {
   activate(WHATSAPP_TAB);
 }
 
+/** Pseudo-path of the model Playground tab (Fase 9). */
+export const PLAYGROUND_TAB = '::playground';
+
+/** Opens the Playground tab, on Build when asked. */
+export function openPlaygroundTab(mode?: 'single' | 'compare' | 'build'): void {
+  if (!state.tabs.some((x) => x.path === PLAYGROUND_TAB))
+    setState((s) => ({
+      tabs: [...s.tabs, { path: PLAYGROUND_TAB, name: 'Playground', dirty: false }],
+    }));
+  activate(PLAYGROUND_TAB);
+  // The pane listens for this (it may mount in this same tick).
+  if (mode)
+    setTimeout(() => window.dispatchEvent(new CustomEvent('zx-playground-mode', { detail: mode })), 0);
+}
+
 export function openBrowserTab(): void {
   if (!state.tabs.some((x) => x.path === BROWSER_TAB))
     setState((s) => ({
@@ -424,6 +448,14 @@ export function activate(path: string | null): void {
   const prev = state.active && docs.get(state.active);
   if (prev && editor) prev.viewState = editor.saveViewState();
   setState({ active: path });
+}
+
+const savedListeners = new Set<(path: string) => void>();
+
+/** Called after a file of the editor is written to disk (Test Explorer's "run on save"). */
+export function onSaved(fn: (path: string) => void): () => void {
+  savedListeners.add(fn);
+  return () => savedListeners.delete(fn);
 }
 
 export async function save(path = state.active, format = true): Promise<void> {
@@ -441,6 +473,7 @@ export async function save(path = state.active, format = true): Promise<void> {
   d.savedVersion = d.model.getAlternativeVersionId();
   updateDirty(path);
   lspSaved(path);
+  for (const fn of savedListeners) fn(path);
 }
 
 export async function saveAll(): Promise<void> {
@@ -524,7 +557,11 @@ export function resetDocs(): void {
   docs.clear();
   setState((s) => {
     const tabs = s.tabs.filter(
-      (x) => x.path === BROWSER_TAB || x.path === SECURITY_TAB || x.path === WHATSAPP_TAB,
+      (x) =>
+        x.path === BROWSER_TAB ||
+        x.path === SECURITY_TAB ||
+        x.path === WHATSAPP_TAB ||
+        x.path === PLAYGROUND_TAB,
     );
     return { tabs, active: tabs[0]?.path ?? null };
   });
@@ -663,6 +700,35 @@ export function saveAgentMode(on: boolean): void {
   }
 }
 
+const MODE_KEY = 'zs.chatMode';
+
+/** The mode new chats start in (the last one the user picked). */
+function savedChatMode(): ChatMode {
+  try {
+    return modeFrom(localStorage.getItem(MODE_KEY), savedAgentMode());
+  } catch {
+    return 'agent';
+  }
+}
+
+export function saveChatMode(mode: ChatMode): void {
+  saveAgentMode(usesAgent(mode));
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // storage unavailable: new chats start in agent mode
+  }
+}
+
+/** A chat's mode, matching an explicit agent on/off (older callers only pass `agent`). */
+function modeOf(patch: Partial<ChatTab>): ChatMode {
+  if (isChatMode(patch.mode)) return patch.mode;
+  const saved = savedChatMode();
+  if (patch.agent === undefined) return saved;
+  if (!patch.agent) return 'ask';
+  return usesAgent(saved) ? saved : 'agent';
+}
+
 function savedChatList(): boolean {
   try {
     return localStorage.getItem(LIST_KEY) === 'on';
@@ -723,16 +789,18 @@ export function chatFolder(
 const newChatId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function blankChat(patch: Partial<ChatTab> = {}): ChatTab {
+  const mode = modeOf(patch);
   return {
     id: newChatId(),
     title: '',
     model: null,
-    agent: savedAgentMode(),
     busy: false,
     waiting: false,
     unread: false,
     queued: [],
     ...patch,
+    mode,
+    agent: usesAgent(mode),
   };
 }
 
@@ -766,6 +834,7 @@ function restoreChats(): Pick<State, 'chats' | 'activeChat' | 'chatSplit' | 'cha
             conversationId: typeof x.conversationId === 'string' ? x.conversationId : undefined,
             model: typeof x.model === 'string' ? x.model : null,
             agent: typeof x.agent === 'boolean' ? x.agent : savedAgentMode(),
+            ...(isChatMode(x.mode) ? { mode: x.mode } : {}),
             folder: typeof x.folder === 'string' && x.folder ? x.folder : undefined,
             noFolder: x.noFolder === true || undefined,
             resume: typeof x.resume === 'string' && x.resume ? x.resume : undefined,
@@ -803,6 +872,7 @@ function persistChats(): void {
           conversationId: c.conversationId,
           model: c.model,
           agent: c.agent,
+          mode: c.mode,
           folder: c.folder,
           noFolder: c.noFolder,
           resume: c.resume,
@@ -841,9 +911,17 @@ export function chatTab(id: string): ChatTab | undefined {
   return state.chats.find((c) => c.id === id);
 }
 
-export function updateChat(id: string, patch: Partial<ChatTab>): void {
+export function updateChat(id: string, given: Partial<ChatTab>): void {
   const cur = chatTab(id);
   if (!cur) return;
+  // The mode and the agent switch always agree (older callers only send `agent`).
+  let patch = given;
+  if (isChatMode(given.mode)) patch = { ...given, agent: usesAgent(given.mode) };
+  else if (given.agent !== undefined)
+    patch = {
+      ...given,
+      mode: given.agent ? (usesAgent(cur.mode) ? cur.mode : 'agent') : 'ask',
+    };
   const changed = (Object.keys(patch) as (keyof ChatTab)[]).some((k) => cur[k] !== patch[k]);
   if (!changed) return;
   setState((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
@@ -852,6 +930,7 @@ export function updateChat(id: string, patch: Partial<ChatTab>): void {
     'conversationId' in patch ||
     'model' in patch ||
     'agent' in patch ||
+    'mode' in patch ||
     'folder' in patch ||
     'noFolder' in patch ||
     'resume' in patch

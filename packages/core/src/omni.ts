@@ -447,9 +447,12 @@ export class OmniCore {
           tools: req.tools,
           maxTokens: req.maxTokens,
           temperature: req.temperature,
+          ...(req.topP !== undefined ? { topP: req.topP } : {}),
           reasoning: req.reasoning,
           jsonMode: req.jsonMode,
+          ...(req.jsonSchema ? { jsonSchema: req.jsonSchema } : {}),
           cwd: req.cwd,
+          ...(req.readOnly ? { readOnly: true } : {}),
         };
         for await (const chunk of adapter.chat(cfg, chatReq, signal)) {
           if (chunk.type === 'usage') {

@@ -55,7 +55,8 @@ export function toGemini(
             : m.content.map((p) =>
                 p.type === 'text'
                   ? { text: p.text }
-                  : { inlineData: { mimeType: p.mediaType, data: p.data } },
+                  : // Gemini reads images, PDF, audio, video and text inline.
+                    { inlineData: { mimeType: p.mediaType, data: p.data } },
               ),
         );
         break;
@@ -187,7 +188,10 @@ export function geminiBody(req: ChatRequest, rawTag = 'google-gemini'): Record<s
   const generationConfig: Record<string, unknown> = {
     ...(req.maxTokens ? { maxOutputTokens: req.maxTokens } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-    ...(req.jsonMode ? { responseMimeType: 'application/json' } : {}),
+    ...(req.topP !== undefined ? { topP: req.topP } : {}),
+    ...(req.jsonMode || req.jsonSchema ? { responseMimeType: 'application/json' } : {}),
+    // responseJsonSchema takes standard JSON Schema (responseSchema only an OpenAPI subset).
+    ...(req.jsonSchema ? { responseJsonSchema: req.jsonSchema.schema } : {}),
     ...(req.reasoning ? { thinkingConfig: { includeThoughts: true } } : {}),
   };
   return {

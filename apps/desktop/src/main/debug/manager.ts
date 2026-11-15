@@ -11,10 +11,15 @@ import type {
   DebugVariable,
 } from '../../shared/devtools.js';
 import { childEnv } from '../env.js';
-import { which, type BackendEvents, type DebugBackend } from './backend.js';
+import { findPython, which, type BackendEvents, type DebugBackend } from './backend.js';
+
+export { findPython } from './backend.js';
 import { CdpBackend } from './cdpBackend.js';
 import { autoConfig, kindOf, parseLaunchJson, resolveConfig } from './config.js';
 import { DapBackend } from './dapBackend.js';
+import { testCommand, type TestRunRequest } from '../testing.js';
+import { tmpdir } from 'node:os';
+import { randomBytes } from 'node:crypto';
 
 const LAUNCH_FILES = ['.zinarix/launch.json', '.vscode/launch.json'];
 
@@ -28,23 +33,6 @@ function freePort(): Promise<number> {
       srv.close(() => resolve(port));
     });
   });
-}
-
-/** Python executable (+ launcher args), preferring one that has debugpy. */
-function findPython(): { cmd: string; pre: string[] } | null {
-  const candidates: { cmd: string; pre: string[] }[] = [];
-  for (const name of ['python', 'python3']) {
-    const p = which(name);
-    if (p && !/WindowsApps/i.test(p)) candidates.push({ cmd: p, pre: [] });
-  }
-  const py = which('py');
-  if (py) candidates.push({ cmd: py, pre: ['-3'] });
-  // The Microsoft Store stub opens the Store instead of running: only as a last resort.
-  for (const name of ['python', 'python3']) {
-    const p = which(name);
-    if (p && /WindowsApps/i.test(p)) candidates.push({ cmd: p, pre: [] });
-  }
-  return candidates[0] ?? null;
 }
 
 function hasDebugpy(py: { cmd: string; pre: string[] }): boolean {
@@ -70,6 +58,8 @@ export class DebugManager {
     config: DebugConfig | null;
     file?: string;
     breakpoints: Record<string, Breakpoint[]>;
+    /** Set when the session debugs a test (restart runs the same test). */
+    test?: TestRunRequest;
   };
   /** Bumped per session so events of a stopped session are ignored. */
   private generation = 0;
@@ -120,6 +110,126 @@ export class DebugManager {
         'No sé cómo depurar este archivo. Abre un archivo .js/.ts, .py o .go, o crea .zinarix/launch.json.',
       );
     const cfg = resolveConfig(cfg0, root, file);
+    await this.launch(cfg.name, (ev) => this.create(cfg, ev), breakpoints);
+  }
+
+  /**
+   * Debugs one test (or a describe / file) with its runner: Vitest through the inspector it opens
+   * in its worker, Jest in band under Node's inspector, Pytest through debugpy.
+   */
+  async startTest(
+    root: string,
+    req: TestRunRequest,
+    breakpoints: Record<string, Breakpoint[]>,
+  ): Promise<void> {
+    if (this.backend) await this.stop();
+    this.last = { root, config: null, breakpoints, test: req };
+    this.root = root;
+    const report = join(
+      tmpdir(),
+      `zinarix-debug-${randomBytes(6).toString('hex')}.${req.framework === 'pytest' ? 'xml' : 'json'}`,
+    );
+    const cmd = testCommand(root, req, report);
+    const env = childEnv({ ...process.env, FORCE_COLOR: '0' });
+    const name = req.item?.fullName || req.files?.[0] || req.framework;
+    if (req.framework === 'vitest') {
+      const port = await freePort();
+      await this.launch(
+        name,
+        (ev) =>
+          new CdpBackend(
+            {
+              request: 'launch',
+              node: cmd.command,
+              args: [],
+              cwd: cmd.cwd,
+              env,
+              host: '127.0.0.1',
+              port,
+              stopOnEntry: false,
+              spawn: {
+                command: cmd.command,
+                args: [
+                  ...cmd.args,
+                  `--inspect-brk=127.0.0.1:${port}`,
+                  '--no-file-parallelism',
+                  '--test-timeout=0',
+                  '--hook-timeout=0',
+                ],
+              },
+            },
+            ev,
+          ),
+        breakpoints,
+      );
+      return;
+    }
+    if (req.framework === 'jest') {
+      const [script, ...args] = cmd.args;
+      await this.launch(
+        name,
+        (ev) =>
+          new CdpBackend(
+            {
+              request: 'launch',
+              node: cmd.command,
+              program: script,
+              args: [...args, '--runInBand', '--testTimeout=2147483647'],
+              cwd: cmd.cwd,
+              env,
+              host: '127.0.0.1',
+              stopOnEntry: false,
+            },
+            ev,
+          ),
+        breakpoints,
+      );
+      return;
+    }
+    const py = findPython();
+    if (!py)
+      throw new DebugError('No encontré Python en el PATH. Instálalo desde https://python.org.');
+    if (!hasDebugpy(py))
+      throw new DebugError(
+        'Falta el depurador de Python (debugpy). Instálalo con:  pip install debugpy',
+      );
+    // cmd.args = [...pre, '-m', 'pytest', ...rest]
+    const rest = cmd.args.slice(py.pre.length + 2);
+    await this.launch(
+      name,
+      (ev) =>
+        new DapBackend(
+          {
+            kind: 'stdio',
+            command: py.cmd,
+            args: [...py.pre, '-m', 'debugpy.adapter'],
+            cwd: cmd.cwd,
+            env,
+          },
+          'debugpy',
+          'launch',
+          {
+            type: 'python',
+            request: 'launch',
+            module: 'pytest',
+            args: rest,
+            cwd: cmd.cwd,
+            console: 'internalConsole',
+            redirectOutput: true,
+            justMyCode: true,
+          },
+          ev,
+        ),
+      breakpoints,
+    );
+  }
+
+  private async launch(
+    name: string,
+    make: (ev: BackendEvents) => DebugBackend,
+    breakpoints: Record<string, Breakpoint[]>,
+  ): Promise<void> {
+    const cfg = { name };
     const gen = ++this.generation;
     const ev: BackendEvents = {
       stopped: (reason, threadId, description) => {
@@ -141,7 +251,7 @@ export class DebugManager {
         this.emit({ kind: 'state', state: 'idle' });
       },
     };
-    this.backend = this.create(cfg, ev);
+    this.backend = make(ev);
     this.emit({ kind: 'state', state: 'starting', name: cfg.name });
     const map = new Map<string, Breakpoint[]>();
     for (const [rel, bps] of Object.entries(breakpoints)) if (bps.length) map.set(this.abs(rel), bps);
@@ -358,7 +468,8 @@ export class DebugManager {
     const l = this.last;
     if (!l) throw new DebugError('No hay una sesión anterior que reiniciar.');
     await this.stop();
-    await this.start(l.root, l.config, l.file, l.breakpoints);
+    if (l.test) await this.startTest(l.root, l.test, l.breakpoints);
+    else await this.start(l.root, l.config, l.file, l.breakpoints);
   }
 }
 

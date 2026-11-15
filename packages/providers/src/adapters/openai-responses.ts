@@ -2,6 +2,7 @@ import { OmniError } from '@omni/shared';
 import type { ChatChunk, ChatMessage, ChatRequest } from '@omni/shared';
 import { describeErrorBody, providerMessage, request } from '../http.js';
 import { parseSse, safeJson } from '../sse.js';
+import { decodeText, isPdf, isTextual, schemaName, unsupportedPart } from '../parts.js';
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
 import { openAiCompatible, testViaModelsOrChat } from './openai-compatible.js';
 
@@ -23,11 +24,22 @@ export function toResponsesInput(messages: ChatMessage[]): {
           content:
             typeof m.content === 'string'
               ? [{ type: 'input_text', text: m.content }]
-              : m.content.map((p) =>
-                  p.type === 'text'
-                    ? { type: 'input_text', text: p.text }
-                    : { type: 'input_image', image_url: `data:${p.mediaType};base64,${p.data}` },
-                ),
+              : m.content.map((p) => {
+                  if (p.type === 'text') return { type: 'input_text', text: p.text };
+                  if (p.type === 'image')
+                    return {
+                      type: 'input_image',
+                      image_url: `data:${p.mediaType};base64,${p.data}`,
+                    };
+                  if (isPdf(p))
+                    return {
+                      type: 'input_file',
+                      filename: p.name ?? 'document.pdf',
+                      file_data: `data:application/pdf;base64,${p.data}`,
+                    };
+                  if (isTextual(p)) return { type: 'input_text', text: decodeText(p) };
+                  return { type: 'input_text', text: unsupportedPart(p, 'OpenAI (Responses)') };
+                }),
         });
         break;
       case 'assistant':
@@ -93,8 +105,22 @@ async function* chat(
     ...(instructions ? { instructions } : {}),
     ...(req.maxTokens ? { max_output_tokens: req.maxTokens } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+    ...(req.topP !== undefined ? { top_p: req.topP } : {}),
     ...(req.reasoning ? { reasoning: { effort: req.reasoning, summary: 'auto' } } : {}),
-    ...(req.jsonMode ? { text: { format: { type: 'json_object' } } } : {}),
+    ...(req.jsonSchema
+      ? {
+          text: {
+            format: {
+              type: 'json_schema',
+              name: schemaName(req.jsonSchema.name),
+              schema: req.jsonSchema.schema,
+              strict: req.jsonSchema.strict === true,
+            },
+          },
+        }
+      : req.jsonMode
+        ? { text: { format: { type: 'json_object' } } }
+        : {}),
     ...(req.tools?.length
       ? {
           tools: req.tools.map((t) => ({

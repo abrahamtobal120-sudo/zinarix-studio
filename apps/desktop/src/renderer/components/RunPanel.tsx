@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { confirmDialog } from '../confirm';
 import { pressable } from '../a11y';
 import { t } from '../i18n';
-import { api, openFile, setState, toast, useStore } from '../store';
+import { api, getState, openFile, setState, toast, useStore } from '../store';
 import { fileIcon } from './icons';
 import { runInTerminal } from './Terminal';
 import { Icon } from './Icon';
+import { parseTasksJson } from '../../shared/vscodeTasks';
 
 export interface RunTask {
   /** Short name shown on the row ("dev", "make build", "docker compose up"). */
@@ -204,6 +205,44 @@ async function tasksFor(path: string, all: Set<string>): Promise<RunTask[]> {
   return [];
 }
 
+const VSCODE_TASKS = '.vscode/tasks.json';
+
+function platformName(): 'windows' | 'osx' | 'linux' {
+  const p = navigator.platform.toLowerCase();
+  return p.includes('win') ? 'windows' : p.includes('mac') ? 'osx' : 'linux';
+}
+
+/** VS Code tasks of the workspace (only those that can run here). */
+async function vscodeTasks(all: Set<string>): Promise<RunTask[]> {
+  if (!all.has(VSCODE_TASKS)) return [];
+  const text = await readText(VSCODE_TASKS);
+  const root = getState().workspace?.root;
+  if (!text || !root) return [];
+  const active = getState().active;
+  const tasks = parseTasksJson(text, {
+    root,
+    file: active && all.has(active) ? active : undefined,
+    platform: platformName(),
+    packageManager: packageManager('', all),
+  });
+  return tasks
+    .filter((x) => !x.problem && x.command)
+    .map((x) => {
+      const notes = [
+        x.dependsOn.length ? t('taskDepends', { list: x.dependsOn.join(', ') }) : '',
+        x.background ? t('taskBackground') : '',
+      ].filter(Boolean);
+      return {
+        label: `task: ${x.label}`,
+        command: x.command,
+        file: VSCODE_TASKS,
+        // The default build task first, then the other build / test tasks.
+        priority: x.isDefault && x.group === 'build' ? 0.5 : x.group === 'build' ? 3 : x.group === 'test' ? 6 : 4,
+        ...(notes.length ? { detail: `${x.command} (${notes.join(' · ')})` } : {}),
+      };
+    });
+}
+
 export interface Detection {
   tasks: RunTask[];
   files: string[];
@@ -224,8 +263,10 @@ const READ_CONFIGS = /^(package\.json|(gnu)?makefile|deno\.jsonc?)$/;
  * those it reads), to skip a rescan when a save touched some other file.
  */
 async function configFingerprint(): Promise<string> {
-  const configs = configsOf(await api().workspace.listFiles()).slice(0, 40);
+  const listed = await api().workspace.listFiles();
+  const configs = configsOf(listed).slice(0, 40);
   const parts: string[] = [];
+  if (listed.includes(VSCODE_TASKS)) parts.push(VSCODE_TASKS, (await readText(VSCODE_TASKS)) ?? '');
   for (const f of configs)
     parts.push(f, READ_CONFIGS.test(nameOf(f).toLowerCase()) ? ((await readText(f)) ?? '') : '');
   return parts.join('\0');
@@ -238,8 +279,9 @@ export async function detectRunTasks(): Promise<Detection> {
   const configs = configsOf(files);
   const tasks: RunTask[] = [];
   for (const f of configs.slice(0, 40)) tasks.push(...(await tasksFor(f, all)));
+  tasks.push(...(await vscodeTasks(all)));
   tasks.sort((a, b) => a.priority - b.priority || a.label.localeCompare(b.label));
-  return { tasks, files: configs };
+  return { tasks, files: all.has(VSCODE_TASKS) ? [VSCODE_TASKS, ...configs] : configs };
 }
 
 /** The command as the user should see it before running: "npm run dev → vite --host". */

@@ -355,6 +355,15 @@ export interface NextEditRequestView {
   cursor: { line: number; column: number };
 }
 
+/** Fase 8: several (multi-line) edits per prediction, with the model and time it took. */
+export interface NextEditResultView {
+  hunks: import('./nextEdit.js').NextEditHunk[];
+  /** provider/model that answered ('' when it failed before starting). */
+  model: string;
+  latencyMs: number;
+  error?: boolean;
+}
+
 export interface NextEditView {
   /** 1-based line to change. */
   line: number;

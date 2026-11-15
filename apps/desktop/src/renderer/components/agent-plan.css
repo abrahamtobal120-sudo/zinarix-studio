@@ -1,0 +1,218 @@
+/* Fase 3 — chat modes, the agent's task list, ask_user questions and the plan bar. */
+
+.mode-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mode-pill.mode-plan {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+}
+.mode-pill.mode-auto {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.mode-pill.mode-agent {
+  color: var(--accent);
+}
+.mode-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: 300px;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mode-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--fg);
+  cursor: pointer;
+}
+.mode-item:hover,
+.mode-item:focus-visible {
+  background: var(--hover);
+}
+.mode-item.on {
+  background: var(--sel);
+}
+.mode-item-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12px;
+}
+.mode-menu-foot {
+  font-size: 11px;
+  padding: 4px 8px 2px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+
+/* Task list (todo_write) */
+.task-list {
+  margin: 0 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+  font-size: 12px;
+}
+.task-list-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  color: var(--fg);
+}
+.task-list-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-4);
+  overflow: hidden;
+}
+.task-list-bar span {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  transition: width 0.25s ease;
+}
+.task-list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 6px;
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.task {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--fg-dim);
+}
+.task.in_progress {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+.task.completed span {
+  text-decoration: line-through;
+}
+.task.completed svg {
+  color: var(--ok);
+}
+
+/* ask_user */
+.ask-card {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ask-question {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--fg-strong);
+}
+.ask-keys {
+  margin-left: auto;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.ask-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ask-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-3);
+  color: var(--fg);
+  cursor: pointer;
+}
+.ask-option:hover,
+.ask-option:focus-visible,
+.ask-option.on {
+  border-color: var(--accent);
+}
+.ask-own {
+  display: flex;
+  gap: 6px;
+}
+.ask-own input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Plan bar under a proposed plan */
+.plan-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 8%, var(--bg-2));
+}
+.plan-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.plan-bar.done {
+  font-size: 12px;
+  color: var(--fg-dim);
+  align-items: center;
+}
+.plan-bar.done.approved {
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--border));
+  background: color-mix(in srgb, var(--ok) 8%, var(--bg-2));
+}
+.plan-editor {
+  width: min(760px, 92vw);
+}
+.plan-editor textarea {
+  width: 100%;
+  min-height: 46vh;
+  resize: vertical;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-list-bar span {
+    transition: none;
+  }
+}

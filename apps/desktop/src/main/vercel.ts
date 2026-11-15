@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { AccountList, type SavedAccount } from './accounts.js';
+import { vercelName as vercelProjectName } from '../shared/build.js';
 import type {
   VercelDeploymentView,
   VercelEnvView,
@@ -445,6 +447,90 @@ export class Vercel {
       body: { name: d.name, deploymentId: id, ...(production ? { target: 'production' } : {}) },
     });
     return `https://${r.url}`;
+  }
+
+  /**
+   * Deploys local files as a static site (Phase 9 Build): uploads each file by its SHA-1
+   * (Vercel skips the ones it already has), then creates the deployment. `files` are
+   * project-relative paths with their contents.
+   */
+  async deployFiles(
+    name: string,
+    files: { file: string; data: Buffer }[],
+    teamId: string | null,
+    production: boolean,
+  ): Promise<{ id: string; url: string; state: string; projectId?: string }> {
+    if (!files.length) throw new Error('No hay archivos para publicar.');
+    const tok = await this.token();
+    if (!tok) throw new Error('Conecta tu cuenta de Vercel primero.');
+    let token = tok.token;
+    const entries = files.map((f) => ({
+      ...f,
+      sha: createHash('sha1').update(f.data).digest('hex'),
+    }));
+    const upload = async (e: (typeof entries)[number]) => {
+      const url = new URL('/v2/files', API);
+      if (teamId) url.searchParams.set('teamId', checkId(teamId));
+      const call = () =>
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/octet-stream',
+            'x-vercel-digest': e.sha,
+          },
+          body: new Uint8Array(e.data),
+          signal: AbortSignal.timeout(120_000),
+        });
+      let r = await call();
+      if (r.status === 401 && tok.source === 'cli') {
+        const fresh = await renewCli();
+        if (fresh) {
+          token = fresh;
+          r = await call();
+        }
+      }
+      if (!r.ok) {
+        if (r.status === 401 || r.status === 403)
+          throw new AuthError('Vercel rechazó el token. Vuelve a conectar tu cuenta.');
+        throw new Error(`No se pudo subir ${e.file} (${r.status}).`);
+      }
+    };
+    // A few uploads at a time: fast without hammering the API.
+    const queue = [...new Map(entries.map((e) => [e.sha, e])).values()];
+    await Promise.all(
+      Array.from({ length: Math.min(6, queue.length) }, async () => {
+        for (let e = queue.shift(); e; e = queue.shift()) await upload(e);
+      }),
+    );
+    const r = await this.req<{ id: string; url: string; readyState?: string; projectId?: string }>(
+      '/v13/deployments?skipAutoDetectionConfirmation=1',
+      teamId,
+      {
+        method: 'POST',
+        body: {
+          name: vercelProjectName(name),
+          files: entries.map((e) => ({ file: e.file, sha: e.sha, size: e.data.length })),
+          projectSettings: { framework: null },
+          ...(production ? { target: 'production' } : {}),
+        },
+      },
+    );
+    return {
+      id: r.id,
+      url: `https://${r.url}`,
+      state: r.readyState ?? 'QUEUED',
+      projectId: r.projectId,
+    };
+  }
+
+  /** readyState of one deployment (QUEUED, BUILDING, READY, ERROR, CANCELED). */
+  async deploymentState(deploymentId: string, teamId: string | null): Promise<string> {
+    const d = await this.req<{ readyState?: string }>(
+      `/v13/deployments/${checkId(deploymentId)}`,
+      teamId,
+    );
+    return d.readyState ?? 'QUEUED';
   }
 
   /** Makes a READY deployment the production one again (instant rollback, no rebuild). */

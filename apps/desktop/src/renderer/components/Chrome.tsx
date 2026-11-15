@@ -6,11 +6,14 @@ import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
 import { tv } from './video/strings';
 import { td } from '../i18nDebug';
+import { tp } from '../i18nPlayground';
 import { useProblemCounts } from './Problems';
 import { useDebug } from '../debug';
 import { toggleStudio, useV } from './video/videoStore';
 import {
   BROWSER_TAB,
+  PLAYGROUND_TAB,
+  openPlaygroundTab,
   activate,
   api,
   getState,
@@ -78,6 +81,7 @@ function useBarItems() {
     git: view('git', t('gitTitle'), 'git', gitChanges),
     run: view('run', t('runTitle'), 'run'),
     debug: view('debug', td('dbgBarTip'), 'bug'),
+    testing: view('testing', t('teBarTip'), 'beaker'),
     chat: tool('chat', t('chat'), 'agent', 'toggle', chatOpen, () =>
       setState({ chatOpen: !chatOpen }),
     ),
@@ -116,6 +120,14 @@ function useBarItems() {
     ),
     security: tool('security', t('securityTitle'), 'shield', 'toggle', active === '::security', () =>
       openSecurityTab(),
+    ),
+    playground: tool(
+      'playground',
+      tp('pgOpen'),
+      'sparkle',
+      'toggle',
+      active === PLAYGROUND_TAB,
+      () => openPlaygroundTab(),
     ),
     usage: tool('usage', t('usageTitle'), 'chart', 'action', false, () =>
       setState({ modal: { kind: 'usage' } }),
@@ -186,6 +198,7 @@ export function ActivityBar() {
       {button(items.git)}
       {button(items.run)}
       {button(items.debug)}
+      {button(items.testing)}
       {sep('s1')}
       {button(items.chat)}
       {button(items.watch)}
@@ -204,6 +217,7 @@ export function ActivityBar() {
       <div className="spacer" />
       {sidebar && sidebar !== 'design' && button(items.maximize)}
       {button(items.security)}
+      {button(items.playground)}
       {button(items.usage)}
       {button(items.providers)}
       {button(items.palette)}
@@ -251,6 +265,7 @@ export function AppsPanel() {
         {row(items.whatsapp, t('appsWhatsapp'))}
         {row(items.browser, t('appsBrowser'))}
         <div className="apps-section">{t('appsTools')}</div>
+        {row(items.playground, tp('pgTab'))}
         {row(items.usage, t('appsUsage'))}
         {row(items.palette, t('appsPalette'))}
       </div>

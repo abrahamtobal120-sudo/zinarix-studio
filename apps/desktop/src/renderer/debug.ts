@@ -11,6 +11,7 @@ import type {
   DebugState,
   DebugVariable,
 } from '../shared/devtools';
+import type { TestRunRequest } from '../shared/testing';
 import { td } from './i18nDebug';
 import { fileUriOf, modelPath } from './lsp';
 import { monaco } from './monaco';
@@ -262,6 +263,21 @@ export async function startDebug(): Promise<void> {
   }
 }
 
+/** Debugs a test of the Test Explorer (main builds the runner command). */
+export async function startTestDebug(req: TestRunRequest): Promise<void> {
+  if (!getState().workspace) return toast(td('dbgIdle'));
+  if (view.state !== 'idle') await api().debug.stop().catch(() => undefined);
+  await saveAll();
+  setState({ panelOpen: true, panelView: 'debug' });
+  clearConsole();
+  set({ frames: [], frameId: null, verified: {} });
+  try {
+    await api().debug.startTest(req, view.breakpoints);
+  } catch (e) {
+    showError(e);
+  }
+}
+
 export function setConfigIndex(i: number): void {
   set({ configIndex: i });
 }
@@ -366,9 +382,20 @@ export function attachDebugToEditor(ed: monaco.editor.IStandaloneCodeEditor): mo
       )
         return;
       if (e.event.rightButton) return;
+      // The right lane holds the Test Explorer's ▶ / ✓ / ✗: a click there runs the test.
       const model = ed.getModel();
       const path = model && modelPath(model);
       const line = e.target.position?.lineNumber;
+      if (
+        model &&
+        line &&
+        (e.target.detail as { glyphMarginLane?: monaco.editor.GlyphMarginLane } | undefined)
+          ?.glyphMarginLane === monaco.editor.GlyphMarginLane.Right &&
+        model
+          .getLineDecorations(line)
+          .some((d) => d.options.glyphMarginClassName?.includes('te-mark'))
+      )
+        return;
       if (path && line) toggleBreakpoint(path, line);
     }),
     // A faint dot where a click would add a breakpoint.

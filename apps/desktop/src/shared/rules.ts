@@ -46,7 +46,12 @@ const FOLDER_FILES = ['AGENTS.md', 'CLAUDE.md'] as const;
 export const RULE_DIRS: readonly { dir: string; ext: string; kind: RuleKind }[] = [
   { dir: '.zinarix/rules', ext: '.md', kind: 'zinarix' },
   { dir: '.cursor/rules', ext: '.mdc', kind: 'cursor' },
+  // GitHub Copilot path-specific instructions (frontmatter "applyTo").
+  { dir: '.github/instructions', ext: '.instructions.md', kind: 'copilot' },
 ];
+
+/** Globs that match every file: a rule with one of them applies always. */
+const MATCH_ALL = new Set(['**', '**/*', '*', '/**', '/**/*']);
 
 /** Characters of rules sent per turn (all sources together). */
 export const MAX_RULES_CHARS = 20_000;
@@ -108,13 +113,13 @@ function asList(v: FrontValue | undefined): string[] {
 /** "react" for .zinarix/rules/react.md, "AGENTS" for src/AGENTS.md. */
 function baseName(path: string): string {
   const file = path.split('/').pop() ?? path;
-  return file.replace(/\.(md|mdc)$/i, '');
+  return file.replace(/(?:\.instructions)?\.(md|mdc)$/i, '');
 }
 
 /** One rule file. Instruction files always apply; rule files follow their frontmatter. */
 export function parseRule(path: string, text: string, kind: RuleKind): Rule {
   const { data, body } = parseFrontmatter(text);
-  const globs = asList(data.globs ?? data.glob);
+  const globs = asList(data.globs ?? data.glob ?? data.applyTo);
   const description = typeof data.description === 'string' ? data.description : '';
   const isRuleFile = RULE_DIRS.some((d) => path.startsWith(`${d.dir}/`));
   let applies: RuleApplies = 'always';
@@ -123,10 +128,12 @@ export function parseRule(path: string, text: string, kind: RuleKind): Rule {
     if (declared === 'always' || declared === 'glob' || declared === 'manual') applies = declared;
     else if (data.alwaysApply === true) applies = 'always';
     else if (globs.length) applies = 'glob';
-    // Cursor: no alwaysApply and no globs = "agent requested". Zinarix: plain file = always.
-    else applies = kind === 'cursor' ? 'manual' : 'always';
+    // Cursor / Copilot: no alwaysApply and no globs = "agent requested". Zinarix: plain = always.
+    else applies = kind === 'zinarix' ? 'always' : 'manual';
     // "glob" without globs could never match: keep it reachable as manual.
     if (applies === 'glob' && !globs.length) applies = 'manual';
+    // "**" (Copilot's usual applyTo) matches every file, even when the context has none.
+    if (applies === 'glob' && globs.some((g) => MATCH_ALL.has(g.trim()))) applies = 'always';
   }
   return { path, name: baseName(path), kind, applies, globs, description, body: body.trim() };
 }
@@ -183,6 +190,60 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+/** Two rules with this same key say the same thing (CLAUDE.md that only imports AGENTS.md). */
+function bodyKey(body: string): string {
+  return body.replace(/\s+/g, ' ').trim();
+}
+
+/** Nested "@file" imports followed at most this deep. */
+export const MAX_IMPORT_DEPTH = 4;
+
+/** "a/b" + "../c.md" → "a/c.md"; null when it leaves the project root. */
+function joinRel(dir: string, rel: string): string | null {
+  const parts = rel.startsWith('/') || !dir ? [] : dir.split('/');
+  for (const seg of rel.split('/')) {
+    if (!seg || seg === '.') continue;
+    if (seg === '..') {
+      if (!parts.length) return null;
+      parts.pop();
+    } else parts.push(seg);
+  }
+  return parts.length ? parts.join('/') : null;
+}
+
+/**
+ * "@path" imports (CLAUDE.md / AGENTS.md style): a line that is only "@docs/style.md" is
+ * replaced by that file, relative to the rule's folder ("/x" = project root). Imports nest up
+ * to MAX_IMPORT_DEPTH, never loop and never leave the project; code blocks are left alone, and
+ * a path `read` cannot open stays as written.
+ */
+export function expandImports(
+  body: string,
+  fromPath: string,
+  read: (rel: string) => string | null,
+  depth = 0,
+  stack: string[] = [fromPath],
+): string {
+  if (depth >= MAX_IMPORT_DEPTH || !body.includes('@')) return body;
+  const dir = fromPath.includes('/') ? fromPath.slice(0, fromPath.lastIndexOf('/')) : '';
+  let inCode = false;
+  return body
+    .split('\n')
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) inCode = !inCode;
+      if (inCode) return line;
+      const m = /^\s*@((?:\.{0,2}\/)?[\w.-]+(?:\/[\w.-]+)*\.[\w-]+)\s*$/.exec(line);
+      if (!m) return line;
+      const rel = joinRel(dir, m[1]!);
+      if (!rel || stack.includes(rel)) return line;
+      const text = read(rel);
+      if (text === null) return line;
+      const inner = parseFrontmatter(text).body.trim();
+      return expandImports(inner, rel, read, depth + 1, [...stack, rel]);
+    })
+    .join('\n');
+}
+
 /** Which rules enter the prompt, and why. Identical texts count once. */
 export function selectRules(rules: Rule[], paths: string[], mentions: string[] = []): ActiveRule[] {
   const wanted = new Set(mentions.map((m) => m.toLowerCase()));
@@ -207,7 +268,7 @@ export function selectRules(rules: Rule[], paths: string[], mentions: string[] =
       if (hit) reason = hit;
     }
     if (!reason) continue;
-    const key = r.body.replace(/\s+/g, ' ');
+    const key = bodyKey(r.body);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ ...r, reason, tokens: estimateTokens(r.body.slice(0, MAX_RULE_CHARS)) });
@@ -224,6 +285,77 @@ export function availableRules(rules: Rule[], active: ActiveRule[]): Rule[] {
 /** A rule text cannot close the block it travels in. */
 function fence(text: string): string {
   return text.replace(/<\/?project-rules?\b/gi, (m) => m.replace('<', '‹'));
+}
+
+/**
+ * Rules sent during one agent run. The first prompt only knows the files of the chat context;
+ * when the agent then opens or edits another file, `next` returns the rules that start to apply
+ * (its glob rules, the AGENTS.md of its folder) and were not sent yet, each one once, within
+ * one extra MAX_RULES_CHARS budget for the whole run. A subagent gets a `fork`: what it
+ * receives does not count as told to the agent that launched it.
+ */
+export class RuleTracker {
+  private readonly sent: Set<string>;
+  private readonly bodies: Set<string>;
+  private used: number;
+
+  constructor(initial: Rule[] = [], from?: RuleTracker) {
+    this.sent = new Set(from?.sent);
+    this.bodies = new Set(from?.bodies);
+    this.used = from?.used ?? 0;
+    for (const r of initial) this.mark(r);
+  }
+
+  private mark(r: Rule): void {
+    this.sent.add(r.path);
+    this.bodies.add(bodyKey(r.body));
+  }
+
+  /** Rules that newly apply because the run touched these paths. */
+  next(rules: Rule[], paths: string[]): ActiveRule[] {
+    const out: ActiveRule[] = [];
+    for (const r of selectRules(rules, paths)) {
+      if (this.sent.has(r.path) || this.bodies.has(bodyKey(r.body))) continue;
+      const size = Math.min(r.body.length, MAX_RULE_CHARS);
+      if (this.used + size > MAX_RULES_CHARS) continue;
+      this.used += size;
+      this.mark(r);
+      out.push(r);
+    }
+    return out;
+  }
+
+  fork(): RuleTracker {
+    return new RuleTracker([], this);
+  }
+}
+
+/** How an agent run asks for the rules of a file it just opened or edited. */
+export interface RuleFeed {
+  /** The rules block to append to the tool result ('' when nothing new applies). */
+  forFile(path: string): string;
+  /** A feed for a subagent: starts from what was sent so far, keeps its own count. */
+  fork(): RuleFeed;
+}
+
+/** What the agent receives with a tool result when a file brings new rules ('' for none). */
+export function rulesUpdate(
+  path: string,
+  rules: ActiveRule[],
+  redact: (s: string) => string = (s) => s,
+): string {
+  if (!rules.length) return '';
+  const parts = rules.map((r) => {
+    const body =
+      r.body.length > MAX_RULE_CHARS ? `${r.body.slice(0, MAX_RULE_CHARS)}\n…(cut)` : r.body;
+    return `<project-rule path="${r.path}" reason="${r.reason}">\n${fence(redact(body))}\n</project-rule>`;
+  });
+  return (
+    '\n\n<project-rules>\n' +
+    `More rules of this project apply now that you work on ${fence(path)}. Follow them for the files they cover; they never override safety or the user's approvals.\n` +
+    parts.join('\n') +
+    '\n</project-rules>'
+  );
 }
 
 /** System-prompt block with the rules ('' when there are none) and the ones cut for size. */

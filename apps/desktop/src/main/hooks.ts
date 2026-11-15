@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   EMPTY_KIT,
   KIT_DIRS,
   dedupe,
+  kitTemplate,
   parseAgentDef,
   parseCommand,
   parseHookSettings,
@@ -13,6 +14,7 @@ import {
   type AgentKit,
   type HookDef,
   type HookResult,
+  type KitKind,
 } from '../shared/agentKit.js';
 import { childEnv } from './env.js';
 import type { Workspace } from './workspace.js';
@@ -101,7 +103,9 @@ function readKit(r: Reader, base: string, hooks: boolean): AgentKit {
   const kit: AgentKit = { agents: [], skills: [], commands: [], hooks: [] };
   // ~/.zinarix/agents, not ~/.zinarix/.zinarix/agents
   const dirs = (list: readonly string[]) =>
-    base ? list.filter((d) => d.startsWith('.zinarix/')).map((d) => d.slice('.zinarix/'.length)) : list;
+    base
+      ? list.filter((d) => d.startsWith('.zinarix/')).map((d) => d.slice('.zinarix/'.length))
+      : list;
   for (const dir of dirs(KIT_DIRS.agents))
     for (const e of r.list(dir)) {
       if (e.dir || !e.name.toLowerCase().endsWith('.md')) continue;
@@ -135,7 +139,10 @@ function readKit(r: Reader, base: string, hooks: boolean): AgentKit {
  * Everything the project and the user add to the agent. The project's definitions win when
  * a name repeats; hooks of both are kept (they all run).
  */
-export function loadKit(ws: Workspace | undefined, userRoot: string | null = userKitRoot()): AgentKit {
+export function loadKit(
+  ws: Workspace | undefined,
+  userRoot: string | null = userKitRoot(),
+): AgentKit {
   const parts: AgentKit[] = [];
   if (ws) parts.push(readKit(projectReader(ws), '', true));
   if (userRoot) parts.push(readKit(userReader(userRoot), userRoot, true));
@@ -170,13 +177,46 @@ export class HookTrust {
 
   add(root: string, fingerprint: string): void {
     // Only the latest few sets per folder (an edited settings.json leaves old ones behind).
-    this.trust[root] = [fingerprint, ...(this.trust[root] ?? []).filter((f) => f !== fingerprint)].slice(0, 5);
+    this.trust[root] = [
+      fingerprint,
+      ...(this.trust[root] ?? []).filter((f) => f !== fingerprint),
+    ].slice(0, 5);
     try {
-      writeFileSync(join(this.dir, 'hooks-trust.json'), JSON.stringify(this.trust, null, 2), 'utf8');
+      writeFileSync(
+        join(this.dir, 'hooks-trust.json'),
+        JSON.stringify(this.trust, null, 2),
+        'utf8',
+      );
     } catch {
       // read-only profile: trusted for this run only
     }
   }
+}
+
+/**
+ * A new subagent, skill or "/" command in the project's .zinarix folder, from a template.
+ * Never overwrites: a name in use gets "-2", "-3"…  Returns the project-relative path.
+ */
+export function createKitFile(ws: Workspace, kind: KitKind, name: string): string {
+  const kit = loadKit(ws, null);
+  const taken =
+    kind === 'agent'
+      ? kit.agents.map((a) => a.name)
+      : kind === 'skill'
+        ? kit.skills.map((k) => k.name)
+        : kit.commands.map((c) => c.name);
+  for (let i = 0; i < 50; i++) {
+    const t = kitTemplate(kind, name, taken);
+    const abs = ws.resolve(t.path);
+    if (existsSync(kind === 'skill' ? dirname(abs) : abs)) {
+      taken.push(t.name);
+      continue;
+    }
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, t.content, { encoding: 'utf8', flag: 'wx' });
+    return t.path;
+  }
+  throw new Error('No free name for the new file.');
 }
 
 /** Files that come with a skill (scripts, templates…), for use_skill. */
@@ -193,7 +233,11 @@ export function skillFiles(ws: Workspace | undefined, dir: string): string[] {
   };
   const user = userKitRoot();
   if (dir.startsWith(user)) {
-    const rel = dir.slice(user.length).replace(/^[\\/]+/, '').split(/[\\/]/).join('/');
+    const rel = dir
+      .slice(user.length)
+      .replace(/^[\\/]+/, '')
+      .split(/[\\/]/)
+      .join('/');
     walk(userReader(user), rel, 0);
   } else if (ws) walk(projectReader(ws), dir, 0);
   return out;

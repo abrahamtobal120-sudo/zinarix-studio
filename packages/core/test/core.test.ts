@@ -637,6 +637,23 @@ describe('history ids', () => {
     expect(c.history.get(a.id)?.conversation.id).toBe(a.id);
     expect(c.history.get(a.id.slice(0, 8))?.conversation.id).toBe(a.id);
   });
+
+  it('truncates a conversation from its n-th user message on (rewind)', () => {
+    const c = open();
+    const a = c.history.create('a', 'mock/m');
+    const b = c.history.create('b', 'mock/m');
+    for (const id of [a.id, b.id])
+      for (const n of [0, 1, 2]) {
+        c.history.append(id, { role: 'user', content: `q${n}` });
+        c.history.append(id, { role: 'assistant', content: `r${n}` });
+      }
+    expect(c.history.truncateAtUser(a.id, 1)).toBe(4);
+    expect(c.history.get(a.id)!.messages.map((m) => m.message.content)).toEqual(['q0', 'r0']);
+    // Other conversations and out-of-range indexes are left alone.
+    expect(c.history.get(b.id)!.messages).toHaveLength(6);
+    expect(c.history.truncateAtUser(a.id, 5)).toBe(0);
+    expect(c.history.truncateAtUser(a.id, -1)).toBe(0);
+  });
 });
 
 describe('data directory', () => {
