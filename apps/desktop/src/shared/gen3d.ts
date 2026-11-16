@@ -117,10 +117,27 @@ const IMAGE_FIELDS = [
   'front_image',
 ];
 /** Booleans that ask for the textured mesh file (off by default on some models). */
-const WANT_FIELDS = ['generate_model', 'generate_texture', 'texture', 'textured_mesh', 'enable_pbr'];
+const WANT_FIELDS = [
+  'generate_model',
+  'generate_texture',
+  'texture',
+  'textured_mesh',
+  'enable_pbr',
+];
 /** Booleans that ask for side outputs we do not use (videos, gaussian splats). */
-const SKIP_FIELDS = ['generate_color', 'generate_normal', 'save_gaussian_ply', 'return_no_background'];
-const FORMAT_FIELDS = ['geometry_file_format', 'output_format', 'file_format', 'format', 'mesh_format'];
+const SKIP_FIELDS = [
+  'generate_color',
+  'generate_normal',
+  'save_gaussian_ply',
+  'return_no_background',
+];
+const FORMAT_FIELDS = [
+  'geometry_file_format',
+  'output_format',
+  'file_format',
+  'format',
+  'mesh_format',
+];
 const SEED_FIELDS = ['seed'];
 
 const pick = (props: InputProps, names: string[]) => names.find((n) => props[n] !== undefined);
@@ -139,7 +156,8 @@ export function genInput(
   const pf = pick(p, PROMPT_FIELDS);
   if (prompt && pf) input[pf] = prompt;
   const imf = pick(p, IMAGE_FIELDS);
-  if (r.imageDataUrl && imf) input[imf] = p[imf]?.type === 'array' ? [r.imageDataUrl] : r.imageDataUrl;
+  if (r.imageDataUrl && imf)
+    input[imf] = p[imf]?.type === 'array' ? [r.imageDataUrl] : r.imageDataUrl;
   for (const f of WANT_FIELDS) if (p[f]?.type === 'boolean') input[f] = true;
   for (const f of SKIP_FIELDS) if (p[f]?.type === 'boolean') input[f] = false;
   const ff = pick(p, FORMAT_FIELDS);

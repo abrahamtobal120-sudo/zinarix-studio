@@ -56,7 +56,9 @@ const num = (a: Args, k: string) =>
   typeof a[k] === 'number' && Number.isFinite(a[k]) ? (a[k] as number) : undefined;
 const vec = (a: Args, k: string): Vec3 | undefined => {
   const v = a[k];
-  return Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x))
+  return Array.isArray(v) &&
+    v.length === 3 &&
+    v.every((x) => typeof x === 'number' && Number.isFinite(x))
     ? (v as Vec3)
     : undefined;
 };
@@ -96,7 +98,10 @@ export function sceneStateText(s: Scene3D, selected: string | null, open: boolea
       : '';
     const keys = n.keys
       ? ` keys{${Object.entries(n.keys)
-          .map(([p, l]) => `${p}:${l!.map((k) => `${r3(k.t)}s=${r3(k.v)}${k.ease ? `/${k.ease}` : ''}`).join(',')}`)
+          .map(
+            ([p, l]) =>
+              `${p}:${l!.map((k) => `${r3(k.t)}s=${r3(k.v)}${k.ease ? `/${k.ease}` : ''}`).join(',')}`,
+          )
           .join(' ')}}`
       : '';
     lines.push(
@@ -131,7 +136,9 @@ function applyFields(n: Node3D, a: Args): Node3D {
   } else {
     const hasMat =
       isHex(a.color) ||
-      ['metalness', 'roughness', 'emissiveIntensity', 'opacity'].some((k) => num(a, k) !== undefined) ||
+      ['metalness', 'roughness', 'emissiveIntensity', 'opacity'].some(
+        (k) => num(a, k) !== undefined,
+      ) ||
       isHex(a.emissive);
     if (hasMat || out.material) {
       const m = { ...(out.material ?? makeMesh('box').material!) };
@@ -177,7 +184,8 @@ export function applyScene3dOps(scene: Scene3D, ops: unknown, playhead = 0): Ops
     const op = str(a, 'op') as Scene3DOp;
     counts[op] = (counts[op] ?? 0) + 1;
     const target = (): Node3D =>
-      findNode(s, str(a, 'id')) ?? fail(`no node "${str(a, 'id')}" (use an id or name from scene3d_state)`);
+      findNode(s, str(a, 'id')) ??
+      fail(`no node "${str(a, 'id')}" (use an id or name from scene3d_state)`);
     switch (op) {
       case 'add': {
         if (s.nodes.length >= LIMITS.nodes) fail(`the scene already has ${LIMITS.nodes} nodes`);
@@ -185,7 +193,8 @@ export function applyScene3dOps(scene: Scene3D, ops: unknown, playhead = 0): Ops
         let n: Node3D;
         if (kind === 'light') {
           const type = str(a, 'light') || str(a, 'type') || 'point';
-          if (!LIGHT_TYPES.includes(type as LightType)) fail(`light must be ${LIGHT_TYPES.join('|')}`);
+          if (!LIGHT_TYPES.includes(type as LightType))
+            fail(`light must be ${LIGHT_TYPES.join('|')}`);
           n = makeLight(type as LightType);
         } else if (kind === 'model') {
           const path = str(a, 'model');
@@ -234,13 +243,18 @@ export function applyScene3dOps(scene: Scene3D, ops: unknown, playhead = 0): Ops
         if (v === undefined) fail('key needs a number "v"');
         if (t < 0 || t > s.duration) fail(`t must be between 0 and the duration (${s.duration} s)`);
         const easeRaw = str(a, 'ease');
-        if (easeRaw && !EASES_3D.includes(easeRaw as Ease3D)) fail(`ease must be ${EASES_3D.join('|')}`);
+        if (easeRaw && !EASES_3D.includes(easeRaw as Ease3D))
+          fail(`ease must be ${EASES_3D.join('|')}`);
         const ease = (easeRaw || undefined) as Ease3D | undefined;
         if (str(a, 'id') === 'camera') {
-          if (!CAMERA_PROPS.includes(prop as CameraProp)) fail(`camera prop must be ${CAMERA_PROPS.join('|')}`);
+          if (!CAMERA_PROPS.includes(prop as CameraProp))
+            fail(`camera prop must be ${CAMERA_PROPS.join('|')}`);
           s = {
             ...s,
-            camera: { ...s.camera, keys: withKey(s.camera.keys, prop as CameraProp, t, v!, s.fps, ease) },
+            camera: {
+              ...s.camera,
+              keys: withKey(s.camera.keys, prop as CameraProp, t, v!, s.fps, ease),
+            },
           };
           log.push(`camera key ${prop} ${r3(t)}s=${r3(v!)}`);
           return;
@@ -263,7 +277,8 @@ export function applyScene3dOps(scene: Scene3D, ops: unknown, playhead = 0): Ops
           next = { ...keysOf };
           delete (next as Record<string, unknown>)[prop];
           if (!Object.keys(next).length) next = undefined;
-        } else next = withoutKey(keysOf as Record<string, never> | undefined, prop as never, t, s.fps);
+        } else
+          next = withoutKey(keysOf as Record<string, never> | undefined, prop as never, t, s.fps);
         if (isCam) {
           const cam = { ...s.camera };
           if (next) cam.keys = next as Scene3D['camera']['keys'];
@@ -292,7 +307,12 @@ export function applyScene3dOps(scene: Scene3D, ops: unknown, playhead = 0): Ops
         const fov = num(a, 'fov');
         s = {
           ...s,
-          camera: { ...s.camera, ...(p ? { position: p } : {}), ...(tg ? { target: tg } : {}), ...(fov !== undefined ? { fov } : {}) },
+          camera: {
+            ...s.camera,
+            ...(p ? { position: p } : {}),
+            ...(tg ? { target: tg } : {}),
+            ...(fov !== undefined ? { fov } : {}),
+          },
         };
         log.push('camera changed');
         return;
@@ -345,7 +365,12 @@ export function applyScene3dOps(scene: Scene3D, ops: unknown, playhead = 0): Ops
   const summary = Object.entries(counts)
     .map(([op, c]) => `${ES[op] ?? op}${c > 1 ? ` ×${c}` : ''}`)
     .join(', ');
-  return { scene: clean, log, summary, ...(lastAdded && clean.nodes.some((n) => n.id === lastAdded) ? { lastAdded } : {}) };
+  return {
+    scene: clean,
+    log,
+    summary,
+    ...(lastAdded && clean.nodes.some((n) => n.id === lastAdded) ? { lastAdded } : {}),
+  };
 }
 
 /** Plain Spanish line for the approval card. */

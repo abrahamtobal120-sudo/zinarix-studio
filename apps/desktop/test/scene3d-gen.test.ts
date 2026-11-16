@@ -59,7 +59,15 @@ describe('Fase 14: animation curves', () => {
       { t: 2, v: 100 },
     ];
     expect(interpKeys(keys, 1)).toBeCloseTo(12.5, 6);
-    expect(interpKeys([{ t: 0, v: 5, ease: 'hold' }, { t: 1, v: 9 }], 0.99)).toBe(5);
+    expect(
+      interpKeys(
+        [
+          { t: 0, v: 5, ease: 'hold' },
+          { t: 1, v: 9 },
+        ],
+        0.99,
+      ),
+    ).toBe(5);
   });
 
   it('bakes curves into per-frame linear keys that land exactly on every frame', () => {
@@ -84,7 +92,12 @@ describe('Fase 14: animation curves', () => {
   it('Blender receives baked keys only (no curve it would draw differently)', () => {
     const s = fromTemplate('logo', { duration: 2 });
     const logo = s.nodes.find((n) => n.shape === 'text')!;
-    logo.keys = { ry: [{ t: 0, v: 0, ease: 'back' }, { t: 2, v: 360 }] };
+    logo.keys = {
+      ry: [
+        { t: 0, v: 0, ease: 'back' },
+        { t: 2, v: 360 },
+      ],
+    };
     const py = toBpy(s, { framesDir: 'C:\\f', engine: 'eevee' });
     const b64 = /b64decode\("([A-Za-z0-9+/=]+)"\)/.exec(py)![1]!;
     const sent = JSON.parse(Buffer.from(b64, 'base64').toString('utf8')).scene;
@@ -110,11 +123,14 @@ describe('Fase 14: animation curves', () => {
         },
       ],
     });
-    expect(s.nodes[0]!.keys!.px).toEqual([{ t: 0, v: 0, ease: 'bounce' }, { t: 1, v: 1 }]);
+    expect(s.nodes[0]!.keys!.px).toEqual([
+      { t: 0, v: 0, ease: 'bounce' },
+      { t: 1, v: 1 },
+    ]);
   });
 
   it('re-keying keeps the curve; the curve picker sets every key at the playhead', () => {
-    let k = withKey(undefined, 'px', 0, 0, 30, 'out');
+    let k = withKey<'px' | 'py'>(undefined, 'px', 0, 0, 30, 'out');
     k = withKey(k, 'px', 0, 5, 30);
     expect(k.px).toEqual([{ t: 0, v: 5, ease: 'out' }]);
     k = withKey(k, 'py', 0, 1, 30);
@@ -182,9 +198,10 @@ describe('Fase 14: 3D generation (pure)', () => {
         gaussian_ply: 'https://replicate.delivery/a/p.ply',
       }),
     ).toEqual({ url: 'https://replicate.delivery/a/model.glb', ext: 'glb' });
-    expect(
-      modelUrlOf(['https://x.io/m.obj', 'https://x.io/m.glb?sig=1']),
-    ).toEqual({ url: 'https://x.io/m.glb?sig=1', ext: 'glb' });
+    expect(modelUrlOf(['https://x.io/m.obj', 'https://x.io/m.glb?sig=1'])).toEqual({
+      url: 'https://x.io/m.glb?sig=1',
+      ext: 'glb',
+    });
     expect(modelUrlOf('https://x.io/m.FBX')).toEqual({ url: 'https://x.io/m.FBX', ext: 'fbx' });
     expect(modelUrlOf('http://x.io/m.glb')).toBeNull();
     expect(modelUrlOf({ a: 'https://x.io/v.mp4' })).toBeNull();
@@ -193,7 +210,9 @@ describe('Fase 14: 3D generation (pure)', () => {
 
   it('file names, progress from logs', () => {
     const at = new Date(2026, 10, 15, 18, 30, 5);
-    expect(gen3dFileName('Taza roja con asa!', 'glb', at)).toBe('taza-roja-con-asa-20261115-183005.glb');
+    expect(gen3dFileName('Taza roja con asa!', 'glb', at)).toBe(
+      'taza-roja-con-asa-20261115-183005.glb',
+    );
     expect(gen3dFileName(undefined, 'obj', at)).toBe('modelo-3d-20261115-183005.obj');
     expect(logPercent('a\n 12%|██  | 3/25\n 48%|████ | 12/25')).toBe(48);
     expect(logPercent('nothing')).toBeUndefined();
@@ -289,11 +308,8 @@ describe('Fase 14: 3D generation against a fake Replicate', () => {
     try {
       const svc = service(base);
       // The download host equals the API host here, so it goes through the provider fetch.
-      const r = await svc.generate(
-        'g1',
-        { model: 'firtoz/trellis', image: img },
-        ws,
-        (e) => events.push(e.type === 'progress' ? `${e.stage}${e.percent ?? ''}` : e.type),
+      const r = await svc.generate('g1', { model: 'firtoz/trellis', image: img }, ws, (e) =>
+        events.push(e.type === 'progress' ? `${e.stage}${e.percent ?? ''}` : e.type),
       );
       expect(r.path.startsWith(join(ws, 'media', '3d'))).toBe(true);
       expect(r.path.endsWith('.glb')).toBe(true);
@@ -322,13 +338,10 @@ describe('Fase 14: 3D generation against a fake Replicate', () => {
   });
 
   it('refuses without Replicate connected, before sending anything', async () => {
-    const svc = new Gen3DService(
-      { connectedProviders: async () => [] } as never,
-      tmp,
-    );
-    await expect(svc.generate('g3', { model: 'tencent/hunyuan-3d-3.1', prompt: 'a' }, tmp)).rejects.toThrow(
-      /Replicate no está conectado/,
-    );
+    const svc = new Gen3DService({ connectedProviders: async () => [] } as never, tmp);
+    await expect(
+      svc.generate('g3', { model: 'tencent/hunyuan-3d-3.1', prompt: 'a' }, tmp),
+    ).rejects.toThrow(/Replicate no está conectado/);
   });
 });
 
@@ -337,7 +350,7 @@ describe('Fase 14: generate_3d_model tool', () => {
     expect(SCENE3D_TOOLS.some((t) => t.name === 'generate_3d_model')).toBe(true);
     expect(alwaysAsks('generate_3d_model', {})).toBe(true);
     expect(decide('full', 'generate_3d_model', { prompt: 'a' })).not.toBe('auto');
-    const p = scene3dPreview('generate_3d_model', { prompt: 'taza roja' });
+    const p = scene3dPreview('generate_3d_model', { prompt: 'taza roja' })!;
     expect(p.warning).toMatch(/no se estima/);
     expect(p.command).toBe('taza roja');
     expect(gen3dRequestOf({ model: 'nope', prompt: 'a', seed: 3.6 })).toEqual({

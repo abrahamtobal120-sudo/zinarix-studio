@@ -144,10 +144,7 @@ async function editorTool(
       toast(`La IA cambió la escena 3D: ${r.summary}`);
       return {
         ok: true,
-        content: `${r.log.join('
-')}
-
-${sceneStateText(r.scene, get3().selected, get3().open)}`,
+        content: `${r.log.join('\n')}\n\n${sceneStateText(r.scene, get3().selected, get3().open)}`,
         summary: r.summary,
       };
     } catch (e) {

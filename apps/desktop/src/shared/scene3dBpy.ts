@@ -258,20 +258,33 @@ def main(cfg):
     scene.render.image_settings.color_depth = '8'
     scene.render.filepath = os.path.join(cfg['framesDir'], 'f_####')
 
+    # The world lights the objects with the ambient light, but the camera sees the background
+    # colour (as in the viewer, where they are separate): Light Path "Is Camera Ray" picks.
     world = bpy.data.worlds.new('Zinarix')
     scene.world = world
     world.use_nodes = True
-    bg = world.node_tree.nodes.get('Background')
+    nt = world.node_tree
+    for node in list(nt.nodes):
+        nt.nodes.remove(node)
     amb = [n for n in s['nodes'] if n['kind'] == 'light' and n['light']['type'] == 'ambient' and n.get('visible', True)]
-    if bg is not None:
-        if amb:
-            r, g, b = hex_rgb(amb[0]['light']['color'])
-            bg.inputs[0].default_value = (r, g, b, 1.0)
-            bg.inputs[1].default_value = float(amb[0]['light']['intensity'])
-        else:
-            r, g, b = hex_rgb(s['background'])
-            bg.inputs[0].default_value = (r, g, b, 1.0)
-            bg.inputs[1].default_value = 0.0 if s['transparent'] else 1.0
+    light_bg = nt.nodes.new('ShaderNodeBackground')
+    if amb:
+        r, g, b = hex_rgb(amb[0]['light']['color'])
+        light_bg.inputs[0].default_value = (r, g, b, 1.0)
+        light_bg.inputs[1].default_value = float(amb[0]['light']['intensity'])
+    else:
+        light_bg.inputs[1].default_value = 0.0
+    seen_bg = nt.nodes.new('ShaderNodeBackground')
+    r, g, b = hex_rgb(s['background'])
+    seen_bg.inputs[0].default_value = (r, g, b, 1.0)
+    seen_bg.inputs[1].default_value = 1.0
+    path = nt.nodes.new('ShaderNodeLightPath')
+    mix = nt.nodes.new('ShaderNodeMixShader')
+    out = nt.nodes.new('ShaderNodeOutputWorld')
+    nt.links.new(path.outputs['Is Camera Ray'], mix.inputs[0])
+    nt.links.new(light_bg.outputs[0], mix.inputs[1])
+    nt.links.new(seen_bg.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs['Surface'])
 
     root = new_empty('Zinarix (Y arriba)', None)
     root.rotation_euler = (math.pi / 2, 0, 0)

@@ -57,6 +57,7 @@ import {
 import { t3, type Key3D } from './strings3d';
 import { Viewport } from './viewport3d';
 import { Gen3DDialog } from './Gen3DDialog';
+import { QuickTools3D } from './QuickTools3D';
 import './studio3d.css';
 
 export function Studio3DHost() {
@@ -246,6 +247,7 @@ function Studio3D() {
               onClick={() => set3({ viewCam: !viewCam })}
             />
           </div>
+          <QuickTools3D />
         </div>
         <Inspector getView={() => vp.current?.editorView()} />
       </div>
@@ -1056,7 +1058,11 @@ function CurvePick() {
       const k = withEaseAt(s.camera.keys, t, s.fps, ease);
       commit({ ...s, camera: { ...s.camera, ...(k ? { keys: k } : {}) } }, t3('editCurve'));
     } else if (n) {
-      commitNode(n.id, (x) => ({ ...x, keys: withEaseAt(x.keys, t, s.fps, ease) }), t3('editCurve'));
+      commitNode(
+        n.id,
+        (x) => ({ ...x, keys: withEaseAt(x.keys, t, s.fps, ease) }),
+        t3('editCurve'),
+      );
     }
   };
   return (
@@ -1113,7 +1119,18 @@ function RenderDialog() {
               <button type="button" className="s3-link" onClick={() => look(true)}>
                 {t3('findAgain')}
               </button>
-            )}
+            )}{' '}
+            <button
+              type="button"
+              className="s3-link"
+              onClick={async () => {
+                const b = await api().scene3d.pickBlender();
+                if (b) setInfo((i) => ({ outDir: i?.outDir ?? '', blender: b }));
+                else if (b === false) toast(t3('notBlender'));
+              }}
+            >
+              {t3('pickBlender')}
+            </button>
           </p>
         )}
         <Field label={t3('format')}>

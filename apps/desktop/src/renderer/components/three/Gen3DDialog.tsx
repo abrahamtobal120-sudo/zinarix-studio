@@ -33,7 +33,12 @@ export function Gen3DDialog() {
 
   const m = info?.models.find((x) => x.id === model);
   const needImage = !!m && !m.inputs.includes('text');
-  const issue = !prompt.trim() && !image ? t3('genNeedPrompt') : needImage && !image ? t3('genNeedImage') : null;
+  const issue =
+    !prompt.trim() && !image
+      ? t3('genNeedPrompt')
+      : needImage && !image
+        ? t3('genNeedImage')
+        : null;
   const close = () => set3({ genOpen: false });
 
   const run = async () => {
@@ -59,7 +64,10 @@ export function Gen3DDialog() {
       toast(t3('genDone', { name }));
       for (const w of r.warnings) toast(w);
     } catch (e) {
-      const msg = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e);
+      const msg =
+        e instanceof Error
+          ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+          : String(e);
       setBusy(null);
       toast(t3('genFail', { msg }));
     } finally {

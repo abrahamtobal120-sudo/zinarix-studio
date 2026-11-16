@@ -116,6 +116,24 @@ describe('agent safety', () => {
       // 3D (Fase 14, scene3dTools.ts)
       'render_3d',
       'blender_script',
+      // Video Studio (Fase 13B, videoTools.ts)
+      'video_state',
+      'video_transcript',
+      'video_add_media',
+      'video_keep_ranges',
+      'video_cut_words',
+      'video_remove_fillers',
+      'video_remove_silences',
+      'video_split_scenes',
+      'video_split',
+      'video_trim',
+      'video_move',
+      'video_delete',
+      'video_add_title',
+      'video_captions',
+      'video_set_format',
+      'video_transcribe',
+      'video_export',
     ];
     const names = TOOLS.map((t) => t.name);
     expect(new Set(names).size, 'duplicate tool names').toBe(names.length);

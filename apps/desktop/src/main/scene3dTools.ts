@@ -23,6 +23,10 @@ import { SCENE3D_OPS, describeOps } from '../shared/scene3dAgent.js';
  * renders it in the viewer or with Blender; blender_script runs a bpy script the user reads
  * first. Both are approved every time: a render takes minutes and the script is code.
  */
+const IMAGE_ONLY = GEN3D_MODELS.filter((m) => !m.inputs.includes('text'))
+  .map((m) => m.id)
+  .join(', ');
+
 export const SCENE3D_TOOLS: ToolDefinition[] = [
   {
     name: 'scene3d_state',
@@ -127,9 +131,7 @@ export const SCENE3D_TOOLS: ToolDefinition[] = [
         model: {
           type: 'string',
           enum: GEN3D_MODELS.map((m) => m.id),
-          description: `Default ${GEN3D_MODELS[0]!.id}. Image-only: ${GEN3D_MODELS.filter((m) => !m.inputs.includes('text'))
-            .map((m) => m.id)
-            .join(', ')}.`,
+          description: `Default ${GEN3D_MODELS[0]!.id}. Image-only: ${IMAGE_ONLY}.`,
         },
         seed: { type: 'integer', minimum: 0 },
       },
@@ -213,12 +215,15 @@ export function gen3dRequestOf(a: Record<string, unknown>): Gen3DRequest {
   };
 }
 
+/** null for scene3d_state (a read: no approval); the agent's gate takes null as "nothing to ask". */
+export function scene3dPreview(name: 'scene3d_state', a: Record<string, unknown>): null;
+export function scene3dPreview(name: string, a: Record<string, unknown>): SystemPreview;
 export function scene3dPreview(name: string, a: Record<string, unknown>): SystemPreview | null {
   // Reading the open scene changes nothing.
   if (name === 'scene3d_state') return null;
   if (name === 'scene3d_edit')
     return {
-      risk: 'low',
+      risk: 'medium',
       action: 'editar la escena 3D abierta',
       warning: `${describeOps(a.ops)}. Se deshace con Ctrl+Z en el editor 3D.`,
       // Undoable: may be allowed for the rest of the conversation.
@@ -280,13 +285,15 @@ export async function runScene3dTool(
 ): Promise<{ ok: boolean; content: string; summary: string }> {
   try {
     if (name === 'scene3d_state' || name === 'scene3d_edit' || name === 'scene3d_render') {
-      if (!ui) return { ok: false, content: 'The 3D editor is not available.', summary: 'sin editor' };
+      if (!ui)
+        return { ok: false, content: 'The 3D editor is not available.', summary: 'sin editor' };
       return await ui.editor(name, a);
     }
     if (name === 'generate_3d_model') {
       if (!gen)
         return { ok: false, content: '3D generation is not available.', summary: 'no disponible' };
-      const r = await gen.generate(`agent:${callId}`, gen3dRequestOf(a), workspaceRoot, undefined, signal);
+      const req = gen3dRequestOf(a);
+      const r = await gen.generate(`agent:${callId}`, req, workspaceRoot, undefined, signal);
       return {
         ok: true,
         content: [

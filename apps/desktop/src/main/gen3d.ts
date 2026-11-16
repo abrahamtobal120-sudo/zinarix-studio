@@ -99,8 +99,7 @@ export class Gen3DService {
       }>(cfg, { path: `/models/${owner}/${name}`, signal });
       const props = (
         info.latest_version?.openapi_schema as
-          | { components?: { schemas?: { Input?: { properties?: InputProps } } } }
-          | undefined
+          { components?: { schemas?: { Input?: { properties?: InputProps } } } } | undefined
       )?.components?.schemas?.Input?.properties;
 
       let imageDataUrl: string | undefined;
@@ -169,7 +168,8 @@ export class Gen3DService {
       host === new URL(cfg.baseUrl).host
         ? await request(cfg, { path: url, signal })
         : await fetch(url, { signal, redirect: 'follow' });
-    if (!res.ok || !res.body) throw new Error(`No se pudo descargar el modelo (HTTP ${res.status}).`);
+    if (!res.ok || !res.body)
+      throw new Error(`No se pudo descargar el modelo (HTTP ${res.status}).`);
     const len = Number(res.headers.get('content-length') ?? 0);
     if (len > GEN3D_FILE_MAX) throw new Error('El modelo generado pasa de 300 MB.');
     const out = createWriteStream(dest);
@@ -180,7 +180,9 @@ export class Gen3DService {
         if (total > GEN3D_FILE_MAX) throw new Error('El modelo generado pasa de 300 MB.');
         if (!out.write(chunk)) await new Promise<void>((r) => out.once('drain', () => r()));
       }
-      await new Promise<void>((resolve, reject) => out.end((e?: Error | null) => (e ? reject(e) : resolve())));
+      await new Promise<void>((resolve, reject) =>
+        out.end((e?: Error | null) => (e ? reject(e) : resolve())),
+      );
     } catch (e) {
       out.destroy();
       await rm(dest, { force: true });

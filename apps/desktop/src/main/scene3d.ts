@@ -9,7 +9,7 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, extname, isAbsolute, join } from 'node:path';
@@ -248,10 +248,43 @@ export class Scene3DService {
   // ---------------- Blender ----------------
 
   /** The newest Blender found that the bridge supports (cached; `refresh` looks again). */
+  /** Where the blender.exe the user picked by hand is remembered (portable builds, odd folders). */
+  private get pickedFile(): string {
+    return join(this.userData, 'blender-path.json');
+  }
+
+  private picked(): string | null {
+    try {
+      const p = (JSON.parse(readFileSync(this.pickedFile, 'utf8')) as { path?: unknown }).path;
+      return typeof p === 'string' && isAbsolute(p) ? p : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Uses this executable from now on, when it is Blender 3.6 or newer. Returns what it found
+   * (null leaves the previous choice as it was).
+   */
+  async useBlender(path: string): Promise<BlenderInfo | null> {
+    if (!isAbsolute(path) || !isFile(path)) return null;
+    let v: string | null = null;
+    try {
+      v = parseBlenderVersion(await runText(path, ['--version'], 30_000));
+    } catch {
+      return null;
+    }
+    if (!v || !versionOk(v)) return null;
+    await writeFile(this.pickedFile, JSON.stringify({ path }));
+    this.blender = { path, version: v };
+    return this.blender;
+  }
+
   async findBlender(refresh = false): Promise<BlenderInfo | null> {
     if (this.blender !== undefined && !refresh) return this.blender;
     this.blender = null;
-    for (const c of blenderCandidates()) {
+    const picked = this.picked();
+    for (const c of [...(picked ? [picked] : []), ...blenderCandidates()]) {
       if (!isAbsolute(c) || !isFile(c)) continue;
       try {
         const v = parseBlenderVersion(await runText(c, ['--version'], 30_000));

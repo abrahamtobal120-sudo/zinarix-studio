@@ -1076,7 +1076,12 @@ export function setTransition(
   if (!editable(p, c)) return p;
   if (!tr) return replaceClip(p, { ...c, transition: undefined });
   const d = Math.max(TRANSITION_MIN, transitionLength(p, c, tr.d, prevAdjacent(p, c)));
-  return replaceClip(p, { ...c, transition: { kind: tr.kind, d: Math.round(d * 1000) / 1000 } });
+  const next: Transition = { kind: tr.kind, d: Math.round(d * 1000) / 1000 };
+  if (tr.kind === 'custom') {
+    if (!tr.def) return p;
+    next.def = tr.def;
+  }
+  return replaceClip(p, { ...c, transition: next });
 }
 
 /**
@@ -1092,7 +1097,7 @@ export function visualAt(p: VideoProject, c: Clip, t: number): Look | null {
   let look = animAt(c.anim, into, len);
   const w = transitionWindow(p, c);
   if (w && t < w.from + w.d)
-    look = combine(look, transitionLook(c.transition!.kind, (t - w.from) / w.d));
+    look = combine(look, transitionLook(c.transition!.kind, (t - w.from) / w.d, c.transition!.def));
   return look;
 }
 

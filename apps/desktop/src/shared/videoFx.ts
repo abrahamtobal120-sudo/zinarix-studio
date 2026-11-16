@@ -4,6 +4,12 @@
  * the effects use the exact matrices of the CSS filter functions the canvas applies.
  * No runtime imports from video.ts (it imports the validators from here).
  */
+import {
+  customLook,
+  customLookExpr,
+  validTransitionDef,
+  type TransitionDef,
+} from './videoTransitions.js';
 
 // ---------------- effects ----------------
 
@@ -288,7 +294,12 @@ export interface LookExpr {
   scale?: string;
   reveal?: string;
 }
-function lookExpr(kind: AnimKind | TransitionKind | undefined, k: string): LookExpr {
+function lookExpr(
+  kind: AnimKind | TransitionName | undefined,
+  k: string,
+  def?: TransitionDef,
+): LookExpr {
+  if (kind === 'custom') return def ? customLookExpr(def, k) : {};
   const e = `(${k}*${k}*(3-2*${k}))`;
   switch (kind) {
     case 'fade':
@@ -322,17 +333,18 @@ function lookExpr(kind: AnimKind | TransitionKind | undefined, k: string): LookE
  * (`appear`) or disappearing: FFmpeg expressions for the look, numbers only.
  */
 export function windowExpr(
-  kind: AnimKind | TransitionKind | undefined,
+  kind: AnimKind | TransitionName | undefined,
   T: string,
   from: number,
   d: number,
   appear: boolean,
+  def?: TransitionDef,
 ): LookExpr {
   if (!kind || kind === 'none' || !(d > 1e-6)) return {};
   const k = appear
     ? `clip((${T}-(${n6(from)}))/${n6(d)},0,1)`
     : `clip(((${n6(from + d)})-${T})/${n6(d)},0,1)`;
-  return lookExpr(kind, k);
+  return lookExpr(kind, k, def);
 }
 
 /** Several looks at once: alphas and scales multiply, offsets add. */
@@ -355,19 +367,25 @@ export function combineExpr(list: LookExpr[]): LookExpr {
 
 export type TransitionKind = 'dissolve' | 'wipe' | 'slide' | 'zoomIn';
 export const TRANSITION_KINDS: readonly TransitionKind[] = ['dissolve', 'wipe', 'slide', 'zoomIn'];
+/** A built-in kind, or 'custom': a data-only transition (videoTransitions.ts) kept in `def`. */
+export type TransitionName = TransitionKind | 'custom';
 export interface Transition {
-  kind: TransitionKind;
+  kind: TransitionName;
   /** Seconds. */
   d: number;
+  /** The definition of a 'custom' transition, kept in the clip so the project is self-contained. */
+  def?: TransitionDef;
 }
 export const TRANSITION_DEFAULT = 0.6;
 export const TRANSITION_MIN = 0.1;
 export const TRANSITION_MAX = 4;
 
 /** How the incoming clip looks at k (0 = not yet there, 1 = fully in). */
-export function transitionLook(kind: TransitionKind, k: number): Look {
+export function transitionLook(kind: TransitionName, k: number, def?: TransitionDef): Look {
   const e = smooth(k);
   switch (kind) {
+    case 'custom':
+      return def ? customLook(def, k) : LOOK_NONE;
     case 'dissolve':
       return { ...LOOK_NONE, alpha: e };
     case 'wipe':
@@ -596,7 +614,9 @@ export function validTransition(x: unknown): boolean {
   if (x === undefined) return true;
   if (!x || typeof x !== 'object') return false;
   const t = x as Transition;
-  return TRANSITION_KINDS.includes(t.kind) && finite(t.d) && t.d > 0;
+  if (!finite(t.d) || !(t.d > 0)) return false;
+  if (t.kind === 'custom') return validTransitionDef(t.def);
+  return TRANSITION_KINDS.includes(t.kind) && t.def === undefined;
 }
 
 export function validText(x: unknown): boolean {

@@ -21,6 +21,7 @@ import type { LspStatus, NextEditRequestView, NextEditResultView } from './lsp.j
 import type { SuggestionStatsRow } from './nextEdit.js';
 import type { ExportOptions, MediaItem, Transcript, VideoProject } from './video.js';
 import type { VideoAgentResult } from './videoAgent.js';
+import type { TransitionDef } from './videoTransitions.js';
 
 /** Fase 13: a speech-to-text engine as the video editor lists it. */
 export type SttEngineId = 'local' | 'openai' | 'groq';
@@ -2015,6 +2016,8 @@ export interface OmniApi {
     saveCaptions(name: string, text: string, ext: 'srt' | 'vtt'): Promise<string | null>;
     /** Fase 13B: answer to a 'video:agent' event. */
     agentDone(requestId: string, r: VideoAgentResult): Promise<void>;
+    /** Transitions shared in the Zinarix Studio repository (community/transitions). */
+    communityTransitions(force: boolean): Promise<TransitionDef[]>;
   };
   /** Ayuda de Zinarix: the help assistant (a small local model that knows the app). */
   helper: {
@@ -2066,6 +2069,8 @@ export interface OmniApi {
     info(
       refresh?: boolean,
     ): Promise<{ blender: { path: string; version: string } | null; outDir: string }>;
+    /** File dialog for blender.exe (portable builds): null if cancelled, false if not Blender 3.6+. */
+    pickBlender(): Promise<{ path: string; version: string } | null | false>;
     /** Starts encoding viewer frames; then frame() each RGBA frame and end(). */
     begin(o: {
       width: number;
@@ -2503,6 +2508,7 @@ export const CHANNELS = [
   'video:scenes',
   'video:saveCaptions',
   'video:agentDone',
+  'video:communityTransitions',
   'helper:status',
   'helper:ask',
   'helper:pull',
@@ -2540,6 +2546,7 @@ export const CHANNELS = [
   'media:generate',
   'media:abort',
   'scene3d:info',
+  'scene3d:pickBlender',
   'scene3d:begin',
   'scene3d:frame',
   'scene3d:end',

@@ -386,6 +386,9 @@ const api: OmniApi = {
     scenes: call('video:scenes') as OmniApi['video']['scenes'],
     saveCaptions: call('video:saveCaptions') as OmniApi['video']['saveCaptions'],
     agentDone: call('video:agentDone') as OmniApi['video']['agentDone'],
+    communityTransitions: call(
+      'video:communityTransitions',
+    ) as OmniApi['video']['communityTransitions'],
   },
   helper: {
     status: call('helper:status') as OmniApi['helper']['status'],
@@ -433,6 +436,7 @@ const api: OmniApi = {
   },
   scene3d: {
     info: call('scene3d:info') as OmniApi['scene3d']['info'],
+    pickBlender: call('scene3d:pickBlender') as OmniApi['scene3d']['pickBlender'],
     begin: call('scene3d:begin') as OmniApi['scene3d']['begin'],
     frame: call('scene3d:frame') as OmniApi['scene3d']['frame'],
     end: call('scene3d:end') as OmniApi['scene3d']['end'],

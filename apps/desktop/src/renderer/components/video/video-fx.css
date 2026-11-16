@@ -169,7 +169,6 @@
   background: linear-gradient(90deg, rgb(255 255 255 / 0.55), transparent);
   pointer-events: none;
 }
-}
 
 /* Stickers tab */
 .vs-sticker-colors {
@@ -216,4 +215,5 @@
 .vs-sticker:focus-visible {
   background: var(--hover);
   border-color: var(--border);
+}
 }

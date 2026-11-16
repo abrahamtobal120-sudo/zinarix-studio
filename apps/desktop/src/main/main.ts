@@ -105,6 +105,7 @@ import { GEN3D_MODELS, isGen3dImage } from '../shared/gen3d.js';
 import { isModelPath, sanitizeScene, type Scene3D } from '../shared/scene3d.js';
 import type { VideoProject } from '../shared/video.js';
 import type { VideoAgentResult } from '../shared/videoAgent.js';
+import { communityTransitions } from './communityTransitions.js';
 import { MEDIA_EXTENSIONS, PROJECT_EXT, mediaKindOf, validProject } from '../shared/video.js';
 
 let mcp: McpManager | undefined;
@@ -1015,6 +1016,9 @@ function registerIpc(): void {
     'video:scenes',
     z.tuple([absPath, seconds, z.number().min(0.05).max(0.9)]),
     (_w, p, d, t) => transcriber().scenes(mediaFile(p), d, t),
+  );
+  handle('video:communityTransitions', z.tuple([z.boolean()]), (_w, force) =>
+    communityTransitions(force),
   );
   handle(
     'video:saveCaptions',
@@ -2805,6 +2809,17 @@ function registerScene3dIpc(): void {
     blender: await svc.findBlender(refresh === true),
     outDir: svc.outDir(w.workspace?.root),
   }));
+  handle('scene3d:pickBlender', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Elegir Blender',
+      properties: ['openFile'],
+      filters:
+        process.platform === 'win32' ? [{ name: 'Blender', extensions: ['exe'] }] : [],
+    });
+    const p = r.canceled ? undefined : r.filePaths[0];
+    if (!p) return null;
+    return (await svc.useBlender(resolve(p))) ?? false;
+  });
   handle(
     'scene3d:begin',
     z.tuple([
