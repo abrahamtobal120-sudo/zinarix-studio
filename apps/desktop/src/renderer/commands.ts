@@ -1,4 +1,5 @@
 import { askInChat, closeChatFromTab, focusedChatTab } from './components/Chat';
+import { openNewTask } from './components/TasksPanel';
 import { listTerminals, sendTerminalToChat, terminalFocused } from './components/Terminal';
 import { confirmDialog } from './confirm';
 import { goToNextProblem } from './components/Problems';
@@ -339,6 +340,11 @@ function baseCommands(): Command[] {
       id: 'chat.newInFolder',
       label: t('chatNewInFolder'),
       run: () => void newChatInFolder(),
+    },
+    {
+      id: 'tasks.new',
+      label: t('taskNewCmd'),
+      run: () => openNewTask(),
     },
     {
       id: 'chat.list',

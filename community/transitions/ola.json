@@ -1,0 +1,43 @@
+{
+  "format": "zinarix-transition",
+  "version": 1,
+  "id": "ola",
+  "name": "Ola",
+  "description": "Llega desde la izquierda subiendo y bajando como una ola.",
+  "author": "Zinarix Studio",
+  "ease": "smooth",
+  "channels": {
+    "dx": [
+      {
+        "t": 0,
+        "v": -1
+      },
+      {
+        "t": 1,
+        "v": 0
+      }
+    ],
+    "dy": [
+      {
+        "t": 0,
+        "v": 0
+      },
+      {
+        "t": 0.25,
+        "v": -0.12
+      },
+      {
+        "t": 0.5,
+        "v": 0.08
+      },
+      {
+        "t": 0.75,
+        "v": -0.04
+      },
+      {
+        "t": 1,
+        "v": 0
+      }
+    ]
+  }
+}

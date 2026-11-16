@@ -7,6 +7,20 @@
 import type { ClipAnim, Effects, Look, TextSpec, Transition } from './videoFx.js';
 import type { ColorGrade } from './videoColor.js';
 import { cleanGrade, validGrade } from './videoColor.js';
+import type { MediaAnalysis } from './videoAnalysis.js';
+import { validAnalysis } from './videoAnalysis.js';
+import type { ChromaKey } from './videoOneClick.js';
+import { validChroma } from './videoOneClick.js';
+import type { Compressor, Eq4 } from './videoAudioFx.js';
+import type { ExtraKeyProp, KeyedEffect } from './videoKeys.js';
+import {
+  BEZIER_DEFAULT,
+  EXTRA_KEY_PROPS,
+  KEYED_EFFECTS,
+  KEY_RANGE,
+  bezierLinear,
+  bezierTable,
+} from './videoKeys.js';
 import {
   LOOK_NONE,
   TEXT_DEFAULT_DUR,
@@ -47,6 +61,8 @@ export interface MediaItem {
    * the built-in one drops the alpha; "native" (PNG, ProRes 4444, QuickTime RLE) decodes as is.
    */
   alpha?: 'vp9' | 'native';
+  /** Fase 11C: what the analysis found (sound, scenes, still / blurry parts, beats). */
+  analysis?: MediaAnalysis;
 }
 
 export interface Clip {
@@ -79,7 +95,30 @@ export interface Clip {
   transition?: Transition;
   /** A title: the clip draws this text instead of a media file (mediaId is ''). */
   text?: TextSpec;
+  /** Fase 11D: green screen (colorkey) and stabilisation (deshake, export). */
+  chroma?: ChromaKey;
+  stabilize?: boolean;
+  /** Fase 12D: stereo balance of the clip, −1 (left) … 1 (right), on top of the track's. */
+  pan?: number;
+  /** Fase 12B: a second grade (B) and how much of it shows, 0 = only A (color) … 1 = only B. */
+  colorB?: ColorGrade;
+  gradeMix?: number;
+  /** Fase 12D: the clip's own 4-band EQ (videoAudioFx.ts), before the track's. */
+  eq?: Eq4;
+  /** Fase 12E: a compound clip draws this sub-timeline instead of a media file (mediaId ''). */
+  compound?: Compound;
 }
+
+/** Fase 12E: a sub-timeline inside a clip (its media live in the project's media list). */
+export interface Compound {
+  name: string;
+  tracks: Track[];
+  clips: Clip[];
+  /** Seconds (the end of its last clip when it was made). */
+  duration: number;
+}
+/** Compounds inside compounds, at most this deep. */
+export const COMPOUND_MAX_DEPTH = 4;
 
 export const isText = (c: Clip): boolean => !!c.text;
 
@@ -87,8 +126,20 @@ export const isText = (c: Clip): boolean => !!c.text;
 export type KeyProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
 export const KEY_PROPS: readonly KeyProp[] = ['x', 'y', 'scale', 'rotation', 'opacity'];
 /** How a key moves to the next one: straight, smooth start and end, or a jump at the next key. */
-export type Ease = 'linear' | 'ease' | 'in' | 'out' | 'back' | 'hold';
-export const EASES: readonly Ease[] = ['linear', 'ease', 'in', 'out', 'back', 'hold'];
+export type Ease = 'linear' | 'ease' | 'in' | 'out' | 'back' | 'hold' | 'bezier';
+export const EASES: readonly Ease[] = ['linear', 'ease', 'in', 'out', 'back', 'hold', 'bezier'];
+/** Fase 12B: transform properties plus volume, pan, effects and the A/B grade mix. */
+export type AnyKeyProp = KeyProp | ExtraKeyProp;
+export const ANY_KEY_PROPS: readonly AnyKeyProp[] = [
+  'x',
+  'y',
+  'scale',
+  'rotation',
+  'opacity',
+  ...EXTRA_KEY_PROPS,
+];
+export { BEZIER_DEFAULT, KEY_RANGE };
+export type { ExtraKeyProp };
 
 /** Overshoot of 'back' (the classic 1.70158). */
 export const BACK_S = 1.70158;
@@ -123,8 +174,13 @@ export interface Keyframe {
   v: number;
   /** Towards the next key (default linear). */
   ease?: Ease;
+  /** 'bezier': the two control points, as in CSS cubic-bezier (x within 0…1). */
+  cx1?: number;
+  cy1?: number;
+  cx2?: number;
+  cy2?: number;
 }
-export type Keyframes = Partial<Record<KeyProp, Keyframe[]>>;
+export type Keyframes = Partial<Record<AnyKeyProp, Keyframe[]>>;
 /** Per property: plenty for hand animation, and it bounds the export expressions. */
 export const MAX_KEYS = 100;
 
@@ -182,14 +238,52 @@ export function interpKeys(keys: readonly Keyframe[], src: number): number {
     const b = keys[i + 1]!;
     if (src >= b.t) continue;
     if (a.ease === 'hold' || b.t - a.t < 1e-9) return a.v;
-    const k = easeCurve(a.ease, (src - a.t) / (b.t - a.t));
+    const x = (src - a.t) / (b.t - a.t);
+    // Bezier: the same straight pieces the export draws (videoKeys.expandBezier).
+    const k = a.ease === 'bezier' ? bezierLinear(bezierTable(a), x) : easeCurve(a.ease, x);
     return a.v + (b.v - a.v) * k;
   }
   return keys[keys.length - 1]!.v;
 }
 
-export const isAnimated = (c: Clip, prop: KeyProp): boolean => !!c.keyframes?.[prop]?.length;
-export const hasKeyframes = (c: Clip): boolean => KEY_PROPS.some((k) => isAnimated(c, k));
+export const isAnimated = (c: Clip, prop: AnyKeyProp): boolean => !!c.keyframes?.[prop]?.length;
+export const hasKeyframes = (c: Clip): boolean => ANY_KEY_PROPS.some((k) => isAnimated(c, k));
+
+/** The value a non-transform property has when it is not animated. */
+function staticExtra(c: Clip, prop: ExtraKeyProp): number {
+  switch (prop) {
+    case 'volume':
+      return c.volume;
+    case 'pan':
+      return c.pan ?? 0;
+    case 'gradeMix':
+      return c.gradeMix ?? 0;
+    default:
+      return c.effects?.[prop] ?? 0;
+  }
+}
+
+/** Any animatable property of a clip at timeline time t (keys evaluated, clamped to its range). */
+export function propAt(c: Clip, prop: AnyKeyProp, t: number): number {
+  if ((KEY_PROPS as readonly string[]).includes(prop)) return transformAt(c, t)[prop as KeyProp];
+  const keys = c.keyframes?.[prop];
+  const v = keys?.length ? interpKeys(keys, sourceAt(c, t)) : staticExtra(c, prop as ExtraKeyProp);
+  const [lo, hi] = KEY_RANGE[prop]!;
+  return Math.min(hi, Math.max(lo, v));
+}
+
+/** The clip's effects at timeline time t (animated ones evaluated). */
+export function effectsAt(c: Clip, t: number): Effects | undefined {
+  if (!KEYED_EFFECTS.some((k) => isAnimated(c, k))) return c.effects;
+  const fx: Effects = { ...c.effects };
+  for (const k of KEYED_EFFECTS) if (isAnimated(c, k)) fx[k] = propAt(c, k, t);
+  return fx;
+}
+export const volumeAt = (c: Clip, t: number): number => propAt(c, 'volume', t);
+export const panAt = (c: Clip, t: number): number => propAt(c, 'pan', t);
+/** How much of grade B shows at t (0 when the clip has no B). */
+export const gradeMixAt = (c: Clip, t: number): number =>
+  c.colorB ? propAt(c, 'gradeMix', t) : 0;
 
 /** The clip's transform at timeline time t, with its animated properties evaluated. */
 export function transformAt(c: Clip, t: number): Transform {
@@ -209,7 +303,7 @@ export function transformAt(c: Clip, t: number): Transform {
 /** Timeline times of all the clip's keys inside the clip, sorted, without duplicates. */
 export function keyTimes(c: Clip): number[] {
   const out: number[] = [];
-  for (const prop of KEY_PROPS)
+  for (const prop of ANY_KEY_PROPS)
     for (const k of c.keyframes?.[prop] ?? []) {
       const t = keyTimeline(c, k);
       if (t >= c.start - 1e-6 && t <= clipEnd(c) + 1e-6) out.push(t);
@@ -219,7 +313,7 @@ export function keyTimes(c: Clip): number[] {
 }
 
 /** The key of a property at timeline time t (within half a frame), if any. */
-export function keyAt(c: Clip, prop: KeyProp, t: number, fps: number): Keyframe | undefined {
+export function keyAt(c: Clip, prop: AnyKeyProp, t: number, fps: number): Keyframe | undefined {
   const src = sourceAt(c, t);
   const tol = (0.5 / fps) * speedOf(c);
   return c.keyframes?.[prop]?.find((k) => Math.abs(k.t - src) < tol);
@@ -240,6 +334,11 @@ export interface Track {
   duck?: number;
   /** Fase 13: the track automatic captions go to (its titles are replaced when they are redone). */
   role?: 'captions';
+  /** Fase 11B: duck only where the other clips really have sound (their analysis), not all along. */
+  duckSound?: boolean;
+  /** Fase 12D: 4-band EQ and compressor of the track (videoAudioFx.ts). */
+  eq?: Eq4;
+  comp?: Compressor;
 }
 
 /** Fase 13: a transcribed word, in seconds of the media file. */
@@ -459,11 +558,19 @@ export function updateTrack(
 export function insertMedia(
   p: VideoProject,
   media: MediaItem,
-  at?: { trackId?: string; start?: number },
+  at?: { trackId?: string; start?: number; duration?: number },
 ): { project: VideoProject; clip: Clip | null } {
   if (media.missing) return { project: p, clip: null };
   const kind = trackKindFor(media);
-  const dur = media.kind === 'image' ? IMAGE_DEFAULT : media.duration;
+  // Fase 10B: an asked length (a picture held longer, a voice trimmed); video and audio never
+  // run past the end of their file.
+  const asked = at?.duration !== undefined && at.duration > 0 ? at.duration : undefined;
+  const dur =
+    media.kind === 'image'
+      ? (asked ?? IMAGE_DEFAULT)
+      : asked !== undefined
+        ? Math.min(asked, media.duration)
+        : media.duration;
   if (!(dur > 0)) return { project: p, clip: null };
   let project = p;
   const candidates = [
@@ -642,7 +749,7 @@ export function trimClip(
 function shiftKeys(c: Clip, d: number): Clip {
   if (!c.keyframes) return c;
   const kf: Keyframes = {};
-  for (const prop of KEY_PROPS) {
+  for (const prop of ANY_KEY_PROPS) {
     const keys = c.keyframes[prop];
     if (keys) kf[prop] = keys.map((k) => ({ ...k, t: k.t + d }));
   }
@@ -683,17 +790,35 @@ export function setTransform(p: VideoProject, id: string, patch: Partial<Transfo
   return updateClip(p, id, { transform: same ? undefined : t });
 }
 
-function withKeys(c: Clip, prop: KeyProp, keys: Keyframe[]): Clip {
+function withKeys(c: Clip, prop: AnyKeyProp, keys: Keyframe[]): Clip {
   const kf: Keyframes = { ...c.keyframes };
   if (keys.length) kf[prop] = keys;
   else delete kf[prop];
-  return { ...c, keyframes: KEY_PROPS.some((k) => kf[k]?.length) ? kf : undefined };
+  return { ...c, keyframes: ANY_KEY_PROPS.some((k) => kf[k]?.length) ? kf : undefined };
 }
 
-function staticValue(c: Clip, prop: KeyProp, v: number): Clip {
+function staticValue(c: Clip, prop: AnyKeyProp, v: number): Clip {
+  if (!(KEY_PROPS as readonly string[]).includes(prop)) {
+    const [lo, hi] = KEY_RANGE[prop]!;
+    const x = Math.min(hi, Math.max(lo, v));
+    if (prop === 'volume') return { ...c, volume: x };
+    if (prop === 'pan') return withOptional(c, 'pan', Math.abs(x) < 1e-4 ? undefined : x);
+    if (prop === 'gradeMix') return withOptional(c, 'gradeMix', x < 1e-4 ? undefined : x);
+    const effects = cleanEffects({ ...c.effects, [prop as KeyedEffect]: x });
+    const next = { ...c, effects };
+    if (!effects) delete next.effects;
+    return next;
+  }
   const t = { ...transformOf(c), [prop]: v };
   const same = (Object.keys(IDENTITY) as (keyof Transform)[]).every((k) => t[k] === IDENTITY[k]);
   return { ...c, transform: same ? undefined : t };
+}
+
+function withOptional<K extends 'pan' | 'gradeMix'>(c: Clip, k: K, v: number | undefined): Clip {
+  const next = { ...c };
+  if (v === undefined) delete next[k];
+  else next[k] = v;
+  return next;
 }
 
 const replaceClip = (p: VideoProject, c: Clip): VideoProject => ({
@@ -708,15 +833,16 @@ const replaceClip = (p: VideoProject, c: Clip): VideoProject => ({
 export function setKey(
   p: VideoProject,
   id: string,
-  prop: KeyProp,
+  prop: AnyKeyProp,
   t: number,
   v?: number,
   ease?: Ease,
+  bezier?: [number, number, number, number],
 ): VideoProject {
   const c = p.clips.find((x) => x.id === id);
   if (!c || trackOf(p, c.trackId)?.locked) return p;
   const at = Math.min(Math.max(t, c.start), clipEnd(c));
-  const value = v ?? transformAt(c, at)[prop];
+  const value = v ?? propAt(c, prop, at);
   if (!Number.isFinite(value)) return p;
   const old = keyAt(c, prop, at, p.fps);
   const keys = (c.keyframes?.[prop] ?? []).filter((k) => k !== old);
@@ -724,13 +850,21 @@ export function setKey(
   const key: Keyframe = { t: old?.t ?? sourceAt(c, at), v: value };
   const e = ease ?? old?.ease;
   if (e && e !== 'linear') key.ease = e;
+  if (e === 'bezier') {
+    const prev: [number, number, number, number] | null =
+      old?.ease === 'bezier' && old.cx1 !== undefined
+        ? [old.cx1, old.cy1 ?? 0, old.cx2 ?? 1, old.cy2 ?? 1]
+        : null;
+    const [cx1, cy1, cx2, cy2] = bezier ?? prev ?? BEZIER_DEFAULT;
+    Object.assign(key, { cx1, cy1, cx2, cy2 });
+  }
   keys.push(key);
   keys.sort((a, b) => a.t - b.t);
   return replaceClip(p, withKeys(c, prop, keys));
 }
 
 /** Removes a property's key at timeline time t (the last one leaves its value as the static one). */
-export function removeKey(p: VideoProject, id: string, prop: KeyProp, t: number): VideoProject {
+export function removeKey(p: VideoProject, id: string, prop: AnyKeyProp, t: number): VideoProject {
   const c = p.clips.find((x) => x.id === id);
   const old = c && keyAt(c, prop, t, p.fps);
   if (!c || !old || trackOf(p, c.trackId)?.locked) return p;
@@ -740,10 +874,89 @@ export function removeKey(p: VideoProject, id: string, prop: KeyProp, t: number)
 }
 
 /** Stops animating a property: it keeps the value it has at timeline time t. */
-export function clearKeys(p: VideoProject, id: string, prop: KeyProp, t: number): VideoProject {
+export function clearKeys(p: VideoProject, id: string, prop: AnyKeyProp, t: number): VideoProject {
   const c = p.clips.find((x) => x.id === id);
   if (!c || !isAnimated(c, prop) || trackOf(p, c.trackId)?.locked) return p;
-  return replaceClip(p, staticValue(withKeys(c, prop, []), prop, transformAt(c, t)[prop]));
+  return replaceClip(p, staticValue(withKeys(c, prop, []), prop, propAt(c, prop, t)));
+}
+
+/**
+ * Fase 12B: what a control of any animatable property calls. Animated: a key at timeline time
+ * t; otherwise its static value changes.
+ */
+export function editPropAt(
+  p: VideoProject,
+  id: string,
+  prop: AnyKeyProp,
+  v: number,
+  t: number,
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c || !Number.isFinite(v) || trackOf(p, c.trackId)?.locked) return p;
+  if (isAnimated(c, prop)) return setKey(p, id, prop, t, v);
+  if ((KEY_PROPS as readonly string[]).includes(prop))
+    return setTransform(p, id, { [prop]: v } as Partial<Transform>);
+  return replaceClip(p, staticValue(c, prop, v));
+}
+
+/**
+ * Moves one key to another timeline time (dragged on the key lane), within the clip; refused
+ * (unchanged) when another key of the property already sits there.
+ */
+export function moveKey(
+  p: VideoProject,
+  id: string,
+  prop: AnyKeyProp,
+  from: number,
+  to: number,
+  v?: number,
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  const old = c && keyAt(c, prop, from, p.fps);
+  if (!c || !old || trackOf(p, c.trackId)?.locked) return p;
+  const at = Math.min(Math.max(to, c.start), clipEnd(c));
+  const src = sourceAt(c, at);
+  const rest = (c.keyframes?.[prop] ?? []).filter((k) => k !== old);
+  if (rest.some((k) => Math.abs(k.t - src) < (0.5 / p.fps) * speedOf(c))) return p;
+  const [lo, hi] = KEY_RANGE[prop]!;
+  const moved: Keyframe = {
+    ...old,
+    t: src,
+    v: v === undefined || !Number.isFinite(v) ? old.v : Math.min(hi, Math.max(lo, v)),
+  };
+  return replaceClip(p, withKeys(c, prop, [...rest, moved].sort((a, b) => a.t - b.t)));
+}
+
+/** Copies a property's keys (times relative to the first key, in source seconds). */
+export function copyKeys(c: Clip, prop: AnyKeyProp): Keyframe[] {
+  const keys = c.keyframes?.[prop] ?? [];
+  const t0 = keys[0]?.t ?? 0;
+  return keys.map((k) => ({ ...k, t: k.t - t0 }));
+}
+
+/**
+ * Pastes copied keys onto a clip so the first lands at timeline time `at` (they replace the
+ * property's keys; the ones past the clip's end are dropped).
+ */
+export function pasteKeys(
+  p: VideoProject,
+  id: string,
+  prop: AnyKeyProp,
+  keys: readonly Keyframe[],
+  at: number,
+): VideoProject {
+  const c = p.clips.find((x) => x.id === id);
+  if (!c || !keys.length || trackOf(p, c.trackId)?.locked) return p;
+  const base = sourceAt(c, Math.min(Math.max(at, c.start), clipEnd(c)));
+  const [lo, hi] = KEY_RANGE[prop]!;
+  const end = sourceAt(c, clipEnd(c)) + 1e-6;
+  const next = keys
+    .filter((k) => Number.isFinite(k.t) && Number.isFinite(k.v))
+    .map((k) => ({ ...k, t: base + k.t, v: Math.min(hi, Math.max(lo, k.v)) }))
+    .filter((k) => k.t <= end)
+    .slice(0, MAX_KEYS)
+    .sort((a, b) => a.t - b.t);
+  return next.length ? replaceClip(p, withKeys(c, prop, next)) : p;
 }
 
 /**
@@ -881,7 +1094,7 @@ function validKeyframes(kf: unknown): boolean {
   if (!kf || typeof kf !== 'object' || Array.isArray(kf)) return false;
   return Object.entries(kf).every(
     ([prop, keys]: [string, unknown]) =>
-      (KEY_PROPS as readonly string[]).includes(prop) &&
+      (ANY_KEY_PROPS as readonly string[]).includes(prop) &&
       (keys === undefined ||
         (Array.isArray(keys) &&
           keys.length <= MAX_KEYS &&
@@ -891,6 +1104,7 @@ function validKeyframes(kf: unknown): boolean {
               Number.isFinite(k.t) &&
               Number.isFinite(k.v) &&
               (k.ease === undefined || EASES.includes(k.ease)) &&
+              [k.cx1, k.cy1, k.cx2, k.cy2].every((n) => n === undefined || Number.isFinite(n)) &&
               // Sorted by time: the evaluation and the export rely on it.
               (i === 0 || k.t >= (keys[i - 1] as Keyframe).t),
           ))),
@@ -923,7 +1137,10 @@ export function validProject(x: unknown): x is VideoProject {
         validAnim(c.anim) &&
         validTransition(c.transition) &&
         validText(c.text) &&
-        validGrade(c.color),
+        validGrade(c.color) &&
+        validChroma(c.chroma) &&
+        (c.stabilize === undefined || typeof c.stabilize === 'boolean') &&
+        validClipExtras(c, 0),
     ) &&
     p.tracks.every(
       (t) =>
@@ -931,10 +1148,74 @@ export function validProject(x: unknown): x is VideoProject {
         (t.kind === 'video' || t.kind === 'audio') &&
         (t.volume === undefined || (Number.isFinite(t.volume) && t.volume >= 0 && t.volume <= 2)) &&
         (t.pan === undefined || (Number.isFinite(t.pan) && t.pan >= -1 && t.pan <= 1)) &&
-        (t.duck === undefined || (Number.isFinite(t.duck) && t.duck >= 0 && t.duck <= 1)),
+        (t.duck === undefined || (Number.isFinite(t.duck) && t.duck >= 0 && t.duck <= 1)) &&
+        (t.duckSound === undefined || typeof t.duckSound === 'boolean') &&
+        (t.eq === undefined || validEqShape(t.eq)) &&
+        (t.comp === undefined || validCompShape(t.comp)),
     ) &&
-    p.media.every((m) => typeof m.id === 'string' && typeof m.path === 'string') &&
+    p.media.every(
+      (m) => typeof m.id === 'string' && typeof m.path === 'string' && validAnalysis(m.analysis),
+    ) &&
     validTranscripts(p.transcripts)
+  );
+}
+
+const finiteIn = (v: unknown, lo: number, hi: number) =>
+  v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi);
+
+/** Fase 12: per-clip pan, grade B, EQ and compound sub-timelines (at most 4 deep). */
+function validClipExtras(c: Clip, depth: number): boolean {
+  if (!finiteIn(c.pan, -1, 1) || !finiteIn(c.gradeMix, 0, 1) || !validGrade(c.colorB)) return false;
+  if (c.eq !== undefined && !validEqShape(c.eq)) return false;
+  if (c.compound === undefined) return true;
+  const k = c.compound;
+  if (depth + 1 > COMPOUND_MAX_DEPTH || !k || typeof k !== 'object') return false;
+  return (
+    typeof k.name === 'string' &&
+    k.name.length <= 512 &&
+    Number.isFinite(k.duration) &&
+    Array.isArray(k.tracks) &&
+    k.tracks.length <= 200 &&
+    k.tracks.every(
+      (t) => !!t && typeof t.id === 'string' && (t.kind === 'video' || t.kind === 'audio'),
+    ) &&
+    Array.isArray(k.clips) &&
+    k.clips.length <= 20_000 &&
+    k.clips.every(
+      (x) =>
+        !!x &&
+        typeof x.id === 'string' &&
+        typeof x.trackId === 'string' &&
+        Number.isFinite(x.start) &&
+        Number.isFinite(x.in) &&
+        Number.isFinite(x.out) &&
+        (x.speed === undefined ||
+          (Number.isFinite(x.speed) && x.speed >= SPEED_MIN && x.speed <= SPEED_MAX)) &&
+        validKeyframes(x.keyframes) &&
+        validEffects(x.effects) &&
+        validAnim(x.anim) &&
+        validTransition(x.transition) &&
+        validText(x.text) &&
+        validGrade(x.color) &&
+        validClipExtras(x, depth + 1),
+    )
+  );
+}
+
+/** A compressor as loaded from a file: its five numbers, finite. */
+function validCompShape(x: unknown): boolean {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return false;
+  const c = x as Record<string, unknown>;
+  return ['threshold', 'ratio', 'attack', 'release', 'makeup'].every(
+    (k) => typeof c[k] === 'number' && Number.isFinite(c[k]),
+  );
+}
+
+/** An EQ as loaded from a file: an object of finite numbers within ±24 dB. */
+export function validEqShape(x: unknown): boolean {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return false;
+  return Object.entries(x as Record<string, unknown>).every(
+    ([k, v]) => ['low', 'lowMid', 'highMid', 'high'].includes(k) && finiteIn(v, -24, 24),
   );
 }
 

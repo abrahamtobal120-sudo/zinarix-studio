@@ -1,0 +1,51 @@
+{
+  "format": "zinarix-transition",
+  "version": 1,
+  "id": "salto-elastico",
+  "name": "Salto elástico",
+  "description": "Aparece pequeño, se pasa de tamaño y vuelve como un resorte.",
+  "author": "Zinarix Studio",
+  "ease": "smooth",
+  "channels": {
+    "alpha": [
+      {
+        "t": 0,
+        "v": 0
+      },
+      {
+        "t": 0.2,
+        "v": 1
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ],
+    "scale": [
+      {
+        "t": 0,
+        "v": 0.3
+      },
+      {
+        "t": 0.3,
+        "v": 1.2
+      },
+      {
+        "t": 0.5,
+        "v": 0.9
+      },
+      {
+        "t": 0.68,
+        "v": 1.06
+      },
+      {
+        "t": 0.84,
+        "v": 0.98
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ]
+  }
+}

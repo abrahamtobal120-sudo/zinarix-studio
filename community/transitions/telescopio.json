@@ -1,0 +1,45 @@
+{
+  "format": "zinarix-transition",
+  "version": 1,
+  "id": "telescopio",
+  "name": "Telescopio",
+  "description": "Sale desde el fondo, pequeño y abajo, hasta llenar la pantalla.",
+  "author": "Zinarix Studio",
+  "ease": "smooth",
+  "channels": {
+    "alpha": [
+      {
+        "t": 0,
+        "v": 0
+      },
+      {
+        "t": 0.3,
+        "v": 1
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ],
+    "scale": [
+      {
+        "t": 0,
+        "v": 0.15
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ],
+    "dy": [
+      {
+        "t": 0,
+        "v": 0.3
+      },
+      {
+        "t": 1,
+        "v": 0
+      }
+    ]
+  }
+}

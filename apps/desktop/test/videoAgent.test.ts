@@ -53,7 +53,8 @@ function interview(): VideoProject {
   return setTranscript(p, m.id, { engine: 'test', lang: 'es', words, at: 0 });
 }
 
-const ok = <T>(e: T | { error: string }): T => {
+const ok = <T>(e: T | { error: string } | null): T => {
+  if (e === null) throw new Error('no edit');
   if (e && typeof e === 'object' && 'error' in e) throw new Error((e as { error: string }).error);
   return e as T;
 };

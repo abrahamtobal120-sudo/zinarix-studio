@@ -7,13 +7,17 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { copyFile, lstat, mkdir, readdir } from 'node:fs/promises';
+import { appendFile, copyFile, lstat, mkdir, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { ChatEventView, ChatRequestView, ToolDecision } from '../shared/api.js';
 import {
   afterRestart,
   branchName,
   canTransition,
+  clampParallel,
+  tailText,
+  terminalChunk,
+  TASK_OUTPUT_MAX,
   isIdle,
   isInside,
   mergeClash,
@@ -80,6 +84,10 @@ export class TaskManager {
   private tasks: TaskView[] = [];
   /** The request in progress per task (abort, approvals). */
   private readonly live = new Map<string, string>();
+  /** Fase 5A: each task's terminal (run_command lines and output), and its open commands. */
+  private readonly terminal = new Map<string, string>();
+  private readonly commandIds = new Map<string, Set<string>>();
+  private logWrite: Promise<unknown> = Promise.resolve();
   private readonly file: string;
   private readonly git: (args: string[], cwd: string) => Promise<string>;
   maxParallel: number;
@@ -91,7 +99,7 @@ export class TaskManager {
 
   constructor(private readonly o: TaskManagerOptions) {
     this.file = join(o.dir, 'tasks.json');
-    this.maxParallel = o.maxParallel ?? 3;
+    this.maxParallel = clampParallel(o.maxParallel ?? 3);
     this.git = o.git ?? ((args, cwd) => runUntrustedGit(args, cwd));
     this.tasks = afterRestart(this.load());
     this.save();
@@ -457,6 +465,75 @@ export class TaskManager {
     this.changed();
   }
 
+  /** How many tasks run at once (the user's setting, 1–8); more start now if there is room. */
+  setMaxParallel(n: number): void {
+    const v = clampParallel(n);
+    if (v === this.maxParallel) return;
+    this.maxParallel = v;
+    this.changed();
+    this.pump();
+  }
+
+  /** The task's terminal: its run_command lines and output (kept on disk, newest part). */
+  output(id: string): string {
+    const t = this.get(id);
+    const live = this.terminal.get(t.id);
+    if (live !== undefined) return live;
+    try {
+      return tailText(readFileSync(this.logFile(t.id), 'utf8'));
+    } catch {
+      return '';
+    }
+  }
+
+  /** The task's diff against its base commit (uncommitted work included, new files too). */
+  async diff(id: string): Promise<string> {
+    const t = this.get(id);
+    const max = 400_000;
+    let out: string;
+    if (!t.closed && existsSync(t.path)) {
+      out = await this.git(['diff', '--no-color', t.baseCommit], t.path).catch(() => '');
+      const untracked = (
+        await this.git(['ls-files', '--others', '--exclude-standard'], t.path).catch(() => '')
+      )
+        .split('\n')
+        .map((f) => f.trim())
+        .filter(Boolean)
+        .slice(0, 50);
+      for (const f of untracked) {
+        let text = '';
+        try {
+          text = readFileSync(join(t.path, f), 'utf8');
+        } catch {
+          continue;
+        }
+        if (text.includes('\0')) continue;
+        const lines = text.split('\n');
+        if (lines.at(-1) === '') lines.pop();
+        const body = lines.map((l) => `+${l}`).join('\n');
+        out += `diff --git a/${f} b/${f}\nnew file mode 100644\n--- /dev/null\n+++ b/${f}\n@@ -0,0 +1,${lines.length} @@\n${body}\n`;
+      }
+    } else {
+      out = await this.git(['diff', '--no-color', t.baseCommit, t.branch], t.repo).catch(() => '');
+    }
+    return out.length > max ? `${out.slice(0, max)}\n… (diff truncated)` : out;
+  }
+
+  private logFile(id: string): string {
+    return join(this.o.dir, 'logs', `${id}.log`);
+  }
+
+  /** Adds to the task's terminal (memory) and its log on disk. */
+  private appendTerminal(t: TaskView, chunk: string): void {
+    const cur = this.terminal.get(t.id) ?? this.output(t.id);
+    this.terminal.set(t.id, tailText(cur + chunk, TASK_OUTPUT_MAX));
+    const file = this.logFile(t.id);
+    this.logWrite = this.logWrite
+      .then(() => mkdir(dirname(file), { recursive: true }))
+      .then(() => appendFile(file, chunk))
+      .catch(() => undefined);
+  }
+
   /** Forgets closed tasks (the list gets long). */
   clearClosed(): void {
     this.tasks = this.tasks.filter((t) => !t.closed);
@@ -627,6 +704,10 @@ export class TaskManager {
 
   private onEvent(t: TaskView, rid: string, ev: ChatEventView): void {
     if (this.live.get(t.id) !== rid) return;
+    let ids = this.commandIds.get(t.id);
+    if (!ids) this.commandIds.set(t.id, (ids = new Set()));
+    const chunk = terminalChunk(ev, ids);
+    if (chunk) this.appendTerminal(t, chunk);
     switch (ev.type) {
       case 'conversation':
         t.conversationId = ev.id;

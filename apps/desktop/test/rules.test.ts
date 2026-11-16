@@ -7,6 +7,8 @@ import {
   contextPaths,
   expandImports,
   hierarchyCandidates,
+  nestedRuleSources,
+  ruleBase,
   mentionedRules,
   parseFrontmatter,
   parseRule,
@@ -287,5 +289,55 @@ describe('RuleTracker (rules of files the agent opens later)', () => {
     expect(text).toContain('now that you work on src/ui/App.tsx');
     expect(text).toContain('reason="**/*.tsx"');
     expect(rulesUpdate('x.md', [])).toBe('');
+  });
+});
+
+describe('Cursor and Copilot rules in sub-folders (hierarchy)', () => {
+  it('lists .cursor/rules and copilot-instructions.md from the root down to the file folder', () => {
+    const n = nestedRuleSources(['apps/web/src/x.tsx']);
+    expect(n.files.map((f) => f.path)).toEqual([
+      'apps/.github/copilot-instructions.md',
+      'apps/web/.github/copilot-instructions.md',
+      'apps/web/src/.github/copilot-instructions.md',
+    ]);
+    expect(n.dirs.map((d) => [d.dir, d.ext, d.kind])).toEqual([
+      ['apps/.cursor/rules', '.mdc', 'cursor'],
+      ['apps/web/.cursor/rules', '.mdc', 'cursor'],
+      ['apps/web/src/.cursor/rules', '.mdc', 'cursor'],
+    ]);
+    expect(nestedRuleSources(['root.ts'])).toEqual({ files: [], dirs: [] });
+  });
+
+  it('knows the folder each rule speaks for', () => {
+    expect(ruleBase('AGENTS.md')).toBe('');
+    expect(ruleBase('.cursor/rules/a.mdc')).toBe('');
+    expect(ruleBase('.github/copilot-instructions.md')).toBe('');
+    expect(ruleBase('apps/web/AGENTS.md')).toBe('apps/web');
+    expect(ruleBase('apps/web/.cursor/rules/a.mdc')).toBe('apps/web');
+    expect(ruleBase('apps/web/.github/copilot-instructions.md')).toBe('apps/web');
+  });
+
+  it('a nested rule enters only for files inside its folder; its globs are relative to it', () => {
+    const rules = [
+      parseRule('.cursor/rules/root.mdc', '---\nalwaysApply: true\n---\nRoot cursor', 'cursor'),
+      parseRule(
+        'apps/web/.cursor/rules/always.mdc',
+        '---\nalwaysApply: true\n---\nWeb cursor',
+        'cursor',
+      ),
+      parseRule('apps/web/.cursor/rules/tsx.mdc', '---\nglobs: ["src/*.tsx"]\n---\nWeb tsx', 'cursor'),
+      parseRule('apps/web/.github/copilot-instructions.md', 'Web copilot', 'copilot'),
+    ];
+    expect(rules[1]!.applies).toBe('always');
+    expect(rules[2]!.applies).toBe('glob');
+    const at = (paths: string[]) => selectRules(rules, paths).map((r) => [r.path, r.reason]);
+    expect(at(['apps/api/x.ts'])).toEqual([['.cursor/rules/root.mdc', 'always']]);
+    expect(at(['apps/web/src/App.tsx'])).toEqual([
+      ['.cursor/rules/root.mdc', 'always'],
+      ['apps/web/.cursor/rules/always.mdc', 'folder'],
+      ['apps/web/.cursor/rules/tsx.mdc', 'src/*.tsx'],
+      ['apps/web/.github/copilot-instructions.md', 'folder'],
+    ]);
+    expect(at(['apps/web/lib/a.ts']).map((x) => x[0])).not.toContain('apps/web/.cursor/rules/tsx.mdc');
   });
 });

@@ -215,7 +215,12 @@ export async function discoverTests(root: string, files: string[]): Promise<Test
       const deps = depsOf(await pkg(d));
       if (deps.has('vitest')) return { framework: 'vitest', cwd: d };
       if (deps.has('jest')) return { framework: 'jest', cwd: d };
-      if (cfg.some((n) => /^vite\.config/.test(n)) && deps.size)
+    }
+    // A bare vite.config (an app's bundler setup, not a test setup) only counts when no
+    // ancestor names a runner: in a monorepo the root vitest.config must win.
+    for (const d of upward(dirOf(file))) {
+      const cfg = configsIn.get(d) ?? [];
+      if (cfg.some((n) => /^vite\.config/.test(n)) && depsOf(await pkg(d)).size)
         return { framework: 'vitest', cwd: d };
     }
     return {

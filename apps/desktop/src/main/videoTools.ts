@@ -6,6 +6,7 @@ import {
   type VideoAgentResult,
 } from '../shared/videoAgent.js';
 import type { SystemPreview } from './system.js';
+import { TRANSITION_KINDS } from '../shared/videoFx.js';
 
 /**
  * Fase 13B: agent tools that edit Video Studio. The project lives in the renderer, so each call
@@ -164,7 +165,7 @@ export const VIDEO_TOOLS: ToolDefinition[] = [
       'Put a transition on clips (default: every video clip that follows another, i.e. every cut). Use a built-in "kind", a saved "transition_id", or INVENT a new one with "custom": curves of how the incoming clip looks from t=0 (start) to t=1 (fully in). Channels: alpha 0…1 (opacity), dx / dy -1…1 (offset as share of the frame width / height, + is right / down), scale 0.1…3, reveal 0…1 (share shown from the left). Every channel is forced to end in place at t=1 (alpha 1, dx 0, dy 0, scale 1, reveal 1). Example "zoom with a turn-in from the right": {"name":"Zoom desde la derecha","channels":{"alpha":[{"t":0,"v":0},{"t":0.4,"v":1}],"dx":[{"t":0,"v":0.3}],"scale":[{"t":0,"v":1.6},{"t":0.7,"v":0.95}]}}. A new custom transition is saved in the user’s library. remove=true takes the transitions off.',
     parameters: obj({
       clips: { type: 'array', items: { type: 'string' }, description: 'Clip ids (optional)' },
-      kind: { type: 'string', enum: ['dissolve', 'wipe', 'slide', 'zoomIn'] },
+      kind: { type: 'string', enum: [...TRANSITION_KINDS] },
       transition_id: { type: 'string', description: 'A custom transition from video_transitions' },
       custom: {
         type: 'object',

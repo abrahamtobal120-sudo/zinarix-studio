@@ -31,6 +31,7 @@ import {
   contextPaths,
   expandImports,
   hierarchyCandidates,
+  nestedRuleSources,
   mentionedRules,
   parseRule,
   rulesPrompt,
@@ -842,7 +843,13 @@ export class AiService {
       const text = read(rel);
       if (text !== null) out.push(rule(rel, text, 'instructions'));
     }
-    for (const d of RULE_DIRS) {
+    // Fase 1: .cursor/rules and copilot-instructions.md also count inside sub-folders.
+    const nested = nestedRuleSources(paths);
+    for (const rel of nested.files) {
+      const text = read(rel.path);
+      if (text !== null) out.push(rule(rel.path, text, rel.kind));
+    }
+    for (const d of [...RULE_DIRS, ...nested.dirs]) {
       let names: string[] = [];
       try {
         const abs = ws.resolve(d.dir);

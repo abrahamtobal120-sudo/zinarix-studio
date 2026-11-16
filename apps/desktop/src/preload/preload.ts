@@ -389,9 +389,8 @@ const api: OmniApi = {
     scenes: call('video:scenes') as OmniApi['video']['scenes'],
     saveCaptions: call('video:saveCaptions') as OmniApi['video']['saveCaptions'],
     agentDone: call('video:agentDone') as OmniApi['video']['agentDone'],
-    communityTransitions: call(
-      'video:communityTransitions',
-    ) as OmniApi['video']['communityTransitions'],
+    // prettier-ignore
+    communityTransitions: call('video:communityTransitions') as OmniApi['video']['communityTransitions'],
   },
   helper: {
     status: call('helper:status') as OmniApi['helper']['status'],
@@ -418,6 +417,8 @@ const api: OmniApi = {
     reopen: call('tasks:reopen') as OmniApi['tasks']['reopen'],
     archiveIdle: call('tasks:archiveIdle') as OmniApi['tasks']['archiveIdle'],
     usage: call('tasks:usage') as OmniApi['tasks']['usage'],
+    output: call('tasks:output') as OmniApi['tasks']['output'],
+    diff: call('tasks:diff') as OmniApi['tasks']['diff'],
   },
   review: {
     run: call('review:run') as OmniApi['review']['run'],

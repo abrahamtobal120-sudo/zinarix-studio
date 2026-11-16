@@ -484,6 +484,61 @@ describe('hooks in the agent loop', () => {
     expect(r.offered).toHaveLength(4);
     expect(r.events.filter((e) => e.type === 'notice' && e.kind === 'hook')).toHaveLength(3);
   }, 30_000);
+
+  it('UserPromptSubmit exit 2 blocks the message: the model is never called', async () => {
+    // The hook reads the prompt from stdin (Claude Code JSON) and refuses one that has a key.
+    const guard = nodeHook(
+      'prompt-guard.cjs',
+      `let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const i=JSON.parse(s);if(i.hook_event_name==='UserPromptSubmit'&&i.prompt.includes('go')){process.stderr.write('Prompt has a forbidden word');process.exit(2);}});`,
+    );
+    writeFileSync(
+      join(ws, '.zinarix', 'settings.json'),
+      JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ command: guard }] }] } }),
+    );
+    const r = await run([[{ name: 'write_file', args: { path: 'x.txt', content: 'x' } }], []]);
+    expect(r.offered).toHaveLength(0);
+    expect(existsSync(join(ws, 'x.txt'))).toBe(false);
+    expect(r.answer).toContain('UserPromptSubmit');
+    expect(r.answer).toContain('Prompt has a forbidden word');
+    expect(
+      r.events.some(
+        (e) => e.type === 'notice' && e.kind === 'hook' && e.message.includes('forbidden word'),
+      ),
+    ).toBe(true);
+    expect(r.asked).toEqual(['project_hooks']);
+  }, 30_000);
+
+  it('UserPromptSubmit output on exit 0 is added to the prompt as context', async () => {
+    const ctx = nodeHook('prompt-ctx.cjs', `process.stdout.write('Current branch: feature/x');`);
+    writeFileSync(
+      join(ws, '.zinarix', 'settings.json'),
+      JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ command: ctx }] }] } }),
+    );
+    let seen = '';
+    const offered: string[][] = [];
+    const core = fakeCore([[]], offered) as unknown as {
+      stream: (req: { messages: ChatMessage[] }) => AsyncGenerator<unknown>;
+    };
+    const inner = core.stream.bind(core);
+    core.stream = async function* (req) {
+      seen = req.messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
+      yield* inner(req);
+    };
+    const workspace = new Workspace(ws);
+    const agent = new Agent(core as unknown as OmniCore, () => workspace);
+    agent.userKitRoot = null;
+    await agent.run({
+      conversationId: 'c',
+      userMessage: { role: 'user', content: 'go' },
+      fallbackHistory: [],
+      signal: new AbortController().signal,
+      emit: () => undefined,
+      ask: () => Promise.resolve('approve'),
+    });
+    expect(offered).toHaveLength(1);
+    expect(seen).toContain('<hook-context event="UserPromptSubmit">');
+    expect(seen).toContain('Current branch: feature/x');
+  }, 30_000);
 });
 
 /* -------------------------------------------------------------- Fase 4, improvements */

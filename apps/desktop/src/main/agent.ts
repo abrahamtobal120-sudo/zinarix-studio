@@ -32,6 +32,7 @@ import {
 } from '../shared/agentModes.js';
 import { editedSince, hunks, revertHunks, rewindPlan, turnFiles } from '../shared/checkpoints.js';
 import { CheckpointStore } from './checkpointStore.js';
+import { beforeData, bytesOf, isAsBefore, snapshot } from './checkpointBytes.js';
 import type { BrowserController, BrowserTab, PageSnapshot } from './browser.js';
 import { normalizeUrl, siteOf } from './browser.js';
 import {
@@ -793,6 +794,8 @@ export interface Checkpoint {
   path: string;
   /** null = the file did not exist before the agent touched it. */
   before: string | null;
+  /** Exact bytes of `before` (base64) when the file is not valid UTF-8: restores byte-exact. */
+  beforeBytes?: string;
   /** What the agent wrote: tells a later hand edit apart (Fase 2). */
   after?: string | null;
   /** A file outside the workspace (absolute path). */
@@ -2486,12 +2489,13 @@ A project hook did not let you finish yet. Address it, then answer.`,
             return finish(true, msg, `${name} (permanente)`);
           }
           const file = profileFile();
-          const before = existsSync(file) ? await readFile(file, 'utf8') : null;
+          const snap = await snapshot(file);
+          const before = snap.before;
           const after = profileWithVar(before ?? '', name, value, file.endsWith('.fish'));
           this.checkpoint(s, opts.conversationId, {
             turn: opts.turn,
             path: file,
-            before,
+            ...snap,
             after,
             absolute: true,
           });
@@ -2695,7 +2699,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
           const abs = w.resolve(path);
           const denied = deniedPath(abs, 'write');
           if (denied) return finish(false, denied, `${path}: protegido`);
-          const before = await readFile(abs, 'utf8');
+          const raw = await readFile(abs);
+          const before = raw.toString('utf8');
           const count = oldS ? before.split(oldS).length - 1 : 0;
           if (count !== 1) {
             return finish(
@@ -2711,6 +2716,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
             turn: opts.turn,
             path,
             before,
+            ...bytesOf(raw),
             after,
             root: w.root,
           });
@@ -2724,11 +2730,12 @@ A project hook did not let you finish yet. Address it, then answer.`,
           const abs = w.resolve(path);
           const denied = deniedPath(abs, 'write');
           if (denied) return finish(false, denied, `${path}: protegido`);
-          const before = existsSync(abs) ? await readFile(abs, 'utf8') : null;
+          const snap = await snapshot(abs);
+          const before = snap.before;
           this.checkpoint(s, opts.conversationId, {
             turn: opts.turn,
             path,
-            before,
+            ...snap,
             after: content,
             root: w.root,
           });
@@ -2846,7 +2853,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
       const abs = cp.absolute ? cp.path : ws!.resolve(cp.path);
       if (cp.before === null) {
         await rm(abs, { force: true });
-      } else await writeFile(abs, cp.before, 'utf8');
+      } else await writeFile(abs, beforeData(cp));
       // Restored: the backup copy (which may hold secrets) is no longer needed.
       if (cp.backup) await rm(cp.backup, { force: true });
       if (!restored.includes(cp.path)) restored.push(cp.path);
@@ -2912,8 +2919,9 @@ A project hook did not let you finish yet. Address it, then answer.`,
     const ws = this.folderFor(restore, workspace);
     const out: RewindFileView[] = [];
     for (const r of restore) {
-      const now = await this.onDisk(r.absolute ? r.path : ws!.resolve(r.path));
-      if (now === r.before) continue; // already as it was
+      const abs = r.absolute ? r.path : ws!.resolve(r.path);
+      const now = await this.onDisk(abs);
+      if (await isAsBefore(abs, r)) continue; // already as it was (byte for byte)
       out.push({
         path: r.path,
         action: r.before === null ? 'delete' : 'restore',
@@ -2946,11 +2954,11 @@ A project hook did not let you finish yet. Address it, then answer.`,
     const restored: string[] = [];
     for (const r of restore) {
       const abs = r.absolute ? r.path : ws!.resolve(r.path);
-      if ((await this.onDisk(abs)) !== r.before) {
+      if ((await isAsBefore(abs, r)) !== true) {
         if (r.before === null) await rm(abs, { force: true });
         else {
           await mkdir(dirname(abs), { recursive: true });
-          await writeFile(abs, r.before, 'utf8');
+          await writeFile(abs, beforeData(r));
         }
         restored.push(r.path);
       }

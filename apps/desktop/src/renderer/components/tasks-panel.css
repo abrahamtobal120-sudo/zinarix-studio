@@ -268,3 +268,51 @@
   gap: 4px;
 }
 }
+
+/* Fase 5A: a task's terminal and diff */
+.tasks-parallel select {
+  margin-left: 4px;
+}
+.task-detail {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.task-detail-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.task-detail-tabs [aria-selected='true'] {
+  font-weight: 600;
+}
+.task-terminal,
+.task-diff pre {
+  margin: 0;
+  padding: 8px;
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.task-diff {
+  max-height: 420px;
+  overflow: auto;
+}
+.task-diff summary {
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.task-diff .add {
+  color: var(--green, #3fb950);
+}
+.task-diff .del {
+  color: var(--red, #f85149);
+}
+.task-diff .hunk {
+  color: var(--fg-dim, #8b949e);
+}

@@ -4,6 +4,7 @@
  * drawing as a PNG, so both look the same.
  */
 import type { TextFont, TextSpec } from '../../../shared/videoFx';
+import { graphemes } from '../../../shared/videoTypewriter';
 
 export const FONT_FAMILY: Record<TextFont, string> = {
   sans: 'Inter, "Segoe UI", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif',
@@ -86,5 +87,58 @@ export function textPngs(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const c of clips) if (c.text) out[c.id] = textCanvas(c.text, W, H).toDataURL('image/png');
+  return out;
+}
+
+/**
+ * Fase 11B: where each letter (grapheme) of a title ends, as shares of the frame width, in
+ * reading order (never going back: on a second line the reveal waits for the first one's end).
+ * The same layout as drawText, so the typewriter cuts between letters.
+ */
+const stopCache = new Map<string, number[]>();
+export function textStops(spec: TextSpec, W: number, H: number): number[] {
+  const key = `${W}x${H}|${JSON.stringify(spec)}`;
+  const hit = stopCache.get(key);
+  if (hit) return hit;
+  const cv = document.createElement('canvas');
+  const ctx = cv.getContext('2d');
+  if (!ctx) return [];
+  const px = Math.max(4, spec.size * H);
+  ctx.font = `${spec.italic ? 'italic ' : ''}${spec.bold ? '700' : '400'} ${px}px ${FONT_FAMILY[spec.font]}`;
+  const lines = (spec.content || ' ').split('\n');
+  const widths = lines.map((l) => ctx.measureText(l).width);
+  const boxW = Math.max(...widths);
+  const left = W / 2 - boxW / 2;
+  const extra = spec.stroke && spec.stroke.width > 0 ? (spec.stroke.width * px) / 2 : 0;
+  const out: number[] = [];
+  let last = 0;
+  lines.forEach((line, i) => {
+    const w = widths[i]!;
+    const x =
+      spec.align === 'left' ? left : spec.align === 'right' ? left + boxW - w : W / 2 - w / 2;
+    let prefix = '';
+    for (const g of graphemes(line)) {
+      prefix += g;
+      last = Math.max(last, Math.min(1, (x + ctx.measureText(prefix).width + extra) / W));
+      out.push(last);
+    }
+    // The line break is a letter too (it takes a step, like in typeLetters).
+    if (i < lines.length - 1) out.push(last);
+  });
+  if (stopCache.size > 64) stopCache.delete(stopCache.keys().next().value!);
+  stopCache.set(key, out);
+  return out;
+}
+
+/** Stops of every typewriter title of a project, at the export size. */
+export function textStopsOf(
+  clips: { id: string; text?: TextSpec; anim?: { in?: string; out?: string } }[],
+  W: number,
+  H: number,
+): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  for (const c of clips)
+    if (c.text && (c.anim?.in === 'typewriter' || c.anim?.out === 'typewriter'))
+      out[c.id] = textStops(c.text, W, H);
   return out;
 }

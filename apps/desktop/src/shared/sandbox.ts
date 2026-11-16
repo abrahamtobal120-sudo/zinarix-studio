@@ -8,10 +8,16 @@
  * folder (it holds the other worktrees and the tokens). A sandbox that is missing is never
  * faked: when a protection is not active, the command goes back to asking for approval.
  *
+ * Network: none, or (Linux, macOS) only through a local proxy that lets through the hosts
+ * of NET_ALLOW (npm and PyPI registries). The proxy runs in the app (main/netProxy.ts);
+ * the sandbox can reach nothing but it.
+ *
  * Windows (first version, like the plan says): a low-integrity token without admin rights
- * inside a Job Object. Low integrity cannot write anything of medium integrity (almost the
- * whole disk, the registry, other processes); only the worktree and its temp folder are
- * labeled low. Network and reading ~/.ssh are not restricted, and the caps say so.
+ * inside a Job Object (process count, memory, kill on close). Low integrity cannot write
+ * anything of medium integrity (almost the whole disk, the registry, other processes); only
+ * the worktree and its temp folder are labeled low. The hidden folders get a no-read-up
+ * label, so ~/.ssh and the app data cannot be read either. The network is not restricted
+ * (that needs admin: a firewall rule or AppContainer), and the caps say so.
  */
 
 export type SandboxKind = 'bwrap' | 'sandbox-exec' | 'windows' | 'none';
@@ -29,6 +35,9 @@ export interface SandboxCaps {
   reason?: string;
   /** Windows: the helper's C# source and its launcher script (main/sandboxWin.ts). */
   helper?: WinHelper;
+  /** Network is not cut entirely: these hosts are reachable through the allow-list proxy
+   * (Linux and macOS; missing = no network at all). */
+  netAllow?: readonly string[];
 }
 
 /** Windows: the launcher script and the helper's C# source it compiles in memory. */
@@ -46,7 +55,66 @@ export interface SandboxPaths {
   /** Hidden entirely (only folders that exist: bwrap cannot create mount points on a
    * read-only system): the app's data folder (other worktrees, tokens) and secretDirs(). */
   hidden: readonly string[];
+  /** The allow-list proxy (Linux, macOS). Missing = no network at all. */
+  proxy?: SandboxProxy;
+  /** Windows: the folder of all the worktrees. Hiding never relabels it or what is below it
+   * (the worktrees are labeled low; a medium label on top would take their writes away). */
+  keep?: string;
 }
+
+/** Where a confined command reaches the allow-list proxy. */
+export interface SandboxProxy {
+  /** The loopback TCP port the command's HTTP(S)_PROXY points at. macOS: the proxy itself;
+   * Linux: a bridge inside the sandbox that forwards to `socket`. */
+  port: number;
+  /** Linux: the proxy's unix socket outside, bound into the sandbox (bwrap --unshare-net
+   * leaves only loopback; a socket file is the one way out). */
+  socket?: string;
+}
+
+/** Hosts a confined command may reach (through the proxy) where the sandbox supports it:
+ * the npm and PyPI registries, so installs work and nothing else leaves the machine. */
+export const NET_ALLOW: readonly string[] = [
+  'registry.npmjs.org',
+  'registry.yarnpkg.com',
+  'pypi.org',
+  'files.pythonhosted.org',
+];
+
+/** Whether `host` (no port) is in the list: exact, or under a `*.domain` entry. */
+export function hostAllowed(host: string, allow: readonly string[]): boolean {
+  const h = host
+    .toLowerCase()
+    .replace(/\.$/, '')
+    .replace(/^\[|\]$/g, '');
+  if (!h) return false;
+  return allow.some((a) => {
+    const e = a.toLowerCase();
+    return e.startsWith('*.') ? h.endsWith(e.slice(1)) : h === e;
+  });
+}
+
+/** The variables that send a command's HTTP(S) traffic through the proxy (npm, pip, curl,
+ * git, Node's fetch with NODE_USE_ENV_PROXY). Programs that ignore them get no network. */
+export function proxyEnv(port: number): Record<string, string> {
+  const url = `http://127.0.0.1:${port}`;
+  return {
+    HTTP_PROXY: url,
+    HTTPS_PROXY: url,
+    http_proxy: url,
+    https_proxy: url,
+    ALL_PROXY: url,
+    NO_PROXY: '',
+    no_proxy: '',
+    npm_config_proxy: url,
+    npm_config_https_proxy: url,
+    PIP_PROXY: url,
+    NODE_USE_ENV_PROXY: '1',
+  };
+}
+
+/** Windows: at most this many processes in a confined command's tree (the Job Object). */
+export const MAX_PROCESSES = 256;
 
 export const NO_SANDBOX: SandboxCaps = {
   kind: 'none',
@@ -88,9 +156,10 @@ export function encodePowerShell(command: string): string {
  */
 export function winLauncherArgs(
   helper: WinHelper,
-  p: Pick<SandboxPaths, 'root' | 'tmp'>,
+  p: Pick<SandboxPaths, 'root' | 'tmp'> & Partial<Pick<SandboxPaths, 'hidden' | 'keep'>>,
   command: string,
   memBytes = 0,
+  maxProcesses = MAX_PROCESSES,
 ): string[] {
   return [
     '-NoProfile',
@@ -107,6 +176,14 @@ export function winLauncherArgs(
     p.tmp,
     '-Mem',
     String(Math.max(0, Math.floor(memBytes))),
+    '-Procs',
+    String(Math.max(1, Math.floor(maxProcesses))),
+    // Windows paths cannot contain `|`, so it separates them and stands for "none" (an empty
+    // argument can get lost on the way to `powershell -File`).
+    '-Hide',
+    (p.hidden ?? []).join('|') || '|',
+    '-Keep',
+    p.keep || '|',
     '-B64',
     encodePowerShell(command),
   ];
@@ -118,6 +195,7 @@ export function sandboxNote(c: SandboxCaps): string {
     !c.network && 'la red no está restringida',
     !c.secrets && 'puede leer archivos fuera del worktree (como ~/.ssh)',
   ].filter(Boolean);
+  if (c.network && c.netAllow?.length) missing.push(`la red solo llega a ${c.netAllow.join(', ')}`);
   return `Corre en el sandbox: solo puede escribir en el worktree y en su carpeta temporal${
     missing.length ? `; ${missing.join(' y ')}` : ''
   }.`;
@@ -147,9 +225,59 @@ export function bwrapArgs(p: SandboxPaths): string[] {
   const args = ['--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--tmpfs', '/tmp'];
   for (const h of p.hidden) args.push('--tmpfs', h);
   args.push('--bind', p.tmp, p.tmp, '--bind', p.root, p.root);
+  // The proxy's socket is the only way out of the network namespace.
+  if (p.proxy?.socket) args.push('--bind', p.proxy.socket, p.proxy.socket);
   args.push('--unshare-net', '--unshare-ipc', '--die-with-parent', '--new-session');
+  // With the bridge, a pid namespace too: when the command ends, the bridge goes with it.
+  if (p.proxy?.socket) args.push('--unshare-pid');
   args.push('--setenv', 'TMPDIR', p.tmp);
+  if (p.proxy)
+    for (const [k, v] of Object.entries(proxyEnv(p.proxy.port))) args.push('--setenv', k, v);
   return args;
+}
+
+/**
+ * Linux, with the allow-list proxy: a small Node script that runs inside the sandbox, listens
+ * on 127.0.0.1:<port> (loopback is up in bwrap's network namespace), forwards every
+ * connection to the proxy's unix socket, and then runs the command (its exit code is passed
+ * on). argv: <port> <socket> <file> <args...>.
+ */
+export const BRIDGE_JS = [
+  "const net = require('net'), cp = require('child_process');",
+  'const [port, sock, file, ...args] = process.argv.slice(1);',
+  'const s = net.createServer((c) => {',
+  '  const u = net.connect(sock);',
+  "  c.on('error', () => u.destroy()); u.on('error', () => c.destroy());",
+  '  c.pipe(u).pipe(c);',
+  '});',
+  "s.on('error', (e) => { console.error('proxy bridge: ' + e.message); process.exit(125); });",
+  "s.listen(Number(port), '127.0.0.1', () => {",
+  '  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;',
+  "  const ch = cp.spawn(file, args, { stdio: 'inherit', env });",
+  "  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => ch.kill(sig));",
+  "  ch.on('error', () => process.exit(127));",
+  "  ch.on('exit', (code, sig) => process.exit(code ?? (sig ? 128 : 1)));",
+  '});',
+].join('\n');
+
+/** The whole bwrap command line (after `bwrap`). With the proxy, the bridge runs first with
+ * `node` (Electron's own binary as Node) and starts the shell. */
+export function bwrapCommand(p: SandboxPaths, command: string, node: string): string[] {
+  const shell = ['/bin/bash', '-lc', command];
+  if (!p.proxy?.socket) return [...bwrapArgs(p), '--', ...shell];
+  return [
+    ...bwrapArgs(p),
+    '--setenv',
+    'ELECTRON_RUN_AS_NODE',
+    '1',
+    '--',
+    node,
+    '-e',
+    BRIDGE_JS,
+    String(p.proxy.port),
+    p.proxy.socket,
+    ...shell,
+  ];
 }
 
 /** A string literal for a sandbox-exec (SBPL) profile. */
@@ -169,6 +297,8 @@ export function macProfile(p: SandboxPaths): string {
     '(allow default)',
     '(deny network*)',
     '(allow network* (remote unix-socket))',
+    // The allow-list proxy is the only host it may reach (the proxy decides what goes out).
+    ...(p.proxy ? [`(allow network-outbound (remote ip "localhost:${p.proxy.port}"))`] : []),
     '(deny file-write*)',
     `(allow file-write* (subpath ${sbplString(p.root)}) (subpath ${sbplString(p.tmp)}) (subpath "/private/var/folders") (literal "/dev/null") (literal "/dev/zero") (regex #"^/dev/tty") (regex #"^/dev/fd/"))`,
   ];

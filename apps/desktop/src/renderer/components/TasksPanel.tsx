@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TaskView, TasksStatusView, TasksUsageView } from '../../shared/api';
-import { fmtBytes, isIdle, USAGE_WARN_BYTES, type TaskApprovalView } from '../../shared/tasks';
+import {
+  clampParallel,
+  fmtBytes,
+  isIdle,
+  MAX_PARALLEL,
+  splitDiff,
+  taskModel,
+  USAGE_WARN_BYTES,
+  type TaskApprovalView,
+} from '../../shared/tasks';
 import { sandboxComplete, sandboxConfines, type SandboxCaps } from '../../shared/sandbox';
 import { confirmDialog } from '../confirm';
 import { errText } from '../errText';
 import { t, type Key } from '../i18n';
-import { api, toast } from '../store';
+import { api, focusedChat, refreshModels, setState, toast, updatePrefs, useStore } from '../store';
 import { Icon } from './Icon';
 import { ModalShell } from './ModalShell';
 import './tasks-panel.css';
@@ -35,6 +44,29 @@ function SandboxLine({ caps }: { caps: SandboxCaps | undefined }) {
 }
 
 const ACTIVE = new Set(['queued', 'preparing', 'working', 'waiting']);
+
+/** What "Nueva tarea en segundo plano" may bring: a prompt (an approved plan…) and a model. */
+export interface NewTaskSeed {
+  prompt?: string;
+  model?: string;
+}
+
+/** Window event the focused chat listens to: it opens the Tasks panel on the new-task form. */
+export const NEW_TASK_EVENT = 'zx-new-task';
+
+/**
+ * Opens the Tasks panel of the focused chat on the new-task form, optionally filled in
+ * (command palette, an approved plan). The task is not created until the user confirms.
+ */
+export function openNewTask(seed: NewTaskSeed = {}): void {
+  setState({ chatOpen: true });
+  const chat = focusedChat();
+  // The chat panel may be mounting: give it a moment to listen.
+  setTimeout(
+    () => window.dispatchEvent(new CustomEvent(NEW_TASK_EVENT, { detail: { ...seed, chat } })),
+    50,
+  );
+}
 
 /** Tasks that need the user (approval) or are running: the chip's badge. */
 export function useTasks(): TasksStatusView | null {
@@ -74,16 +106,30 @@ const fmtUsd = (usd: number | null) => (usd === null ? '—' : `US$${usd.toFixed
 export function TasksPanel({
   status,
   model,
+  seed,
   onClose,
   onOpenChat,
 }: {
   status: TasksStatusView | null;
   /** The chat's model: the default for a new task. */
   model?: string;
+  /** Fills in the new-task form (openNewTask). */
+  seed?: NewTaskSeed | null;
   onClose: () => void;
   onOpenChat: (conversationId: string, folder: string) => void;
 }) {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(seed?.prompt ?? '');
+  const [chosenModel, setChosenModel] = useState(seed?.model ?? '');
+  useEffect(() => {
+    if (seed?.prompt) setPrompt(seed.prompt);
+    if (seed?.model) setChosenModel(seed.model);
+  }, [seed]);
+  const models = useStore((s) => s.models);
+  const parallel = useStore((s) => s.prefs.taskParallel);
+  useEffect(() => {
+    if (!models.length) void refreshModels().catch(() => undefined);
+  }, [models.length]);
+  const [details, setDetails] = useState<string | null>(null);
   const [base, setBase] = useState('');
   const [mode, setMode] = useState<'agent' | 'auto'>('agent');
   const [copyChanges, setCopyChanges] = useState(false);
@@ -168,7 +214,7 @@ export function TasksPanel({
     try {
       await api().tasks.create({
         prompt,
-        model,
+        model: taskModel(chosenModel, model),
         mode,
         base: base.trim() || undefined,
         copyChanges,
@@ -228,6 +274,21 @@ export function TasksPanel({
         <Icon name="layers" size={15} />
         <h2 id="tasks-title">{t('tasksPanel')}</h2>
         <span className="tasks-sub">{t('tasksParallel', { n: status?.maxParallel ?? 3 })}</span>
+        <label className="tasks-sub tasks-parallel" title={t('taskParallelHint')}>
+          {t('taskParallelLabel')}{' '}
+          <select
+            value={clampParallel(parallel ?? status?.maxParallel)}
+            onChange={(e) =>
+              void updatePrefs({ taskParallel: clampParallel(Number(e.target.value)) })
+            }
+          >
+            {Array.from({ length: MAX_PARALLEL }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
         <span className="spacer" />
         {usage && usage.total > 0 && (
           <span
@@ -276,6 +337,20 @@ export function TasksPanel({
           <label>
             {t('taskBase')}
             <input value={base} placeholder="HEAD" onChange={(e) => setBase(e.target.value)} />
+          </label>
+          <label>
+            {t('taskModel')}
+            <input
+              list="tasks-models"
+              value={chosenModel}
+              placeholder={model || t('taskModelPh')}
+              onChange={(e) => setChosenModel(e.target.value)}
+            />
+            <datalist id="tasks-models">
+              {models.map((m) => (
+                <option key={`${m.provider}/${m.id}`} value={`${m.provider}/${m.id}`} />
+              ))}
+            </datalist>
           </label>
           <label>
             {t('taskMode')}
@@ -437,6 +512,12 @@ export function TasksPanel({
                       {t('taskOpenChat')}
                     </button>
                   )}
+                  <button
+                    aria-expanded={details === x.id}
+                    onClick={() => setDetails((d) => (d === x.id ? null : x.id))}
+                  >
+                    {details === x.id ? t('taskDetailsHide') : t('taskDetails')}
+                  </button>
                   <button onClick={() => void act(() => api().tasks.openFolder(x.id))}>
                     {t('taskOpenFolder')}
                   </button>
@@ -484,6 +565,7 @@ export function TasksPanel({
                   )}
                 </div>
               )}
+              {details === x.id && <TaskDetail task={x} live={live} />}
               {x.closed === 'kept' && (
                 <div className="task-actions">
                   <button onClick={() => void act(() => api().tasks.reopen(x.id))}>
@@ -500,6 +582,99 @@ export function TasksPanel({
 }
 
 /** An ask_user question of a background task: pick options, answer in words, or skip. */
+const diffClass = (l: string) =>
+  l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : l.startsWith('@@') ? 'hunk' : undefined;
+
+/** Opening a task: its terminal (commands and output) and its diff against the base commit. */
+function TaskDetail({ task, live }: { task: TaskView; live: boolean }) {
+  const [tab, setTab] = useState<'terminal' | 'diff'>('terminal');
+  const [output, setOutput] = useState('');
+  const [diff, setDiff] = useState<string | null>(null);
+  const [n, setN] = useState(0);
+  const pre = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    let on = true;
+    const load = () =>
+      void api()
+        .tasks.output(task.id)
+        .then((o) => on && setOutput(o))
+        .catch(() => undefined);
+    load();
+    // While the task works its terminal grows.
+    const h = live ? setInterval(load, 1500) : undefined;
+    return () => {
+      on = false;
+      if (h) clearInterval(h);
+    };
+  }, [task.id, live, n]);
+  useEffect(() => {
+    if (tab !== 'diff') return;
+    let on = true;
+    void api()
+      .tasks.diff(task.id)
+      .then((d) => on && setDiff(d))
+      .catch((e: unknown) => on && setDiff(errText(e)));
+    return () => {
+      on = false;
+    };
+  }, [tab, task.id, task.state, n]);
+  useEffect(() => {
+    if (tab === 'terminal' && pre.current) pre.current.scrollTop = pre.current.scrollHeight;
+  }, [output, tab]);
+  const files = diff ? splitDiff(diff) : [];
+  return (
+    <div className="task-detail">
+      <div className="task-detail-tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'terminal'} onClick={() => setTab('terminal')}>
+          {t('taskTerminal')}
+        </button>
+        <button role="tab" aria-selected={tab === 'diff'} onClick={() => setTab('diff')}>
+          {t('taskDiff')}
+          {files.length > 0 && ` (${files.length})`}
+        </button>
+        <span className="spacer" />
+        <button
+          aria-label={t('taskRefresh')}
+          title={t('taskRefresh')}
+          onClick={() => setN((k) => k + 1)}
+        >
+          <Icon name="refresh" size={12} />
+        </button>
+      </div>
+      {tab === 'terminal' ? (
+        <pre ref={pre} className="task-terminal" aria-label={t('taskTerminal')}>
+          {output.trim() ? output : t('taskNoOutput')}
+        </pre>
+      ) : (
+        <div className="task-diff" aria-label={t('taskDiff')}>
+          {diff === null ? (
+            <p className="tasks-hint">…</p>
+          ) : !files.length ? (
+            <p className="tasks-hint">{diff.trim() ? diff : t('taskNoDiff')}</p>
+          ) : (
+            files.map((f) => (
+              <details key={f.path} open={files.length <= 5}>
+                <summary>
+                  <code>{f.path}</code> <span className="add">+{f.added}</span>{' '}
+                  <span className="del">−{f.removed}</span>
+                </summary>
+                <pre>
+                  {f.lines.map((l, i) => (
+                    <span key={i} className={diffClass(l)}>
+                      {l}
+                      {'\n'}
+                    </span>
+                  ))}
+                </pre>
+              </details>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TaskQuestion({
   task,
   p,

@@ -1,0 +1,35 @@
+{
+  "format": "zinarix-transition",
+  "version": 1,
+  "id": "cortina-lenta",
+  "name": "Cortina lenta",
+  "description": "Se descubre de izquierda a derecha mientras aparece.",
+  "author": "Zinarix Studio",
+  "ease": "smooth",
+  "channels": {
+    "alpha": [
+      {
+        "t": 0,
+        "v": 0.2
+      },
+      {
+        "t": 0.5,
+        "v": 1
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ],
+    "reveal": [
+      {
+        "t": 0,
+        "v": 0
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ]
+  }
+}

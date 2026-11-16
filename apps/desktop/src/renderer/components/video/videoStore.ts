@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from 'react';
 import type { VideoJobView } from '../../../shared/api';
 import type { Clip, MediaItem, VideoProject } from '../../../shared/video';
+import type { Look } from '../../../shared/videoFx';
 import {
   insertMedia,
   mediaKindOf,
@@ -61,6 +62,11 @@ export interface VState {
   clipboard: Clip[];
   /** The studio's own text prompt (the app's modals sit below the studio). */
   prompt: { label: string; value: string; resolve: (v: string | null) => void } | null;
+  /**
+   * Hovering an animation card: these clips play it on a loop in the viewer (runtime only,
+   * nothing is edited). `since` is performance.now() when the hover started.
+   */
+  fxPreview: { ids: string[]; look: (k: number) => Look; since: number } | null;
 }
 
 const LAYOUT_KEY = 'zvs.layout';
@@ -92,6 +98,7 @@ let state: VState = {
   tools: null,
   clipboard: [],
   prompt: null,
+  fxPreview: null,
 };
 
 const listeners = new Set<() => void>();

@@ -335,3 +335,86 @@ export function mergeClash(taskFiles: readonly string[], dirty: readonly string[
   const d = new Set(dirty.map((f) => f.replace(/\\/g, '/')));
   return taskFiles.map((f) => f.replace(/\\/g, '/')).filter((f) => d.has(f));
 }
+
+// ---------------- Fase 5A: concurrency, model, terminal and diff of a task ----------------
+
+/** How many tasks may run at once: 1–8, default 3. */
+export const DEFAULT_PARALLEL = 3;
+export const MAX_PARALLEL = 8;
+export function clampParallel(n: unknown): number {
+  const v = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : DEFAULT_PARALLEL;
+  return Math.min(MAX_PARALLEL, Math.max(1, v));
+}
+
+/** The model a new task runs with: the one chosen in the form, else the chat's (undefined =
+ * the agent role / default model). */
+export function taskModel(chosen: string | undefined, chatModel?: string): string | undefined {
+  const c = chosen?.trim();
+  return c ? c : chatModel?.trim() || undefined;
+}
+
+/** Most of a task's terminal kept (the newest output wins). */
+export const TASK_OUTPUT_MAX = 200_000;
+
+/** The last `max` characters of a text, cut at a line start when possible. */
+export function tailText(text: string, max = TASK_OUTPUT_MAX): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(-max);
+  const nl = cut.indexOf('\n');
+  return nl >= 0 && nl < 2000 ? cut.slice(nl + 1) : cut;
+}
+
+/** The events of a run that matter for its terminal (structural: no Electron types). */
+export type TerminalEvent =
+  | { type: 'tool_call'; id: string; name: string; args: Record<string, unknown> }
+  | { type: 'tool_output'; id: string; chunk: string }
+  | { type: 'tool_result'; id: string; ok: boolean; summary: string }
+  | { type: string; id?: string };
+
+/**
+ * What one event adds to a task's terminal: the command line of each run_command, its
+ * output and its exit line. `commands` collects the ids of the run_command calls seen.
+ */
+export function terminalChunk(ev: TerminalEvent, commands: Set<string>): string | null {
+  if (ev.type === 'tool_call' && 'name' in ev && ev.name === 'run_command') {
+    const e = ev as Extract<TerminalEvent, { type: 'tool_call' }>;
+    commands.add(e.id);
+    return `\n$ ${String(e.args.command ?? '')}\n`;
+  }
+  if (ev.type === 'tool_output' && 'chunk' in ev && commands.has(String(ev.id)))
+    return (ev as { chunk: string }).chunk;
+  if (ev.type === 'tool_result' && 'summary' in ev && commands.has(String(ev.id))) {
+    commands.delete(String(ev.id));
+    return `\n[${(ev as { summary: string }).summary}]\n`;
+  }
+  return null;
+}
+
+export interface DiffFile {
+  path: string;
+  added: number;
+  removed: number;
+  lines: string[];
+}
+
+/** A unified diff (`git diff`) split by file, with +/− counts per file. */
+export function splitDiff(patch: string): DiffFile[] {
+  const files: DiffFile[] = [];
+  let cur: DiffFile | null = null;
+  for (const line of patch.split('\n')) {
+    const head = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
+    if (head) {
+      cur = { path: head[2]!, added: 0, removed: 0, lines: [] };
+      files.push(cur);
+      continue;
+    }
+    if (!cur) continue;
+    if (/^(index |--- |\+\+\+ |new file mode|deleted file mode|similarity |rename )/.test(line))
+      continue;
+    if (line.startsWith('+')) cur.added++;
+    else if (line.startsWith('-')) cur.removed++;
+    cur.lines.push(line);
+  }
+  if (files.length && files.at(-1)!.lines.at(-1) === '') files.at(-1)!.lines.pop();
+  return files;
+}

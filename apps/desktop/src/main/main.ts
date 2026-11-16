@@ -1789,6 +1789,7 @@ function registerIpc(): void {
       helperBubble: z.boolean(),
       helperModel: z.string().regex(MODEL_NAME),
       windowEffects: z.boolean(),
+      taskParallel: z.number().int().min(1).max(8),
     })
     .partial();
   handle('app:prefs', z.tuple([]), () => prefs());
@@ -1798,6 +1799,7 @@ function registerIpc(): void {
     if (patch.lsp !== undefined || patch.lspCommands)
       for (const h of lspHosts.values()) void h.restart();
     ai.useRules = next.projectRules;
+    if (patch.taskParallel !== undefined) tasks?.setMaxParallel(patch.taskParallel);
     applyZoom();
     broadcastSettings(w);
     return next;
@@ -2493,6 +2495,7 @@ function taskManager(): TaskManager {
     tasks = new TaskManager({
       dir: tasksDir(),
       runner: ai,
+      maxParallel: prefs().taskParallel,
       onChange: (status) => {
         for (const w of wins.values()) send(w, { type: 'tasks', status });
       },
@@ -3071,6 +3074,8 @@ function registerTasksIpc(): void {
   handle('tasks:usage', z.tuple([z.boolean().optional()]), (_w, fresh) =>
     taskManager().usage(fresh),
   );
+  handle('tasks:output', z.tuple([taskId]), (_w, id) => taskManager().output(id));
+  handle('tasks:diff', z.tuple([taskId]), (_w, id) => taskManager().diff(id));
   handle('tasks:pause', z.tuple([taskId]), (_w, id) => taskManager().pause(id));
   handle('tasks:cancel', z.tuple([taskId]), (_w, id) => taskManager().cancel(id));
   handle('tasks:resume', z.tuple([taskId, big.optional()]), (_w, id, p) =>

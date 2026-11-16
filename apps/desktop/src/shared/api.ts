@@ -255,6 +255,8 @@ export interface Prefs {
   helperModel: string;
   /** Fase 18: Mica (Windows 11) or vibrancy (macOS) behind the title bar and the side bar. */
   windowEffects: boolean;
+  /** Fase 5A: background tasks that run at the same time (1–8; the rest wait in the queue). */
+  taskParallel: number;
 }
 
 /** Steps of the interface size (Ver > Acercar / Alejar and Settings). */
@@ -280,6 +282,7 @@ export const DEFAULT_PREFS: Prefs = {
   helperBubble: true,
   helperModel: 'qwen2.5:1.5b',
   windowEffects: true,
+  taskParallel: 3,
 };
 
 export interface GitFileView {
@@ -2187,6 +2190,10 @@ export interface OmniApi {
     archiveIdle(): Promise<number>;
     /** Disk taken by the worktrees (cached a minute unless `fresh`). */
     usage(fresh?: boolean): Promise<TasksUsageView>;
+    /** The task's terminal: its commands and their output (newest part). */
+    output(id: string): Promise<string>;
+    /** The task's unified diff against its base commit (uncommitted work included). */
+    diff(id: string): Promise<string>;
   };
   on(listener: (ev: AppEvent) => void): () => void;
 }
@@ -2552,6 +2559,8 @@ export const CHANNELS = [
   'tasks:reopen',
   'tasks:archiveIdle',
   'tasks:usage',
+  'tasks:output',
+  'tasks:diff',
   'review:run',
   'review:abort',
   'review:prs',

@@ -15,7 +15,9 @@ export type MediaPrice =
   | { per: 'million_chars'; usd: number }
   /** Speech billed by output audio tokens; the length is estimated from the text. */
   | { per: 'million_audio_tokens'; usd: number; tokensPerSecond: number }
-  | { per: 'song'; usd: number };
+  | { per: 'song'; usd: number }
+  /** Fase 10C: runs on the user's own machine (ComfyUI, A1111, Piper…): 0 USD. */
+  | { per: 'free' };
 
 export interface MediaModel {
   provider: string;
@@ -33,6 +35,21 @@ export interface MediaModel {
   seed?: boolean;
   /** Free text shown next to the model (shutdown dates, price changes). */
   note?: string;
+  /** Fase 10C: runs on the user's machine (no cost, no internet). */
+  local?: boolean;
+  /** Fase 10C: listed but not usable yet, with the reason (never faked). */
+  unavailable?: string;
+  /** Fase 10C: several speakers in one script (in one call, or line by line joined with FFmpeg). */
+  multiSpeaker?: boolean;
+  /** Fase 10D: accepts a library image as first frame of a video and/or as style reference. */
+  reference?: readonly ('first_frame' | 'style')[];
+  /** Fase 10D: edits an image (with a mask when `mask` is true). */
+  edit?: boolean;
+  mask?: boolean;
+  /** Fase 10D: mark the provider puts in the file (kept: Zinarix does not re-encode it). */
+  watermark?: string;
+  /** Longest sound / music, seconds. */
+  maxSeconds?: number;
   verifiedAt: string;
   source: string;
 }
@@ -42,7 +59,19 @@ const OPENAI_PRICING = 'https://developers.openai.com/api/docs/pricing';
 const OPENAI_TTS = 'https://developers.openai.com/api/docs/guides/text-to-speech';
 const GOOGLE_PRICING = 'https://aistudio.google.com/docs/pricing';
 const GOOGLE_OMNI = 'https://aistudio.google.com/docs/omni';
+const ELEVEN_TTS = 'https://elevenlabs.io/docs/api-reference/text-to-speech/convert';
+const ELEVEN_SFX = 'https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert';
+const ELEVEN_MUSIC = 'https://elevenlabs.io/docs/api-reference/music/compose';
+const ELEVEN_PRICING = 'https://elevenlabs.io/pricing/api';
+const GOOGLE_MUSIC = 'https://ai.google.dev/gemini-api/docs/music-generation';
+const COMFY = 'https://docs.comfy.org/development/comfyui-server/comms_routes';
+const A1111 = 'https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/API';
+const PIPER = 'https://github.com/OHF-Voice/piper1-gpl';
 const CHECKED = '2026-11-15';
+/** ElevenLabs bills in credits of the user's plan; no per-unit USD figure we could verify. */
+const ELEVEN_NOTE = 'ElevenLabs cobra en créditos de tu plan: el costo no se estima.';
+const GOOGLE_MARK = 'SynthID (marca de agua invisible de Google)';
+const OPENAI_MARK = 'Metadatos C2PA de OpenAI';
 
 const OPENAI_VOICES = [
   'marin',
@@ -93,6 +122,10 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'openai',
     id: 'gpt-image-2',
+    edit: true,
+    mask: true,
+    reference: ['style'],
+    watermark: OPENAI_MARK,
     label: 'GPT Image 2',
     kind: 'image',
     price: q([0.006, 0.005], [0.053, 0.041], [0.211, 0.165]),
@@ -105,6 +138,10 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'openai',
     id: 'gpt-image-1.5',
+    edit: true,
+    mask: true,
+    reference: ['style'],
+    watermark: OPENAI_MARK,
     label: 'GPT Image 1.5',
     kind: 'image',
     price: q([0.009, 0.013], [0.034, 0.05], [0.133, 0.2]),
@@ -117,6 +154,10 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'openai',
     id: 'gpt-image-1-mini',
+    edit: true,
+    mask: true,
+    reference: ['style'],
+    watermark: OPENAI_MARK,
     label: 'GPT Image 1 mini',
     kind: 'image',
     price: q([0.005, 0.006], [0.011, 0.015], [0.036, 0.052]),
@@ -129,6 +170,10 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'openai',
     id: 'gpt-image-2.6-flare',
+    edit: true,
+    mask: true,
+    reference: ['style'],
+    watermark: OPENAI_MARK,
     label: 'GPT Image 2.6 Flare',
     kind: 'image',
     // Billed per output token ($30 / 1M); OpenAI publishes no per-image figure.
@@ -144,6 +189,7 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'openai',
     id: 'gpt-4o-mini-tts',
+    multiSpeaker: true,
     label: 'GPT-4o mini TTS',
     kind: 'speech',
     price: null,
@@ -155,6 +201,7 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'openai',
     id: 'tts-1-hd',
+    multiSpeaker: true,
     label: 'TTS-1 HD',
     kind: 'speech',
     price: { per: 'million_chars', usd: 30 },
@@ -165,6 +212,7 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'openai',
     id: 'tts-1',
+    multiSpeaker: true,
     label: 'TTS-1',
     kind: 'speech',
     price: { per: 'million_chars', usd: 15 },
@@ -176,6 +224,9 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'google-gemini',
     id: 'gemini-nano-banana-2.1',
+    edit: true,
+    reference: ['style'],
+    watermark: GOOGLE_MARK,
     label: 'Nano Banana 2.1',
     kind: 'image',
     price: { per: 'image', usd: 0.034 },
@@ -187,6 +238,9 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'google-gemini',
     id: 'gemini-3.1-flash-image',
+    edit: true,
+    reference: ['style'],
+    watermark: GOOGLE_MARK,
     label: 'Gemini 3.1 Flash Image',
     kind: 'image',
     price: { per: 'image', usd: 0.067 },
@@ -198,6 +252,9 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'google-gemini',
     id: 'gemini-3-pro-image',
+    edit: true,
+    reference: ['style'],
+    watermark: GOOGLE_MARK,
     label: 'Gemini 3 Pro Image',
     kind: 'image',
     price: { per: 'image', usd: 0.134 },
@@ -210,6 +267,7 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'google-gemini',
     id: 'gemini-3.8-flash-tts',
+    multiSpeaker: true,
     label: 'Gemini 3.8 Flash TTS',
     kind: 'speech',
     price: { per: 'million_audio_tokens', usd: 9, tokensPerSecond: 32 },
@@ -221,6 +279,7 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'google-gemini',
     id: 'gemini-3.8-flash-lite-tts',
+    multiSpeaker: true,
     label: 'Gemini 3.8 Flash Lite TTS',
     kind: 'speech',
     price: { per: 'million_audio_tokens', usd: 6, tokensPerSecond: 32 },
@@ -233,6 +292,8 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
   {
     provider: 'google-gemini',
     id: 'gemini-omni-1.2-flash',
+    reference: ['first_frame', 'style'],
+    watermark: GOOGLE_MARK,
     label: 'Gemini Omni 1.2 Flash',
     kind: 'video',
     price: null,
@@ -240,6 +301,114 @@ export const MEDIA_MODELS: readonly MediaModel[] = [
     duration: { min: 3, max: 15, default: 5 },
     verifiedAt: CHECKED,
     source: GOOGLE_OMNI,
+  },
+  // ---- Google: music (Lyria) — listed, not usable until the request format is confirmed ----
+  {
+    provider: 'google-gemini',
+    id: 'lyria',
+    label: 'Lyria (Google)',
+    kind: 'music',
+    price: null,
+    unavailable:
+      'No disponible todavía: falta confirmar cómo se pide Lyria por la API de Gemini que usa Zinarix. Usa ElevenLabs Music.',
+    verifiedAt: CHECKED,
+    source: GOOGLE_MUSIC,
+  },
+  // ---- ElevenLabs (Fase 10C): voice, sound effects and music; key in Settings → Generation ----
+  {
+    provider: 'elevenlabs',
+    id: 'eleven_multilingual_v2',
+    label: 'Eleven Multilingual v2',
+    kind: 'speech',
+    price: null,
+    multiSpeaker: true,
+    seed: true,
+    note: ELEVEN_NOTE,
+    verifiedAt: CHECKED,
+    source: ELEVEN_PRICING,
+  },
+  {
+    provider: 'elevenlabs',
+    id: 'eleven_flash_v2_5',
+    label: 'Eleven Flash v2.5',
+    kind: 'speech',
+    price: null,
+    multiSpeaker: true,
+    seed: true,
+    note: ELEVEN_NOTE,
+    verifiedAt: CHECKED,
+    source: ELEVEN_TTS,
+  },
+  {
+    provider: 'elevenlabs',
+    id: 'eleven_text_to_sound_v2',
+    label: 'Eleven Sound Effects',
+    kind: 'sound',
+    price: null,
+    maxSeconds: 30,
+    note: ELEVEN_NOTE,
+    verifiedAt: CHECKED,
+    source: ELEVEN_SFX,
+  },
+  {
+    provider: 'elevenlabs',
+    id: 'music_v1',
+    label: 'Eleven Music',
+    kind: 'music',
+    price: null,
+    maxSeconds: 300,
+    note: ELEVEN_NOTE,
+    verifiedAt: CHECKED,
+    source: ELEVEN_MUSIC,
+  },
+  // ---- Local (Fase 10C): servers / programs the user already runs; Zinarix only connects ----
+  {
+    provider: 'comfyui',
+    id: 'comfyui',
+    label: 'ComfyUI (local)',
+    kind: 'image',
+    price: { per: 'free' },
+    local: true,
+    seed: true,
+    aspects: ALL_ASPECTS,
+    maxCount: 4,
+    verifiedAt: CHECKED,
+    source: COMFY,
+  },
+  {
+    provider: 'a1111',
+    id: 'a1111',
+    label: 'AUTOMATIC1111 / Forge (local)',
+    kind: 'image',
+    price: { per: 'free' },
+    local: true,
+    seed: true,
+    aspects: ALL_ASPECTS,
+    maxCount: 4,
+    verifiedAt: CHECKED,
+    source: A1111,
+  },
+  {
+    provider: 'local-speech',
+    id: 'local-speech',
+    label: 'Servidor de voz local (/v1/audio/speech)',
+    kind: 'speech',
+    price: { per: 'free' },
+    local: true,
+    multiSpeaker: true,
+    verifiedAt: CHECKED,
+    source: OPENAI_TTS,
+  },
+  {
+    provider: 'piper',
+    id: 'piper',
+    label: 'Piper (local)',
+    kind: 'speech',
+    price: { per: 'free' },
+    local: true,
+    multiSpeaker: true,
+    verifiedAt: CHECKED,
+    source: PIPER,
   },
 ];
 
@@ -275,7 +444,8 @@ export function estimateMediaCost(
   req: Pick<MediaRequest, 'prompt' | 'count' | 'quality' | 'aspect' | 'durationSec'>,
 ): MediaCostEstimate {
   const p = model?.price;
-  if (!model || !p) return { usd: null, approximate: false, detail: 'precio no publicado' };
+  if (!model || !p) return { usd: null, approximate: false, detail: 'costo no estimado' };
+  if (p.per === 'free') return { usd: 0, approximate: false, detail: 'local, sin costo' };
   const count = Math.max(1, Math.min(model.maxCount ?? 1, req.count ?? 1));
   switch (p.per) {
     case 'image':

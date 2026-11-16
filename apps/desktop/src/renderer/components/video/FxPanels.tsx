@@ -5,6 +5,8 @@
 import type { Clip, Track, VideoProject } from '../../../shared/video';
 import {
   addTextClip,
+  compositeOrder,
+  setAnim,
   setEffects,
   setTrackMix,
   setTransition,
@@ -12,12 +14,16 @@ import {
   trackPan,
   trackVolume,
   updateTrack,
+  visualClipsAt,
 } from '../../../shared/video';
 import type { TransitionDef } from '../../../shared/videoTransitions';
-import type { TransitionName } from '../../../shared/videoFx';
-import { useState } from 'react';
+import type { AnimKind, TransitionKind, TransitionName } from '../../../shared/videoFx';
+import { isPackKind, PACK, PACK_GROUPS, type PackGroup } from '../../../shared/videoAnimPack';
+import { useEffect, useState } from 'react';
 import type { StickerGroup } from '../../../shared/videoFx';
 import {
+  animLook,
+  ANIM_KINDS,
   LOOKS,
   STICKER_ANIM,
   STICKER_COLORS,
@@ -26,13 +32,14 @@ import {
   TEXT_PRESETS,
   TRANSITION_DEFAULT,
   TRANSITION_KINDS,
+  transitionLook,
   cssFilter,
 } from '../../../shared/videoFx';
 import { toast } from '../../store';
-import { CustomTransitions } from './CustomTransitions';
+import { CustomTransitions, LookSample } from './CustomTransitions';
 import { DuckControl } from './EasyPanel';
 import { FONT_FAMILY } from './textDraw';
-import { type VideoKey, tv } from './strings';
+import { type VideoKey, kindLabel, tv } from './strings';
 import { commit, commitMerged, getV, setV, useV } from './videoStore';
 import './video-fx.css';
 
@@ -169,42 +176,137 @@ export function EffectsPanel() {
   );
 }
 
+type FxMode = 'transition' | 'in' | 'out';
+type FxGroup = 'all' | 'classic' | PackGroup;
+const FX_GROUPS: readonly FxGroup[] = ['all', 'classic', ...PACK_GROUPS];
+
+/** Who plays a hovered card in the viewer: the selection, else the top picture at the playhead. */
+function previewTargets(targets: Clip[]): string[] {
+  if (targets.length) return targets.map((c) => c.id);
+  const s = getV();
+  const p = s.project;
+  for (const track of [...compositeOrder(p)].reverse()) {
+    if (track.hidden || track.kind !== 'video') continue;
+    const top = visualClipsAt(p, track.id, s.playhead).at(-1);
+    if (top) return [top.id];
+  }
+  return [];
+}
+
 export function TransitionsPanel() {
   const project = useV((s) => s.project);
   const selection = useV((s) => s.selection);
   const targets = selectedVisual(project, selection);
+  const [mode, setMode] = useState<FxMode>('transition');
+  const [group, setGroup] = useState<FxGroup>('all');
+  const [query, setQuery] = useState('');
+  const [hover, setHover] = useState<string | null>(null);
+  useEffect(() => () => setV({ fxPreview: null }), []);
+
+  const isTr = mode === 'transition';
+  const kinds: string[] = (isTr ? TRANSITION_KINDS : ANIM_KINDS).filter((k) => k !== 'none');
+  const label = (k: string) => kindLabel(isTr ? 'tr' : 'anim', k);
+  const groupOf = (k: string): FxGroup => (isPackKind(k) ? PACK[k].group : 'classic');
+  const q = query.trim().toLowerCase();
+  const shown = kinds.filter(
+    (k) => (group === 'all' || groupOf(k) === group) && (!q || label(k).toLowerCase().includes(q)),
+  );
+  const lookOf = (k: string) =>
+    isTr
+      ? (x: number) => transitionLook(k as TransitionKind, x)
+      : mode === 'in'
+        ? (x: number) => animLook(k as AnimKind, x)
+        : (x: number) => animLook(k as AnimKind, 1 - x);
+
+  const apply = (k: string) => {
+    if (!targets.length) return;
+    let p = getV().project;
+    for (const c of targets)
+      p = isTr
+        ? setTransition(p, c.id, {
+            kind: k as TransitionKind,
+            d: c.transition?.d ?? TRANSITION_DEFAULT,
+          })
+        : setAnim(p, c.id, { [mode]: k as AnimKind });
+    commit(p, tv(isTr ? 'editTransition' : 'editAnim'));
+    toast(tv('fxApplied', { what: label(k), n: targets.length }));
+  };
+  const enter = (k: string) => {
+    setHover(k);
+    const ids = previewTargets(targets);
+    setV({ fxPreview: ids.length ? { ids, look: lookOf(k), since: performance.now() } : null });
+  };
+  const leave = () => {
+    setHover(null);
+    setV({ fxPreview: null });
+  };
+
   return (
     <div className="vs-fx-panel">
       <div className="vs-panel-title">{tv('tabTransitions')}</div>
-      <p className="vs-dim vs-note">{targets.length ? tv('trHint') : tv('needVisual')}</p>
-      <div className="vs-fx-grid">
-        {TRANSITION_KINDS.map((k) => (
+      <p className="vs-dim vs-note">
+        {targets.length ? tv('trHint') : tv('needVisual')} {tv('trHoverHint')}
+      </p>
+      <div className="vs-fx-tools">
+        <div className="vs-fx-modes" role="radiogroup" aria-label={tv('tabTransitions')}>
+          {(['transition', 'in', 'out'] as const).map((m) => (
+            <button
+              key={m}
+              role="radio"
+              aria-checked={mode === m}
+              className={`vs-chip ${mode === m ? 'active' : ''}`}
+              onClick={() => setMode(m)}
+            >
+              {m === 'transition' ? tv('editTransition') : tv(m === 'in' ? 'animIn' : 'animOut')}
+            </button>
+          ))}
+        </div>
+        <input
+          className="vs-search vs-fx-search"
+          type="search"
+          value={query}
+          placeholder={tv('trSearch')}
+          aria-label={tv('trSearch')}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <div className="vs-fx-groups">
+          {FX_GROUPS.map((g) => (
+            <button
+              key={g}
+              aria-pressed={group === g}
+              className={`vs-chip ${group === g ? 'active' : ''}`}
+              onClick={() => setGroup(g)}
+            >
+              {tv(`trGroup_${g}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="vs-fx-grid" onPointerLeave={leave}>
+        {shown.map((k) => (
           <button
             key={k}
             className="vs-fx-card"
-            disabled={!targets.length}
-            onClick={() => {
-              let p = getV().project;
-              for (const c of targets)
-                p = setTransition(p, c.id, { kind: k, d: c.transition?.d ?? TRANSITION_DEFAULT });
-              commit(p, tv('editTransition'));
-              toast(tv('fxApplied', { what: tv(`tr_${k}` as VideoKey), n: targets.length }));
-            }}
+            aria-disabled={!targets.length}
+            title={label(k)}
+            onPointerEnter={() => enter(k)}
+            onFocus={() => enter(k)}
+            onBlur={leave}
+            onClick={() => apply(k)}
           >
-            <span className={`vs-fx-swatch vs-tr-sample vs-tr-${k}`} aria-hidden="true">
-              <i />
-            </span>
-            <span className="vs-fx-name">{tv(`tr_${k}` as VideoKey)}</span>
+            <LookSample id={`${mode}:${k}`} look={lookOf(k)} play={hover === k} />
+            <span className="vs-fx-name">{label(k)}</span>
           </button>
         ))}
+        {!shown.length && <p className="vs-dim vs-note">{tv('trNoMatch')}</p>}
       </div>
-      <CustomTransitions targets={targets} />
+      {isTr && <CustomTransitions targets={targets} />}
     </div>
   );
 }
 
 export const transitionLabel = (k: TransitionName, def?: TransitionDef): string =>
-  k === 'custom' ? (def?.name ?? tv('trCustom')) : tv(`tr_${k}` as VideoKey);
+  k === 'custom' ? (def?.name ?? tv('trCustom')) : kindLabel('tr', k);
 
 export function MixerPanel() {
   const project = useV((s) => s.project);

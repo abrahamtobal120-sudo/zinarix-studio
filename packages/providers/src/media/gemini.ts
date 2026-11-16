@@ -79,11 +79,35 @@ export function geminiMediaBody(req: MediaRequest): {
     warnings.push('La Interactions API no documenta semilla: no se envió.');
   if (req.transparent && req.kind === 'image')
     warnings.push('Gemini no hace fondos transparentes: se generó con fondo.');
+  // Fase 10D: a library image (style reference, first frame, or the image to edit) goes in
+  // the input next to the text, as inline data.
+  const picture = req.edit?.image ?? req.reference;
+  if (req.edit?.mask) warnings.push('Gemini edita con instrucciones, no con máscara: no se envió.');
+  if (req.reference && !model?.reference?.includes(req.reference.role)) {
+    warnings.push('Este modelo no acepta imagen de referencia: no se envió.');
+  }
+  const sendPicture = picture && (req.edit || model?.reference?.includes(req.reference!.role));
+  const withPicture = (text: string): unknown =>
+    sendPicture && picture
+      ? [
+          {
+            type: 'user_input',
+            content: [
+              {
+                type: 'image',
+                data: Buffer.from(picture.data).toString('base64'),
+                mime_type: picture.mediaType,
+              },
+              { type: 'text', text },
+            ],
+          },
+        ]
+      : text;
   if (req.kind === 'image') {
     return {
       body: {
         model: req.model,
-        input: styledPrompt(req),
+        input: withPicture(styledPrompt(req)),
         response_format: {
           type: 'image',
           mime_type: 'image/png',
@@ -116,7 +140,18 @@ export function geminiMediaBody(req: MediaRequest): {
           },
         ],
         response_format: { type: 'audio', mime_type: 'audio/wav' },
-        generation_config: { speech_config: [{ voice: voice ?? model?.voices?.[0] ?? 'Kore' }] },
+        // Fase 10C: a script with several speakers is one call, one voice per speaker name.
+        generation_config: {
+          speech_config: req.speakers?.length
+            ? req.speakers.map((sp) => ({
+                speaker: sp.name,
+                voice:
+                  !model?.voices || model.voices.includes(sp.voice)
+                    ? sp.voice
+                    : (model.voices[0] ?? 'Kore'),
+              }))
+            : [{ voice: voice ?? model?.voices?.[0] ?? 'Kore' }],
+        },
       },
       warnings,
     };
@@ -135,7 +170,7 @@ export function geminiMediaBody(req: MediaRequest): {
     return {
       body: {
         model: req.model,
-        input: styledPrompt(req),
+        input: withPicture(styledPrompt(req)),
         response_format: {
           type: 'video',
           aspect_ratio: aspect,
@@ -147,7 +182,7 @@ export function geminiMediaBody(req: MediaRequest): {
       warnings,
     };
   }
-  throw new OmniError('unsupported', 'Gemini todavía no genera música desde Zinarix.', {
+  throw new OmniError('unsupported', `Gemini todavía no genera ${req.kind === 'sound' ? 'efectos de sonido' : 'música'} desde Zinarix.`, {
     provider: 'google-gemini',
     retryable: false,
   });
@@ -218,7 +253,7 @@ async function download(
 }
 
 const OUTPUT: Record<
-  Exclude<MediaKind, 'music'>,
+  Exclude<MediaKind, 'music' | 'sound'>,
   { type: 'image' | 'video' | 'audio'; mime: string }
 > = {
   image: { type: 'image', mime: 'image/png' },
@@ -246,7 +281,7 @@ async function once(
     await sleep(POLL_MS, signal);
     it = await requestJson<Interaction>(cfg, { path: `/interactions/${it.id}`, signal, headers });
   }
-  const out = OUTPUT[req.kind as Exclude<MediaKind, 'music'>];
+  const out = OUTPUT[req.kind as Exclude<MediaKind, 'music' | 'sound'>];
   const found = findOutputs(it.steps ?? it, out.type);
   if (!found.length)
     throw new OmniError(

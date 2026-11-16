@@ -57,7 +57,7 @@ import {
   updateClip,
 } from '../../../shared/video';
 import { api, toast } from '../../store';
-import { type VideoKey, fmtBytes, fmtDuration, tv } from './strings';
+import { type VideoKey, fmtBytes, fmtDuration, kindLabel, tv } from './strings';
 import { commit, commitMerged, getV, seek, useV } from './videoStore';
 
 export function Inspector() {
@@ -726,7 +726,7 @@ function AnimSection({ clip }: { clip: Clip }) {
           >
             {ANIM_KINDS.map((k) => (
               <option key={k} value={k}>
-                {tv(`anim_${k}` as VideoKey)}
+                {kindLabel('anim', k)}
               </option>
             ))}
           </select>
@@ -788,7 +788,7 @@ function TransitionSection({ clip }: { clip: Clip }) {
           <option value="">{tv('trNone')}</option>
           {TRANSITION_KINDS.map((k) => (
             <option key={k} value={k}>
-              {tv(`tr_${k}` as VideoKey)}
+              {kindLabel('tr', k)}
             </option>
           ))}
           {tr?.kind === 'custom' && (

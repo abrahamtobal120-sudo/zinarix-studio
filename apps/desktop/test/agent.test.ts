@@ -115,6 +115,7 @@ describe('agent safety', () => {
       'forget',
       // 3D (Fase 14, scene3dTools.ts)
       'render_3d',
+      'generate_3d_model',
       'blender_script',
       // Video Studio (Fase 13B, videoTools.ts)
       'video_state',
@@ -132,6 +133,9 @@ describe('agent safety', () => {
       'video_add_title',
       'video_captions',
       'video_set_format',
+      'video_add_transition',
+      'video_transitions',
+      'video_share_transition',
       'video_transcribe',
       'video_export',
     ];

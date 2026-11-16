@@ -121,7 +121,9 @@ export function parseRule(path: string, text: string, kind: RuleKind): Rule {
   const { data, body } = parseFrontmatter(text);
   const globs = asList(data.globs ?? data.glob ?? data.applyTo);
   const description = typeof data.description === 'string' ? data.description : '';
-  const isRuleFile = RULE_DIRS.some((d) => path.startsWith(`${d.dir}/`));
+  const isRuleFile = RULE_DIRS.some(
+    (d) => path.startsWith(`${d.dir}/`) || path.includes(`/${d.dir}/`),
+  );
   let applies: RuleApplies = 'always';
   if (isRuleFile) {
     const declared = typeof data.applies === 'string' ? data.applies.toLowerCase() : '';
@@ -175,6 +177,36 @@ export function hierarchyCandidates(paths: string[]): string[] {
     .filter(Boolean)
     .sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
   return dirs.flatMap((d) => FOLDER_FILES.map((f) => `${d}/${f}`));
+}
+
+/**
+ * Cursor and Copilot files inside sub-folders (apps/web/.cursor/rules/*.mdc,
+ * apps/web/.github/copilot-instructions.md): like a sub-folder AGENTS.md, they speak only for
+ * the files in that folder. Shallow folders first (the deepest one is added last and wins).
+ */
+export function nestedRuleSources(paths: string[]): {
+  files: { path: string; kind: RuleKind }[];
+  dirs: { dir: string; ext: string; kind: RuleKind }[];
+} {
+  const dirs = [...new Set(paths.flatMap(ancestorDirs))]
+    .filter(Boolean)
+    .sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
+  return {
+    files: dirs.map((d) => ({ path: `${d}/.github/copilot-instructions.md`, kind: 'copilot' })),
+    dirs: dirs.map((d) => ({ dir: `${d}/.cursor/rules`, ext: '.mdc', kind: 'cursor' })),
+  };
+}
+
+/** The folder a rule speaks for: '' = the whole project; "apps/web" for apps/web/AGENTS.md,
+ * apps/web/.cursor/rules/x.mdc or apps/web/.github/copilot-instructions.md. */
+export function ruleBase(path: string): string {
+  for (const marker of ['.cursor/rules/', '.github/', '.zinarix/']) {
+    if (path.startsWith(marker)) return '';
+    const i = path.indexOf(`/${marker}`);
+    if (i > 0) return path.slice(0, i);
+  }
+  const slash = path.lastIndexOf('/');
+  return slash > 0 ? path.slice(0, slash) : '';
 }
 
 /** Rule names the prompt mentions with @ ("@react", "@rules/react"), lower-case. */
@@ -252,18 +284,23 @@ export function selectRules(rules: Rule[], paths: string[], mentions: string[] =
   for (const r of rules) {
     if (!r.body) continue;
     let reason: string | null = null;
-    const slash = r.path.lastIndexOf('/');
-    const isFolder = r.kind === 'instructions' && slash > 0;
-    const dir = isFolder ? `${r.path.slice(0, slash)}/`.toLowerCase() : '';
+    // A sub-folder AGENTS.md / CLAUDE.md / .cursor/rules / copilot-instructions.md only
+    // speaks for the files inside that folder (its globs are relative to it).
+    const base = r.kind === 'instructions' || r.kind === 'cursor' || r.kind === 'copilot'
+      ? ruleBase(r.path)
+      : '';
+    const dir = base ? `${base}/`.toLowerCase() : '';
+    const scoped = dir
+      ? paths.filter((p) => p.toLowerCase().startsWith(dir)).map((p) => p.slice(dir.length))
+      : paths;
     if (wanted.has(r.name.toLowerCase())) reason = 'mention';
-    else if (isFolder) {
-      // A sub-folder AGENTS.md / CLAUDE.md only speaks for the files inside that folder.
-      if (paths.some((p) => p.toLowerCase().startsWith(dir))) reason = 'folder';
-    } else if (r.applies === 'always') reason = 'always';
+    else if (dir && !scoped.length) reason = null;
+    else if (dir && (r.kind === 'instructions' || r.applies === 'always')) reason = 'folder';
+    else if (r.applies === 'always') reason = 'always';
     else if (r.applies === 'glob') {
       const hit = r.globs.find((g) => {
         const re = globToRegExp(g.replace(/^\//, ''));
-        return paths.some((p) => re.test(p));
+        return scoped.some((p) => re.test(p));
       });
       if (hit) reason = hit;
     }

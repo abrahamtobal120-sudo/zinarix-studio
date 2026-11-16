@@ -287,7 +287,7 @@ describe('Fase 14: agent tools', () => {
     expect(sceneOf({ scene: { nodes: [{ kind: 'mesh', shape: 'torus' }] } }).nodes[0]!.shape).toBe(
       'torus',
     );
-    expect(scene3dPreview('render_3d', { template: 'logo' }).action).toContain('visor');
+    expect(scene3dPreview('render_3d', { template: 'logo' }).action).toContain('Zinarix (rápido)');
   });
 });
 

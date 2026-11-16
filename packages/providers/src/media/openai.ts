@@ -1,5 +1,5 @@
 import { OmniError } from '@omni/shared';
-import { request, requestJson } from '../http.js';
+import { applyAuth, errorFromResponse, joinUrl, request, requestJson } from '../http.js';
 import type { ProviderConfig } from '../types.js';
 import { findMediaModel } from './catalog.js';
 import { base64ToBytes, extFor, styledPrompt } from './types.js';
@@ -10,6 +10,8 @@ import type { MediaAspect, MediaGenProvider, MediaRequest, MediaResult } from '.
  *   POST /images/generations  { model, prompt, n, size, quality, output_format, background }
  *        -> { data: [{ b64_json, revised_prompt? }] }
  *   POST /audio/speech        { model, input, voice, instructions?, response_format } -> audio
+ *   POST /images/edits        multipart: model, prompt, image[] (+ mask), n, size, quality
+ *        -> { data: [{ b64_json }] }   (Fase 10D: edit an image, or use one as reference)
  * The Videos API (Sora) was shut down on 2026-09-24, so there is no video here.
  */
 
@@ -80,18 +82,72 @@ export function openAiSpeechBody(req: MediaRequest): {
   return { body, warnings };
 }
 
+/**
+ * Fase 10D: multipart fields of /images/edits. The picture to edit (or the style reference)
+ * goes as image[]; a mask PNG marks with transparency the part to change.
+ */
+export function openAiEditForm(req: MediaRequest): {
+  fields: Record<string, string>;
+  files: { field: string; name: string; type: string; data: Uint8Array }[];
+  warnings: string[];
+} {
+  const { body, warnings } = openAiImageBody(req);
+  const fields: Record<string, string> = {};
+  for (const [k, v] of Object.entries(body)) if (v !== undefined) fields[k] = String(v);
+  const files = [];
+  const pic = req.edit?.image ?? req.reference;
+  if (pic) files.push({ field: 'image[]', name: `image.${pic.ext}`, type: pic.mediaType, data: pic.data });
+  if (req.edit?.mask)
+    files.push({ field: 'mask', name: 'mask.png', type: 'image/png', data: req.edit.mask.data });
+  return { fields, files, warnings };
+}
+
+async function editImage(
+  cfg: ProviderConfig,
+  req: MediaRequest,
+  signal: AbortSignal,
+): Promise<{ data?: { b64_json?: string; url?: string }[]; warnings: string[] }> {
+  const { fields, files, warnings } = openAiEditForm(req);
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  for (const f of files)
+    form.append(f.field, new Blob([new Uint8Array(f.data)], { type: f.type }), f.name);
+  const url = new URL(joinUrl(cfg.baseUrl, '/images/edits'));
+  const headers: Record<string, string> = { accept: 'application/json', ...cfg.extraHeaders };
+  applyAuth(cfg, url, headers);
+  // Not retried: a second POST would be billed twice.
+  const res = await (cfg.fetch ?? fetch)(url, { method: 'POST', headers, body: form, signal });
+  if (!res.ok) throw await errorFromResponse(res, cfg.entry.id);
+  const j = (await res.json()) as { data?: { b64_json?: string; url?: string }[] };
+  return { data: j.data, warnings };
+}
+
 async function image(
   cfg: ProviderConfig,
   req: MediaRequest,
   signal: AbortSignal,
 ): Promise<MediaResult> {
+  if (req.edit || req.reference) {
+    const r = await editImage(cfg, req, signal);
+    return collect(cfg, req, r.data ?? [], r.warnings, signal);
+  }
   const { body, warnings } = openAiImageBody(req);
   const res = await requestJson<{ data?: { b64_json?: string; url?: string }[] }>(
     { ...cfg, timeoutMs: Math.max(cfg.timeoutMs ?? 0, LONG) },
     { method: 'POST', path: '/images/generations', body, signal },
   );
+  return collect(cfg, req, res.data ?? [], warnings, signal);
+}
+
+async function collect(
+  cfg: ProviderConfig,
+  req: MediaRequest,
+  data: { b64_json?: string; url?: string }[],
+  warnings: string[],
+  signal: AbortSignal,
+): Promise<MediaResult> {
   const files = [];
-  for (const d of res.data ?? []) {
+  for (const d of data) {
     if (d.b64_json)
       files.push({ data: base64ToBytes(d.b64_json), mediaType: 'image/png', ext: 'png' });
     else if (d.url) {

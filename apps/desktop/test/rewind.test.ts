@@ -104,6 +104,43 @@ describe('rewind', () => {
     expect(agent.changedFiles('conv')).toBe(0);
   });
 
+  it('puts non-UTF-8 files (Latin-1, binary) back byte for byte', async () => {
+    // "café" in Latin-1 (0xE9 is not valid UTF-8) and a few bytes that are not text at all.
+    const latin1 = Buffer.from('const s = "café";\n', 'latin1');
+    const binary = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x80, 0x0a]);
+    writeFileSync(join(ws, 'latin.ts'), latin1);
+    writeFileSync(join(ws, 'src/logo.bin'), binary);
+    const { agent, turn } = setup([
+      [
+        editC('latin.ts', 'const s', 'let s'),
+        write('src/logo.bin', 'text now'),
+        editC('a.ts', 'const a = 1', 'const a = 2'),
+        write('src/c.md', 'x'),
+        write('d.json', '[]'),
+      ],
+      [],
+    ]);
+    const before = disk();
+    await turn('t1');
+    expect(readFileSync(join(ws, 'latin.ts')).equals(latin1)).toBe(false);
+    expect(await agent.rewindPreview('conv', ['t1'])).toHaveLength(5);
+    expect(await agent.rewind('conv', ['t1'])).toHaveLength(5);
+    expect(readFileSync(join(ws, 'latin.ts')).equals(latin1)).toBe(true);
+    expect(readFileSync(join(ws, 'src/logo.bin')).equals(binary)).toBe(true);
+    expect(disk()).toEqual(before);
+  });
+
+  it('revert also restores non-UTF-8 bytes, after a restart', async () => {
+    const latin1 = Buffer.from('niño\r\n', 'latin1');
+    writeFileSync(join(ws, 'latin.txt'), latin1);
+    const { turn } = setup([[editC('latin.txt', 'ni', 'NI')], []]);
+    await turn('t1');
+    // A new agent (the app restarted) reads the checkpoints saved on disk.
+    const { agent: again } = setup([], false);
+    await again.revert('conv');
+    expect(readFileSync(join(ws, 'latin.txt')).equals(latin1)).toBe(true);
+  });
+
   it('rewinding an exchange takes the later ones with it', async () => {
     const { agent, turn } = setup([
       [write('a.ts', 'one')],
@@ -235,5 +272,78 @@ describe('rewind', () => {
     await first.turn('t1');
     first.agent.forget('conv');
     expect(setup([], false).agent.changedFiles('conv')).toBe(0);
+  });
+});
+
+/**
+ * "Volver aquí" → "Restaurar conversación" (Fase 2): the saved history is cut at that question
+ * (core history.truncateAtUser, tested in packages/core) and the agent drops its transcript
+ * (resetMessages), so the next turn starts from what is left. The code is not touched; with
+ * "ambas" the files go back too.
+ */
+describe('restore conversation', () => {
+  type Msg = { role: string; content: unknown };
+  function recordingAgent(steps: Call[][]) {
+    let step = 0;
+    let n = 0;
+    const sent: Msg[][] = [];
+    const core = {
+      paths: { home: join(root, 'omni') },
+      async *stream(req: { messages: Msg[] }) {
+        sent.push(req.messages.map((m) => ({ role: m.role, content: m.content })));
+        for (const c of steps[step++] ?? [])
+          yield { type: 'tool_call', id: `c${++n}`, name: c.name, argsDelta: JSON.stringify(c.args) };
+        yield { type: 'text', delta: `answer ${step}` };
+        yield { type: 'done', stopReason: 'stop' };
+      },
+    } as unknown as OmniCore;
+    for (const [p, c] of Object.entries(ORIGINAL)) writeFileSync(join(ws, p), c);
+    const workspace = new Workspace(ws);
+    const agent = new Agent(core, () => workspace);
+    agent.userKitRoot = null;
+    const turn = (id: string, text: string, history: Msg[] = []) =>
+      agent.run({
+        conversationId: 'conv',
+        turn: id,
+        userMessage: { role: 'user', content: text },
+        fallbackHistory: history as never,
+        signal: new AbortController().signal,
+        emit: () => {},
+        ask: () => Promise.resolve('approve'),
+      });
+    const texts = (i: number) => sent[i]!.map((m) => String(m.content));
+    return { agent, turn, sent, texts };
+  }
+
+  it('the next turn starts from the history before that question; files stay', async () => {
+    const r = recordingAgent([[write('a.ts', 'first')], [], [write('d.json', 'second')], [], []]);
+    await r.turn('t1', 'first question');
+    await r.turn('t2', 'second question');
+    const afterBoth = disk();
+    // Restore the conversation at the 2nd question (index 1): only the transcript changes.
+    r.agent.resetMessages('conv');
+    await r.turn('t3', 'another question', [
+      { role: 'user', content: 'first question' },
+      { role: 'assistant', content: 'answer 2' },
+    ]);
+    const last = r.texts(r.sent.length - 1);
+    expect(last).toContain('first question');
+    expect(last).toContain('another question');
+    expect(last.some((c) => c.includes('second question'))).toBe(false);
+    expect(disk()).toEqual(afterBoth);
+    // Its checkpoints are still there: "restore code" can still undo the cut exchange.
+    expect(r.agent.changedFiles('conv')).toBe(2);
+  });
+
+  it('"both" puts the files back and forgets the transcript', async () => {
+    const r = recordingAgent([[write('a.ts', 'first')], [], [write('d.json', 'second')], [], []]);
+    await r.turn('t1', 'first question');
+    const afterT1 = disk();
+    await r.turn('t2', 'second question');
+    expect(await r.agent.rewind('conv', ['t2'])).toEqual(['d.json']);
+    r.agent.resetMessages('conv');
+    expect(disk()).toEqual(afterT1);
+    await r.turn('t3', 'again', [{ role: 'user', content: 'first question' }]);
+    expect(r.texts(r.sent.length - 1).some((c) => c.includes('second question'))).toBe(false);
   });
 });

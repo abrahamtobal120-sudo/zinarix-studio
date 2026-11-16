@@ -7,9 +7,13 @@
 import {
   customLook,
   customLookExpr,
+  maxDefScale,
+  normalizeTransitionDef,
   validTransitionDef,
+  type TransitionChannel,
   type TransitionDef,
 } from './videoTransitions.js';
+import { PACK, PACK_KINDS, type PackKind } from './videoAnimPack.js';
 
 // ---------------- effects ----------------
 
@@ -192,7 +196,29 @@ export function ffmpegEffects(fx: Effects | undefined, pxScale = 1): string[] {
 // ---------------- in / out animations ----------------
 
 export type AnimKind =
-  'none' | 'fade' | 'slideUp' | 'slideDown' | 'slideLeft' | 'slideRight' | 'pop' | 'zoom';
+  | 'none'
+  | 'fade'
+  | 'slideUp'
+  | 'slideDown'
+  | 'slideLeft'
+  | 'slideRight'
+  | 'pop'
+  | 'zoom'
+  | 'grow'
+  | 'bounce'
+  | 'elastic'
+  | 'backUp'
+  | 'flyUp'
+  | 'flyDown'
+  | 'flyLeft'
+  | 'flyRight'
+  | 'wipe'
+  | 'blink'
+  | 'punch'
+  | 'drift'
+  /** Fase 11B: titles only, letter by letter (shared/videoTypewriter.ts; a no-op elsewhere). */
+  | 'typewriter'
+  | PackKind;
 export const ANIM_KINDS: readonly AnimKind[] = [
   'none',
   'fade',
@@ -202,6 +228,20 @@ export const ANIM_KINDS: readonly AnimKind[] = [
   'slideRight',
   'pop',
   'zoom',
+  'grow',
+  'bounce',
+  'elastic',
+  'backUp',
+  'flyUp',
+  'flyDown',
+  'flyLeft',
+  'flyRight',
+  'wipe',
+  'blink',
+  'punch',
+  'drift',
+  'typewriter',
+  ...PACK_KINDS,
 ];
 export interface ClipAnim {
   in?: AnimKind;
@@ -249,8 +289,10 @@ export function animLook(kind: AnimKind | undefined, k: number): Look {
       return { ...LOOK_NONE, alpha: e, scale: 0.6 + 0.4 * e };
     case 'zoom':
       return { ...LOOK_NONE, alpha: e, scale: 1.4 - 0.4 * e };
-    default:
-      return LOOK_NONE;
+    default: {
+      const def = kind ? PRESETS[kind] : undefined;
+      return def ? customLook(def, k) : LOOK_NONE;
+    }
   }
 }
 
@@ -323,8 +365,10 @@ function lookExpr(
       return { dx: `(1-${e})` };
     case 'zoomIn':
       return { alpha: e, scale: `(1.25-0.25*${e})` };
-    default:
-      return {};
+    default: {
+      const d = kind ? PRESETS[kind] : undefined;
+      return d ? customLookExpr(d, k) : {};
+    }
   }
 }
 
@@ -365,8 +409,43 @@ export function combineExpr(list: LookExpr[]): LookExpr {
 
 // ---------------- transitions ----------------
 
-export type TransitionKind = 'dissolve' | 'wipe' | 'slide' | 'zoomIn';
-export const TRANSITION_KINDS: readonly TransitionKind[] = ['dissolve', 'wipe', 'slide', 'zoomIn'];
+export type TransitionKind =
+  | 'dissolve'
+  | 'wipe'
+  | 'slide'
+  | 'zoomIn'
+  | 'pushLeft'
+  | 'pushUp'
+  | 'pushDown'
+  | 'diagonal'
+  | 'whip'
+  | 'zoomOut'
+  | 'punch'
+  | 'elastic'
+  | 'bounce'
+  | 'rise'
+  | 'blink'
+  | 'drift'
+  | PackKind;
+export const TRANSITION_KINDS: readonly TransitionKind[] = [
+  'dissolve',
+  'wipe',
+  'slide',
+  'zoomIn',
+  'pushLeft',
+  'pushUp',
+  'pushDown',
+  'diagonal',
+  'whip',
+  'zoomOut',
+  'punch',
+  'elastic',
+  'bounce',
+  'rise',
+  'blink',
+  'drift',
+  ...PACK_KINDS,
+];
 /** A built-in kind, or 'custom': a data-only transition (videoTransitions.ts) kept in `def`. */
 export type TransitionName = TransitionKind | 'custom';
 export interface Transition {
@@ -394,7 +473,98 @@ export function transitionLook(kind: TransitionName, k: number, def?: Transition
       return { ...LOOK_NONE, dx: 1 - e };
     case 'zoomIn':
       return { ...LOOK_NONE, alpha: e, scale: 1.25 - 0.25 * e };
+    default: {
+      const d = PRESETS[kind];
+      return d ? customLook(d, k) : LOOK_NONE;
+    }
   }
+}
+
+// ---------------- preset curves ----------------
+
+function preset(
+  id: string,
+  ease: 'smooth' | 'linear',
+  channels: Partial<Record<TransitionChannel, readonly number[]>>,
+): TransitionDef {
+  const ch: Record<string, { t: number; v: number }[]> = {};
+  for (const [c, tv] of Object.entries(channels)) {
+    const list: { t: number; v: number }[] = [];
+    for (let i = 0; i + 1 < tv!.length; i += 2) list.push({ t: tv![i]!, v: tv![i + 1]! });
+    ch[c] = list;
+  }
+  const d = normalizeTransitionDef({ id, name: id, ease, channels: ch });
+  if ('error' in d) throw new Error(`preset ${id}: ${d.error}`);
+  return d;
+}
+
+/**
+ * Built-in animations and transitions written as curves ([t, v, t, v…], like the custom ones),
+ * so the preview (customLook) and the export (customLookExpr) agree by construction.
+ */
+const PRESETS: Partial<Record<AnimKind | TransitionKind, TransitionDef>> = {
+  // transitions
+  pushLeft: preset('push-left', 'smooth', { dx: [0, -1, 1, 0] }),
+  pushUp: preset('push-up', 'smooth', { dy: [0, 1, 1, 0] }),
+  pushDown: preset('push-down', 'smooth', { dy: [0, -1, 1, 0] }),
+  diagonal: preset('diagonal', 'smooth', {
+    dx: [0, 0.7, 1, 0],
+    dy: [0, -0.7, 1, 0],
+    alpha: [0, 0, 0.5, 1],
+  }),
+  whip: preset('whip', 'smooth', {
+    dx: [0, 1, 0.55, -0.05, 0.8, 0.015, 1, 0],
+    alpha: [0, 0.3, 0.25, 1],
+  }),
+  zoomOut: preset('zoom-out', 'smooth', { scale: [0, 0.3, 1, 1], alpha: [0, 0, 0.6, 1] }),
+  rise: preset('rise', 'smooth', {
+    dy: [0, 0.35, 0.6, -0.03, 0.85, 0.008, 1, 0],
+    alpha: [0, 0, 0.45, 1],
+  }),
+  // transitions and in / out animations
+  punch: preset('punch', 'smooth', { scale: [0, 1.7, 0.6, 0.92, 1, 1], alpha: [0, 0, 0.3, 1] }),
+  elastic: preset('elastic', 'smooth', {
+    scale: [0, 0.2, 0.35, 1.18, 0.55, 0.92, 0.72, 1.05, 0.86, 0.98, 1, 1],
+    alpha: [0, 0, 0.25, 1],
+  }),
+  bounce: preset('bounce', 'linear', {
+    dy: [0, -1, 0.4, 0, 0.55, -0.1, 0.7, 0, 0.82, -0.03, 0.92, 0, 1, 0],
+  }),
+  blink: preset('blink', 'linear', {
+    alpha: [0, 0, 0.15, 1, 0.3, 0.1, 0.45, 1, 0.6, 0.35, 0.75, 1, 1, 1],
+  }),
+  drift: preset('drift', 'smooth', {
+    alpha: [0, 0, 1, 1],
+    scale: [0, 1.1, 1, 1],
+    dx: [0, 0.04, 1, 0],
+  }),
+  wipe: preset('wipe', 'linear', { reveal: [0, 0, 1, 1] }),
+  // in / out animations
+  grow: preset('grow', 'smooth', { scale: [0, 0.1, 1, 1], alpha: [0, 0, 0.4, 1] }),
+  backUp: preset('back-up', 'smooth', { dy: [0, 0.15, 0.65, -0.025, 1, 0], alpha: [0, 0, 0.5, 1] }),
+  flyUp: preset('fly-up', 'smooth', { dy: [0, 1, 1, 0] }),
+  flyDown: preset('fly-down', 'smooth', { dy: [0, -1, 1, 0] }),
+  flyLeft: preset('fly-left', 'smooth', { dx: [0, 1, 1, 0] }),
+  flyRight: preset('fly-right', 'smooth', { dx: [0, -1, 1, 0] }),
+  // the animation pack (videoAnimPack.ts)
+  ...Object.fromEntries(PACK_KINDS.map((k) => [k, preset(k, PACK[k].ease, PACK[k].ch)])),
+};
+
+/** The curves behind a built-in kind that is written as data (for samples and tests). */
+export function presetDef(kind: AnimKind | TransitionKind): TransitionDef | undefined {
+  return PRESETS[kind];
+}
+
+/** Largest scale an animation or transition reaches (the export scales once to it). */
+export function lookMaxScale(
+  kind: AnimKind | TransitionName | undefined,
+  def?: TransitionDef,
+): number {
+  if (kind === 'custom') return def ? maxDefScale(def) : 1;
+  if (kind === 'zoom') return 1.4;
+  if (kind === 'zoomIn') return 1.25;
+  const d = kind ? PRESETS[kind] : undefined;
+  return d ? maxDefScale(d) : 1;
 }
 
 // ---------------- titles ----------------
@@ -418,6 +588,8 @@ export interface TextSpec {
   shadow?: boolean;
   /** Box behind the text. */
   bg?: string;
+  /** Fase 13C (karaoke): this word (0-based, reading order) is drawn in `color` (#rrggbb). */
+  hl?: { word: number; color: string };
 }
 export const TEXT_MAX = 2000;
 export const TEXT_DEFAULT_DUR = 4;

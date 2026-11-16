@@ -30,6 +30,7 @@
     "three": "^0.181.2"
   },
   "devDependencies": {
+    "@mediapipe/tasks-vision": "1.2.3",
     "@omni/catalog": "workspace:*",
     "@omni/core": "workspace:*",
     "@omni/providers": "workspace:*",

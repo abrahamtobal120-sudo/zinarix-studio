@@ -5,7 +5,7 @@ import type { ProviderConfig } from '../types.js';
  * Chat adapters stay as they are; a MediaGenProvider is a second, independent entry point for
  * the same catalog provider (same key, same base URL).
  */
-export type MediaKind = 'image' | 'video' | 'speech' | 'music';
+export type MediaKind = 'image' | 'video' | 'speech' | 'music' | 'sound';
 export type MediaAspect = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
 export type ImageQuality = 'low' | 'medium' | 'high';
 
@@ -28,6 +28,17 @@ export interface MediaRequest {
   voice?: string;
   /** PNG with transparent background, when the model supports it. */
   transparent?: boolean;
+  /**
+   * Fase 10C: several speakers in one script (speech). `prompt` holds the script as
+   * "Name: line" lines; each name gets its voice. Only adapters that do it in one call read it.
+   */
+  speakers?: { name: string; voice: string }[];
+  /** Fase 10C: music without singing. */
+  instrumental?: boolean;
+  /** Fase 10D: an image from the library as the video's first frame or as a style reference. */
+  reference?: MediaFile & { role: 'first_frame' | 'style' };
+  /** Fase 10D: edit this image (with an optional mask: transparent = the part to change). */
+  edit?: { image: MediaFile; mask?: MediaFile };
 }
 
 export interface MediaFile {
@@ -43,6 +54,8 @@ export interface MediaResult {
   files: MediaFile[];
   /** Options that were not sent or were changed (shown to the user). */
   warnings: string[];
+  /** Seed the provider really used, when it reports one (local servers). */
+  seed?: number;
 }
 
 export interface MediaProgress {

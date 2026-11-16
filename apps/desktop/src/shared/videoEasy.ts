@@ -17,12 +17,21 @@ import {
   mediaOf,
   prevAdjacent,
   setTransition,
+  speedOf,
   trackAudible,
   trackOf,
   uid,
 } from './video.js';
-import type { ClipAnim, TextSpec, Transition } from './videoFx.js';
-import { LOOKS, TEXT_PRESETS, cleanEffects } from './videoFx.js';
+import type { ClipAnim, Effects, TextSpec, Transition } from './videoFx.js';
+import {
+  LOOKS,
+  TEXT_PRESETS,
+  cleanEffects,
+  validAnim,
+  validEffects,
+  validText,
+  validTransition,
+} from './videoFx.js';
 
 // ---------------- Ken Burns ----------------
 
@@ -151,7 +160,19 @@ export function duckWindows(p: VideoProject, trackId: string): { from: number; t
     if (!t || t.duck !== undefined || !trackAudible(p, t) || (t.volume ?? 1) <= 0) continue;
     const m = mediaOf(p, c.mediaId);
     if (!m || m.missing || !m.hasAudio || m.kind === 'image') continue;
-    spans.push({ from: c.start, to: clipEnd(c) });
+    const voice = me.duckSound ? m.analysis?.voice : undefined;
+    if (!voice) {
+      spans.push({ from: c.start, to: clipEnd(c) });
+      continue;
+    }
+    // Fase 11B: only where the clip really has sound (seconds of the file → timeline).
+    const sp = speedOf(c);
+    for (const [a, b] of voice) {
+      const s0 = Math.max(a, c.in);
+      const s1 = Math.min(b, c.out);
+      if (!(s1 - s0 > 1e-3) || !Number.isFinite(s0) || !Number.isFinite(s1)) continue;
+      spans.push({ from: c.start + (s0 - c.in) / sp, to: c.start + (s1 - c.in) / sp });
+    }
   }
   spans.sort((a, b) => a.from - b.from);
   const out: { from: number; to: number }[] = [];
@@ -175,6 +196,35 @@ export function duckGainAt(p: VideoProject, track: Track | undefined, t: number)
       clamp01((t - w.from + DUCK_RAMP) / DUCK_RAMP) * clamp01((w.to + DUCK_RAMP - t) / DUCK_RAMP),
     );
   return 1 - (1 - clamp01(track.duck)) * k;
+}
+
+/** Ducking guided by the detected sound on (true) or along whole clips (false) for a track. */
+export function setTrackDuckSound(p: VideoProject, trackId: string, on: boolean): VideoProject {
+  const t = trackOf(p, trackId);
+  if (!t) return p;
+  const next: Track = { ...t };
+  if (on) next.duckSound = true;
+  else delete next.duckSound;
+  return { ...p, tracks: p.tracks.map((x) => (x.id === trackId ? next : x)) };
+}
+
+/**
+ * Points (time, gain) of a track's ducking curve between `from` and `to`, for drawing it on the
+ * timeline: the corners of every ramp, so a straight line between them is the exact curve.
+ */
+export function duckCurve(
+  p: VideoProject,
+  trackId: string,
+  from: number,
+  to: number,
+): { t: number; g: number }[] {
+  const track = trackOf(p, trackId);
+  if (!track || track.duck === undefined || !(to > from)) return [];
+  const ts = new Set<number>([from, to]);
+  for (const w of duckWindows(p, trackId))
+    for (const x of [w.from - DUCK_RAMP, w.from, w.to, w.to + DUCK_RAMP])
+      if (x > from && x < to) ts.add(x);
+  return [...ts].sort((a, b) => a - b).map((t) => ({ t, g: duckGainAt(p, track, t) }));
 }
 
 /**
@@ -208,6 +258,15 @@ export interface VideoTheme {
   kenBurns: boolean;
   /** Music level under voices. */
   duck: number;
+  /** Fase 11D (themes as files): the name shown, and the file format version. */
+  name?: string;
+  version?: number;
+  /** Effects of its own instead of a LOOKS id. */
+  fx?: Effects;
+  /** Music the theme brings (absolute path; used when the Magic video has none). */
+  music?: string;
+  /** A .cube LUT put on every media clip (Fase 12 colour grade). */
+  lut?: string;
 }
 
 export const VIDEO_THEMES: VideoTheme[] = [
@@ -258,8 +317,8 @@ export const VIDEO_THEMES: VideoTheme[] = [
   },
 ];
 
-export const themeOf = (id: string | undefined): VideoTheme =>
-  VIDEO_THEMES.find((t) => t.id === id) ?? VIDEO_THEMES[0]!;
+export const themeOf = (id: string | undefined, extra: readonly VideoTheme[] = []): VideoTheme =>
+  extra.find((t) => t.id === id) ?? VIDEO_THEMES.find((t) => t.id === id) ?? VIDEO_THEMES[0]!;
 
 /** The title style of a theme, ready for addTextClip. */
 export function themeTitle(theme: VideoTheme, content: string): TextSpec {
@@ -277,9 +336,15 @@ const kbCycle: KenBurnsKind[] = ['zoomIn', 'panRight', 'zoomOut', 'panLeft'];
  * the transition where a clip touches the one before it, the title style on titles, and Ken
  * Burns on photos that have no animation yet.
  */
-export function applyTheme(p: VideoProject, themeId: string, ids?: string[]): VideoProject {
-  const theme = themeOf(themeId);
-  const fx = cleanEffects(LOOKS.find((l) => l.id === theme.look)?.fx);
+export function applyTheme(
+  p: VideoProject,
+  themeId: string,
+  ids?: string[],
+  /** Themes loaded from files (they win over the built-in ones with the same id). */
+  extra: readonly VideoTheme[] = [],
+): VideoProject {
+  const theme = themeOf(themeId, extra);
+  const fx = cleanEffects(theme.fx ?? LOOKS.find((l) => l.id === theme.look)?.fx);
   const pick = new Set(ids ?? p.clips.map((c) => c.id));
   let next = p;
   let photo = 0;
@@ -297,6 +362,8 @@ export function applyTheme(p: VideoProject, themeId: string, ids?: string[]): Vi
     } else {
       c = { ...c, effects: fx };
       if (!fx) delete c.effects;
+      if (theme.lut && mediaOf(next, c.mediaId)?.kind !== 'audio')
+        c = { ...c, color: { ...c.color, lut: theme.lut } };
     }
     next = { ...next, clips: next.clips.map((x) => (x.id === c.id ? c : x)) };
     if (!c.text && prevAdjacent(next, c)) next = setTransition(next, c.id, theme.transition);
@@ -427,4 +494,131 @@ export function magicVideo(
       project = setTrackDuck(project, aTrack.id, theme.duck);
   }
   return { project, clipIds: ids, duration: end - at };
+}
+
+// ---------------- themes as files (Fase 11D) ----------------
+
+/** Format version of a theme file (.zinarix/video-themes/*.json). 1 = the 11A shape. */
+export const THEME_VERSION = 2;
+export const THEME_MAX_BYTES = 64 * 1024;
+
+const THEME_KEYS = [
+  'id',
+  'name',
+  'version',
+  'transition',
+  'look',
+  'fx',
+  'title',
+  'titleAnim',
+  'kenBurns',
+  'duck',
+  'music',
+  'lut',
+] as const;
+const TITLE_KEYS = ['font', 'size', 'color', 'bold', 'italic', 'align', 'stroke', 'shadow', 'bg'] as const;
+
+/** A theme id from any name: lower-case letters, digits and dashes. */
+export const themeSlug = (s: string): string =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'tema';
+
+/**
+ * Reads a theme file (parsed JSON): fields it does not know are dropped, missing or wrong ones
+ * take the "clean" theme's value, an old version is migrated. Null when it is not a theme at all
+ * (not an object, or no name / id).
+ */
+export function parseThemeFile(x: unknown): VideoTheme | null {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+  const o = x as Record<string, unknown>;
+  const rawName = typeof o.name === 'string' ? o.name.trim().slice(0, 60) : '';
+  const rawId = typeof o.id === 'string' ? o.id : rawName;
+  if (!rawId.trim()) return null;
+  const def = VIDEO_THEMES[0]!;
+  const version = typeof o.version === 'number' && Number.isFinite(o.version) ? o.version : 1;
+  // v1 (11A, in code) had no name: the id was the name.
+  const name = rawName || rawId.trim().slice(0, 60);
+  const transition = validTransition(o.transition) && o.transition ? (o.transition as Transition) : def.transition;
+  const look = typeof o.look === 'string' && LOOKS.some((l) => l.id === o.look) ? o.look : 'none';
+  const fx = o.fx !== undefined && validEffects(o.fx) ? cleanEffects(o.fx as Effects) : undefined;
+  const title: Partial<TextSpec> = {};
+  if (o.title && typeof o.title === 'object' && !Array.isArray(o.title)) {
+    const t = o.title as Record<string, unknown>;
+    const probe = { ...TEXT_PRESETS.find((p) => p.id === 'title')!.spec } as TextSpec;
+    for (const k of TITLE_KEYS) {
+      if (t[k] === undefined) continue;
+      const trial = { ...probe, [k]: t[k] } as TextSpec;
+      if (validText(trial)) (title as Record<string, unknown>)[k] = t[k];
+    }
+  }
+  const titleAnim = validAnim(o.titleAnim) && o.titleAnim ? { ...(o.titleAnim as ClipAnim) } : { ...def.titleAnim };
+  const duck =
+    typeof o.duck === 'number' && Number.isFinite(o.duck) ? Math.min(1, Math.max(0, o.duck)) : def.duck;
+  const str = (v: unknown) => (typeof v === 'string' && v.length <= 1024 && v.trim() ? v : undefined);
+  const theme: VideoTheme = {
+    id: themeSlug(rawId),
+    name,
+    version: THEME_VERSION,
+    transition,
+    look,
+    title: Object.keys(title).length ? title : { ...def.title },
+    titleAnim,
+    kenBurns: typeof o.kenBurns === 'boolean' ? o.kenBurns : def.kenBurns,
+    duck,
+  };
+  if (fx) theme.fx = fx;
+  const music = str(o.music);
+  const lut = str(o.lut);
+  if (music) theme.music = music;
+  if (lut && lut.toLowerCase().endsWith('.cube')) theme.lut = lut;
+  if (version > THEME_VERSION) theme.version = THEME_VERSION;
+  return theme;
+}
+
+/** What a theme file holds (known fields only, in a fixed order). */
+export function themeToFile(t: VideoTheme): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const full = { ...t, version: THEME_VERSION, name: t.name ?? t.id };
+  for (const k of THEME_KEYS) if (full[k] !== undefined) out[k] = full[k];
+  return out;
+}
+
+/**
+ * "Save current theme": the style of the project as it is now, taken from the selected clips
+ * (or all of them): the first transition, the media clips' effects, the first title's style and
+ * animation, whether photos carry Ken Burns, and the ducking level of a ducked track.
+ */
+export function themeFromProject(p: VideoProject, name: string, ids?: readonly string[]): VideoTheme {
+  const pick = new Set(ids?.length ? ids : p.clips.map((c) => c.id));
+  const clips = p.clips.filter((c) => pick.has(c.id)).sort((a, b) => a.start - b.start);
+  const def = VIDEO_THEMES[0]!;
+  const media = clips.filter((c) => !c.text && mediaOf(p, c.mediaId)?.kind !== 'audio');
+  const tr = media.find((c) => c.transition)?.transition;
+  const fx = cleanEffects(media.find((c) => c.effects)?.effects);
+  const look = fx ? (LOOKS.find((l) => JSON.stringify(cleanEffects(l.fx)) === JSON.stringify(fx))?.id ?? 'none') : 'none';
+  const t = clips.find((c) => c.text);
+  const title: Partial<TextSpec> = {};
+  if (t?.text) for (const k of TITLE_KEYS) if (t.text[k] !== undefined) (title as Record<string, unknown>)[k] = t.text[k];
+  const photos = media.filter((c) => mediaOf(p, c.mediaId)?.kind === 'image');
+  const ducked = p.tracks.find((x) => x.duck !== undefined);
+  const lut = media.find((c) => c.color?.lut)?.color?.lut;
+  const theme: VideoTheme = {
+    id: themeSlug(name),
+    name: name.trim().slice(0, 60) || 'Tema',
+    version: THEME_VERSION,
+    transition: tr ? { ...tr } : def.transition,
+    look,
+    title: Object.keys(title).length ? title : { ...def.title },
+    titleAnim: t?.anim ? { ...t.anim } : { ...def.titleAnim },
+    kenBurns: photos.length ? photos.some(hasKenBurns) : def.kenBurns,
+    duck: ducked?.duck ?? def.duck,
+  };
+  if (fx && look === 'none') theme.fx = fx;
+  if (lut) theme.lut = lut;
+  return theme;
 }

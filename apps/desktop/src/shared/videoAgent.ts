@@ -651,7 +651,9 @@ export function addTransition(
   p: VideoProject,
   a: Args,
   library: readonly TransitionDef[],
-): (VideoEdit & { def?: TransitionDef; isNew?: boolean }) | { error: string } {
+):
+  | (Exclude<VideoEdit, { error: string }> & { def?: TransitionDef; isNew?: boolean })
+  | { error: string } {
   const d0 = num(a, 'duration') ?? TRANSITION_DEFAULT;
   const d = Math.min(TRANSITION_MAX, Math.max(TRANSITION_MIN, d0));
   let tr: Transition | null = null;

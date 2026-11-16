@@ -17,7 +17,6 @@ import {
   trackAudible,
   trackOf,
   trackVolume,
-  transformAt,
   visualAt,
   visualClipsAt,
 } from '../../../shared/video';
@@ -25,10 +24,17 @@ import type { Look } from '../../../shared/videoFx';
 import { cssFilter } from '../../../shared/videoFx';
 import { duckGainAt } from '../../../shared/videoEasy';
 import { gradedLayer, gradePending, onLutLoaded } from './colorGrade';
-import { textCanvas } from './textDraw';
+import { textCanvas, textStops } from './textDraw';
+import { layerPlacement } from '../../../shared/videoPreview';
+import { usesTypewriter } from '../../../shared/videoTypewriter';
 import { getV, setV } from './videoStore';
 
 type El = HTMLVideoElement | HTMLAudioElement;
+
+/** Hover preview loop: the animation plays in PREVIEW_PLAY ms, then holds in place a moment. */
+const PREVIEW_PLAY = 1100;
+const PREVIEW_LOOP = 1700;
+const previewK = (ms: number) => Math.min(1, (ms % PREVIEW_LOOP) / PREVIEW_PLAY);
 
 /** Seconds of drift tolerated while playing before re-seeking an element. */
 const DRIFT = 0.2;
@@ -215,10 +221,12 @@ export class Player {
       ready: boolean;
       look: Look;
     }[] = [];
+    const pv = s.fxPreview;
+    const pk = pv ? previewK(performance.now() - pv.since) : 1;
     for (const track of compositeOrder(p)) {
       if (track.hidden) continue;
       for (const c of visualClipsAt(p, track.id, t)) {
-        const look = visualAt(p, c, t)!;
+        const look = pv?.ids.includes(c.id) ? pv.look(pk) : visualAt(p, c, t)!;
         if (c.text) {
           layers.push({ c, src: textCanvas(c.text, W, H), w: W, h: H, ready: true, look });
           continue;
@@ -251,7 +259,7 @@ export class Player {
         }
       }
     }
-    const key = `${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}:${gradePending(l.c.color)}`).join(',')}`;
+    const key = `${pv ? `pv${pk.toFixed(3)}|` : ''}${t.toFixed(4)}|${W}x${H}|${layers.map((l) => `${l.c.id}:${l.ready}:${gradePending(l.c.color)}`).join(',')}`;
     if (!s.playing && key === this.lastDrawKey && p === this.lastProject) return;
     this.lastProject = p;
     const allReady = layers.every((l) => l.ready);
@@ -267,23 +275,21 @@ export class Player {
     ctx.fillRect(0, 0, W, H);
     for (const l of layers) {
       if (!l.ready || !l.w || !l.h) continue;
-      // Fit inside the frame, centred, then the clip's transform (same maths as the export).
-      const tr = transformAt(l.c, t);
-      const lk = l.look;
-      const alpha = tr.opacity * fadeAt(l.c, t) * lk.alpha;
-      if (alpha <= 0 || lk.reveal <= 0) continue;
-      const k = Math.min(W / l.w, H / l.h) * tr.scale * lk.scale;
-      const dw = l.w * k;
-      const dh = l.h * k;
+      // Fit inside the frame, centred, then the clip's transform (same maths as the export,
+      // shared/videoPreview.ts; typewriter titles uncover up to the letter due).
+      const stops = l.c.text && usesTypewriter(l.c) ? textStops(l.c.text, W, H) : undefined;
+      const pl = layerPlacement(l.c, t, l.look, W, H, l.w, l.h, stops);
+      if (!pl) continue;
+      const { dw, dh } = pl;
       ctx.save();
-      ctx.globalAlpha = Math.min(1, alpha);
-      ctx.translate(W / 2 + (tr.x + lk.dx) * W, H / 2 + (tr.y + lk.dy) * H);
-      if (tr.rotation) ctx.rotate((tr.rotation * Math.PI) / 180);
-      if (tr.flipH || tr.flipV) ctx.scale(tr.flipH ? -1 : 1, tr.flipV ? -1 : 1);
-      if (lk.reveal < 1) {
+      ctx.globalAlpha = pl.alpha;
+      ctx.translate(pl.cx, pl.cy);
+      if (pl.rotation) ctx.rotate((pl.rotation * Math.PI) / 180);
+      if (pl.flipH || pl.flipV) ctx.scale(pl.flipH ? -1 : 1, pl.flipV ? -1 : 1);
+      if (pl.reveal < 1) {
         // Wipes uncover the picture from its left edge (the same as the export).
         ctx.beginPath();
-        ctx.rect(tr.flipH ? dw / 2 - dw * lk.reveal : -dw / 2, -dh / 2, dw * lk.reveal, dh);
+        ctx.rect(pl.flipH ? dw / 2 - dw * pl.reveal : -dw / 2, -dh / 2, dw * pl.reveal, dh);
         ctx.clip();
       }
       // Colour grade (Fase 12): graded on the CPU at the drawn size (capped while playing).

@@ -12,6 +12,8 @@ export interface CheckpointLike {
   path: string;
   /** null = the file did not exist. */
   before: string | null;
+  /** The exact bytes of `before` (base64) when the file is not valid UTF-8. */
+  beforeBytes?: string;
   /** What the agent wrote (null = it deleted the file; undefined = not recorded). */
   after?: string | null;
   /** A file outside the workspace (absolute path). */
@@ -33,6 +35,8 @@ export interface RestoreStep {
   root?: string;
   /** null = delete it (the agent created it). */
   before: string | null;
+  /** The exact bytes of `before` (base64) when it is not valid UTF-8. */
+  beforeBytes?: string;
   /** What the last of these changes left (undefined = not recorded). */
   after?: string | null;
   /** Backup copies no longer needed once restored. */
@@ -60,6 +64,7 @@ function perFile(cps: readonly CheckpointLike[]): RestoreStep[] {
         absolute: !!c.absolute,
         ...(c.root !== undefined ? { root: c.root } : {}),
         before: c.before,
+        ...(c.beforeBytes !== undefined ? { beforeBytes: c.beforeBytes } : {}),
         backups: [],
       };
       out.set(k, step);

@@ -248,10 +248,21 @@ function Studio3D() {
             />
           </div>
           <QuickTools3D />
+          <div className="s3-watermark" aria-hidden>
+            <img src="./logo.svg" alt="" />
+            Zinarix 3D
+          </div>
         </div>
         <Inspector getView={() => vp.current?.editorView()} />
       </div>
       <KeyBar />
+      <div className="s3-splash" aria-hidden>
+        <img src="./logo.svg" alt="" />
+        <strong>
+          <span className="s3-brand-name">Zinarix</span> 3D
+        </strong>
+        <span>{t3('tagline')}</span>
+      </div>
       {dialog && <RenderDialog />}
       {genOpen && <Gen3DDialog />}
       {rendering && (
@@ -312,8 +323,9 @@ function TopBar() {
   const [tpl, setTpl] = useState(false);
   return (
     <header className="s3-top">
+      <img className="s3-logo" src="./logo.svg" alt="" />
       <strong className="s3-title">
-        {t3('title')}
+        <span className="s3-brand-name">Zinarix</span> 3D
         {path && (
           <span className="s3-path">
             {' '}

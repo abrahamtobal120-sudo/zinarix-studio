@@ -40,9 +40,8 @@ import {
   transitionWindow,
 } from './video.js';
 import type { LookExpr } from './videoFx.js';
-import { animLengths, combineExpr, ffmpegEffects, windowExpr } from './videoFx.js';
+import { animLengths, combineExpr, ffmpegEffects, lookMaxScale, windowExpr } from './videoFx.js';
 import { duckExpr } from './videoEasy.js';
-import { maxDefScale } from './videoTransitions.js';
 import { ffmpegGrade, lutKey } from './videoColor.js';
 
 const duckFilter = (p: VideoProject, track: Track, offset: number): string[] => {
@@ -267,17 +266,18 @@ function looksOf(p: VideoProject, pc: Piece, T: string): LookExpr {
   if (inD > 1e-6) parts.push(windowExpr(c.anim!.in, T, c.start - pc.at, inD, true));
   if (outD > 1e-6) parts.push(windowExpr(c.anim!.out, T, clipEnd(c) - outD - pc.at, outD, false));
   const w = transitionWindow(p, c);
-  if (w) parts.push(windowExpr(c.transition!.kind, T, w.from - pc.at, w.d, true, c.transition!.def));
+  if (w)
+    parts.push(windowExpr(c.transition!.kind, T, w.from - pc.at, w.d, true, c.transition!.def));
   return combineExpr(parts);
 }
 
 /** Largest size the looks can reach (scale once to it, then shrink per frame). */
 function maxLookScale(c: Clip): number {
-  const kinds = [c.anim?.in, c.anim?.out, c.transition?.kind];
-  const custom = c.transition?.def ? maxDefScale(c.transition.def) : 1;
-  if (kinds.includes('zoom')) return Math.max(1.4, custom);
-  if (kinds.includes('zoomIn')) return Math.max(1.25, custom);
-  return custom;
+  return Math.max(
+    lookMaxScale(c.anim?.in),
+    lookMaxScale(c.anim?.out),
+    lookMaxScale(c.transition?.kind, c.transition?.def),
+  );
 }
 
 /** Video filters of one clip: size, flips, effects, timing, opacity, rotation, size, fades. */
@@ -491,8 +491,7 @@ export function buildRender(
   let n = 0;
   let clips = 0;
 
-  if (!measure)
-    graph.push(`color=c=black:s=${W}x${H}:r=${fps}:d=${num(D)},format=yuv420p[base0]`);
+  if (!measure) graph.push(`color=c=black:s=${W}x${H}:r=${fps}:d=${num(D)},format=yuv420p[base0]`);
   let base = 'base0';
   let layer = 0;
 
@@ -614,8 +613,7 @@ export function buildRender(
           ? `,${loudnormFilter(target, extras.loudness)},aresample=48000`
           : '';
   if (!audio.length) graph.push(`anullsrc=r=48000:cl=stereo,atrim=0:${num(D)}[aout]`);
-  else if (audio.length === 1)
-    graph.push(`[${audio[0]}]apad,atrim=0:${num(D)}${norm}[aout]`);
+  else if (audio.length === 1) graph.push(`[${audio[0]}]apad,atrim=0:${num(D)}${norm}[aout]`);
   else
     graph.push(
       `${audio.map((a) => `[${a}]`).join('')}amix=inputs=${audio.length}:duration=longest:dropout_transition=0:normalize=0,apad,atrim=0:${num(D)}${norm}[aout]`,

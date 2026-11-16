@@ -1,0 +1,41 @@
+{
+  "format": "zinarix-transition",
+  "version": 1,
+  "id": "barrido-suave",
+  "name": "Barrido suave",
+  "description": "Se descubre de izquierda a derecha mientras aparece y se desliza un poco.",
+  "author": "Zinarix Studio",
+  "ease": "smooth",
+  "channels": {
+    "reveal": [
+      {
+        "t": 0,
+        "v": 0
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ],
+    "alpha": [
+      {
+        "t": 0,
+        "v": 0.4
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ],
+    "dx": [
+      {
+        "t": 0,
+        "v": -0.06
+      },
+      {
+        "t": 1,
+        "v": 0
+      }
+    ]
+  }
+}

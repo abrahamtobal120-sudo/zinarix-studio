@@ -3,6 +3,7 @@ import { lang } from '../../i18n';
 /** Strings of the 3D editor (Fase 14). */
 const es = {
   title: 'Zinarix 3D',
+  tagline: 'Crea en 3D con Zinarix',
   tab: '3D',
   open: 'Abrir Zinarix 3D',
   close: 'Cerrar',
@@ -152,6 +153,7 @@ const es = {
 
 const en: Record<keyof typeof es, string> = {
   title: 'Zinarix 3D',
+  tagline: 'Create in 3D with Zinarix',
   tab: '3D',
   open: 'Open Zinarix 3D',
   close: 'Close',

@@ -1,0 +1,70 @@
+@layer features {
+/* Video Studio, Fase 12C: scopes (theme variables only). */
+
+.vs-scopes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+}
+.vs-scopes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.vs-scopes-kinds button {
+  font-size: var(--text-xs);
+}
+.vs-scopes-badge {
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+.vs-scopes-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--vs-stage);
+  overflow: hidden;
+}
+.vs-scopes-stage.vs-scopes-square {
+  width: min(100%, 320px);
+  aspect-ratio: 1 / 1;
+  align-self: center;
+}
+.vs-scopes-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.vs-scopes-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--vs-stage-fg);
+  opacity: 0.7;
+}
+.vs-scopes-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-variant-numeric: tabular-nums;
+}
+.vs-scopes-dim {
+  color: var(--fg-dim);
+}
+.vs-scopes-warn {
+  color: var(--warn);
+}
+.vs-scopes-err {
+  margin: 0;
+  color: var(--danger);
+}
+}

@@ -1,4 +1,5 @@
 import { lang } from '../../i18n';
+import { isPackKind, PACK } from '../../../shared/videoAnimPack';
 
 /** Strings of Zinarix Video Studio (kept apart from i18n.ts, like i18nLsp.ts). */
 const es = {
@@ -308,6 +309,19 @@ const es = {
   anim_slideRight: 'Deslizar a la derecha',
   anim_pop: 'Rebote',
   anim_zoom: 'Alejar',
+  anim_grow: 'Crecer',
+  anim_bounce: 'Caer y rebotar',
+  anim_elastic: 'Elástico',
+  anim_backUp: 'Subir con impulso',
+  anim_flyUp: 'Volar desde abajo',
+  anim_flyDown: 'Volar desde arriba',
+  anim_flyLeft: 'Volar desde la derecha',
+  anim_flyRight: 'Volar desde la izquierda',
+  anim_wipe: 'Revelar',
+  anim_blink: 'Parpadeo',
+  anim_punch: 'Golpe',
+  anim_drift: 'Deriva suave',
+  anim_typewriter: 'Máquina de escribir',
   editAnim: 'Animación',
   secTransition: 'Transición de entrada',
   trNone: 'Sin transición',
@@ -317,6 +331,31 @@ const es = {
   tr_wipe: 'Barrido',
   tr_slide: 'Empujar',
   tr_zoomIn: 'Zoom',
+  tr_pushLeft: 'Empujar desde la izquierda',
+  tr_pushUp: 'Empujar desde abajo',
+  tr_pushDown: 'Empujar desde arriba',
+  tr_diagonal: 'Diagonal',
+  tr_whip: 'Latigazo',
+  tr_zoomOut: 'Zoom desde lejos',
+  tr_punch: 'Golpe',
+  tr_elastic: 'Elástico',
+  tr_bounce: 'Caída con rebote',
+  tr_rise: 'Subida con impulso',
+  tr_blink: 'Parpadeo',
+  tr_drift: 'Deriva suave',
+  trGroup_all: 'Todas',
+  trGroup_classic: 'Clásicas',
+  trGroup_slide: 'Deslizar',
+  trGroup_bounce: 'Rebote',
+  trGroup_zoom: 'Zoom',
+  trGroup_spin: 'Giros y curvas',
+  trGroup_shake: 'Sacudida',
+  trGroup_light: 'Luz',
+  trGroup_reveal: 'Revelar',
+  trGroup_camera: 'Cámara',
+  trSearch: 'Buscar animación…',
+  trHoverHint: 'Pasa el mouse sobre una tarjeta para verla en el visor.',
+  trNoMatch: 'Ninguna coincide.',
   trHint:
     'Elige el clip que entra y haz clic en una transición: se coloca en el corte con el clip anterior de la misma pista.',
   trReveal:
@@ -659,6 +698,19 @@ const en: Record<VideoKey, string> = {
   anim_slideRight: 'Slide right',
   anim_pop: 'Pop',
   anim_zoom: 'Zoom out',
+  anim_grow: 'Grow',
+  anim_bounce: 'Drop and bounce',
+  anim_elastic: 'Elastic',
+  anim_backUp: 'Spring up',
+  anim_flyUp: 'Fly in from below',
+  anim_flyDown: 'Fly in from above',
+  anim_flyLeft: 'Fly in from the right',
+  anim_flyRight: 'Fly in from the left',
+  anim_wipe: 'Reveal',
+  anim_blink: 'Flicker',
+  anim_punch: 'Punch',
+  anim_drift: 'Gentle drift',
+  anim_typewriter: 'Typewriter',
   editAnim: 'Animation',
   secTransition: 'Transition in',
   trNone: 'No transition',
@@ -668,6 +720,31 @@ const en: Record<VideoKey, string> = {
   tr_wipe: 'Wipe',
   tr_slide: 'Push',
   tr_zoomIn: 'Zoom',
+  tr_pushLeft: 'Push from the left',
+  tr_pushUp: 'Push from below',
+  tr_pushDown: 'Push from above',
+  tr_diagonal: 'Diagonal',
+  tr_whip: 'Whip',
+  tr_zoomOut: 'Zoom from afar',
+  tr_punch: 'Punch',
+  tr_elastic: 'Elastic',
+  tr_bounce: 'Drop with bounce',
+  tr_rise: 'Spring up',
+  tr_blink: 'Flicker',
+  tr_drift: 'Gentle drift',
+  trGroup_all: 'All',
+  trGroup_classic: 'Classic',
+  trGroup_slide: 'Slide',
+  trGroup_bounce: 'Bounce',
+  trGroup_zoom: 'Zoom',
+  trGroup_spin: 'Spins and curves',
+  trGroup_shake: 'Shake',
+  trGroup_light: 'Light',
+  trGroup_reveal: 'Reveal',
+  trGroup_camera: 'Camera',
+  trSearch: 'Search animations…',
+  trHoverHint: 'Hover a card to preview it in the viewer.',
+  trNoMatch: 'Nothing matches.',
   trHint:
     'Select the incoming clip and click a transition: it goes on the cut with the previous clip on the same track.',
   trReveal:
@@ -724,4 +801,10 @@ export function fmtDuration(s: number): string {
   return h
     ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
     : `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+/** Name of a built-in transition ('tr') or in / out animation ('anim'), pack ones included. */
+export function kindLabel(prefix: 'tr' | 'anim', k: string): string {
+  if (isPackKind(k)) return PACK[k][lang === 'en' ? 'en' : 'es'];
+  return tv(`${prefix}_${k}` as VideoKey);
 }

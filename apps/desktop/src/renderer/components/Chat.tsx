@@ -23,7 +23,13 @@ import type {
 } from '../../shared/api';
 import { expandCommand, skillPrompt } from '../../shared/agentKit';
 import { AgentKitMenu, type KitKind } from './AgentKitMenu';
-import { TasksPanel, taskBadge, useTasks } from './TasksPanel';
+import {
+  NEW_TASK_EVENT,
+  TasksPanel,
+  taskBadge,
+  useTasks,
+  type NewTaskSeed,
+} from './TasksPanel';
 import { pressable } from '../a11y';
 import { confirmDialog } from '../confirm';
 import { errText } from '../errText';
@@ -1282,6 +1288,18 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const [kitMenu, setKitMenu] = useState(false);
   // Fase 5: background tasks (worktrees).
   const [tasksOpen, setTasksOpen] = useState(false);
+  // "Nueva tarea en segundo plano" (palette, approved plan): this chat opens the form.
+  const [taskSeed, setTaskSeed] = useState<NewTaskSeed | null>(null);
+  useEffect(() => {
+    const onNew = (e: Event) => {
+      const d = (e as CustomEvent<NewTaskSeed & { chat?: string }>).detail;
+      if (d?.chat && d.chat !== id) return;
+      setTaskSeed({ prompt: d?.prompt, model: d?.model });
+      setTasksOpen(true);
+    };
+    window.addEventListener(NEW_TASK_EVENT, onNew);
+    return () => window.removeEventListener(NEW_TASK_EVENT, onNew);
+  }, [id]);
   const tasksStatus = useTasks();
   const tasksNow = taskBadge(tasksStatus);
   const kitMenuEl = useRef<HTMLDivElement>(null);
@@ -2729,7 +2747,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           <TasksPanel
             status={tasksStatus}
             model={chatModel}
-            onClose={() => setTasksOpen(false)}
+            seed={taskSeed}
+            onClose={() => {
+              setTasksOpen(false);
+              setTaskSeed(null);
+            }}
             onOpenChat={(cid, folder) => {
               setTasksOpen(false);
               openConversation(cid, folder);

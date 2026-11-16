@@ -505,3 +505,95 @@
     }
   }
 }
+
+/* Zinarix identity: logo in the top bar, brand-gradient name and buttons, a faint mark in
+   the viewport (editor only, never in renders) and a short splash when the editor opens. */
+@layer features {
+  .s3-logo {
+    width: 22px;
+    height: 22px;
+    flex: none;
+  }
+  .s3-brand-name {
+    background: var(--brand-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+  }
+  .s3-root .s3-primary {
+    background: var(--brand-grad);
+    border-color: transparent;
+    color: #fff;
+  }
+  .s3-root .s3-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+  .s3-watermark {
+    position: absolute;
+    left: 10px;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-xs, 11px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--fg-dim);
+    opacity: 0.55;
+    pointer-events: none;
+    user-select: none;
+  }
+  .s3-watermark img {
+    width: 16px;
+    height: 16px;
+  }
+  .s3-splash {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 8px;
+    background: var(--bg);
+    pointer-events: none;
+    animation: s3-splash 1.4s ease forwards;
+  }
+  .s3-splash img {
+    width: 96px;
+    height: 96px;
+    animation: s3-splash-logo 1.4s ease forwards;
+  }
+  .s3-splash strong {
+    font-size: 28px;
+  }
+  .s3-splash span:last-child {
+    color: var(--fg-dim);
+  }
+  @keyframes s3-splash {
+    0%,
+    55% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+  @keyframes s3-splash-logo {
+    0% {
+      transform: scale(0.7) rotate(-20deg);
+      opacity: 0;
+    }
+    35% {
+      transform: scale(1) rotate(0);
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .s3-splash {
+      display: none;
+    }
+  }
+}

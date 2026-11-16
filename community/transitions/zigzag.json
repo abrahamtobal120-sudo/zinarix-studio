@@ -1,0 +1,55 @@
+{
+  "format": "zinarix-transition",
+  "version": 1,
+  "id": "zigzag",
+  "name": "Zigzag",
+  "description": "Entra desde arriba moviéndose a los lados en zigzag.",
+  "author": "Zinarix Studio",
+  "ease": "linear",
+  "channels": {
+    "dy": [
+      {
+        "t": 0,
+        "v": -1
+      },
+      {
+        "t": 0.7,
+        "v": 0
+      },
+      {
+        "t": 1,
+        "v": 0
+      }
+    ],
+    "dx": [
+      {
+        "t": 0,
+        "v": 0
+      },
+      {
+        "t": 0.15,
+        "v": 0.2
+      },
+      {
+        "t": 0.3,
+        "v": -0.18
+      },
+      {
+        "t": 0.45,
+        "v": 0.14
+      },
+      {
+        "t": 0.6,
+        "v": -0.08
+      },
+      {
+        "t": 0.8,
+        "v": 0.02
+      },
+      {
+        "t": 1,
+        "v": 0
+      }
+    ]
+  }
+}

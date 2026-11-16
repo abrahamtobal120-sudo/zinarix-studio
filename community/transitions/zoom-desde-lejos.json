@@ -1,0 +1,39 @@
+{
+  "format": "zinarix-transition",
+  "version": 1,
+  "id": "zoom-desde-lejos",
+  "name": "Zoom desde lejos",
+  "description": "El clip llega pequeño desde el centro, se pasa un poco y se asienta.",
+  "author": "Zinarix Studio",
+  "ease": "smooth",
+  "channels": {
+    "alpha": [
+      {
+        "t": 0,
+        "v": 0
+      },
+      {
+        "t": 0.35,
+        "v": 1
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ],
+    "scale": [
+      {
+        "t": 0,
+        "v": 0.3
+      },
+      {
+        "t": 0.7,
+        "v": 1.06
+      },
+      {
+        "t": 1,
+        "v": 1
+      }
+    ]
+  }
+}
