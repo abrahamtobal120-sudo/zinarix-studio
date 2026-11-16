@@ -1736,7 +1736,7 @@ function registerIpc(): void {
         context: ctx,
         conversationId: conv.optional(),
         agent: z.boolean().optional(),
-        mode: z.enum(['plan', 'agent', 'auto']).optional(),
+        mode: z.enum(['plan', 'agent', 'auto', 'full']).optional(),
         folder: z.string().min(1).max(4096).optional(),
         noFolder: z.boolean().optional(),
         images: z

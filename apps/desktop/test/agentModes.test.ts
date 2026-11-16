@@ -17,9 +17,18 @@ import {
 
 describe('chat modes', () => {
   it('Shift+Tab cycles ask → plan → agent → auto → ask, and back', () => {
-    expect(CHAT_MODES.map((m) => nextMode(m))).toEqual(['plan', 'agent', 'auto', 'ask']);
+    expect(CHAT_MODES.map((m) => nextMode(m))).toEqual(['plan', 'agent', 'auto', 'ask', 'ask']);
     expect(nextMode('ask', true)).toBe('auto');
     expect(nextMode('plan', true)).toBe('ask');
+  });
+
+  it('Shift+Tab never lands on full access; it leaves it', () => {
+    let m = nextMode('ask');
+    for (let i = 0; i < 10; i++, m = nextMode(m)) expect(m).not.toBe('full');
+    for (let i = 0; i < 10; i++, m = nextMode(m, true)) expect(m).not.toBe('full');
+    expect(nextMode('full')).toBe('ask');
+    expect(nextMode('full', true)).toBe('auto');
+    expect(modeFrom('full')).toBe('full');
   });
 
   it('reads chats saved before modes existed', () => {
@@ -31,7 +40,7 @@ describe('chat modes', () => {
   });
 
   it('only ask mode works without the agent', () => {
-    expect(CHAT_MODES.filter(usesAgent)).toEqual(['plan', 'agent', 'auto']);
+    expect(CHAT_MODES.filter(usesAgent)).toEqual(['plan', 'agent', 'auto', 'full']);
   });
 });
 

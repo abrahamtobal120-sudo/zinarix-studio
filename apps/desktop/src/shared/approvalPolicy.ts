@@ -76,7 +76,7 @@ export function isGitPush(command: string): boolean {
 
 /**
  * Actions that always ask, in every mode, and never take an "Always" answer: sending mail,
- * git push, Vercel changes and Supabase SQL that writes. They reach people or production.
+ * git push, Vercel changes, Supabase SQL that writes and Blender scripts (code outside the sandbox).
  */
 export function alwaysAsks(
   tool: string,
@@ -84,6 +84,8 @@ export function alwaysAsks(
   ctx: PolicyContext = {},
 ): boolean {
   if (tool === 'mail_send') return true;
+  // Fase 14: Python inside Blender runs outside any sandbox, even with full access.
+  if (tool === 'blender_script') return true;
   if (tool === 'run_command') return isGitPush(str(args.command));
   if (tool.startsWith('vercel_')) return !VERCEL_READS.has(tool);
   if (tool === 'supabase_query') return (ctx.isWriteSql ?? (() => true))(str(args.sql));
@@ -104,7 +106,9 @@ export function decide(
   if (mode === 'plan' && !planAllows(tool, readOnly, ctx.mcpReadOnly)) return 'deny';
   if (alwaysAsks(tool, args, ctx)) return 'ask';
   if (FREE.has(tool) || (readOnly.has(tool) && !tool.startsWith('mcp__'))) return 'auto';
-  if (mode === 'auto' && FILE_EDITS.has(tool)) {
+  // Files that make other programs run code, hold secrets or rules ask even with full
+  // access: a prompt injection could plant a hook or a script that runs later.
+  if ((mode === 'auto' || mode === 'full') && FILE_EDITS.has(tool)) {
     const isProtected = ctx.isProtected ?? (() => true);
     return isProtected(str(args.path)) ? 'ask' : 'auto';
   }
@@ -112,5 +116,8 @@ export function decide(
   if (mode === 'auto' && tool === 'run_command' && sandboxComplete(ctx.sandbox)) {
     return args.admin === true ? 'deny' : 'auto';
   }
+  // Full access: commands run on their own (blocked commands are still refused by the
+  // agent); running as administrator still asks, since the OS dialog asks anyway.
+  if (mode === 'full' && tool === 'run_command') return args.admin === true ? 'ask' : 'auto';
   return 'ask';
 }

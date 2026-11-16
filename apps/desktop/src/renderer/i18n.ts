@@ -717,11 +717,14 @@ const es = {
   modePlan: 'Plan',
   modeAgent: 'Agente',
   modeAuto: 'Auto-aprobar',
+  modeFull: 'Acceso total',
   modeAskHint: 'Solo responde, sin herramientas',
   modePlanHint: 'Solo lee el proyecto y propone un plan para que lo apruebes',
   modeAgentHint: 'Trabaja en el proyecto; apruebas cada cambio',
   modeAutoHint:
     'Edita los archivos del proyecto sin preguntar; los comandos siguen pidiendo aprobación',
+  modeFullHint:
+    'Edita y ejecuta comandos sin preguntar, fuera de cualquier sandbox. Correo, git push, Vercel, Supabase y el navegador siguen pidiendo aprobación. No se activa con Shift+Tab',
   modeTitle: 'Modo: {mode}. {hint}. Shift+Tab para cambiar',
   modeToast: 'Modo {mode}: {hint}',
   planPlaceholder: 'Describe qué quieres hacer: el agente investiga y te propone un plan…',
@@ -783,9 +786,10 @@ const es = {
   taskMode: 'Aprobación',
   taskSandboxChecking: 'Revisando el sandbox de este equipo…',
   taskSandbox:
-    'Sandbox: escritura solo en el worktree {write} · sin red {network} · sin tokens ni claves ✓.',
+    'Sandbox: escritura solo en el worktree {write} · sin red {network} · sin leer tus claves {secrets} · sin tokens ni claves ✓.',
   taskSandboxOn: 'Los comandos corren solos, dentro del sandbox.',
   taskSandboxOff: 'Cada comando pide aprobación.',
+  taskSandboxConfined: 'Cada comando pide aprobación y, si lo apruebas, corre dentro del sandbox.',
   taskMaxUsd: 'Tope US$',
   taskMaxMin: 'Tope min',
   taskCopy: 'Copiar mis cambios sin commit',
@@ -2871,10 +2875,13 @@ const en: Record<Key, string> = {
   modePlan: 'Plan',
   modeAgent: 'Agent',
   modeAuto: 'Auto-approve',
+  modeFull: 'Full access',
   modeAskHint: 'Only answers, no tools',
   modePlanHint: 'Only reads the project and proposes a plan for you to approve',
   modeAgentHint: 'Works on the project; you approve every change',
   modeAutoHint: 'Edits project files without asking; commands still need approval',
+  modeFullHint:
+    'Edits and runs commands without asking, outside any sandbox. Mail, git push, Vercel, Supabase and the browser still ask. Shift+Tab never turns it on',
   modeTitle: 'Mode: {mode}. {hint}. Shift+Tab to switch',
   modeToast: '{mode} mode: {hint}',
   planPlaceholder: 'Describe what you want: the agent investigates and proposes a plan…',
@@ -2936,9 +2943,11 @@ const en: Record<Key, string> = {
   taskMode: 'Approval',
   taskSandboxChecking: "Checking this computer's sandbox…",
   taskSandbox:
-    'Sandbox: writes only in the worktree {write} · no network {network} · no tokens or keys ✓.',
+    'Sandbox: writes only in the worktree {write} · no network {network} · cannot read your keys {secrets} · no tokens or keys ✓.',
   taskSandboxOn: 'Commands run on their own, inside the sandbox.',
   taskSandboxOff: 'Every command asks for approval.',
+  taskSandboxConfined:
+    'Every command asks for approval and, if you approve it, runs inside the sandbox.',
   taskMaxUsd: 'Max US$',
   taskMaxMin: 'Max min',
   taskCopy: 'Copy my uncommitted changes',

@@ -3,22 +3,25 @@
  * - Linux: bubblewrap (bwrap). Not installed, or user namespaces off = no sandbox.
  * - macOS: sandbox-exec with a generated profile (deprecated by Apple, still works; Codex
  *   CLI uses it too).
- * - Windows: not yet (Job Object + restricted token + ACLs need native code). It reports
- *   "none" and its commands keep asking for approval. A sandbox is never faked.
+ * - Windows: a low-integrity token in a Job Object (main/sandboxWin.ts). Writes are confined;
+ *   network and reads are not, so its commands still ask (and then run confined).
+ * A sandbox is never faked.
  * Detection runs a probe once and is cached; the rules themselves are in shared/sandbox.ts.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, realpathSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { homedir, tmpdir, totalmem } from 'node:os';
 import { join } from 'node:path';
 import {
   NO_SANDBOX,
   bwrapArgs,
   macProfile,
   secretDirs,
+  winLauncherArgs,
   type SandboxCaps,
   type SandboxPaths,
 } from '../shared/sandbox.js';
+import { detectWindowsSandbox, windowsPowerShell } from './sandboxWin.js';
 
 const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
 const PROBE_TIMEOUT = 5000;
@@ -60,7 +63,7 @@ export async function detectSandbox(platform = process.platform): Promise<Sandbo
       'true',
     ]);
     return ok
-      ? { kind: 'bwrap', write: true, network: true }
+      ? { kind: 'bwrap', write: true, network: true, secrets: true }
       : {
           ...NO_SANDBOX,
           reason:
@@ -76,14 +79,11 @@ export async function detectSandbox(platform = process.platform): Promise<Sandbo
         '/usr/bin/true',
       ]));
     return ok
-      ? { kind: 'sandbox-exec', write: true, network: true }
+      ? { kind: 'sandbox-exec', write: true, network: true, secrets: true }
       : { ...NO_SANDBOX, reason: 'sandbox-exec no está disponible en este Mac.' };
   }
-  return {
-    ...NO_SANDBOX,
-    reason:
-      'Windows todavía no tiene sandbox en Zinarix: en "Auto en el worktree" cada comando pide aprobación.',
-  };
+  if (platform === 'win32') return detectWindowsSandbox();
+  return NO_SANDBOX;
 }
 
 let cached: Promise<SandboxCaps> | undefined;
@@ -121,6 +121,12 @@ export function sandboxedSpawn(
     return {
       file: SANDBOX_EXEC,
       args: ['-p', macProfile(paths), '/bin/bash', '-lc', command],
+    };
+  // The whole tree of the command gets at most 3/4 of the memory of the machine.
+  if (caps.kind === 'windows' && caps.helper)
+    return {
+      file: windowsPowerShell(),
+      args: winLauncherArgs(caps.helper, paths, command, totalmem() * 0.75),
     };
   return undefined;
 }

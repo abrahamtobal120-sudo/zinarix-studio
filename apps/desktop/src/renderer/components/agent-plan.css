@@ -18,6 +18,12 @@
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
 }
+/* Full access: the strongest warning (filled), so it is never mistaken for auto-approve. */
+.mode-pill.mode-full {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
 .mode-pill.mode-agent {
   color: var(--accent);
 }

@@ -18,12 +18,14 @@ const MODE_TEXT: Record<ChatMode, { label: Key; hint: Key; icon: IconName }> = {
   plan: { label: 'modePlan', hint: 'modePlanHint', icon: 'eye' },
   agent: { label: 'modeAgent', hint: 'modeAgentHint', icon: 'agent' },
   auto: { label: 'modeAuto', hint: 'modeAutoHint', icon: 'bolt' },
+  full: { label: 'modeFull', hint: 'modeFullHint', icon: 'unlock' },
 };
 
 export const modeLabel = (m: ChatMode): string => t(MODE_TEXT[m].label);
 export const modeHint = (m: ChatMode): string => t(MODE_TEXT[m].hint);
 
-/** The mode pill next to the message box: a menu with the four modes (Shift+Tab cycles). */
+/** The mode pill next to the message box: a menu with the five modes (Shift+Tab cycles the
+ * first four; full access is only chosen here). */
 export function ModeMenu({ mode, onChange }: { mode: ChatMode; onChange: (m: ChatMode) => void }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);

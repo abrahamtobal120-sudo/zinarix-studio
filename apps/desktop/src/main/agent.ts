@@ -44,7 +44,13 @@ import {
 } from './textTools.js';
 import { globToRegExp } from '../shared/glob.js';
 import { childEnv } from './env.js';
-import { taskEnv, type SandboxCaps, type SandboxPaths } from '../shared/sandbox.js';
+import {
+  sandboxConfines,
+  sandboxNote,
+  taskEnv,
+  type SandboxCaps,
+  type SandboxPaths,
+} from '../shared/sandbox.js';
 import { sandboxedSpawn } from './sandbox.js';
 import { MCP_PREFIX, type McpManager } from './mcp.js';
 import { dropOldImages } from './chatImages.js';
@@ -1998,6 +2004,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
       // mail_send, git push, Vercel changes, Supabase writes: asked every time, no "Always".
       const forced = alwaysAsks(call.name, a, POLICY);
       // Fase 5B: in a task, auto mode lets a command through only inside a complete sandbox.
+      // An incomplete one (Windows: writes confined, network free) still confines the
+      // command, after asking. git push is not confined: it has to reach the network.
       const box = opts.scope?.task?.sandbox;
       const policy: PolicyContext = box ? { ...POLICY, sandbox: box.caps } : POLICY;
       const confine =
@@ -2005,7 +2013,9 @@ A project hook did not let you finish yet. Address it, then answer.`,
         box &&
         !sys &&
         !forced &&
-        decide(opts.mode ?? 'agent', call.name, a, policy) === 'auto'
+        opts.mode === 'auto' &&
+        a.admin !== true &&
+        sandboxConfines(box.caps)
           ? box
           : undefined;
       if (sys) {
@@ -2048,6 +2058,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
           ...(await this.preview(ws, call.name, a)),
           ...(guarded ? { risk: 'high' as const, warning: guarded, noAlways: true } : {}),
           ...(forced ? { noAlways: true } : {}),
+          ...(confine ? { warning: sandboxNote(confine.caps) } : {}),
         };
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));
@@ -2680,6 +2691,13 @@ A project hook did not let you finish yet. Address it, then answer.`,
             if ('error' in c) return finish(false, c.error, 'fuera del worktree');
             cwd = c.cwd;
           } else cwd = typeof a.cwd === 'string' && a.cwd.trim() ? expandPath(a.cwd) : w.root;
+          const spawnAs = confine ? sandboxedSpawn(confine.caps, confine.paths, command) : undefined;
+          // Confined or not at all: never falls back to running the command free.
+          if (confine && !spawnAs)
+            return finish(false, 'The sandbox of this task is not available.', 'sin sandbox');
+          const tmpVars: Record<string, string> = confine
+            ? { TMPDIR: confine.paths.tmp, TEMP: confine.paths.tmp, TMP: confine.paths.tmp }
+            : {};
           const r = await runCommand(
             command,
             cwd,
@@ -2687,11 +2705,11 @@ A project hook did not let you finish yet. Address it, then answer.`,
             opts.signal,
             (chunk) => opts.emit({ type: 'tool_output', id: call.id, chunk: redact(chunk) }),
             {
-              env: { ...s.env, ...task?.env, ...(confine ? { TMPDIR: confine.paths.tmp } : {}) },
+              env: { ...s.env, ...task?.env, ...tmpVars },
               admin: !task && a.admin === true,
               // A task's commands never get tokens or keys, with or without sandbox.
               strict: !!task,
-              spawnAs: confine ? sandboxedSpawn(confine.caps, confine.paths, command) : undefined,
+              spawnAs,
             },
           );
           const out = redact(truncate(r.output));

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { TaskView, TasksStatusView, TasksUsageView } from '../../shared/api';
 import { fmtBytes, isIdle, USAGE_WARN_BYTES, type TaskApprovalView } from '../../shared/tasks';
-import { sandboxComplete, type SandboxCaps } from '../../shared/sandbox';
+import { sandboxComplete, sandboxConfines, type SandboxCaps } from '../../shared/sandbox';
 import { confirmDialog } from '../confirm';
 import { errText } from '../errText';
 import { t, type Key } from '../i18n';
@@ -25,8 +25,11 @@ function SandboxLine({ caps }: { caps: SandboxCaps | undefined }) {
       {t('taskSandbox', {
         write: mark(on && caps.write),
         network: mark(on && caps.network),
+        secrets: mark(on && caps.secrets),
       })}{' '}
-      {sandboxComplete(caps) ? t('taskSandboxOn') : `${caps.reason ?? ''} ${t('taskSandboxOff')}`}
+      {sandboxComplete(caps)
+        ? t('taskSandboxOn')
+        : `${caps.reason ?? ''} ${t(sandboxConfines(caps) ? 'taskSandboxConfined' : 'taskSandboxOff')}`}
     </p>
   );
 }

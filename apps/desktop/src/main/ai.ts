@@ -1372,7 +1372,7 @@ export interface TurnDisplay {
   /** Request that produced it (the same one is on its question): pairs answers sent alongside. */
   request?: string;
   /** Fase 3: the agent mode it ran in (a plan-mode answer is a plan to approve). */
-  mode?: 'plan' | 'agent' | 'auto';
+  mode?: 'plan' | 'agent' | 'auto' | 'full';
 }
 
 const MAX_SAVED_OUTPUT = 8000;

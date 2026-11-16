@@ -4,24 +4,31 @@
  */
 
 /** ask = plain chat (no tools); plan = read-only agent that ends with a plan; agent = the
- * usual agent (every change approved); auto = file edits in the project need no approval. */
-export type ChatMode = 'ask' | 'plan' | 'agent' | 'auto';
+ * usual agent (every change approved); auto = file edits in the project need no approval;
+ * full = full access (Fase 5B): file edits and commands need no approval. What leaves the
+ * machine (mail, git push, Vercel, Supabase writes, the browser) still asks in every mode. */
+export type ChatMode = 'ask' | 'plan' | 'agent' | 'auto' | 'full';
 
 /** The modes in which the agent runs (ask is a plain chat). */
 export type AgentRunMode = Exclude<ChatMode, 'ask'>;
 
-/** Shift+Tab order. */
-export const CHAT_MODES: readonly ChatMode[] = ['ask', 'plan', 'agent', 'auto'];
+/** The modes of the menu. */
+export const CHAT_MODES: readonly ChatMode[] = ['ask', 'plan', 'agent', 'auto', 'full'];
+
+/** Shift+Tab order. Full access is only chosen in the menu: cycling never lands on it. */
+export const CYCLE_MODES: readonly ChatMode[] = ['ask', 'plan', 'agent', 'auto'];
 
 export function isChatMode(v: unknown): v is ChatMode {
   return typeof v === 'string' && (CHAT_MODES as readonly string[]).includes(v);
 }
 
-/** The next mode for Shift+Tab (or the previous one with back = true). */
+/** The next mode for Shift+Tab (or the previous one with back = true). From full access,
+ * Shift+Tab goes back to the start of the cycle and Shift+Shift+Tab to auto-approve. */
 export function nextMode(mode: ChatMode, back = false): ChatMode {
-  const i = CHAT_MODES.indexOf(mode);
-  const n = CHAT_MODES.length;
-  return CHAT_MODES[(i + (back ? n - 1 : 1)) % n]!;
+  const n = CYCLE_MODES.length;
+  const i = CYCLE_MODES.indexOf(mode);
+  if (i < 0) return back ? CYCLE_MODES[n - 1]! : CYCLE_MODES[0]!;
+  return CYCLE_MODES[(i + (back ? n - 1 : 1)) % n]!;
 }
 
 /** The mode of a chat saved before Fase 3 (only an agent on/off switch). */

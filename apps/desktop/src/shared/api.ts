@@ -982,8 +982,9 @@ export interface BrowserTabsView {
 export interface ChatRequestView {
   /** Agent mode: the model may read files, search, edit (with approval) and run commands (with approval). */
   agent?: boolean;
-  /** Fase 3, with agent: plan = read-only until the plan is approved, auto = edits need no approval. */
-  mode?: 'plan' | 'agent' | 'auto';
+  /** Fase 3, with agent: plan = read-only until the plan is approved, auto = edits need no
+   * approval, full = edits and commands need no approval (Fase 5B). */
+  mode?: 'plan' | 'agent' | 'auto' | 'full';
   model?: string;
   history: ChatMessage[];
   prompt: string;
