@@ -210,6 +210,14 @@ export const THEME_IDS = [
 ] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
+/** The app's current colors (CSS colors, e.g. "#1b1b1f"), so Zinarix 3D Pro looks the same. */
+export interface Pro3DLook {
+  dark: boolean;
+  bg: string;
+  fg: string;
+  accent: string;
+}
+
 export interface Settings {
   defaultModel: string | null;
   /** Per-role overrides; missing roles use defaultModel. */
@@ -2093,7 +2101,7 @@ export interface OmniApi {
     /** File dialog for blender.exe (portable builds): null if cancelled, false if not Blender 3.6+. */
     pickBlender(): Promise<{ path: string; version: string } | null | false>;
     /** Opens Zinarix 3D Pro: Blender's window with the Zinarix template (needs Blender 4.2+). */
-    openPro(lang: 'es' | 'en'): Promise<void>;
+    openPro(lang: 'es' | 'en', look?: Pro3DLook): Promise<void>;
     /** Starts encoding viewer frames; then frame() each RGBA frame and end(). */
     begin(o: {
       width: number;

@@ -2875,13 +2875,25 @@ function registerScene3dIpc(): void {
     if (!p) return null;
     return (await svc.useBlender(resolve(p))) ?? false;
   });
-  handle('scene3d:openPro', z.tuple([z.enum(['es', 'en'])]), async (_w, lang) =>
-    svc.openPro(
-      app.isPackaged
-        ? join(process.resourcesPath, 'blender-scripts')
-        : join(appRoot, 'blender', 'scripts'),
-      lang,
-    ),
+  const cssColor = z.string().max(64);
+  handle(
+    'scene3d:openPro',
+    z.tuple([
+      z.enum(['es', 'en']),
+      z
+        .object({ dark: z.boolean(), bg: cssColor, fg: cssColor, accent: cssColor })
+        .strict()
+        .optional(),
+    ]),
+    async (_w, lang, look) =>
+      svc.openPro(
+        app.isPackaged
+          ? join(process.resourcesPath, 'blender-scripts')
+          : join(appRoot, 'blender', 'scripts'),
+        lang,
+        undefined,
+        look,
+      ),
   );
   handle(
     'scene3d:begin',
