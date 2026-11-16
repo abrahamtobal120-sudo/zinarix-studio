@@ -110,6 +110,11 @@
   flex-wrap: wrap;
   margin-top: 6px;
 }
+/* The bar wraps: "Corregir último" moves to its own line instead of being cut at the edge
+   (.check's ellipsis never shows, its text is a bare flex item). */
+.git-commit-bar .check {
+  flex: 0 0 auto;
+}
 .git-group {
   display: flex;
   justify-content: space-between;

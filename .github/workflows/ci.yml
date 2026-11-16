@@ -26,6 +26,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Licenses of everything bundled in the desktop app: GPL, AGPL, LGPL or unknown licenses
+      # fail here (the build already stops on them; this prints the full list in the log).
+      - name: Third-party licenses
+        run: node apps/desktop/scripts/notices.mjs --check
       # Every package, plus the desktop app (main, preload, renderer, shared and its tests),
       # which the build only bundles with esbuild/Vite and never type-checks.
       - run: pnpm typecheck

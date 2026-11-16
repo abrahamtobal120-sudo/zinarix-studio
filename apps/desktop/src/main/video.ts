@@ -141,6 +141,9 @@ interface ProbeJson {
     avg_frame_rate?: string;
     r_frame_rate?: string;
     duration?: string;
+    codec_name?: string;
+    pix_fmt?: string;
+    tags?: Record<string, string>;
     disposition?: { attached_pic?: number };
   }[];
 }
@@ -149,6 +152,22 @@ function rate(s: string | undefined): number {
   if (!s) return 0;
   const [a, b] = s.split('/').map(Number);
   return b ? a! / b : Number(a) || 0;
+}
+
+/** Fase 14: whether a video stream carries transparency (and which decoder keeps it). */
+export function alphaOf(
+  v: NonNullable<ProbeJson['streams']>[number] | undefined,
+): MediaItem['alpha'] {
+  if (!v) return undefined;
+  const tag = Object.entries(v.tags ?? {}).find(([k]) => k.toLowerCase() === 'alpha_mode')?.[1];
+  if (v.codec_name === 'vp9' && tag === '1') return 'vp9';
+  if (
+    v.codec_name !== 'vp9' &&
+    v.codec_name !== 'vp8' &&
+    /^(rgba|bgra|argb|abgr|yuva|gbrap|ya)/.test(v.pix_fmt ?? '')
+  )
+    return 'native';
+  return undefined;
 }
 
 /** Media facts from ffprobe's JSON (exported for the tests). */
@@ -171,6 +190,7 @@ export function parseProbe(path: string, j: ProbeJson, size: number): Omit<Media
     hasVideo: kind !== 'audio' && Boolean(v),
     hasAudio: kind !== 'image' && Boolean(a),
     size,
+    ...(alphaOf(v) ? { alpha: alphaOf(v)! } : {}),
   };
 }
 

@@ -78,6 +78,15 @@ import {
   mediaPreview,
   runMediaTool,
 } from './mediaTools.js';
+import {
+  SCENE3D_PROMPT_PART,
+  SCENE3D_TOOL_NAMES,
+  SCENE3D_TOOLS,
+  runScene3dTool,
+  scene3dPreview,
+  type Scene3DUi,
+} from './scene3dTools.js';
+import type { Scene3DService } from './scene3d.js';
 import type { MediaService } from './media.js';
 import {
   MAIL_PROMPT_PART,
@@ -215,6 +224,7 @@ You can inspect and change the project with tools:
 ${MAIL_PROMPT_PART}
 ${CLOUD_PROMPT_PART}
 ${MEDIA_PROMPT_PART}
+${SCENE3D_PROMPT_PART}
 - list_ai_models and delegate_to_ai: other AI models connected in Zinarix Studio can work for you as helpers (e.g. a second opinion, a cheaper model for a long chore, a model with a skill you lack). The user approves every delegation and every action the helper takes. Give the helper a complete, self-contained task; it does not see this conversation.
 ${SYSTEM_PROMPT_PART}
 ${SECURITY_PROMPT_PART}
@@ -414,6 +424,7 @@ export const TOOLS: ToolDefinition[] = [
   ...MAIL_TOOLS,
   ...CLOUD_TOOLS,
   ...MEDIA_TOOLS,
+  ...SCENE3D_TOOLS,
   ...SYSTEM_TOOLS,
   ...SECURITY_TOOLS,
 ];
@@ -926,6 +937,9 @@ export class Agent {
   knowledge?: Knowledge;
   /** Image / video / speech generation (generate_* tools, Fase 10). */
   media?: MediaService;
+  /** Fase 14: 3D renders (Blender and the encoder) and the window's viewer. */
+  scene3d?: Scene3DService;
+  scene3dUi?: Scene3DUi;
   /** Hook sets approved "always" per project (Fase 4). */
   hookTrust?: HookTrust;
   /** ~/.zinarix (user subagents, skills, commands, hooks); null = none (tests). */
@@ -1969,6 +1983,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
         !MAIL_TOOL_NAMES.has(call.name) &&
         !CLOUD_TOOL_NAMES.has(call.name) &&
         !MEDIA_TOOL_NAMES.has(call.name) &&
+        !SCENE3D_TOOL_NAMES.has(call.name) &&
         !SYSTEM_TOOL_NAMES.has(call.name) &&
         !SECURITY_NO_PROJECT.has(call.name)
       )
@@ -1991,6 +2006,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
               ? cloudPreview(call.name, a)
               : MEDIA_TOOL_NAMES.has(call.name) && this.media
                 ? await mediaPreview(this.media, call.name, a)
+                : SCENE3D_TOOL_NAMES.has(call.name)
+                  ? scene3dPreview(call.name, a)
                 : KNOWLEDGE_TOOL_NAMES.has(call.name)
                   ? knowledgePreview(call.name, a, this.knowledge)
                   : call.name === 'run_command'
@@ -2135,6 +2152,18 @@ A project hook did not let you finish yet. Address it, then answer.`,
         if (!this.mail) return finish(false, 'Email is not available.', 'sin correo');
         const r = await runMailTool(this.mail, call.name, a);
         return finish(true, r.content, r.summary);
+      }
+      if (SCENE3D_TOOL_NAMES.has(call.name)) {
+        if (!this.scene3d) return finish(false, '3D rendering is not available.', 'no disponible');
+        const r = await runScene3dTool(
+          this.scene3d,
+          this.scene3dUi,
+          call.name,
+          a,
+          ws?.root,
+          opts.signal,
+        );
+        return finish(r.ok, r.content, r.summary);
       }
       if (MEDIA_TOOL_NAMES.has(call.name) && this.media) {
         const r = await runMediaTool(this.media, call.name, a, ws?.root, opts.signal, call.id);

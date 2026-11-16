@@ -205,7 +205,8 @@ export const CUSTOM_THEMES: Record<CustomThemeId, CustomThemeDef> = {
       '--activity': '#242933',
       '--border': '#3b4252',
       '--fg': '#d8dee9',
-      '--fg-dim': '#9ba5b8',
+      // #9ba5b8 was 4.46:1 on --hover; one step lighter passes AA on every panel.
+      '--fg-dim': '#a0aabc',
       '--fg-strong': '#eceff4',
       '--accent': '#4b6c94',
       '--accent-hover': '#56789f',
@@ -250,7 +251,8 @@ export const CUSTOM_THEMES: Record<CustomThemeId, CustomThemeDef> = {
       '--border': '#d3cbb7',
       '--fg': '#475b62',
       // #657b83 (the value suggested in the review) is still 4.1:1 on --bg; a step darker passes AA.
-      '--fg-dim': '#5c7078',
+      // #5c7078 was 4.24:1 on --bg-2 (panels); one step darker passes AA there too.
+      '--fg-dim': '#54666d',
       '--fg-strong': '#073642',
       '--accent': '#1f6fa8',
       '--accent-hover': '#1a5f91',

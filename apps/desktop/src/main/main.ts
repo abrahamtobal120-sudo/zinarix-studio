@@ -1,5 +1,5 @@
 import './system-ca.js';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BrowserWindow, Menu, Notification, app, dialog, ipcMain, protocol, shell } from 'electron';
@@ -98,6 +98,9 @@ import { ExtensionStore } from './extensions/store.js';
 import { HelperService, MODEL_NAME } from './helper.js';
 import { gitMention, webMention } from './mentions.js';
 import { VideoService, fromStored, readLut, toStored } from './video.js';
+import { Transcriber } from './transcribe.js';
+import { Scene3DService } from './scene3d.js';
+import { isModelPath, sanitizeScene, type Scene3D } from '../shared/scene3d.js';
 import type { VideoProject } from '../shared/video.js';
 import { MEDIA_EXTENSIONS, PROJECT_EXT, mediaKindOf, validProject } from '../shared/video.js';
 
@@ -576,6 +579,15 @@ const videoPaths = new Set<string>();
 /** Export targets the user chose in the save dialog (the only places exports may write). */
 const videoOutputs = new Set<string>();
 const videoJobOwner = new Map<string, Win>();
+const sttRuns = new Map<string, AbortController>();
+let stt: Transcriber | undefined;
+function transcriber(): Transcriber {
+  return (stt ??= new Transcriber(
+    ai.core,
+    app.getPath('userData'),
+    () => videoService().tools().ffmpeg,
+  ));
+}
 function videoService(): VideoService {
   return (video ??= new VideoService(
     appRoot,
@@ -964,6 +976,60 @@ function registerIpc(): void {
     return r.canceled ? null : (r.filePaths[0] ?? null);
   });
   handle('video:readLut', z.tuple([absPath]), (_w, p) => readLut(resolve(p)));
+  // Fase 13: transcription, silences and scenes (media files only).
+  const mediaFile = (p: string) => {
+    if (!mediaKindOf(p) || !isFile(p)) throw new Error('archivo no válido');
+    return resolve(p);
+  };
+  const seconds = z.number().min(0).max(86_400);
+  handle('video:sttEngines', z.tuple([]), () => transcriber().engines());
+  handle(
+    'video:transcribe',
+    z.tuple([
+      z.string().min(1).max(80),
+      absPath,
+      z.enum(['local', 'openai', 'groq']),
+      seconds,
+      z.string().max(8).optional(),
+    ]),
+    async (_w, id, p, engine, duration, lang) => {
+      const ac = new AbortController();
+      sttRuns.set(id, ac);
+      try {
+        return await transcriber().transcribe(mediaFile(p), engine, duration, lang, ac.signal);
+      } finally {
+        sttRuns.delete(id);
+      }
+    },
+  );
+  handle('video:sttAbort', z.tuple([z.string().max(80)]), (_w, id) => sttRuns.get(id)?.abort());
+  handle(
+    'video:silences',
+    z.tuple([absPath, seconds, z.number().min(-80).max(-10), z.number().min(0.1).max(10)]),
+    (_w, p, d, db, min) => transcriber().silences(mediaFile(p), d, db, min),
+  );
+  handle(
+    'video:scenes',
+    z.tuple([absPath, seconds, z.number().min(0.05).max(0.9)]),
+    (_w, p, d, t) => transcriber().scenes(mediaFile(p), d, t),
+  );
+  handle(
+    'video:saveCaptions',
+    z.tuple([z.string().max(512), z.string().max(20_000_000), z.enum(['srt', 'vtt'])]),
+    async (w, name, text, ext) => {
+      const r = await dialog.showSaveDialog(w.win, {
+        title: 'Guardar subtítulos',
+        defaultPath: join(app.getPath('videos'), `${safeName(name, 'subtitulos')}.${ext}`),
+        filters: [{ name: ext === 'srt' ? 'SubRip (.srt)' : 'WebVTT (.vtt)', extensions: [ext] }],
+      });
+      if (r.canceled || !r.filePath) return null;
+      const out = r.filePath.toLowerCase().endsWith(`.${ext}`)
+        ? r.filePath
+        : `${r.filePath}.${ext}`;
+      await writeFile(out, text, 'utf8');
+      return out;
+    },
+  );
   handle('video:workspacePath', z.tuple([rel]), (w, p) => {
     const abs = ws(w).resolve(p);
     return isFile(abs) && (mediaKindOf(abs) || abs.toLowerCase().endsWith(`.${PROJECT_EXT}`))
@@ -1087,11 +1153,16 @@ function registerIpc(): void {
     return out;
   });
   // Exports write only where the user chose in the save dialog.
-  // Titles come as PNGs the renderer drew at the export size (at most 200, 40 MB each).
+  // Titles come as PNGs the renderer drew at the export size (at most 2000 — automatic
+  // captions of a long interview are hundreds —, 40 MB each and 600 MB together).
   const PNG_URL = 'data:image/png;base64,';
   const textPngsArg = z
     .record(z.string().regex(/^[\w-]{1,64}$/), z.string().max(56_000_000).startsWith(PNG_URL))
-    .refine((r) => Object.keys(r).length <= 200, 'demasiados títulos')
+    .refine((r) => Object.keys(r).length <= 2000, 'demasiados títulos')
+    .refine(
+      (r) => Object.values(r).reduce((n, v) => n + v.length, 0) <= 800_000_000,
+      'los títulos pesan demasiado',
+    )
     .optional();
   handle(
     'video:export',
@@ -2506,6 +2577,164 @@ function registerMediaIpc(): void {
   handle('media:abort', z.tuple([str]), (w, requestId) => media.abort(rid(w, requestId)));
 }
 
+/** Fase 14: 3D scenes to video (viewer frames, Blender), and .z3d scene files. */
+function registerScene3dIpc(): void {
+  const svc = new Scene3DService(app.getPath('userData'), () => videoService().tools().ffmpeg);
+  ai.agent.scene3d = svc;
+  const id = z.string().uuid();
+  // The agent's viewer renders run in a window: the focused one, else the first.
+  const pending = new Map<
+    string,
+    { resolve: (r: { path: string }) => void; reject: (e: Error) => void }
+  >();
+  const target = (): Win | undefined => {
+    const f = BrowserWindow.getFocusedWindow();
+    return [...wins.values()].find((w) => w.win === f) ?? wins.values().next().value;
+  };
+  ai.agent.scene3dUi = {
+    render: (scene, name, format) =>
+      new Promise((resolve, reject) => {
+        const w = target();
+        if (!w) return reject(new Error('No hay ninguna ventana abierta.'));
+        const requestId = randomUUID();
+        pending.set(requestId, { resolve, reject });
+        send(w, { type: 'scene3d:agent', requestId, scene, name, format });
+        setTimeout(() => {
+          if (pending.delete(requestId)) reject(new Error('El visor 3D no respondió a tiempo.'));
+        }, 30 * 60_000);
+      }),
+    imported: (path) => {
+      const w = target();
+      if (w) send(w, { type: 'scene3d:imported', path });
+    },
+  };
+  handle(
+    'scene3d:agentDone',
+    z.tuple([
+      id,
+      z.union([
+        z.object({ path: z.string().min(1).max(4096) }),
+        z.object({ error: z.string().max(2000) }),
+      ]),
+    ]),
+    (_w, i, r) => {
+      const p = pending.get(i);
+      if (!p) return;
+      pending.delete(i);
+      if ('path' in r) p.resolve({ path: r.path });
+      else p.reject(new Error(r.error));
+    },
+  );
+  const fmt = z.enum(['webm', 'mp4', 'png']);
+  const name = z.string().max(80);
+  const sceneArg = z.custom<Scene3D>((x) => {
+    try {
+      sanitizeScene(x);
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'escena 3D no válida');
+  const scenePaths = new Set<string>();
+  const Z3D = [{ name: 'Escena 3D de Zinarix', extensions: ['z3d'] }];
+  handle('scene3d:info', z.tuple([z.boolean().optional()]), async (w, refresh) => ({
+    blender: await svc.findBlender(refresh === true),
+    outDir: svc.outDir(w.workspace?.root),
+  }));
+  handle(
+    'scene3d:begin',
+    z.tuple([
+      z.object({
+        width: z.number().int().min(16).max(3840),
+        height: z.number().int().min(16).max(2160),
+        fps: z.number().int().min(1).max(60),
+        format: fmt,
+        name,
+      }),
+    ]),
+    (w, o) => {
+      if (o.width % 2 || o.height % 2) throw new Error('El tamaño debe ser par.');
+      return svc.begin(o, w.workspace?.root);
+    },
+  );
+  handle('scene3d:frame', z.tuple([id, z.instanceof(Uint8Array)]), (_w, i, rgba) =>
+    svc.frame(i, rgba),
+  );
+  handle('scene3d:end', z.tuple([id]), (_w, i) => svc.end(i));
+  handle('scene3d:cancel', z.tuple([id]), (_w, i) => svc.cancel(i));
+  handle(
+    'scene3d:blender',
+    z.tuple([
+      id,
+      sceneArg,
+      z.object({
+        engine: z.enum(['eevee', 'cycles']),
+        format: fmt,
+        name,
+        samples: z.number().int().min(1).max(4096).optional(),
+      }),
+    ]),
+    (w, i, scene, o) =>
+      svc.renderWithBlender(
+        sanitizeScene(scene),
+        o,
+        w.workspace?.root,
+        (progress) => send(w, { type: 'scene3d', requestId: i, progress }),
+        undefined,
+        i,
+      ),
+  );
+  handle('scene3d:pickModel', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Importar modelo 3D',
+      properties: ['openFile'],
+      filters: [{ name: 'Modelos 3D', extensions: ['glb', 'gltf', 'obj', 'fbx'] }],
+    });
+    const p = r.canceled ? undefined : r.filePaths[0];
+    if (!p || !isModelPath(resolve(p))) return null;
+    return { path: resolve(p), url: videoService().urlFor(resolve(p)) };
+  });
+  handle('scene3d:modelUrl', z.tuple([z.string().min(1).max(4096)]), (_w, p) => {
+    const abs = resolve(p);
+    return isModelPath(abs) && existsSync(abs) && statSync(abs).isFile()
+      ? videoService().urlFor(abs)
+      : null;
+  });
+  handle(
+    'scene3d:save',
+    z.tuple([sceneArg, z.string().max(4096).nullable(), z.boolean()]),
+    async (w, scene, path, saveAs) => {
+      let target = path && !saveAs && scenePaths.has(resolve(path)) ? resolve(path) : null;
+      if (!target) {
+        const r = await dialog.showSaveDialog(w.win, {
+          title: 'Guardar escena 3D',
+          defaultPath: 'escena.z3d',
+          filters: Z3D,
+        });
+        if (r.canceled || !r.filePath) return null;
+        target = resolve(r.filePath.toLowerCase().endsWith('.z3d') ? r.filePath : `${r.filePath}.z3d`);
+      }
+      await writeFile(target, JSON.stringify(sanitizeScene(scene), null, 2), 'utf8');
+      scenePaths.add(target);
+      return target;
+    },
+  );
+  handle('scene3d:open', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Abrir escena 3D',
+      properties: ['openFile'],
+      filters: Z3D,
+    });
+    const p = r.canceled ? undefined : r.filePaths[0];
+    if (!p) return null;
+    const abs = resolve(p);
+    if (statSync(abs).size > 5_000_000) throw new Error('El archivo es demasiado grande.');
+    const scene = sanitizeScene(JSON.parse(await readFile(abs, 'utf8')));
+    scenePaths.add(abs);
+    return { scene, path: abs };
+  });
+}
+
 function registerPlaygroundIpc(): void {
   const playground = new PlaygroundService(ai.core, app.getPath('userData'));
   const build = new BuildService(app.getPath('userData'), () => new Vercel(app.getPath('userData')));
@@ -3242,6 +3471,7 @@ app.whenReady().then(async () => {
   registerTasksIpc();
   registerPlaygroundIpc();
   registerMediaIpc();
+  registerScene3dIpc();
   registerReviewIpc();
   buildMenu();
   // Start empty unless a folder is passed explicitly: the user drops or picks one.

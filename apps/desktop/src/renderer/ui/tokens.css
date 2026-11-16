@@ -27,10 +27,13 @@
   --activity: #131316;
   --border: #2a2a2f;
   --fg: #d6d6dc;
-  --fg-dim: #8c8c96;
+  /* >= 4.5:1 on every surface (--bg … --bg-4, --sel, --hover); #8c8c96 fell to 4.17 on --bg-4. */
+  --fg-dim: #9696a0;
   --fg-strong: #f4f4f6;
   --accent: #6d5ef6;
-  --accent-hover: #7d6ff8;
+  /* A hover fill under white text: darker than --accent, like the light theme. The old lighter
+     #7d6ff8 dropped white text to 3.82:1. */
+  --accent-hover: #5f50ee;
   --accent-fg: #ffffff;
   --focus: #7d6ff8;
   --sel: #2a2840;
@@ -63,7 +66,8 @@
   --activity: #f0f0f2;
   --border: #e3e3e7;
   --fg: #2b2b31;
-  --fg-dim: #6e6e78;
+  /* >= 4.5:1 on every surface; #6e6e78 fell to 4.16 on --bg-4. */
+  --fg-dim: #686872;
   --fg-strong: #0f0f12;
   --accent: #5b4cf0;
   --accent-hover: #4d3fe0;
@@ -191,6 +195,9 @@
   --accent-10: var(--accent-hover);
   --accent-11: color-mix(in oklch, var(--accent) 70%, var(--fg-strong));
   --accent-12: color-mix(in oklch, var(--accent) 35%, var(--fg-strong));
+  /* Accent used as TEXT. --accent itself is a fill (white text on it), and as text it falls to
+     3:1 on the dark surfaces; step 11 leans toward --fg-strong, so it reads in every theme. */
+  --accent-text: var(--accent-11);
 
   /* ---- Fixed colors (the same in every theme) ---- */
   --white: #ffffff;

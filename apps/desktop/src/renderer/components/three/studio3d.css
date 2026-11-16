@@ -1,0 +1,469 @@
+@layer features {
+  /* Fase 14: the 3D editor (theme variables and tokens only). It sits above Video Studio and
+   below the studio's confirmations and toasts. */
+
+  .s3-root {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-studio) + 4);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: var(--text-sm);
+  }
+  .s3-top,
+  .s3-keys {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    min-width: 0;
+  }
+  .s3-keys {
+    border-top: 1px solid var(--border);
+    border-bottom: 0;
+  }
+  .s3-title {
+    font-size: var(--text-md);
+    margin-right: 8px;
+    white-space: nowrap;
+  }
+  .s3-path {
+    font-weight: normal;
+    color: var(--fg-dim);
+  }
+  .s3-grow {
+    flex: 1;
+  }
+  .s3-sep {
+    width: 1px;
+    align-self: stretch;
+    background: var(--border);
+    margin: 0 4px;
+  }
+  .s3-flip :is(svg) {
+    transform: scaleX(-1);
+  }
+  .s3-body {
+    display: grid;
+    grid-template-columns: 220px 1fr 280px;
+    min-height: 0;
+  }
+  .s3-side,
+  .s3-insp {
+    overflow: auto;
+    padding: 8px;
+    background: var(--bg-2);
+    min-height: 0;
+  }
+  .s3-side {
+    border-right: 1px solid var(--border);
+  }
+  .s3-insp {
+    border-left: 1px solid var(--border);
+  }
+  .s3-insp h3,
+  .s3-card h3 {
+    font-size: var(--text-sm);
+    margin: 12px 0 6px;
+    color: var(--fg-strong);
+  }
+  .s3-insp section > h3:first-child {
+    margin-top: 0;
+  }
+  .s3-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--bg-3);
+  }
+  .s3-canvas {
+    display: block;
+    border-radius: 4px;
+    box-shadow: 0 0 0 1px var(--border);
+    outline: none;
+  }
+  .s3-canvas:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+  /* Transparent scenes show a checkerboard behind (what will be see-through). */
+  .s3-checker {
+    background-color: var(--bg-2);
+    background-image:
+      linear-gradient(45deg, var(--bg-4) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--bg-4) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--bg-4) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--bg-4) 75%);
+    background-size: 20px 20px;
+    background-position:
+      0 0,
+      0 10px,
+      10px -10px,
+      -10px 0;
+  }
+  .s3-tools {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+  }
+  .s3-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 26px;
+  }
+  .s3-btn:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .s3-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .s3-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+  .s3-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+  .s3-danger {
+    color: var(--danger);
+  }
+  .s3-wide {
+    width: 100%;
+    justify-content: center;
+  }
+  .s3-link {
+    border: 0;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+  }
+  .s3-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .s3-icon:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .s3-icon.on {
+    background: var(--sel);
+    color: var(--fg-strong);
+  }
+  .s3-icon:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .s3-btn:focus-visible,
+  .s3-icon:focus-visible,
+  .s3-row:focus-visible,
+  .s3-key:focus-visible,
+  .s3-mark:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+  }
+  .s3-menu {
+    position: relative;
+  }
+  .s3-pop {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: var(--z-dropdown);
+    min-width: 190px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--bg) 40%, transparent);
+  }
+  .s3-pop button {
+    text-align: left;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .s3-pop button:hover,
+  .s3-pop button:focus-visible {
+    background: var(--hover);
+  }
+  .s3-pop hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+  .s3-tree {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+  }
+  .s3-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+    text-align: left;
+    min-height: 26px;
+  }
+  .s3-row:hover {
+    background: var(--hover);
+  }
+  .s3-row.on {
+    background: var(--sel);
+    color: var(--fg-strong);
+  }
+  .s3-ell {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .s3-dot {
+    color: var(--warn);
+    font-size: var(--text-2xs);
+  }
+  .s3-field {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+  }
+  .s3-field > span {
+    color: var(--fg-dim);
+  }
+  .s3-field input:not([type='checkbox']):not([type='range']),
+  .s3-field select,
+  .s3-num {
+    width: 100%;
+    min-width: 0;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+  }
+  .s3-field input[type='color'] {
+    height: 26px;
+    padding: 1px 2px;
+  }
+  .s3-num {
+    font-variant-numeric: tabular-nums;
+  }
+  .s3-vec {
+    display: grid;
+    grid-template-columns: 70px repeat(3, 1fr) 24px;
+    align-items: center;
+    gap: 4px;
+    margin: 4px 0;
+  }
+  .s3-vec:not(:has(.s3-num:nth-of-type(2))) {
+    grid-template-columns: 70px 1fr 24px;
+  }
+  .s3-vlabel {
+    color: var(--fg-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .s3-key {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--fg-dim);
+    cursor: pointer;
+    font-size: var(--text-xs);
+  }
+  .s3-key.anim {
+    color: var(--warn);
+    opacity: 0.6;
+  }
+  .s3-key.on {
+    color: var(--warn);
+  }
+  .s3-key:hover {
+    background: var(--hover);
+  }
+  .s3-slider {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .s3-slider input {
+    flex: 1;
+    min-width: 0;
+  }
+  .s3-slider output {
+    width: 34px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-dim);
+  }
+  .s3-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .s3-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .s3-hint {
+    color: var(--fg-dim);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+  }
+  .s3-empty {
+    color: var(--fg-dim);
+    padding: 12px;
+  }
+  .s3-time {
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-dim);
+    min-width: 56px;
+    text-align: center;
+  }
+  .s3-track {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .s3-track input {
+    width: 100%;
+  }
+  .s3-mark {
+    position: absolute;
+    top: -10px;
+    transform: translateX(-50%);
+    border: 0;
+    padding: 0 2px;
+    background: none;
+    color: var(--warn);
+    cursor: pointer;
+    font-size: var(--text-2xs);
+    line-height: 1;
+  }
+  .s3-modal {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+  }
+  .s3-card {
+    width: min(440px, calc(100% - 32px));
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-2);
+    box-shadow: 0 12px 40px color-mix(in srgb, var(--bg) 50%, transparent);
+  }
+  .s3-card .s3-field {
+    grid-template-columns: 140px 1fr;
+  }
+  .s3-progress {
+    position: absolute;
+    left: 50%;
+    bottom: 64px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-2);
+  }
+  .s3-bar {
+    width: 200px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-4);
+    overflow: hidden;
+  }
+  .s3-bar > div {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.2s;
+  }
+  .s3-pill {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: var(--z-vs-pill);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-2);
+    color: var(--fg);
+  }
+  /* The Video Studio tab (one-click 3D animation). */
+  .s3-panel {
+    padding: 0 12px;
+  }
+  .s3-panel .s3-field {
+    grid-template-columns: 90px 1fr;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .s3-bar > div {
+      transition: none;
+    }
+  }
+  @media (max-width: 900px) {
+    .s3-body {
+      grid-template-columns: 170px 1fr 230px;
+    }
+  }
+}

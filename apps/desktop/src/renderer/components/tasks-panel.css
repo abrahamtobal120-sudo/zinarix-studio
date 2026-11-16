@@ -156,7 +156,7 @@
 }
 .task-state.state-working,
 .task-state.state-preparing {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 .task-state.state-waiting,

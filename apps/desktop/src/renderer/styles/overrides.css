@@ -95,7 +95,7 @@
 }
 .monaco-editor .te-mark.te-running::before {
   content: '…';
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* from next-edit.css */
@@ -113,7 +113,7 @@
   opacity: 0.6;
 }
 .monaco-editor .zx-ne-hint {
-  color: var(--accent);
+  color: var(--accent-text);
   font-style: italic;
   opacity: 0.9;
 }

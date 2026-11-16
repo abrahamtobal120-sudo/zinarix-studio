@@ -18,7 +18,16 @@ import { api, toast } from '../../store';
 import { tv } from './strings';
 
 export type StudioTab =
-  'media' | 'easy' | 'audio' | 'text' | 'stickers' | 'effects' | 'transitions' | 'color' | 'ai';
+  | 'media'
+  | 'easy'
+  | 'audio'
+  | 'text'
+  | 'stickers'
+  | 'effects'
+  | 'transitions'
+  | 'color'
+  | 'ai'
+  | '3d';
 
 export interface VState {
   open: boolean;

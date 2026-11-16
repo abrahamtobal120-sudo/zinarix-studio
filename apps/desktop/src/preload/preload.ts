@@ -379,6 +379,12 @@ const api: OmniApi = {
     reveal: call('video:reveal') as OmniApi['video']['reveal'],
     cacheSize: call('video:cacheSize') as OmniApi['video']['cacheSize'],
     clearCache: call('video:clearCache') as OmniApi['video']['clearCache'],
+    sttEngines: call('video:sttEngines') as OmniApi['video']['sttEngines'],
+    transcribe: call('video:transcribe') as OmniApi['video']['transcribe'],
+    sttAbort: call('video:sttAbort') as OmniApi['video']['sttAbort'],
+    silences: call('video:silences') as OmniApi['video']['silences'],
+    scenes: call('video:scenes') as OmniApi['video']['scenes'],
+    saveCaptions: call('video:saveCaptions') as OmniApi['video']['saveCaptions'],
   },
   helper: {
     status: call('helper:status') as OmniApi['helper']['status'],
@@ -424,6 +430,19 @@ const api: OmniApi = {
     generate: call('media:generate') as OmniApi['media']['generate'],
     abort: call('media:abort') as OmniApi['media']['abort'],
   },
+  scene3d: {
+    info: call('scene3d:info') as OmniApi['scene3d']['info'],
+    begin: call('scene3d:begin') as OmniApi['scene3d']['begin'],
+    frame: call('scene3d:frame') as OmniApi['scene3d']['frame'],
+    end: call('scene3d:end') as OmniApi['scene3d']['end'],
+    cancel: call('scene3d:cancel') as OmniApi['scene3d']['cancel'],
+    blender: call('scene3d:blender') as OmniApi['scene3d']['blender'],
+    pickModel: call('scene3d:pickModel') as OmniApi['scene3d']['pickModel'],
+    modelUrl: call('scene3d:modelUrl') as OmniApi['scene3d']['modelUrl'],
+    save: call('scene3d:save') as OmniApi['scene3d']['save'],
+    open: call('scene3d:open') as OmniApi['scene3d']['open'],
+    agentDone: call('scene3d:agentDone') as OmniApi['scene3d']['agentDone'],
+  },
   playground: {
     run: call('playground:run') as OmniApi['playground']['run'],
     abort: call('playground:abort') as OmniApi['playground']['abort'],
@@ -443,10 +462,25 @@ const api: OmniApi = {
     deployState: call('build:deployState') as OmniApi['build']['deployState'],
   },
   on(listener) {
-    const handler = (_e: unknown, ev: AppEvent) => listener(ev);
-    ipcRenderer.on(EVENT_CHANNEL, handler);
-    return () => ipcRenderer.removeListener(EVENT_CHANNEL, handler);
+    eventListeners.add(listener);
+    return () => {
+      eventListeners.delete(listener);
+    };
   },
 };
+
+// One IPC listener for every subscriber. With one per subscriber, a normal session (app, LSP,
+// debugger, tests, terminal, each chat, browser, scanner…) passed Node's limit of 10 and
+// printed a "possible memory leak" warning. A subscriber that throws no longer stops the rest.
+const eventListeners = new Set<(ev: AppEvent) => void>();
+ipcRenderer.on(EVENT_CHANNEL, (_e, ev: AppEvent) => {
+  for (const l of [...eventListeners]) {
+    try {
+      l(ev);
+    } catch (err) {
+      console.error('omni:event listener failed', err);
+    }
+  }
+});
 
 contextBridge.exposeInMainWorld('omni', api);

@@ -42,6 +42,11 @@ export interface MediaItem {
   size: number;
   /** File not found when the project was opened (relink it). */
   missing?: boolean;
+  /**
+   * Fase 14: the picture has an alpha channel. "vp9" (WebM) needs FFmpeg's libvpx decoder,
+   * the built-in one drops the alpha; "native" (PNG, ProRes 4444, QuickTime RLE) decodes as is.
+   */
+  alpha?: 'vp9' | 'native';
 }
 
 export interface Clip {

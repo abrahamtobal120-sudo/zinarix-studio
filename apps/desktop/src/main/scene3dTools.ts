@@ -1,0 +1,217 @@
+import type { ToolDefinition } from '@omni/shared';
+import {
+  describeScene,
+  formatFor,
+  fromTemplate,
+  sanitizeScene,
+  SHAPES,
+  TEMPLATES,
+  type Render3DFormat,
+  type Scene3D,
+  type Shape,
+  type TemplateId,
+} from '../shared/scene3d.js';
+import type { Scene3DService } from './scene3d.js';
+import type { SystemPreview } from './system.js';
+
+/**
+ * Fase 14: agent tools for 3D. render_3d builds a scene (a template or full scene JSON) and
+ * renders it in the viewer or with Blender; blender_script runs a bpy script the user reads
+ * first. Both are approved every time: a render takes minutes and the script is code.
+ */
+export const SCENE3D_TOOLS: ToolDefinition[] = [
+  {
+    name: 'render_3d',
+    description:
+      'Render a short 3D animation to a video file in media/3d and add it to Video Studio (library and timeline). Use a template (logo: 3D text turning once; turntable: an object turning; orbit: the camera circling it) or pass a full scene. Transparent backgrounds give a WebM with alpha that overlays other clips. engine "viewer" (default) uses the built-in viewer; "blender" uses Blender (EEVEE or Cycles) when installed. The user approves each render.',
+    parameters: {
+      type: 'object',
+      properties: {
+        template: { type: 'string', enum: [...TEMPLATES] },
+        text: { type: 'string', description: 'logo: the text (up to 60 characters)' },
+        color: { type: 'string', description: 'Main colour, "#rrggbb"' },
+        metal: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          description: '0 plastic … 1 polished metal',
+        },
+        shape: { type: 'string', enum: SHAPES.filter((s) => s !== 'text') },
+        model: {
+          type: 'string',
+          description: 'Absolute path to a .glb/.gltf/.obj/.fbx to use instead of a shape',
+        },
+        duration: { type: 'number', minimum: 0.5, maximum: 60, description: 'Seconds' },
+        transparent: { type: 'boolean', description: 'Transparent background (default true)' },
+        width: { type: 'integer', minimum: 64, maximum: 3840 },
+        height: { type: 'integer', minimum: 64, maximum: 2160 },
+        fps: { type: 'integer', minimum: 12, maximum: 60 },
+        scene: {
+          type: 'object',
+          description:
+            'Full scene instead of a template: {width,height,fps,duration,transparent,background,camera:{position,target,fov,keys},nodes:[{kind:"mesh"|"model"|"light",shape,text,depth,model,light:{type,color,intensity},position,rotation(deg),scale,material:{color,metalness,roughness,emissive,emissiveIntensity,opacity},keys:{px|py|pz|rx|ry|rz|sx|sy|sz|intensity:[{t,v,ease}]}}]}. Y is up.',
+        },
+        engine: { type: 'string', enum: ['viewer', 'blender'] },
+        quality: { type: 'string', enum: ['eevee', 'cycles'], description: 'Blender only' },
+        name: { type: 'string', description: 'File name (without extension)' },
+      },
+    },
+  },
+  {
+    name: 'blender_script',
+    description:
+      'Run a Blender Python (bpy) script without a window, for what render_3d cannot do (modelling, modifiers, physics, materials by nodes). The user reads the script and approves it. The script gets the folder ZINARIX_OUT in its environment: render PNG frames there as f_0001.png, f_0002.png… (they become a video) or save .png/.glb/.blend files there; they are copied to media/3d. Start from bpy.ops.wm.read_factory_settings(use_empty=True).',
+    parameters: {
+      type: 'object',
+      properties: {
+        script: { type: 'string', description: 'The Python code' },
+        name: { type: 'string' },
+        fps: { type: 'integer', minimum: 12, maximum: 60 },
+        transparent: {
+          type: 'boolean',
+          description: 'Frames have alpha: encode a WebM with alpha',
+        },
+      },
+      required: ['script'],
+    },
+  },
+];
+
+export const SCENE3D_TOOL_NAMES = new Set(SCENE3D_TOOLS.map((t) => t.name));
+
+export const SCENE3D_PROMPT_PART =
+  '- render_3d and blender_script: 3D animations (logos, products, titles) rendered to video in media/3d and added to Video Studio. Prefer render_3d with a template; write a full scene only when needed, and blender_script only when Blender is required (both need approval).';
+
+/** The viewer lives in the renderer: main asks the window to render and waits. */
+export interface Scene3DUi {
+  render(scene: Scene3D, name: string, format: Render3DFormat): Promise<{ path: string }>;
+  /** A file to put into Video Studio (library + timeline). */
+  imported(path: string): void;
+}
+
+const text = (a: Record<string, unknown>, k: string) =>
+  typeof a[k] === 'string' ? (a[k] as string).trim() : '';
+const num = (a: Record<string, unknown>, k: string) =>
+  typeof a[k] === 'number' && Number.isFinite(a[k]) ? (a[k] as number) : undefined;
+
+/** The scene a render_3d call stands for. */
+export function sceneOf(a: Record<string, unknown>): Scene3D {
+  if (a.scene && typeof a.scene === 'object') return sanitizeScene(a.scene);
+  const id = (TEMPLATES as readonly string[]).includes(text(a, 'template'))
+    ? (text(a, 'template') as TemplateId)
+    : 'logo';
+  const shape = text(a, 'shape');
+  // The template builder clamps nothing about size: sanitize does (even, within 4K).
+  return sanitizeScene(
+    fromTemplate(id, {
+      text: text(a, 'text') || undefined,
+      color: text(a, 'color') || undefined,
+      metal: num(a, 'metal'),
+      duration: num(a, 'duration'),
+      transparent: typeof a.transparent === 'boolean' ? a.transparent : undefined,
+      shape: (SHAPES as readonly string[]).includes(shape) ? (shape as Shape) : undefined,
+      model: text(a, 'model') || undefined,
+      width: num(a, 'width'),
+      height: num(a, 'height'),
+      fps: num(a, 'fps'),
+    }),
+  );
+}
+
+export function scene3dPreview(name: string, a: Record<string, unknown>): SystemPreview {
+  if (name === 'blender_script') {
+    const script = text(a, 'script');
+    return {
+      risk: 'high',
+      action: 'ejecutar un script de Python en Blender',
+      warning:
+        'El script corre con tus permisos y puede leer o cambiar archivos fuera del proyecto. Léelo antes de aprobar. No recibe tus claves ni tokens.',
+      command: script.slice(0, 20_000),
+    };
+  }
+  try {
+    const s = sceneOf(a);
+    const blender = text(a, 'engine') === 'blender';
+    return {
+      risk: 'medium',
+      action: `renderizar una animación 3D ${blender ? `con Blender (${text(a, 'quality') === 'cycles' ? 'Cycles' : 'EEVEE'})` : 'en el visor'}`,
+      warning: `${describeScene(s)}. El video se guarda en media/3d y se agrega a Video Studio.`,
+    };
+  } catch (e) {
+    return { risk: 'medium', action: 'renderizar una animación 3D', warning: (e as Error).message };
+  }
+}
+
+export async function runScene3dTool(
+  svc: Scene3DService,
+  ui: Scene3DUi | undefined,
+  name: string,
+  a: Record<string, unknown>,
+  workspaceRoot: string | undefined,
+  signal: AbortSignal,
+): Promise<{ ok: boolean; content: string; summary: string }> {
+  try {
+    if (name === 'blender_script') {
+      const script = text(a, 'script');
+      if (!script) return { ok: false, content: 'The script is empty.', summary: 'sin script' };
+      const r = await svc.runScript(
+        script,
+        {
+          fps: Math.round(num(a, 'fps') ?? 30),
+          format: a.transparent === true ? 'webm' : 'mp4',
+          name: text(a, 'name') || 'blender',
+        },
+        workspaceRoot,
+        signal,
+      );
+      for (const p of r.paths) if (/\.(webm|mp4|png|jpg)$/i.test(p)) ui?.imported(p);
+      return {
+        ok: true,
+        content: [
+          r.paths.length
+            ? `Files:\n${r.paths.map((p) => `- ${p}`).join('\n')}`
+            : 'The script wrote no files to ZINARIX_OUT.',
+          `Blender log (end):\n${r.log}`,
+        ].join('\n\n'),
+        summary: `${r.paths.length} archivo(s)`,
+      };
+    }
+    const scene = sceneOf(a);
+    const fileName = text(a, 'name') || (scene.nodes.find((n) => n.text)?.text ?? 'escena-3d');
+    const format = formatFor(scene);
+    let path: string;
+    let how: string;
+    if (text(a, 'engine') === 'blender') {
+      const b = await svc.findBlender();
+      if (!b)
+        return {
+          ok: false,
+          content:
+            'Blender 3.6 or newer is not installed. Use engine "viewer", or ask the user to install Blender.',
+          summary: 'sin Blender',
+        };
+      const r = await svc.renderWithBlender(
+        scene,
+        { engine: text(a, 'quality') === 'cycles' ? 'cycles' : 'eevee', format, name: fileName },
+        workspaceRoot,
+        undefined,
+        signal,
+      );
+      path = r.path;
+      how = `Blender ${b.version}`;
+      ui?.imported(path);
+    } else {
+      if (!ui)
+        return { ok: false, content: 'The 3D viewer is not available.', summary: 'sin visor' };
+      path = (await ui.render(scene, fileName, format)).path;
+      how = 'the viewer';
+    }
+    return {
+      ok: true,
+      content: `Rendered with ${how}: ${path}\n${describeScene(scene)}\nIt was added to Video Studio (library and timeline).`,
+      summary: path.split(/[\\/]/).pop() ?? path,
+    };
+  } catch (e) {
+    return { ok: false, content: `3D render failed: ${(e as Error).message}`, summary: 'falló' };
+  }
+}

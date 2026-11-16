@@ -36,6 +36,10 @@ describe('custom themes', () => {
         ['--fg', '--bg', TEXT],
         ['--fg', '--bg-2', TEXT],
         ['--fg-dim', '--bg', TEXT],
+        // Secondary text also sits on panels, cards and hovered rows, not only on --bg.
+        ['--fg-dim', '--bg-2', TEXT],
+        ['--fg-dim', '--bg-3', TEXT],
+        ['--fg-dim', '--hover', TEXT],
         ['--danger', '--bg', TEXT],
         ['--ok', '--bg', TEXT],
         ['--warn', '--bg', TEXT],

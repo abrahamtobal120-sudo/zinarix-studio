@@ -323,7 +323,7 @@
   color: var(--warn);
 }
 .prob-sev.info {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .prob-msg {
   overflow: hidden;
@@ -363,7 +363,7 @@
   color: var(--fg-dim);
 }
 .dbg-line-out.input {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .dbg-line-out.result {
   color: var(--ok);

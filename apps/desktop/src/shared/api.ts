@@ -19,7 +19,17 @@ import type {
 } from './devtools.js';
 import type { LspStatus, NextEditRequestView, NextEditResultView } from './lsp.js';
 import type { SuggestionStatsRow } from './nextEdit.js';
-import type { ExportOptions, MediaItem, VideoProject } from './video.js';
+import type { ExportOptions, MediaItem, Transcript, VideoProject } from './video.js';
+
+/** Fase 13: a speech-to-text engine as the video editor lists it. */
+export type SttEngineId = 'local' | 'openai' | 'groq';
+export interface SttEngineView {
+  id: SttEngineId;
+  label: string;
+  ready: boolean;
+  note: string;
+  cloud: boolean;
+}
 export type { LicenseStatus } from './plans.js';
 import type { TaskCreateView, TaskView, TasksStatusView, TasksUsageView } from './tasks.js';
 export type { TaskCreateView, TaskView, TasksStatusView, TasksUsageView } from './tasks.js';
@@ -32,6 +42,8 @@ import type {
 } from './playground.js';
 import type { CodeLang } from './playgroundCode.js';
 import type { GenEstimate, GenEvent, GenModelView, GenRequest, GenResult } from './mediaGen.js';
+import type { Render3DFormat, Scene3D } from './scene3d.js';
+import type { BlenderEngine } from './scene3dBpy.js';
 import type { BuildDeployView, BuildView } from './build.js';
 
 export interface WorkspaceInfo {
@@ -1107,7 +1119,26 @@ export type AppEvent =
   | { type: 'review:progress'; requestId: string; progress: ReviewProgressView }
   /** Fase 9: stream of a Playground run (one per model when comparing). */
   | { type: 'playground'; requestId: string; event: PlaygroundEvent }
-  | { type: 'media'; requestId: string; event: GenEvent };
+  | { type: 'media'; requestId: string; event: GenEvent }
+  /** Fase 14: progress (0–1) of a Blender render. */
+  | { type: 'scene3d'; requestId: string; progress: number }
+  /** Fase 14: the agent asks this window's viewer to render a scene (answer with agentDone). */
+  | {
+      type: 'scene3d:agent';
+      requestId: string;
+      scene: Scene3D;
+      name: string;
+      format: Render3DFormat;
+    }
+  /** Fase 14: a 3D render to put into Video Studio (library and timeline). */
+  | { type: 'scene3d:imported'; path: string };
+
+export interface Render3DResult {
+  path: string;
+  format: Render3DFormat;
+  frames: number;
+  ms: number;
+}
 
 /** Whether the help assistant can answer locally (Ollama running and its model downloaded). */
 export interface HelperStatus {
@@ -1943,6 +1974,28 @@ export interface OmniApi {
     reveal(path: string): Promise<void>;
     cacheSize(): Promise<number>;
     clearCache(): Promise<void>;
+    /** Fase 13: speech-to-text engines (whisper.cpp here, or a connected provider). */
+    sttEngines(): Promise<SttEngineView[]>;
+    /** Transcribes a media file with word times; `requestId` lets sttAbort() stop it. */
+    transcribe(
+      requestId: string,
+      path: string,
+      engine: SttEngineId,
+      duration: number,
+      lang?: string,
+    ): Promise<Transcript>;
+    sttAbort(requestId: string): Promise<void>;
+    /** Silent ranges of a file's audio, in seconds of the file. */
+    silences(
+      path: string,
+      duration: number,
+      noiseDb: number,
+      minDur: number,
+    ): Promise<[number, number][]>;
+    /** Where new scenes start, in seconds of the file. */
+    scenes(path: string, duration: number, threshold: number): Promise<number[]>;
+    /** Save dialog for an .srt / .vtt; returns the path (null when canceled). */
+    saveCaptions(name: string, text: string, ext: 'srt' | 'vtt'): Promise<string | null>;
   };
   /** Ayuda de Zinarix: the help assistant (a small local model that knows the app). */
   helper: {
@@ -1987,6 +2040,39 @@ export interface OmniApi {
     /** Progress arrives as 'media' events; resolves with the saved files. */
     generate(requestId: string, req: GenRequest): Promise<GenResult>;
     abort(requestId: string): Promise<void>;
+  };
+  /** Fase 14: 3D scenes rendered to video (viewer frames or Blender). */
+  scene3d: {
+    /** Blender found on this machine (null: not installed or older than 3.6) and the output folder. */
+    info(
+      refresh?: boolean,
+    ): Promise<{ blender: { path: string; version: string } | null; outDir: string }>;
+    /** Starts encoding viewer frames; then frame() each RGBA frame and end(). */
+    begin(o: {
+      width: number;
+      height: number;
+      fps: number;
+      format: Render3DFormat;
+      name: string;
+    }): Promise<{ id: string; path: string }>;
+    frame(id: string, rgba: Uint8Array): Promise<void>;
+    end(id: string): Promise<Render3DResult>;
+    /** Stops a viewer encode or a Blender render (and deletes the half-written file). */
+    cancel(id: string): Promise<void>;
+    /** Renders with Blender; progress arrives as 'scene3d' events with the same id. */
+    blender(
+      id: string,
+      scene: Scene3D,
+      o: { engine: BlenderEngine; format: Render3DFormat; name: string; samples?: number },
+    ): Promise<Render3DResult>;
+    /** File dialog for a .glb/.gltf/.obj/.fbx; returns its path and a URL the viewer can load. */
+    pickModel(): Promise<{ path: string; url: string } | null>;
+    /** URL for a model a scene names (null when the file is gone or not a model). */
+    modelUrl(path: string): Promise<string | null>;
+    save(scene: Scene3D, path: string | null, saveAs: boolean): Promise<string | null>;
+    open(): Promise<{ scene: Scene3D; path: string } | null>;
+    /** Answer to a 'scene3d:agent' event. */
+    agentDone(requestId: string, r: { path: string } | { error: string }): Promise<void>;
   };
   /** Fase 9: model playground (one model or 2–4 side by side). */
   playground: {
@@ -2375,6 +2461,12 @@ export const CHANNELS = [
   'video:reveal',
   'video:cacheSize',
   'video:clearCache',
+  'video:sttEngines',
+  'video:transcribe',
+  'video:sttAbort',
+  'video:silences',
+  'video:scenes',
+  'video:saveCaptions',
   'helper:status',
   'helper:ask',
   'helper:pull',
@@ -2411,6 +2503,17 @@ export const CHANNELS = [
   'media:outDir',
   'media:generate',
   'media:abort',
+  'scene3d:info',
+  'scene3d:begin',
+  'scene3d:frame',
+  'scene3d:end',
+  'scene3d:cancel',
+  'scene3d:blender',
+  'scene3d:pickModel',
+  'scene3d:modelUrl',
+  'scene3d:save',
+  'scene3d:open',
+  'scene3d:agentDone',
   'playground:run',
   'playground:abort',
   'playground:code',

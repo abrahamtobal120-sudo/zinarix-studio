@@ -227,13 +227,18 @@ export function GitPanel() {
         <span className="git-dir">{dir}</span>
         <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
           {(isStaged ? f.index : f.work) !== 'D' && (
-            <button title={t('gitOpenFile')} onClick={() => void openFile(f.path)}>
+            <button
+              title={t('gitOpenFile')}
+              aria-label={t('gitOpenFile')}
+              onClick={() => void openFile(f.path)}
+            >
               <Icon name="file" size={15} />
             </button>
           )}
           {!isStaged && (
             <button
               title={t('gitDiscard')}
+              aria-label={t('gitDiscard')}
               onClick={async () => {
                 if (!(await confirmDialog(t('gitDiscardConfirm', { name }), { danger: true })))
                   return;
@@ -286,11 +291,19 @@ export function GitPanel() {
       <div className="sidebar-title">
         <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
         <span className="sidebar-actions">
-          <button title={t('gitRefresh')} onClick={() => void refresh()}>
+          <button
+            title={t('gitRefresh')}
+            aria-label={t('gitRefresh')}
+            onClick={() => void refresh()}
+          >
             <Icon name="refresh" size={15} />
           </button>
           {st?.isRepo && (
-            <button title={t('gitReviewAi')} onClick={() => setReviewOpen(true)}>
+            <button
+              title={t('gitReviewAi')}
+              aria-label={t('gitReviewAi')}
+              onClick={() => setReviewOpen(true)}
+            >
               <Icon name="shield" size={15} />
             </button>
           )}
@@ -298,6 +311,7 @@ export function GitPanel() {
             <>
               <button
                 title={t('gitSyncTitle')}
+                aria-label={t('gitSyncTitle')}
                 disabled={busy !== null}
                 onClick={() =>
                   void act(
@@ -314,6 +328,7 @@ export function GitPanel() {
               </button>
               <button
                 title={t('gitPull')}
+                aria-label={t('gitPull')}
                 disabled={busy !== null}
                 onClick={() => void sync('pull')}
               >
@@ -321,6 +336,7 @@ export function GitPanel() {
               </button>
               <button
                 title={t('gitPush')}
+                aria-label={t('gitPush')}
                 disabled={busy !== null}
                 onClick={() => void sync('push')}
               >
@@ -330,6 +346,7 @@ export function GitPanel() {
           )}
           <button
             title={t('gitStash')}
+            aria-label={t('gitStash')}
             disabled={!st?.files.length}
             onClick={async () => {
               const msg = await askText(t('gitStashMessage'));
@@ -340,7 +357,11 @@ export function GitPanel() {
             <Icon name="stash" size={15} />
           </button>
           {st?.webUrl && (
-            <button title={t('gitOpenWeb')} onClick={() => openLink(st.webUrl!)}>
+            <button
+              title={t('gitOpenWeb')}
+              aria-label={t('gitOpenWeb')}
+              onClick={() => openLink(st.webUrl!)}
+            >
               <Icon name="external" size={15} />
             </button>
           )}
@@ -607,7 +628,9 @@ export function GitPanel() {
               </button>
             </div>
           )}
-          {listErr ? listError : log.length === 0 && <div className="git-clean">{t('gitNoCommits')}</div>}
+          {listErr
+            ? listError
+            : log.length === 0 && <div className="git-clean">{t('gitNoCommits')}</div>}
           {log
             .filter((c) => matches(filter, c.subject, c.author, c.short, c.refs))
             .map((c) => (
@@ -645,6 +668,7 @@ export function GitPanel() {
                 >
                   <button
                     title={t('gitCopyHash')}
+                    aria-label={t('gitCopyHash')}
                     onClick={() => {
                       void navigator.clipboard.writeText(c.hash);
                       toast(t('gitCopiedHash', { hash: c.short }));
@@ -655,6 +679,7 @@ export function GitPanel() {
                   {st?.webUrl && (
                     <button
                       title={t('gitOpenWeb')}
+                      aria-label={t('gitOpenWeb')}
                       onClick={() => openLink(`${st.webUrl}/commit/${c.hash}`)}
                     >
                       <Icon name="external" size={14} />
@@ -662,6 +687,7 @@ export function GitPanel() {
                   )}
                   <button
                     title={t('gitRevert')}
+                    aria-label={t('gitRevert')}
                     onClick={async () => {
                       if (
                         !(await confirmDialog(t('gitRevertConfirm', { subject: c.subject }), {
@@ -693,6 +719,7 @@ export function GitPanel() {
             <span>{t('gitBranches')}</span>
             <button
               title={t('gitNewBranch')}
+              aria-label={t('gitNewBranch')}
               onClick={async () => {
                 const name = (await askText(t('gitNewBranch')))?.trim();
                 if (name)
@@ -742,6 +769,7 @@ export function GitPanel() {
                   <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                       title={t('gitMerge', { branch: st?.branch ?? '' })}
+                      aria-label={t('gitMerge', { branch: st?.branch ?? '' })}
                       onClick={async () => {
                         if (
                           !(await confirmDialog(
@@ -761,6 +789,7 @@ export function GitPanel() {
                     {!b.remote && (
                       <button
                         title={t('gitDeleteBranch')}
+                        aria-label={t('gitDeleteBranch')}
                         onClick={async () => {
                           if (
                             !(await confirmDialog(t('gitDeleteBranchConfirm', { name: b.name }), {
@@ -815,6 +844,7 @@ export function GitPanel() {
                 <span className="git-row-actions git-commit-actions">
                   <button
                     title={t('gitStashPop')}
+                    aria-label={t('gitStashPop')}
                     onClick={() =>
                       void act(
                         'stash',
@@ -830,6 +860,7 @@ export function GitPanel() {
                   </button>
                   <button
                     title={t('gitStashApply')}
+                    aria-label={t('gitStashApply')}
                     onClick={() =>
                       void act(
                         'stash',
@@ -845,6 +876,7 @@ export function GitPanel() {
                   </button>
                   <button
                     title={t('gitStashDrop')}
+                    aria-label={t('gitStashDrop')}
                     onClick={async () => {
                       if (
                         !(await confirmDialog(

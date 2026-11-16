@@ -113,6 +113,9 @@ describe('agent safety', () => {
       'remember',
       'list_memories',
       'forget',
+      // 3D (Fase 14, scene3dTools.ts)
+      'render_3d',
+      'blender_script',
     ];
     const names = TOOLS.map((t) => t.name);
     expect(new Set(names).size, 'duplicate tool names').toBe(names.length);

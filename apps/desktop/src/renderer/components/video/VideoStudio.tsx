@@ -11,11 +11,14 @@ import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
 import { ExportDialog, RenderQueue } from './ExportDialog';
 import { Inspector } from './Inspector';
+import { AiPanel } from './AiPanel';
+import { Panel3D } from '../three/Panel3D';
+import { Studio3DHost } from '../three/Studio3D';
 import { EasyPanel } from './EasyPanel';
 import { ColorPanel } from './ColorPanel';
 import { rippleToPlayhead, rollToPlayhead, slideSelected, slipSelected } from './proEdit';
 import { tp } from './proStrings';
-import { EffectsPanel, MixerPanel, TextPanel, TransitionsPanel } from './FxPanels';
+import { EffectsPanel, MixerPanel, StickersPanel, TextPanel, TransitionsPanel } from './FxPanels';
 import { MediaLibrary, pickAndImport } from './MediaLibrary';
 import { tv, type VideoKey } from './strings';
 import {
@@ -61,11 +64,12 @@ const TABS: { id: StudioTab; key: VideoKey; icon: IconName; phase?: number; soon
   { id: 'easy', key: 'tabEasy', icon: 'star' },
   { id: 'audio', key: 'tabAudio', icon: 'music' },
   { id: 'text', key: 'tabText', icon: 'type' },
-  { id: 'stickers', key: 'tabStickers', icon: 'smile', phase: 3, soon: 'soonStickers' },
+  { id: 'stickers', key: 'tabStickers', icon: 'smile' },
   { id: 'effects', key: 'tabEffects', icon: 'sparkle' },
   { id: 'transitions', key: 'tabTransitions', icon: 'layers' },
   { id: 'color', key: 'tabColor', icon: 'palette' },
-  { id: 'ai', key: 'tabAi', icon: 'cpu', phase: 4, soon: 'soonAi' },
+  { id: 'ai', key: 'tabAi', icon: 'cpu' },
+  { id: '3d', key: 'tab3d', icon: 'package' },
 ];
 
 /** Top bar + tabs + sash, in px (the rest is viewer and timeline). */
@@ -114,6 +118,7 @@ export function VideoStudioHost() {
     <>
       {mounted && <VideoStudio shown={shown} visible={open && !minimized} />}
       <MiniPill />
+      <Studio3DHost />
     </>
   );
 }
@@ -270,6 +275,8 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
                 <EasyPanel />
               ) : tab === 'text' ? (
                 <TextPanel />
+              ) : tab === 'stickers' ? (
+                <StickersPanel />
               ) : tab === 'effects' ? (
                 <EffectsPanel />
               ) : tab === 'transitions' ? (
@@ -278,6 +285,10 @@ function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
                 <MixerPanel />
               ) : tab === 'color' ? (
                 <ColorPanel />
+              ) : tab === 'ai' ? (
+                <AiPanel />
+              ) : tab === '3d' ? (
+                <Panel3D />
               ) : (
                 <div className="vs-soon">
                   <span className="vs-soon-icon">

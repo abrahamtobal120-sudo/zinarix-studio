@@ -14,8 +14,14 @@ import {
   updateTrack,
 } from '../../../shared/video';
 import type { TransitionKind } from '../../../shared/videoFx';
+import { useState } from 'react';
+import type { StickerGroup } from '../../../shared/videoFx';
 import {
   LOOKS,
+  STICKER_ANIM,
+  STICKER_COLORS,
+  STICKER_GROUPS,
+  stickerSpec,
   TEXT_PRESETS,
   TRANSITION_DEFAULT,
   TRANSITION_KINDS,
@@ -71,6 +77,57 @@ export function TextPanel() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+export function StickersPanel() {
+  const [color, setColor] = useState(STICKER_COLORS[0]!);
+  const add = (item: string, group: StickerGroup) => {
+    const s = getV();
+    const { project, clip } = addTextClip(s.project, stickerSpec(item, group, color), s.playhead, {
+      dur: 3,
+      anim: STICKER_ANIM,
+    });
+    commit(project, tv('addSticker'));
+    setV({ selection: [clip.id] });
+  };
+  return (
+    <div className="vs-fx-panel">
+      <div className="vs-panel-title">{tv('tabStickers')}</div>
+      <p className="vs-dim vs-note">{tv('stickerHint')}</p>
+      <div className="vs-sticker-colors" role="radiogroup" aria-label={tv('stickerColor')}>
+        {STICKER_COLORS.map((c) => (
+          <button
+            key={c}
+            role="radio"
+            aria-checked={c === color}
+            aria-label={c}
+            className={`vs-sticker-color${c === color ? ' on' : ''}`}
+            style={{ background: c }}
+            onClick={() => setColor(c)}
+          />
+        ))}
+      </div>
+      {STICKER_GROUPS.map((g) => (
+        <section key={g.id}>
+          <div className="vs-sticker-group">{tv(`st_${g.id}` as VideoKey)}</div>
+          <div className="vs-sticker-grid">
+            {g.items.map((it) => (
+              <button
+                key={it}
+                className="vs-sticker"
+                title={tv('addSticker')}
+                aria-label={`${tv('addSticker')} ${it}`}
+                style={g.id === 'emoji' ? undefined : { color }}
+                onClick={() => add(it, g.id)}
+              >
+                {it}
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

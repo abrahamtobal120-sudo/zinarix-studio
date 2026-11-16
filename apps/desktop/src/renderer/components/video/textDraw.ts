@@ -6,7 +6,7 @@
 import type { TextFont, TextSpec } from '../../../shared/videoFx';
 
 export const FONT_FAMILY: Record<TextFont, string> = {
-  sans: 'Inter, "Segoe UI", system-ui, sans-serif',
+  sans: 'Inter, "Segoe UI", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif',
   serif: 'Georgia, "Times New Roman", serif',
   mono: '"Cascadia Code", Consolas, ui-monospace, monospace',
   display: 'Impact, "Arial Black", "Segoe UI Black", sans-serif',

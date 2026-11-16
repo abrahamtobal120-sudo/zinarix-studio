@@ -402,12 +402,14 @@ function MailBody({ reset }: { reset: () => void }) {
           <>
             <button
               title={t('mlCompose')}
+              aria-label={t('mlCompose')}
               onClick={() => setDraft({ to: '', cc: '', subject: '', text: '' })}
             >
               <Icon name="edit" size={15} />
             </button>
             <button
               title={t('gitRefresh')}
+              aria-label={t('gitRefresh')}
               onClick={() => {
                 loadFolders();
                 void loadList();
@@ -663,7 +665,12 @@ function MailBody({ reset }: { reset: () => void }) {
             </button>
             <button onClick={closeDraft}>{draft.draftUid ? t('mlClose') : t('mlCancel')}</button>
             {draft.draftUid && (
-              <button title={t('mlDraftDelete')} disabled={busy !== null} onClick={deleteDraft}>
+              <button
+                title={t('mlDraftDelete')}
+                aria-label={t('mlDraftDelete')}
+                disabled={busy !== null}
+                onClick={deleteDraft}
+              >
                 <Icon name="trash" size={14} />
               </button>
             )}
@@ -680,7 +687,7 @@ function MailBody({ reset }: { reset: () => void }) {
       <div className="explorer">
         {title}
         <div className="git-branchbar ml-actions">
-          <button title={t('mlBack')} onClick={() => setMsg(null)}>
+          <button title={t('mlBack')} aria-label={t('mlBack')} onClick={() => setMsg(null)}>
             <Icon name="back" size={14} />
           </button>
           <span className="spacer" />
@@ -706,6 +713,7 @@ function MailBody({ reset }: { reset: () => void }) {
           </button>
           <button
             title={t('mlUnread')}
+            aria-label={t('mlUnread')}
             onClick={() =>
               void act('unread', async () => {
                 await api().mail.setFlag(folder, msg.uid, 'seen', false);
@@ -736,6 +744,7 @@ function MailBody({ reset }: { reset: () => void }) {
               {role !== '\\All' && role !== '\\Archive' && (
                 <button
                   title={t('mlArchive')}
+                  aria-label={t('mlArchive')}
                   onClick={() => moveMsg(msg.uid, 'archive', t('mlArchived'))}
                 >
                   <Icon name="archive" size={14} />
@@ -744,6 +753,7 @@ function MailBody({ reset }: { reset: () => void }) {
               {role !== '\\Sent' && role !== '\\Drafts' && (
                 <button
                   title={t('mlSpam')}
+                  aria-label={t('mlSpam')}
                   onClick={() => moveMsg(msg.uid, 'junk', t('mlSpammed'))}
                 >
                   <Icon name="warning" size={14} />
@@ -753,6 +763,7 @@ function MailBody({ reset }: { reset: () => void }) {
           )}
           <button
             title={role === '\\Trash' ? t('mlDeleteForever') : t('mlTrash')}
+            aria-label={role === '\\Trash' ? t('mlDeleteForever') : t('mlTrash')}
             onClick={async () => {
               if (
                 !(await confirmDialog(

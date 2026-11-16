@@ -2651,7 +2651,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           conversationId={conversationId}
           turn={reviewTurn}
           folder={ownFolder}
-          commands={turns.reduce((n, x) => n + (x.rid === reviewTurn ? stepsOf(x, RUN_TOOLS) : 0), 0)}
+          commands={turns.reduce(
+            (n, x) => n + (x.rid === reviewTurn ? stepsOf(x, RUN_TOOLS) : 0),
+            0,
+          )}
           onClose={() => setReviewTurn(null)}
         />
       )}
@@ -2945,7 +2948,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                     : t('chatQueuedPaused')}
               </span>
               {retry && (
-                <button title={t('chatQueueRetryCancel')} onClick={cancelRetry}>
+                <button
+                  title={t('chatQueueRetryCancel')}
+                  aria-label={t('chatQueueRetryCancel')}
+                  onClick={cancelRetry}
+                >
                   <Icon name="x" size={12} />
                 </button>
               )}
@@ -2955,12 +2962,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                 <div key={i} className="chat-queue-item" title={q}>
                   <span className="chat-queue-text">{q}</span>
                   {!busy && i === 0 && (
-                    <button title={t('send')} onClick={sendQueued}>
+                    <button title={t('send')} aria-label={t('send')} onClick={sendQueued}>
                       <Icon name="send" size={12} />
                     </button>
                   )}
                   <button
                     title={t('chatQueueEdit')}
+                    aria-label={t('chatQueueEdit')}
                     onClick={() => {
                       updateChat(id, { queued: queued.filter((_, j) => j !== i) });
                       setInput((cur) => (cur.trim() ? `${cur}\n${q}` : q));
@@ -2971,6 +2979,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                   </button>
                   <button
                     title={t('chatQueueRemove')}
+                    aria-label={t('chatQueueRemove')}
                     onClick={() => updateChat(id, { queued: queued.filter((_, j) => j !== i) })}
                   >
                     <Icon name="x" size={12} />
@@ -3655,14 +3664,23 @@ export function ChatPanel() {
           </button>
           <button
             title={`${t('chatNewTab')} (${shortcutOf('chat.new')})`}
+            aria-label={`${t('chatNewTab')} (${shortcutOf('chat.new')})`}
             onClick={() => newChat()}
           >
             <Icon name="plus" size={15} />
           </button>
-          <button title={t('chatNewQuestion')} onClick={() => newQuestionChat()}>
+          <button
+            title={t('chatNewQuestion')}
+            aria-label={t('chatNewQuestion')}
+            onClick={() => newQuestionChat()}
+          >
             <Icon name="message" size={15} />
           </button>
-          <button title={t('chatNewInFolder')} onClick={() => void newChatInFolder()}>
+          <button
+            title={t('chatNewInFolder')}
+            aria-label={t('chatNewInFolder')}
+            onClick={() => void newChatInFolder()}
+          >
             <Icon name="folderPlus" size={15} />
           </button>
           <button
@@ -3685,7 +3703,11 @@ export function ChatPanel() {
           >
             <Icon name="history" size={15} />
           </button>
-          <button title={t('close')} onClick={() => setState({ chatOpen: false })}>
+          <button
+            title={t('close')}
+            aria-label={t('close')}
+            onClick={() => setState({ chatOpen: false })}
+          >
             <Icon name="close" size={15} />
           </button>
         </span>

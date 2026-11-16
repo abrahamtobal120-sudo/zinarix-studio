@@ -178,9 +178,7 @@ export function Explorer() {
   const items = rows.filter((r): r is FileRow => 'e' in r);
   // Roving tabindex: only one row is in the Tab order.
   const current =
-    items.find((r) => r.e.path === focused) ??
-    items.find((r) => r.e.path === selected) ??
-    items[0];
+    items.find((r) => r.e.path === focused) ?? items.find((r) => r.e.path === selected) ?? items[0];
 
   const focusRow = (path: string) => {
     setFocused(path);
@@ -344,13 +342,25 @@ export function Explorer() {
       <div className="sidebar-title">
         <span>{workspace.name.toUpperCase()}</span>
         <span className="sidebar-actions">
-          <button title={t('newFile')} onClick={() => void create('file', null)}>
+          <button
+            title={t('newFile')}
+            aria-label={t('newFile')}
+            onClick={() => void create('file', null)}
+          >
             <Icon name="filePlus" size={15} />
           </button>
-          <button title={t('newFolder')} onClick={() => void create('dir', null)}>
+          <button
+            title={t('newFolder')}
+            aria-label={t('newFolder')}
+            onClick={() => void create('dir', null)}
+          >
             <Icon name="folderPlus" size={15} />
           </button>
-          <button title={t('refresh')} onClick={() => open.forEach((d) => void load(d))}>
+          <button
+            title={t('refresh')}
+            aria-label={t('refresh')}
+            onClick={() => open.forEach((d) => void load(d))}
+          >
             <Icon name="refresh" size={15} />
           </button>
         </span>

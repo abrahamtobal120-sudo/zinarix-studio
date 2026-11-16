@@ -87,6 +87,31 @@ textarea:where(:not([data-ui])):focus {
   border-color: var(--focus);
   box-shadow: var(--ring);
 }
+/* Selects with no style of their own (Settings, dialogs) used to fall back to the white system
+   control, a bright box in the dark themes. Zero specificity: the panels that style their
+   own selects keep doing it. */
+select:where(:not([data-ui])) {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-height: 26px;
+  padding: 2px 6px;
+  outline: none;
+}
+select:where(:not([data-ui])):focus-visible {
+  border-color: var(--focus);
+  box-shadow: var(--ring);
+}
+option:where(:not([data-ui])) {
+  background: var(--bg-2);
+  color: var(--fg);
+}
+/* Native sliders, checkboxes and radios take the theme's accent instead of the system blue. */
+:where(input[type='range'], input[type='checkbox'], input[type='radio'], progress) {
+  accent-color: var(--accent);
+}
 kbd:where(:not([data-ui])) {
   font:
     11px ui-monospace,
@@ -130,10 +155,12 @@ kbd:where(:not([data-ui])) {
   background: var(--ok);
   color: var(--black);
 }
+/* The status colors pass on --bg but not always on the badge's --bg-4 (--warn was 4.06:1 in
+   the light theme); leaning toward --fg-strong darkens them in light themes, lightens in dark. */
 .badge.deprecated {
-  color: var(--danger);
+  color: color-mix(in srgb, var(--danger) 80%, var(--fg-strong));
 }
 .badge.unverified {
-  color: var(--warn);
+  color: color-mix(in srgb, var(--warn) 75%, var(--fg-strong));
 }
 }

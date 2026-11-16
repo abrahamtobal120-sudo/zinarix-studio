@@ -225,7 +225,7 @@
 }
 .phone-hero.wait .phone-hero-icon,
 .phone-hero.ok .phone-hero-icon {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .phone-hero-text {
   flex: 1;
@@ -427,7 +427,7 @@
   border: 1px solid var(--border);
   background: var(--bg-2);
   font: 600 22px var(--mono, monospace);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .phone-steps .settings-hint {
   margin: 6px 0 0 28px;

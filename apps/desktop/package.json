@@ -26,7 +26,8 @@
   },
   "dependencies": {
     "@lydell/node-pty": "1.2.0-beta.15",
-    "@napi-rs/keyring": "^1.2.0"
+    "@napi-rs/keyring": "^1.2.0",
+    "three": "^0.181.2"
   },
   "devDependencies": {
     "@omni/catalog": "workspace:*",
@@ -39,6 +40,7 @@
     "@types/mailparser": "^3.9.0",
     "@types/nodemailer": "^8.0.2",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.181.0",
     "@vitejs/plugin-react": "^6.1.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
@@ -120,6 +122,10 @@
           "filter": [
             "*.txt"
           ]
+        },
+        {
+          "from": "dist/THIRD_PARTY_NOTICES.md",
+          "to": "THIRD_PARTY_NOTICES.md"
         }
       ]
     },
@@ -181,6 +187,10 @@
           "filter": [
             "*.txt"
           ]
+        },
+        {
+          "from": "dist/THIRD_PARTY_NOTICES.md",
+          "to": "THIRD_PARTY_NOTICES.md"
         }
       ]
     },
@@ -219,6 +229,10 @@
           "filter": [
             "*.txt"
           ]
+        },
+        {
+          "from": "dist/THIRD_PARTY_NOTICES.md",
+          "to": "THIRD_PARTY_NOTICES.md"
         }
       ]
     },

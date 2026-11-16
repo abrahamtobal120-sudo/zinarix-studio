@@ -159,7 +159,13 @@ describe('text-based editing', () => {
     expect(cuts).toEqual([[0.96, 1.34]]);
     // Two words in a row are one cut.
     expect(wordCuts(T.words, [2, 3])).toEqual([[1.46, 2.34]]);
-    expect(mergeRanges([[3, 4], [1, 2], [1.5, 2.5]])).toEqual([
+    expect(
+      mergeRanges([
+        [3, 4],
+        [1, 2],
+        [1.5, 2.5],
+      ]),
+    ).toEqual([
       [1, 2.5],
       [3, 4],
     ]);
@@ -283,7 +289,10 @@ describe('captions', () => {
   it('rejects broken transcripts in a project file', () => {
     const p = project();
     expect(validProject(p)).toBe(true);
-    const bad = { ...p, transcripts: { m1: { engine: 'x', at: 0, words: [{ s: 'a', e: 1, w: 'x' }] } } };
+    const bad = {
+      ...p,
+      transcripts: { m1: { engine: 'x', at: 0, words: [{ s: 'a', e: 1, w: 'x' }] } },
+    };
     expect(validProject(bad)).toBe(false);
   });
 });
@@ -302,7 +311,10 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('analysis and export (FFmpeg)',
       ...['-f', 'lavfi', '-i', 'sine=frequency=300:duration=1'],
       ...['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono:d=1.5'],
       ...['-f', 'lavfi', '-i', 'sine=frequency=500:duration=1'],
-      ...['-filter_complex', '[0:a]aformat=sample_rates=44100:channel_layouts=mono[a];[2:a]aformat=sample_rates=44100:channel_layouts=mono[c];[a][1:a][c]concat=n=3:v=0:a=1'],
+      ...[
+        '-filter_complex',
+        '[0:a]aformat=sample_rates=44100:channel_layouts=mono[a];[2:a]aformat=sample_rates=44100:channel_layouts=mono[c];[a][1:a][c]concat=n=3:v=0:a=1',
+      ],
       wav,
     ]);
     const s = await stt.silences(wav, 3.5, -35, 0.6);
@@ -345,7 +357,10 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('analysis and export (FFmpeg)',
       png,
     ]);
     const { url: _u, ...mb } = await svc.probe(black);
-    let p: VideoProject = { ...newProject({ width: 160, height: 90, fps: 25, name: 'cap' }), media: [mb] };
+    let p: VideoProject = {
+      ...newProject({ width: 160, height: 90, fps: 25, name: 'cap' }),
+      media: [mb],
+    };
     p = insertMedia(p, mb, { start: 0 }).project;
     // Cues of 0.15 s every 0.25 s; the caption track sits centred (y = 0) for the check.
     const cues = Array.from({ length: 40 }, (_, i) => ({

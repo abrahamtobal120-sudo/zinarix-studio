@@ -577,6 +577,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
         {ref && (
           <button
             title={t('gitRefresh')}
+            aria-label={t('gitRefresh')}
             onClick={() => {
               loadProjects();
               void loadTab();
@@ -588,6 +589,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
         {st?.connected && (
           <button
             title="supabase.com"
+            aria-label="supabase.com"
             onClick={() => open(ref ? `${DASH}/project/${ref}` : `${DASH}/projects`)}
           >
             <Icon name="external" size={15} />
@@ -864,13 +866,18 @@ function SupabaseBody({ reset }: { reset: () => void }) {
             </>
           )}
           {workspace && project?.status === 'ACTIVE_HEALTHY' && (
-            <button title={t('sbNewMigrationTitle')} onClick={newMigration}>
+            <button
+              title={t('sbNewMigrationTitle')}
+              aria-label={t('sbNewMigrationTitle')}
+              onClick={newMigration}
+            >
               <Icon name="filePlus" size={14} />
             </button>
           )}
           {project?.status === 'ACTIVE_HEALTHY' && (
             <button
               title={t('sbPause')}
+              aria-label={t('sbPause')}
               onClick={async () => {
                 if (!(await confirmDialog(t('sbPauseConfirm'), { danger: true }))) return;
                 void act('pause', async () => {
@@ -886,12 +893,13 @@ function SupabaseBody({ reset }: { reset: () => void }) {
           {!linked && workspace && (
             <button
               title={t('sbLinkTitle')}
+              aria-label={t('sbLinkTitle')}
               onClick={() => inTerminal(st.cli, `link --project-ref ${ref}`)}
             >
               <Icon name="link" size={14} />
             </button>
           )}
-          <button onClick={() => open(dash)} title={t('sbDashboard')}>
+          <button onClick={() => open(dash)} title={t('sbDashboard')} aria-label={t('sbDashboard')}>
             <Icon name="external" size={14} />
           </button>
         </div>
@@ -976,6 +984,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                                 </button>
                                 <button
                                   title={t('sbInsertTitle')}
+                                  aria-label={t('sbInsertTitle')}
                                   onClick={() => insertTemplate(tb)}
                                 >
                                   <Icon name="plus" size={11} />
@@ -1000,6 +1009,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                                 </button>
                                 <button
                                   title={t('sbOpenEditor')}
+                                  aria-label={t('sbOpenEditor')}
                                   onClick={() => open(`${dash}/editor`)}
                                 >
                                   <Icon name="external" size={11} />
@@ -1139,7 +1149,11 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                   <Icon name="play" size={14} /> {t('sbRun')} (Ctrl+Enter)
                 </button>
                 {result && (
-                  <button onClick={() => setResult(null)} title={t('sbClear')}>
+                  <button
+                    onClick={() => setResult(null)}
+                    title={t('sbClear')}
+                    aria-label={t('sbClear')}
+                  >
                     <Icon name="x" size={14} />
                   </button>
                 )}
@@ -1167,12 +1181,14 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                   <span className="git-row-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                       title={t('sbFnLogs')}
+                      aria-label={t('sbFnLogs')}
                       onClick={() => open(`${dash}/functions/${f.slug}/logs`)}
                     >
                       <Icon name="scroll" size={13} />
                     </button>
                     <button
                       title={t('sbFnUrl')}
+                      aria-label={t('sbFnUrl')}
                       onClick={() => copy(`https://${ref}.supabase.co/functions/v1/${f.slug}`)}
                     >
                       <Icon name="copy" size={13} />
@@ -1180,6 +1196,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                     {workspace && (
                       <button
                         title={t('sbFnDeploy')}
+                        aria-label={t('sbFnDeploy')}
                         onClick={() => inTerminal(st.cli, `functions deploy ${f.slug}`)}
                       >
                         <Icon name="push" size={13} />
@@ -1187,6 +1204,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                     )}
                     <button
                       title={t('sbFnDelete')}
+                      aria-label={t('sbFnDelete')}
                       onClick={async () => {
                         if (
                           !(await confirmDialog(t('sbFnDeleteConfirm', { name: f.name }), {
@@ -1578,12 +1596,14 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       <span className="git-row-actions">
                         <button
                           title={t('vcEnvEdit')}
+                          aria-label={t('vcEnvEdit')}
                           onClick={() => setSecretForm({ name, value: '' })}
                         >
                           <Icon name="edit" size={13} />
                         </button>
                         <button
                           title={t('vcEnvDelete')}
+                          aria-label={t('vcEnvDelete')}
                           onClick={async () => {
                             if (
                               !(await confirmDialog(t('vcEnvDeleteConfirm', { key: name }), {
@@ -1636,6 +1656,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       {b.public && (
                         <button
                           title={t('sbBucketUrl')}
+                          aria-label={t('sbBucketUrl')}
                           onClick={() =>
                             copy(
                               `https://${ref}.supabase.co/storage/v1/object/public/${encodeURIComponent(b.name)}/`,
@@ -1647,6 +1668,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       )}
                       <button
                         title={t('sbDashboard')}
+                        aria-label={t('sbDashboard')}
                         onClick={() =>
                           open(`${dash}/storage/buckets/${encodeURIComponent(b.name)}`)
                         }
@@ -1777,6 +1799,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       {u.email?.includes('@') && (
                         <button
                           title={t('sbMailRecoveryTitle')}
+                          aria-label={t('sbMailRecoveryTitle')}
                           onClick={async () => {
                             if (
                               await confirmDialog(t('sbMailRecoveryConfirm', { email: u.email! }))
@@ -1789,6 +1812,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                       )}
                       <button
                         title={t('sbUserDelete')}
+                        aria-label={t('sbUserDelete')}
                         onClick={async () => {
                           if (
                             !(await confirmDialog(
@@ -1843,6 +1867,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
                   </button>
                   <button
                     title={t('sbListTitle')}
+                    aria-label={t('sbListTitle')}
                     onClick={() => inTerminal(st.cli, 'migration list')}
                   >
                     <Icon name="terminal" size={14} />

@@ -128,18 +128,84 @@ export function parseVerboseJson(json: unknown): { lang?: string; words: Transcr
   return { ...(lang ? { lang } : {}), words: tidy(words) };
 }
 
+/** Languages Whisper (whisper.cpp and the cloud APIs) can transcribe: short code → the name OpenAI answers with. */
+export const TRANSCRIBE_LANGS: Readonly<Record<string, string>> = {
+  es: 'spanish',
+  en: 'english',
+  pt: 'portuguese',
+  fr: 'french',
+  de: 'german',
+  it: 'italian',
+  ca: 'catalan',
+  gl: 'galician',
+  eu: 'basque',
+  nl: 'dutch',
+  pl: 'polish',
+  ro: 'romanian',
+  ru: 'russian',
+  uk: 'ukrainian',
+  cs: 'czech',
+  sk: 'slovak',
+  hu: 'hungarian',
+  el: 'greek',
+  bg: 'bulgarian',
+  hr: 'croatian',
+  sr: 'serbian',
+  sl: 'slovenian',
+  sv: 'swedish',
+  da: 'danish',
+  no: 'norwegian',
+  fi: 'finnish',
+  et: 'estonian',
+  lv: 'latvian',
+  lt: 'lithuanian',
+  is: 'icelandic',
+  tr: 'turkish',
+  ar: 'arabic',
+  he: 'hebrew',
+  fa: 'persian',
+  ur: 'urdu',
+  hi: 'hindi',
+  bn: 'bengali',
+  ta: 'tamil',
+  te: 'telugu',
+  mr: 'marathi',
+  gu: 'gujarati',
+  pa: 'punjabi',
+  zh: 'chinese',
+  ja: 'japanese',
+  ko: 'korean',
+  vi: 'vietnamese',
+  th: 'thai',
+  id: 'indonesian',
+  ms: 'malay',
+  tl: 'tagalog',
+  sw: 'swahili',
+  af: 'afrikaans',
+  cy: 'welsh',
+  ga: 'irish',
+  sq: 'albanian',
+  mk: 'macedonian',
+  bs: 'bosnian',
+  hy: 'armenian',
+  ka: 'georgian',
+  kk: 'kazakh',
+  az: 'azerbaijani',
+  uz: 'uzbek',
+  ne: 'nepali',
+  si: 'sinhala',
+  km: 'khmer',
+  mn: 'mongolian',
+};
+
+const LANG_BY_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(TRANSCRIBE_LANGS).map(([code, name]) => [name, code]),
+);
+
 /** OpenAI answers "spanish"; whisper.cpp "es". Both end up as the short code when known. */
 function languageCode(l: string): string {
   const k = l.trim().toLowerCase();
-  const names: Record<string, string> = {
-    spanish: 'es',
-    english: 'en',
-    portuguese: 'pt',
-    french: 'fr',
-    german: 'de',
-    italian: 'it',
-  };
-  return names[k] ?? k;
+  return LANG_BY_NAME[k] ?? k;
 }
 
 /** `silencedetect` log → silent ranges (an open one ends at `duration`). */
@@ -221,7 +287,7 @@ export function wordCuts(
   const set = new Set([...chosen].filter((i) => i >= 0 && i < words.length));
   const idx = [...set].sort((a, b) => a - b);
   const cuts: Range[] = [];
-  for (let k = 0; k < idx.length; ) {
+  for (let k = 0; k < idx.length;) {
     const a = idx[k]!;
     let b = a;
     while (k + 1 < idx.length && idx[k + 1] === b + 1) b = idx[++k]!;
@@ -399,7 +465,8 @@ export function timelineWords(p: VideoProject): TimedWord[] {
   }
   all.sort((a, b) => a.t0 - b.t0);
   return all.filter(
-    (w, i) => !all.slice(Math.max(0, i - 3), i).some((x) => x.w === w.w && Math.abs(x.t0 - w.t0) < 0.05),
+    (w, i) =>
+      !all.slice(Math.max(0, i - 3), i).some((x) => x.w === w.w && Math.abs(x.t0 - w.t0) < 0.05),
   );
 }
 
@@ -636,7 +703,7 @@ export function setTranscript(
   const transcripts = { ...p.transcripts };
   if (t) transcripts[mediaId] = t;
   else delete transcripts[mediaId];
-  const next = { ...p, transcripts };
+  const next: VideoProject = { ...p, transcripts };
   if (!Object.keys(transcripts).length) delete next.transcripts;
   return next;
 }

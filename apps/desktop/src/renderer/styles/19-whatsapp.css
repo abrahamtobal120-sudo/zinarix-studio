@@ -443,7 +443,7 @@ button.wa-add {
   color: var(--danger);
 }
 .watch-chip-improve {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .watch-summary {
   margin: 8px 0 4px;

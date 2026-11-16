@@ -429,6 +429,7 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
               <button
                 className="danger"
                 title={tp('pgTemplateDelete')}
+                aria-label={tp('pgTemplateDelete')}
                 onClick={() => void remove()}
               >
                 <Icon name="trash" size={13} />

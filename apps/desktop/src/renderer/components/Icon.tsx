@@ -711,6 +711,13 @@ const ICONS = {
     ['rect', { x: '3', y: '3', width: '12', height: '12', rx: '1' }],
     ['rect', { x: '9', y: '9', width: '12', height: '12', rx: '1' }],
   ],
+  apps: [
+    ['rect', { x: '3', y: '3', width: '7', height: '7', rx: '1' }],
+    ['rect', { x: '14', y: '3', width: '7', height: '7', rx: '1' }],
+    ['rect', { x: '3', y: '14', width: '7', height: '7', rx: '1' }],
+    ['rect', { x: '14', y: '14', width: '7', height: '7', rx: '1' }],
+  ],
+  command: [['path', { d: 'M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3' }]],
   vercel: [['path', { d: 'M12 4l9 16H3z' }]],
   supabase: [['path', { d: 'M13 2.5 4 14h8l-1 7.5L20 10h-8z' }]],
 } as const satisfies Record<string, IconNode>;

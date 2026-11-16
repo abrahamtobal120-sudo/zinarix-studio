@@ -497,6 +497,76 @@ export const TEXT_PRESETS: { id: string; spec: TextSpec; y: number; anim: ClipAn
   },
 ];
 
+// ---------------- stickers (emojis, shapes, arrows) ----------------
+
+/**
+ * Stickers are titles whose text is one emoji or symbol: they reuse the text clip, so the
+ * preview and the export draw them the same way and the inspector can change them later.
+ */
+export type StickerGroup = 'emoji' | 'shapes' | 'arrows';
+export const STICKER_GROUPS: { id: StickerGroup; items: string[] }[] = [
+  {
+    id: 'emoji',
+    items: [
+      '😀',
+      '😂',
+      '😍',
+      '😎',
+      '🤩',
+      '😮',
+      '😢',
+      '😡',
+      '🤔',
+      '🥳',
+      '👍',
+      '👎',
+      '👏',
+      '🙌',
+      '🙏',
+      '💪',
+      '👀',
+      '❤️',
+      '🔥',
+      '✨',
+      '⭐',
+      '🎉',
+      '💯',
+      '✅',
+      '❌',
+      '⚠️',
+      '💡',
+      '📌',
+      '🎬',
+      '🎵',
+      '📷',
+      '🚀',
+      '💰',
+      '🏆',
+      '⏰',
+      '📢',
+    ],
+  },
+  { id: 'shapes', items: ['●', '■', '▲', '◆', '★', '♥', '○', '□', '△', '◇', '☆', '♡'] },
+  { id: 'arrows', items: ['→', '←', '↑', '↓', '↗', '↘', '↙', '↖', '➜', '⇨', '↻', '⤴'] },
+];
+export const STICKER_COLORS = ['#ffffff', '#ffd400', '#ff3b30', '#34c759', '#0a84ff', '#000000'];
+
+/** Text spec of a sticker. Emojis keep their own colours; shapes and arrows use `color`. */
+export function stickerSpec(item: string, group: StickerGroup, color = '#ffffff'): TextSpec {
+  const emoji = group === 'emoji';
+  return {
+    content: item.slice(0, 16),
+    font: 'sans',
+    size: emoji ? 0.2 : 0.18,
+    color: HEX.test(color) ? color : '#ffffff',
+    bold: !emoji,
+    italic: false,
+    align: 'center',
+    shadow: true,
+  };
+}
+export const STICKER_ANIM: ClipAnim = { in: 'pop', out: 'fade' };
+
 // ---------------- validation (project files) ----------------
 
 const HEX = /^#[0-9a-f]{6}$/i;

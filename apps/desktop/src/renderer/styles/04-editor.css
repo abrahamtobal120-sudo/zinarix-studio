@@ -212,7 +212,7 @@
   color: var(--fg-dim);
 }
 .hex-ascii {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .large-host {
   flex: 1;

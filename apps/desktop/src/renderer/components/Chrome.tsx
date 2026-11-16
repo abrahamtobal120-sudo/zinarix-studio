@@ -116,7 +116,7 @@ function useBarItems() {
       alert: true,
     },
     // Unread WhatsApp messages also show on "Más", so they are seen with WhatsApp closed.
-    more: { ...view('apps', t('appsTitle'), 'layers', whatsappUnread), alert: true },
+    more: { ...view('apps', t('appsTitle'), 'apps', whatsappUnread), alert: true },
     maximize: tool(
       'maximize',
       sideMax ? t('restoreSize') : t('maximizeSide'),
@@ -147,7 +147,7 @@ function useBarItems() {
     providers: tool('providers', t('providers'), 'key', 'action', false, () =>
       setState({ modal: { kind: 'providers' } }),
     ),
-    palette: tool('palette', t('cmdPalette'), 'menu', 'action', false, () =>
+    palette: tool('palette', t('cmdPalette'), 'command', 'action', false, () =>
       setState({ modal: { kind: 'palette' } }),
     ),
     settings: tool('settings', t('settings'), 'settings', 'action', false, () =>
@@ -491,7 +491,7 @@ export function Welcome() {
           </div>
           <div className="welcome-keys">
             {row(t('welcomeQuickOpen'), 'quickOpen', 'search')}
-            {row(t('cmdPalette'), 'palette', 'menu')}
+            {row(t('cmdPalette'), 'palette', 'command')}
             {row(t('aiEdit'), 'ai.edit', 'edit')}
             {row(t('welcomeAsk'), 'ai.askSelection', 'message')}
             {row(t('pickModel'), 'ai.pickModel', 'thinking')}

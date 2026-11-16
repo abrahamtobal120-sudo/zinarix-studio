@@ -1,0 +1,47 @@
+@layer features {
+/* Video Studio, phase 13: the AI panel (theme variables only). */
+
+.vs-ai-pad {
+  padding: 0 12px;
+}
+.vs-ai-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.vs-ai-words {
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  user-select: none;
+}
+.vs-ai-words:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.vs-ai-word {
+  cursor: pointer;
+  border-radius: 3px;
+}
+.vs-ai-word:hover {
+  background: var(--bg-2);
+}
+.vs-ai-word.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.vs-ai-word.now {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+}
+.vs-ai-word.gone {
+  color: var(--fg-dim);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+}

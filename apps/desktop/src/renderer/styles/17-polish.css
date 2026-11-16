@@ -5,7 +5,7 @@
 /* Inter (SIL Open Font License 1.1, rsms.me/inter) gives the UI one crisp typeface on every OS. */
 @font-face {
   font-family: 'Inter';
-  src: url('./assets/Inter-roman.var.woff2') format('woff2');
+  src: url('../assets/Inter-roman.var.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;

@@ -161,11 +161,16 @@ function Findings({ report, kind }: { report: SecReportView; kind: SecKind }) {
                   <strong>{f.title}</strong>
                   {f.where && <span className="sv-where">{f.where}</span>}
                   <span className="sv-finding-actions">
-                    <button title={t('secAskAI')} onClick={() => fixOne(kind, f)}>
+                    <button
+                      title={t('secAskAI')}
+                      aria-label={t('secAskAI')}
+                      onClick={() => fixOne(kind, f)}
+                    >
                       <Icon name="sparkle" size={13} />
                     </button>
                     <button
                       title={t('secCopy')}
+                      aria-label={t('secCopy')}
                       onClick={() => {
                         void navigator.clipboard
                           ?.writeText(
@@ -497,7 +502,10 @@ export function SecuritySection() {
                 style={{ ['--c' as string]: scoreColor, ['--p' as string]: `${score ?? 0}%` }}
               >
                 <div className="sv-score-inner">
-                  <strong style={{ color: scoreColor }}>{score ?? '—'}</strong>
+                  {/* No score yet: the ring stays in --border, but the dash must still be readable. */}
+                  <strong style={{ color: score === null ? 'var(--fg-dim)' : scoreColor }}>
+                    {score ?? '—'}
+                  </strong>
                   <span>{t('secScore')}</span>
                 </div>
               </div>

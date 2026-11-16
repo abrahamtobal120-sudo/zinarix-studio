@@ -1,16 +1,18 @@
 import { PROVIDER_LOGOS } from '../providerLogos';
 
+// White initials sit on these, so every one is >= 4.5:1 against white (the 600 shades of
+// orange, green, cyan, teal and pink were 3.6-4.1:1).
 const COLORS = [
   '#2563eb',
   '#7c3aed',
-  '#db2777',
-  '#ea580c',
-  '#059669',
-  '#0891b2',
+  '#be185d',
+  '#c2410c',
+  '#047857',
+  '#0e7490',
   '#4f46e5',
   '#b45309',
   '#be123c',
-  '#0d9488',
+  '#0f766e',
 ];
 
 export function providerColor(id: string): string {
@@ -44,7 +46,11 @@ export function ProviderLogo({
   return (
     <span
       className="plogo initials"
-      style={{ ...style, background: providerColor(id), fontSize: Math.round(size * 0.38) }}
+      style={{
+        ...style,
+        background: providerColor(id),
+        fontSize: Math.max(10, Math.round(size * 0.38)),
+      }}
       title={name}
     >
       {initials}

@@ -142,6 +142,7 @@ function DeployLog({
         )}
         <button
           title={t('vcCopyLog')}
+          aria-label={t('vcCopyLog')}
           disabled={!text}
           onClick={() => {
             void navigator.clipboard.writeText(text ?? '');
@@ -150,7 +151,7 @@ function DeployLog({
         >
           <Icon name="copy" size={12} />
         </button>
-        <button title={t('vcCloseLog')} onClick={onClose}>
+        <button title={t('vcCloseLog')} aria-label={t('vcCloseLog')} onClick={onClose}>
           <Icon name="x" size={12} />
         </button>
       </div>
@@ -412,6 +413,7 @@ function VercelBody({ reset }: { reset: () => void }) {
         {pick && (
           <button
             title={t('gitRefresh')}
+            aria-label={t('gitRefresh')}
             onClick={() => {
               void loadDeps();
               loadInfo();
@@ -421,7 +423,11 @@ function VercelBody({ reset }: { reset: () => void }) {
           </button>
         )}
         {st?.connected && (
-          <button title="vercel.com" onClick={() => open('https://vercel.com/dashboard')}>
+          <button
+            title="vercel.com"
+            aria-label="vercel.com"
+            onClick={() => open('https://vercel.com/dashboard')}
+          >
             <Icon name="external" size={15} />
           </button>
         )}
@@ -787,7 +793,11 @@ function VercelBody({ reset }: { reset: () => void }) {
             </button>
           )}
           {dashboard && (
-            <button onClick={() => open(dashboard)} title={t('vcDashboard')}>
+            <button
+              onClick={() => open(dashboard)}
+              title={t('vcDashboard')}
+              aria-label={t('vcDashboard')}
+            >
               <Icon name="external" size={14} />
             </button>
           )}
@@ -893,17 +903,23 @@ function VercelBody({ reset }: { reset: () => void }) {
                 >
                   <button
                     title={t('vcLogs')}
+                    aria-label={t('vcLogs')}
                     onClick={() => setLogsFor(logsFor === d.id ? null : d.id)}
                   >
                     <Icon name="scroll" size={14} />
                   </button>
                   {d.inspectorUrl && (
-                    <button title={t('vcInspect')} onClick={() => open(d.inspectorUrl!)}>
+                    <button
+                      title={t('vcInspect')}
+                      aria-label={t('vcInspect')}
+                      onClick={() => open(d.inspectorUrl!)}
+                    >
                       <Icon name="external" size={14} />
                     </button>
                   )}
                   <button
                     title={t('vcCopyUrl')}
+                    aria-label={t('vcCopyUrl')}
                     onClick={() => {
                       void navigator.clipboard.writeText(`https://${d.url}`);
                       toast(t('vcCopied'));
@@ -914,6 +930,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                   {LIVE.has(d.state) ? (
                     <button
                       title={t('vcCancel')}
+                      aria-label={t('vcCancel')}
                       onClick={async () => {
                         if (!(await confirmDialog(t('vcCancelConfirm'), { danger: true }))) return;
                         void act('cancel', async () => {
@@ -927,6 +944,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                   ) : (
                     <button
                       title={t('vcRedeploy')}
+                      aria-label={t('vcRedeploy')}
                       onClick={async () => {
                         const toProd = d.target === 'production';
                         if (
@@ -949,6 +967,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                   {d.state === 'READY' && d.id !== prod?.id && (
                     <button
                       title={d.target === 'production' ? t('vcRollback') : t('vcPromote')}
+                      aria-label={d.target === 'production' ? t('vcRollback') : t('vcPromote')}
                       onClick={async () => {
                         const msg =
                           d.target === 'production'
@@ -969,6 +988,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                   {d.id !== prod?.id && !LIVE.has(d.state) && (
                     <button
                       title={t('vcDeleteDeploy')}
+                      aria-label={t('vcDeleteDeploy')}
                       onClick={async () => {
                         if (
                           !(await confirmDialog(t('vcDeleteDeployConfirm', { url: d.url }), {
@@ -1085,7 +1105,10 @@ function VercelBody({ reset }: { reset: () => void }) {
                 <button
                   className="primary"
                   disabled={
-                    !envForm.key.trim() || !envForm.value || !envForm.targets.length || busy !== null
+                    !envForm.key.trim() ||
+                    !envForm.value ||
+                    !envForm.targets.length ||
+                    busy !== null
                   }
                   title={!envForm.value ? t('vcEnvValueRequired') : undefined}
                   onClick={saveEnv}
@@ -1183,12 +1206,14 @@ function VercelBody({ reset }: { reset: () => void }) {
               <span className="git-row-actions">
                 <button
                   title={t('vcEnvEdit')}
+                  aria-label={t('vcEnvEdit')}
                   onClick={() => setEnvForm({ key: e.key, value: '', targets: e.targets })}
                 >
                   <Icon name="edit" size={13} />
                 </button>
                 <button
                   title={t('vcEnvDelete')}
+                  aria-label={t('vcEnvDelete')}
                   onClick={async () => {
                     if (
                       !(await confirmDialog(t('vcEnvDeleteConfirm', { key: e.key }), {
@@ -1258,6 +1283,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                 {!d.verified && (
                   <button
                     title={t('vcVerify')}
+                    aria-label={t('vcVerify')}
                     onClick={() =>
                       void act('verify', async () => {
                         const ok = await api().vercel.verifyDomain(projectId, teamId, d.name);
@@ -1271,6 +1297,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                 )}
                 <button
                   title={t('vcCopyUrl')}
+                  aria-label={t('vcCopyUrl')}
                   onClick={() => {
                     void navigator.clipboard.writeText(`https://${d.name}`);
                     toast(t('vcCopied'));
@@ -1280,6 +1307,7 @@ function VercelBody({ reset }: { reset: () => void }) {
                 </button>
                 <button
                   title={t('vcDomainRemove')}
+                  aria-label={t('vcDomainRemove')}
                   onClick={async () => {
                     if (
                       !(await confirmDialog(t('vcDomainRemoveConfirm', { name: d.name }), {

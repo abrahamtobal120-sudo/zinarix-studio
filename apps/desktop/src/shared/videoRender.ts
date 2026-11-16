@@ -354,7 +354,9 @@ function inputArgs(pc: Piece): string[] {
       pc.media.path,
     ];
   }
-  return ['-ss', num(pc.readIn), '-t', num(pc.readLen), '-i', pc.media.path];
+  // VP9 alpha lives in a side stream only libvpx reads (Fase 14: 3D renders with transparency).
+  const dec = pc.media.alpha === 'vp9' ? ['-c:v', 'libvpx-vp9'] : [];
+  return ['-ss', num(pc.readIn), '-t', num(pc.readLen), ...dec, '-i', pc.media.path];
 }
 
 /** A title drawn by the renderer as a canvas-size transparent PNG. */

@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeKnowledge } from './scripts/helper-knowledge.mjs';
+import { writeMainPackages } from './scripts/notices.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -32,8 +33,9 @@ const googleClient = (() => {
   return { clientId: c.clientId ?? c.client_id ?? '', clientSecret: c.clientSecret ?? c.client_secret ?? '' };
 })();
 
-await build({
+const mainBuild = await build({
   entryPoints: [join(root, 'src/main/main.ts')],
+  metafile: true,
   outfile: join(root, 'dist/main/main.js'),
   bundle: true,
   platform: 'node',
@@ -55,8 +57,9 @@ await build({
   logLevel: 'warning',
 });
 
-await build({
+const preloadBuild = await build({
   entryPoints: [join(root, 'src/preload/preload.ts')],
+  metafile: true,
   outfile: join(root, 'dist/preload/preload.cjs'),
   bundle: true,
   platform: 'node',
@@ -67,8 +70,9 @@ await build({
 });
 
 // The editing script of the visual editor, served only inside its sandboxed preview frame.
-await build({
+const designBuild = await build({
   entryPoints: [join(root, 'src/preload/designPreview.ts')],
+  metafile: true,
   outfile: join(root, 'dist/preload/designPreview.js'),
   bundle: true,
   platform: 'browser',
@@ -84,4 +88,6 @@ for (const f of ['providers.json', 'providers.json.sig', 'keys/catalog.pub']) {
 }
 // What "Ayuda de Zinarix" knows about the app (dist/helper/knowledge.json, packaged with dist/**).
 writeKnowledge(join(root, 'dist/helper/knowledge.json'));
+// The npm packages main/preload bundle; Vite adds the renderer's and writes the notices.
+writeMainPackages([mainBuild.metafile, preloadBuild.metafile, designBuild.metafile]);
 process.stdout.write('main + preload built\n');

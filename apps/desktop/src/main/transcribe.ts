@@ -18,7 +18,12 @@ import type { OmniCore } from '@omni/core';
 import { applyAuth, errorFromResponse, joinUrl } from '@omni/providers';
 import type { Transcript } from '../shared/video.js';
 import type { Range } from '../shared/videoAi.js';
-import { parseScenes, parseSilences, parseVerboseJson, parseWhisperCpp } from '../shared/videoAi.js';
+import {
+  parseScenes,
+  parseSilences,
+  parseVerboseJson,
+  parseWhisperCpp,
+} from '../shared/videoAi.js';
 
 export type TranscribeEngineId = 'local' | 'openai' | 'groq';
 
@@ -85,13 +90,7 @@ function runText(
 }
 
 const lastLine = (s: string) =>
-  s
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .slice(-2)
-    .join(' · ')
-    .slice(0, 400);
+  s.trim().split(/\r?\n/).filter(Boolean).slice(-2).join(' · ').slice(0, 400);
 
 /** Seconds of work FFmpeg may take for a file of this length. */
 const budget = (duration: number) => Math.max(120_000, duration * 2000);
@@ -194,7 +193,22 @@ export class Transcriber {
   ): Promise<void> {
     const r = await runText(
       this.need(),
-      ['-hide_banner', '-v', 'error', '-i', path, '-vn', '-sn', '-ac', '1', '-ar', '16000', ...codec, '-y', out],
+      [
+        '-hide_banner',
+        '-v',
+        'error',
+        '-i',
+        path,
+        '-vn',
+        '-sn',
+        '-ac',
+        '1',
+        '-ar',
+        '16000',
+        ...codec,
+        '-y',
+        out,
+      ],
       budget(duration),
       signal,
     );
@@ -282,7 +296,19 @@ export class Transcriber {
     const d = Math.min(10, Math.max(0.1, minDur));
     const r = await runText(
       this.need(),
-      ['-hide_banner', '-nostats', '-i', path, '-vn', '-sn', '-af', `silencedetect=noise=${db}dB:d=${d}`, '-f', 'null', '-'],
+      [
+        '-hide_banner',
+        '-nostats',
+        '-i',
+        path,
+        '-vn',
+        '-sn',
+        '-af',
+        `silencedetect=noise=${db}dB:d=${d}`,
+        '-f',
+        'null',
+        '-',
+      ],
       budget(duration),
       signal,
     );

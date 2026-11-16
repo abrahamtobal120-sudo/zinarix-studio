@@ -731,7 +731,7 @@
   cursor: pointer;
 }
 .chat-pane-folder:hover {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .model-chip {
   display: inline-flex;

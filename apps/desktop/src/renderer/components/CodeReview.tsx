@@ -290,7 +290,12 @@ export function CodeReview({ onClose, branch }: { onClose: () => void; branch?: 
         <h2 id="code-review-title">
           <Icon name="shield" size={16} /> {t('crTitle')}
         </h2>
-        <button className="icon-btn" title={t('crClose')} onClick={onClose}>
+        <button
+          className="icon-btn"
+          title={t('crClose')}
+          aria-label={t('crClose')}
+          onClick={onClose}
+        >
           <Icon name="close" size={16} />
         </button>
       </header>
@@ -613,6 +618,7 @@ export function CodeReview({ onClose, branch }: { onClose: () => void; branch?: 
             <button
               className="icon-btn"
               title={t('crDeleteReview')}
+              aria-label={t('crDeleteReview')}
               onClick={() => void deleteSaved()}
             >
               <Icon name="trash" size={14} />

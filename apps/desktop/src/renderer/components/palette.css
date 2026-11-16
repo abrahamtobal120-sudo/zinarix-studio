@@ -40,7 +40,7 @@
 }
 .palette .pick-item mark {
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 }

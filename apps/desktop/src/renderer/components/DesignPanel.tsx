@@ -26,7 +26,10 @@ type Tab = 'file' | 'home' | 'view';
 type SaveState = 'saved' | 'saving' | 'error';
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']*': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']*': (Error: )?/,
+    '',
+  );
 
 const ZOOM_KEY = 'zs.design.zoom';
 const PAGE_KEY = 'zs.design.page';
@@ -335,7 +338,10 @@ export function DesignPanel() {
         case 'navigate': {
           const want = msg.path.replace(/^\/+/, '');
           const p = view?.pages.find(
-            (x) => x.file === want || x.path === msg.path || x.file === `${want}.html` ||
+            (x) =>
+              x.file === want ||
+              x.path === msg.path ||
+              x.file === `${want}.html` ||
               x.file === `${want}${want && !want.endsWith('/') ? '/' : ''}index.html`,
           );
           if (p) setPage(p.file);
@@ -427,8 +433,15 @@ export function DesignPanel() {
     return <LiveSetup view={view} onView={showView} onExit={exit} />;
   if (view.mode === 'none' && view.kind === 'desktop')
     return (
-      <Empty icon="monitor" title={t('dzDesktopTitle', { kind: view.label })} text={t('dzDesktopText')}>
-        <button className="primary" onClick={() => askInChat(t('dzAiNotYet', { kind: view.label }))}>
+      <Empty
+        icon="monitor"
+        title={t('dzDesktopTitle', { kind: view.label })}
+        text={t('dzDesktopText')}
+      >
+        <button
+          className="primary"
+          onClick={() => askInChat(t('dzAiNotYet', { kind: view.label }))}
+        >
           <Icon name="sparkle" size={14} /> {t('dzAskAi')}
         </button>
         <button onClick={exit}>{t('dzExit')}</button>
@@ -446,7 +459,9 @@ export function DesignPanel() {
         <button
           className="primary"
           onClick={() =>
-            askInChat(view.kind === 'unknown' ? t('dzAiNewSite') : t('dzAiNotYet', { kind: view.label }))
+            askInChat(
+              view.kind === 'unknown' ? t('dzAiNewSite') : t('dzAiNotYet', { kind: view.label }),
+            )
           }
         >
           <Icon name="sparkle" size={14} /> {t('dzAskAi')}
@@ -458,11 +473,7 @@ export function DesignPanel() {
   const pageIdx = view.pages.findIndex((p) => p.file === page);
   const devW = DEVICE_W[device];
   const pad = 32;
-  const scale = fit
-    ? devW
-      ? Math.min(1, (box.w - pad) / devW)
-      : 1
-    : zoom / 100;
+  const scale = fit ? (devW ? Math.min(1, (box.w - pad) / devW) : 1) : zoom / 100;
   const frameW = devW || Math.max(320, (box.w - pad) / scale);
   const frameH = Math.max(200, (box.h - pad) / scale);
   const shownZoom = Math.round(scale * 100);
@@ -475,7 +486,14 @@ export function DesignPanel() {
       .then(showView)
       .catch((e: unknown) => setProblem(errText(e)));
 
-  const R = (props: { icon: IconName; label: string; onClick: () => void; on?: boolean; disabled?: boolean; title?: string }) => (
+  const R = (props: {
+    icon: IconName;
+    label: string;
+    onClick: () => void;
+    on?: boolean;
+    disabled?: boolean;
+    title?: string;
+  }) => (
     <button
       className={`dz-rb ${props.on ? 'on' : ''}`}
       onClick={props.onClick}
@@ -507,7 +525,9 @@ export function DesignPanel() {
             role="tab"
             aria-selected={tab === id}
             className={tab === id ? 'on' : ''}
-            onClick={() => (tab === id ? setRibbonOpen((o) => !o) : (setTab(id), setRibbonOpen(true)))}
+            onClick={() =>
+              tab === id ? setRibbonOpen((o) => !o) : (setTab(id), setRibbonOpen(true))
+            }
             onDoubleClick={() => setRibbonOpen((o) => !o)}
           >
             {label}
@@ -525,7 +545,9 @@ export function DesignPanel() {
             ref={aiInput}
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
-            placeholder={sel ? t('dzAiPlaceholderSel', { what: tagName(sel.tag) }) : t('dzAiPlaceholder')}
+            placeholder={
+              sel ? t('dzAiPlaceholderSel', { what: tagName(sel.tag) }) : t('dzAiPlaceholder')
+            }
             aria-label={t('dzAiPlaceholder')}
           />
         </form>
@@ -539,11 +561,25 @@ export function DesignPanel() {
             <>
               <Group label={t('dzGroupFile')}>
                 {readOnly ? (
-                  <R icon="refresh" label={t('dzLiveStop')} onClick={changeView} title={t('dzLiveStopTitle')} />
+                  <R
+                    icon="refresh"
+                    label={t('dzLiveStop')}
+                    onClick={changeView}
+                    title={t('dzLiveStopTitle')}
+                  />
                 ) : (
-                  <R icon="file" label={t('dzSeeCode')} onClick={() => page && void openFile(page)} title={t('dzSeeCodeTitle')} />
+                  <R
+                    icon="file"
+                    label={t('dzSeeCode')}
+                    onClick={() => page && void openFile(page)}
+                    title={t('dzSeeCodeTitle')}
+                  />
                 )}
-                <R icon="history" label={t('dzVersions')} onClick={() => setState({ sidebar: 'git' })} />
+                <R
+                  icon="history"
+                  label={t('dzVersions')}
+                  onClick={() => setState({ sidebar: 'git' })}
+                />
                 <R icon="close" label={t('dzExit')} onClick={exit} />
               </Group>
             </>
@@ -551,40 +587,147 @@ export function DesignPanel() {
           {tab === 'home' && (
             <>
               <Group label={t('dzGroupHistory')}>
-                <R icon="undo" label={t('dzUndo')} onClick={() => void undo()} disabled={!history.canUndo} title={history.steps[0] ? `${t('dzUndo')}: ${history.steps[0]} (Ctrl+Z)` : t('dzUndo')} />
-                <R icon="continue" label={t('dzRedo')} onClick={() => void redo()} disabled={!history.canRedo} title={history.redo[0] ? `${t('dzRedo')}: ${history.redo[0]} (Ctrl+Y)` : t('dzRedo')} />
+                <R
+                  icon="undo"
+                  label={t('dzUndo')}
+                  onClick={() => void undo()}
+                  disabled={!history.canUndo}
+                  title={
+                    history.steps[0] ? `${t('dzUndo')}: ${history.steps[0]} (Ctrl+Z)` : t('dzUndo')
+                  }
+                />
+                <R
+                  icon="continue"
+                  label={t('dzRedo')}
+                  onClick={() => void redo()}
+                  disabled={!history.canRedo}
+                  title={
+                    history.redo[0] ? `${t('dzRedo')}: ${history.redo[0]} (Ctrl+Y)` : t('dzRedo')
+                  }
+                />
               </Group>
               <Group label={t('dzGroupText')}>
-                <R icon="edit" label={t('dzEditText')} onClick={() => sel && send({ type: 'editText', src: sel.src })} disabled={!editable} title={t('dzEditTextTitle')} />
-                <button className="dz-rb dz-fmt" disabled={!editable} onClick={() => fmt('bold')} title={t('dzBold')}><b>B</b></button>
-                <button className="dz-rb dz-fmt" disabled={!editable} onClick={() => fmt('italic')} title={t('dzItalic')}><i>I</i></button>
-                <button className="dz-rb dz-fmt" disabled={!editable} onClick={() => fmt('underline')} title={t('dzUnderline')}><u>U</u></button>
-                <button className="dz-rb dz-fmt" disabled={!editable} onClick={() => fmt('strikeThrough')} title={t('dzStrike')}><s>S</s></button>
+                <R
+                  icon="edit"
+                  label={t('dzEditText')}
+                  onClick={() => sel && send({ type: 'editText', src: sel.src })}
+                  disabled={!editable}
+                  title={t('dzEditTextTitle')}
+                />
+                <button
+                  className="dz-rb dz-fmt"
+                  disabled={!editable}
+                  onClick={() => fmt('bold')}
+                  title={t('dzBold')}
+                >
+                  <b>B</b>
+                </button>
+                <button
+                  className="dz-rb dz-fmt"
+                  disabled={!editable}
+                  onClick={() => fmt('italic')}
+                  title={t('dzItalic')}
+                >
+                  <i>I</i>
+                </button>
+                <button
+                  className="dz-rb dz-fmt"
+                  disabled={!editable}
+                  onClick={() => fmt('underline')}
+                  title={t('dzUnderline')}
+                >
+                  <u>U</u>
+                </button>
+                <button
+                  className="dz-rb dz-fmt"
+                  disabled={!editable}
+                  onClick={() => fmt('strikeThrough')}
+                  title={t('dzStrike')}
+                >
+                  <s>S</s>
+                </button>
               </Group>
               <Group label={t('dzGroupSelect')}>
-                <R icon="back" label={t('dzParent')} onClick={() => sel?.parents[0] && send({ type: 'select', src: sel.parents[0].src })} disabled={!sel?.parents.length} title={t('dzParentTitle')} />
-                <R icon="x" label={t('dzDeselect')} onClick={() => { send({ type: 'select', src: null }); setSel(null); }} disabled={!sel} />
+                <R
+                  icon="back"
+                  label={t('dzParent')}
+                  onClick={() =>
+                    sel?.parents[0] && send({ type: 'select', src: sel.parents[0].src })
+                  }
+                  disabled={!sel?.parents.length}
+                  title={t('dzParentTitle')}
+                />
+                <R
+                  icon="x"
+                  label={t('dzDeselect')}
+                  onClick={() => {
+                    send({ type: 'select', src: null });
+                    setSel(null);
+                  }}
+                  disabled={!sel}
+                />
               </Group>
               <Group label={t('dzGroupAi')}>
-                <R icon="sparkle" label={t('dzAskAi')} onClick={() => (aiText.trim() ? askAi(aiText) : aiInput.current?.focus())} />
+                <R
+                  icon="sparkle"
+                  label={t('dzAskAi')}
+                  onClick={() => (aiText.trim() ? askAi(aiText) : aiInput.current?.focus())}
+                />
               </Group>
             </>
           )}
           {tab === 'view' && (
             <>
               <Group label={t('dzGroupDevice')}>
-                <R icon="monitor" label={t('dzDesktop')} on={device === 'desktop'} onClick={() => setDevice('desktop')} />
-                <R icon="window" label={t('dzTablet')} on={device === 'tablet'} onClick={() => setDevice('tablet')} />
-                <R icon="smartphone" label={t('dzPhone')} on={device === 'phone'} onClick={() => setDevice('phone')} />
+                <R
+                  icon="monitor"
+                  label={t('dzDesktop')}
+                  on={device === 'desktop'}
+                  onClick={() => setDevice('desktop')}
+                />
+                <R
+                  icon="window"
+                  label={t('dzTablet')}
+                  on={device === 'tablet'}
+                  onClick={() => setDevice('tablet')}
+                />
+                <R
+                  icon="smartphone"
+                  label={t('dzPhone')}
+                  on={device === 'phone'}
+                  onClick={() => setDevice('phone')}
+                />
               </Group>
               <Group label={t('dzGroupShow')}>
-                <R icon="eye" label={t('dzVisitor')} on={mode === 'visitor'} onClick={() => setMode((m) => (m === 'edit' ? 'visitor' : 'edit'))} title={t('dzVisitorTitle')} />
-                <R icon="columns" label={t('dzOutlines')} on={outlines} onClick={() => setOutlines((o) => !o)} />
+                <R
+                  icon="eye"
+                  label={t('dzVisitor')}
+                  on={mode === 'visitor'}
+                  onClick={() => setMode((m) => (m === 'edit' ? 'visitor' : 'edit'))}
+                  title={t('dzVisitorTitle')}
+                />
+                <R
+                  icon="columns"
+                  label={t('dzOutlines')}
+                  on={outlines}
+                  onClick={() => setOutlines((o) => !o)}
+                />
                 <R icon="refresh" label={t('dzReload')} onClick={reload} />
               </Group>
               <Group label={t('dzGroupZoom')}>
-                <R icon="maximize" label={t('dzFit')} on={fit} onClick={() => setFit(true)} title={`${t('dzFit')} (Ctrl+0)`} />
-                <R icon="search" label="100%" on={!fit && zoom === 100} onClick={() => (setFit(false), setZoom(100))} />
+                <R
+                  icon="maximize"
+                  label={t('dzFit')}
+                  on={fit}
+                  onClick={() => setFit(true)}
+                  title={`${t('dzFit')} (Ctrl+0)`}
+                />
+                <R
+                  icon="search"
+                  label="100%"
+                  on={!fit && zoom === 100}
+                  onClick={() => (setFit(false), setZoom(100))}
+                />
               </Group>
             </>
           )}
@@ -619,31 +762,36 @@ export function DesignPanel() {
                   reload();
                 }}
               >
-                <input value={addr} onChange={(e) => setAddr(e.target.value)} spellCheck={false} aria-label={t('dzLiveAddress')} />
+                <input
+                  value={addr}
+                  onChange={(e) => setAddr(e.target.value)}
+                  spellCheck={false}
+                  aria-label={t('dzLiveAddress')}
+                />
                 <button type="submit">{t('dzLiveGo')}</button>
               </form>
             </>
           ) : (
-          <>
-          <div className="dz-head">{t('dzPages')}</div>
-          <div className="dz-pages">
-            {view.pages.map((p, i) => (
-              <button
-                key={p.file}
-                className={`dz-page ${p.file === page ? 'on' : ''}`}
-                onClick={() => {
-                  void flush();
-                  setPage(p.file);
-                }}
-                title={`${p.path} · ${p.file}`}
-              >
-                <span className="dz-page-n">{i + 1}</span>
-                <span className="dz-page-name">{p.name}</span>
-                <span className="dz-page-path">{p.path}</span>
-              </button>
-            ))}
-          </div>
-          </>
+            <>
+              <div className="dz-head">{t('dzPages')}</div>
+              <div className="dz-pages">
+                {view.pages.map((p, i) => (
+                  <button
+                    key={p.file}
+                    className={`dz-page ${p.file === page ? 'on' : ''}`}
+                    onClick={() => {
+                      void flush();
+                      setPage(p.file);
+                    }}
+                    title={`${p.path} · ${p.file}`}
+                  >
+                    <span className="dz-page-n">{i + 1}</span>
+                    <span className="dz-page-name">{p.name}</span>
+                    <span className="dz-page-path">{p.path}</span>
+                  </button>
+                ))}
+              </div>
+            </>
           )}
           <div className="dz-head">{t('dzLayers')}</div>
           <div className="dz-layers" role="tree" aria-label={t('dzLayers')}>
@@ -720,7 +868,12 @@ export function DesignPanel() {
 
       {/* ---------------- status bar ---------------- */}
       <div className="dz-status">
-        <button onClick={() => void undo()} disabled={!history.canUndo} title={`${t('dzUndo')} (Ctrl+Z)`}>
+        <button
+          onClick={() => void undo()}
+          disabled={!history.canUndo}
+          title={`${t('dzUndo')} (Ctrl+Z)`}
+          aria-label={`${t('dzUndo')} (Ctrl+Z)`}
+        >
           <Icon name="undo" size={13} />
         </button>
         {history.steps.length > 1 && (
@@ -738,11 +891,20 @@ export function DesignPanel() {
             ))}
           </select>
         )}
-        <button onClick={() => void redo()} disabled={!history.canRedo} title={`${t('dzRedo')} (Ctrl+Y)`}>
+        <button
+          onClick={() => void redo()}
+          disabled={!history.canRedo}
+          title={`${t('dzRedo')} (Ctrl+Y)`}
+          aria-label={`${t('dzRedo')} (Ctrl+Y)`}
+        >
           <Icon name="continue" size={13} />
         </button>
         <span className={`dz-save ${saveState}`}>
-          {saveState === 'saved' ? `${t('dzSaved')} ✓` : saveState === 'saving' ? t('dzSaving') : t('dzSaveError')}
+          {saveState === 'saved'
+            ? `${t('dzSaved')} ✓`
+            : saveState === 'saving'
+              ? t('dzSaving')
+              : t('dzSaveError')}
         </span>
         {problem && (
           <span className="dz-problem" role="alert">
@@ -771,7 +933,11 @@ export function DesignPanel() {
           }}
         />
         <span className="dz-zoom">{shownZoom}%</span>
-        <button onClick={() => setFit(true)} title={`${t('dzFit')} (Ctrl+0)`}>
+        <button
+          onClick={() => setFit(true)}
+          title={`${t('dzFit')} (Ctrl+0)`}
+          aria-label={`${t('dzFit')} (Ctrl+0)`}
+        >
           <Icon name="maximize" size={13} />
         </button>
       </div>
@@ -789,7 +955,48 @@ function runOpenFolder(): Promise<void> {
 
 function tagNames(): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const tag of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'a', 'button', 'img', 'section', 'header', 'footer', 'nav', 'div', 'span', 'ul', 'ol', 'li', 'form', 'input', 'main', 'article', 'aside', 'figure', 'video', 'table', 'body', 'blockquote', 'label', 'textarea', 'select', 'svg', 'strong', 'b', 'em', 'i', 'hr', 'iframe', 'small'])
+  for (const tag of [
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'p',
+    'a',
+    'button',
+    'img',
+    'section',
+    'header',
+    'footer',
+    'nav',
+    'div',
+    'span',
+    'ul',
+    'ol',
+    'li',
+    'form',
+    'input',
+    'main',
+    'article',
+    'aside',
+    'figure',
+    'video',
+    'table',
+    'body',
+    'blockquote',
+    'label',
+    'textarea',
+    'select',
+    'svg',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'hr',
+    'iframe',
+    'small',
+  ])
     out[tag] = tagName(tag);
   return out;
 }
@@ -811,7 +1018,9 @@ function Empty(props: { icon: IconName; title: string; text: string; children: R
         <Icon name={props.icon} size={34} />
         <h2>{props.title}</h2>
         {props.text && <p>{props.text}</p>}
-        <div className="dz-empty-actions">{props.children ?? <button onClick={exitOnly}>{t('dzExit')}</button>}</div>
+        <div className="dz-empty-actions">
+          {props.children ?? <button onClick={exitOnly}>{t('dzExit')}</button>}
+        </div>
       </div>
     </div>
   );
@@ -833,7 +1042,8 @@ function LayerRow(props: {
     !!src && (l.src === src || l.children.some((c) => contains(c, src)));
   // Selecting something on the page opens the branches down to it.
   useEffect(() => {
-    if (props.selected && props.selected !== layer.src && contains(layer, props.selected)) setOpen(true);
+    if (props.selected && props.selected !== layer.src && contains(layer, props.selected))
+      setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selected]);
   const ref = useRef<HTMLDivElement>(null);

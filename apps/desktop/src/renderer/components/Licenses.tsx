@@ -3,6 +3,7 @@ import ffmpegSource from '../../../build/ffmpeg/FFMPEG-SOURCE.txt?raw';
 import { t } from '../i18n';
 import { setState } from '../store';
 import { ModalShell } from './ModalShell';
+import { ThirdPartyNotices } from './ThirdPartyNotices';
 
 const pre = {
   whiteSpace: 'pre-wrap',
@@ -31,6 +32,7 @@ export function Licenses() {
         <summary>{t('licensesGpl')}</summary>
         <pre style={pre}>{gplText}</pre>
       </details>
+      <ThirdPartyNotices />
     </ModalShell>
   );
 }

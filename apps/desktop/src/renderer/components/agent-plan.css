@@ -25,7 +25,7 @@
   background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 .mode-pill.mode-agent {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .mode-menu {
   position: absolute;
