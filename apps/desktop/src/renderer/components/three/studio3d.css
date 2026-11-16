@@ -264,7 +264,8 @@
   }
   .s3-field {
     display: grid;
-    grid-template-columns: 110px 1fr;
+    /* minmax(0, …): a range input has a wide min-content size and pushed its value past the panel edge. */
+    grid-template-columns: 110px minmax(0, 1fr);
     align-items: center;
     gap: 6px;
     margin: 4px 0;
@@ -408,7 +409,7 @@
     box-shadow: 0 12px 40px color-mix(in srgb, var(--bg) 50%, transparent);
   }
   .s3-card .s3-field {
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: 140px minmax(0, 1fr);
   }
   .s3-progress {
     position: absolute;
