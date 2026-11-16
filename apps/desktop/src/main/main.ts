@@ -28,7 +28,7 @@ import type {
 } from '../shared/api.js';
 import { UI_ZOOM_STEPS } from '../shared/api.js';
 import { DEFAULT_PREFS, EVENT_CHANNEL, GCLOUD_KINDS, THEME_IDS } from '../shared/api.js';
-import { AiService } from './ai.js';
+import { AiService, describeError } from './ai.js';
 import type { Scope } from './ai.js';
 import {
   Git,
@@ -81,6 +81,7 @@ import { MediaService } from './media.js';
 import { BuildService } from './build.js';
 import { rulesPrompt } from '../shared/rules.js';
 import { redact } from '@omni/security';
+import type { ChatMessage } from '@omni/shared';
 import { DesignSession, EDITOR_SCRIPT_PATH } from './design/session.js';
 import { EditError } from './design/htmlSource.js';
 import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
@@ -101,6 +102,8 @@ import { gitMention, webMention } from './mentions.js';
 import { VideoService, fromStored, readLut, toStored } from './video.js';
 import { Transcriber } from './transcribe.js';
 import { Scene3DService } from './scene3d.js';
+import { BlenderBridge } from './blenderBridge.js';
+import { withProtocol } from './textTools.js';
 import { Gen3DService } from './gen3d.js';
 import { GEN3D_MODELS, isGen3dImage } from '../shared/gen3d.js';
 import { isModelPath, sanitizeScene, type Scene3D } from '../shared/scene3d.js';
@@ -2739,7 +2742,39 @@ function registerVideoAgentIpc(): void {
 
 /** Fase 14: 3D scenes to video (viewer frames, Blender), and .z3d scene files. */
 function registerScene3dIpc(): void {
-  const svc = new Scene3DService(app.getPath('userData'), () => videoService().tools().ffmpeg);
+  // 3D Pro: Blender's AI add-on uses the models connected here through a local bridge.
+  const bridge = new BlenderBridge({
+    models: async () =>
+      (await ai.models(false)).models.map((m) => ({
+        id: `${m.provider}/${m.id}`,
+        ownedBy: m.provider,
+      })),
+    complete: async (req, signal) => {
+      let messages: ChatMessage[] = req.messages;
+      // CLI agents (Claude Code, Codex…) drop system prompts: fold them into the user turn.
+      const ref = ai.core.resolveModel(req.model, 'chat');
+      if (ai.core.provider(ref.provider).adapter === 'cli-agent') {
+        const sys = messages.filter((m) => m.role === 'system').map((m) => m.content);
+        messages = messages.filter((m) => m.role !== 'system');
+        if (sys.length) messages = withProtocol(messages, sys.join('\n\n'), 'user');
+      }
+      try {
+        const r = await ai.core.complete(
+          { model: req.model, role: 'chat', maxTokens: req.maxTokens ?? 4096, messages },
+          signal,
+        );
+        return { text: r.text, model: r.provider ? `${r.provider}/${r.model}` : r.model };
+      } catch (e) {
+        throw new Error(describeError(e).message);
+      }
+    },
+  });
+  app.on('will-quit', () => void bridge.close());
+  const svc = new Scene3DService(
+    app.getPath('userData'),
+    () => videoService().tools().ffmpeg,
+    () => bridge.start(),
+  );
   ai.agent.scene3d = svc;
   const id = z.string().uuid();
   // The agent's viewer renders run in a window: the focused one, else the first.
@@ -2840,6 +2875,14 @@ function registerScene3dIpc(): void {
     if (!p) return null;
     return (await svc.useBlender(resolve(p))) ?? false;
   });
+  handle('scene3d:openPro', z.tuple([z.enum(['es', 'en'])]), async (_w, lang) =>
+    svc.openPro(
+      app.isPackaged
+        ? join(process.resourcesPath, 'blender-scripts')
+        : join(appRoot, 'blender', 'scripts'),
+      lang,
+    ),
+  );
   handle(
     'scene3d:begin',
     z.tuple([

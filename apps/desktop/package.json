@@ -110,6 +110,14 @@
       },
       "extraResources": [
         {
+          "from": "blender/scripts",
+          "to": "blender-scripts",
+          "filter": [
+            "**/*",
+            "!**/__pycache__/**"
+          ]
+        },
+        {
           "from": "node_modules/ffmpeg-static/ffmpeg",
           "to": "ffmpeg/ffmpeg"
         },
@@ -175,6 +183,14 @@
       "identity": null,
       "extraResources": [
         {
+          "from": "blender/scripts",
+          "to": "blender-scripts",
+          "filter": [
+            "**/*",
+            "!**/__pycache__/**"
+          ]
+        },
+        {
           "from": "node_modules/ffmpeg-static/ffmpeg",
           "to": "ffmpeg/ffmpeg"
         },
@@ -216,6 +232,14 @@
       "icon": "build/icon.png",
       "artifactName": "Zinarix-Studio-${version}-${arch}-setup.${ext}",
       "extraResources": [
+        {
+          "from": "blender/scripts",
+          "to": "blender-scripts",
+          "filter": [
+            "**/*",
+            "!**/__pycache__/**"
+          ]
+        },
         {
           "from": "node_modules/ffmpeg-static/ffmpeg.exe",
           "to": "ffmpeg/ffmpeg.exe"

@@ -441,6 +441,7 @@ const api: OmniApi = {
   scene3d: {
     info: call('scene3d:info') as OmniApi['scene3d']['info'],
     pickBlender: call('scene3d:pickBlender') as OmniApi['scene3d']['pickBlender'],
+    openPro: call('scene3d:openPro') as OmniApi['scene3d']['openPro'],
     begin: call('scene3d:begin') as OmniApi['scene3d']['begin'],
     frame: call('scene3d:frame') as OmniApi['scene3d']['frame'],
     end: call('scene3d:end') as OmniApi['scene3d']['end'],

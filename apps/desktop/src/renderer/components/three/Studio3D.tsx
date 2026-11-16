@@ -38,6 +38,7 @@ import {
   type TemplateId,
   type Vec3,
 } from '../../../shared/scene3d';
+import { lang } from '../../i18n';
 import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
 import { render3d, wireAgent3d, type Engine3D } from './actions3d';
@@ -314,6 +315,137 @@ async function save(saveAs: boolean) {
   }
 }
 
+const BLENDER_DOWNLOAD = 'https://www.blender.org/download/';
+/** How long the Pro button stays busy after a launch (Blender takes a while to show up). */
+const PRO_LAUNCH_MS = 4000;
+
+/** Zinarix 3D Pro needs Blender 4.2+ (the render engine alone accepts 3.6+). */
+function proVersionOk(v: string): boolean {
+  const [major = 0, minor = 0] = v.split('.').map((n) => parseInt(n, 10) || 0);
+  return major > 4 || (major === 4 && minor >= 2);
+}
+
+type ProErrorKind = 'NO_BLENDER' | 'OLD_BLENDER' | 'NO_TEMPLATE' | null;
+
+/** Electron's invoke() drops custom error properties, so fall back to the message text. */
+function proErrorKind(e: unknown): ProErrorKind {
+  const code = (e as { code?: unknown } | null)?.code;
+  if (code === 'NO_BLENDER' || code === 'OLD_BLENDER' || code === 'NO_TEMPLATE') return code;
+  const m = e instanceof Error ? e.message : String(e);
+  if (/NO_BLENDER|no está instalado|not installed/i.test(m)) return 'NO_BLENDER';
+  if (/OLD_BLENDER|encontré|\(found /i.test(m)) return 'OLD_BLENDER';
+  if (/NO_TEMPLATE|plantilla|template/i.test(m)) return 'NO_TEMPLATE';
+  return null;
+}
+
+/** "Error invoking remote method 'x': Error: msg" → "msg". */
+const ipcMessage = (e: unknown) =>
+  (e instanceof Error ? e.message : String(e)).replace(
+    /^Error invoking remote method '[^']*': (?:\w*Error: )?/,
+    '',
+  );
+
+/**
+ * "Modo Pro": opens Zinarix 3D Pro (Blender 4.2+ with the Zinarix template). Without a usable
+ * Blender it explains why and offers to download it or pick blender.exe instead.
+ */
+function ProButton() {
+  // undefined = still checking; null = not found.
+  const [blender, setBlender] = useState<{ version: string } | null | undefined>(undefined);
+  const [pop, setPop] = useState(false);
+  const [launching, setLaunching] = useState(false);
+  const busy = useRef(false);
+  const look = (refresh = false) =>
+    api()
+      .scene3d.info(refresh)
+      .then(
+        (i) => (setBlender(i.blender), i.blender),
+        () => (setBlender(null), null),
+      );
+  useEffect(() => void look(), []);
+  const ready = blender === undefined || (!!blender && proVersionOk(blender.version));
+
+  const launch = async () => {
+    if (busy.current) return;
+    busy.current = true;
+    setLaunching(true);
+    setPop(false);
+    let started = false;
+    try {
+      await api().scene3d.openPro(lang === 'en' ? 'en' : 'es');
+      started = true;
+      toast(t3('openProStarted'));
+    } catch (e) {
+      const kind = proErrorKind(e);
+      if (kind === 'NO_BLENDER' || kind === 'OLD_BLENDER') {
+        await look(true);
+        setPop(true);
+      } else if (kind === 'NO_TEMPLATE') toast(t3('proNoTemplate'));
+      else toast(t3('proFailed', { msg: ipcMessage(e) }));
+    } finally {
+      const done = () => {
+        busy.current = false;
+        setLaunching(false);
+      };
+      if (started) window.setTimeout(done, PRO_LAUNCH_MS);
+      else done();
+    }
+  };
+
+  return (
+    <div className="s3-menu">
+      <button
+        type="button"
+        className="s3-btn"
+        title={t3('openProHint')}
+        disabled={launching}
+        aria-busy={launching}
+        aria-expanded={ready ? undefined : pop}
+        onClick={() => (ready ? void launch() : setPop(!pop))}
+      >
+        {launching ? (
+          <span className="s3-spin" aria-hidden="true" />
+        ) : (
+          <Icon name={ready ? 'external' : 'warning'} />
+        )}{' '}
+        {launching ? t3('openProLaunching') : t3('openPro')}
+      </button>
+      {pop && !launching && (
+        <div className="s3-pop s3-pro-pop" role="dialog" aria-label={t3('openPro')}>
+          <p className="s3-hint s3-pro-msg">
+            {blender ? t3('proOldBlender', { v: blender.version }) : t3('proNeedsBlender')}
+          </p>
+          <button type="button" onClick={() => void api().app.openExternal(BLENDER_DOWNLOAD)}>
+            <Icon name="download" /> {t3('proDownload')}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const b = await api().scene3d.pickBlender();
+              if (b === false) return toast(t3('notBlender'));
+              if (!b) return;
+              setBlender(b);
+              if (proVersionOk(b.version)) void launch();
+            }}
+          >
+            <Icon name="folder" /> {t3('proPick')}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const b = await look(true);
+              if (b && proVersionOk(b.version)) void launch();
+              else if (!b) toast(t3('proNotFound'));
+            }}
+          >
+            <Icon name="refresh" /> {t3('findAgain')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TopBar() {
   const past = use3((s) => s.past.length);
   const future = use3((s) => s.future.length);
@@ -385,6 +517,7 @@ function TopBar() {
       <button type="button" className="s3-btn" onClick={() => void save(false)} title="Ctrl+S">
         <Icon name="download" /> {t3('save')}
       </button>
+      <ProButton />
       <button type="button" className="s3-btn" onClick={() => void save(true)}>
         {t3('saveAs')}
       </button>

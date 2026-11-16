@@ -68,6 +68,20 @@ const es = {
   key: 'Poner o quitar keyframe en el cabezal (K)',
   keyHint: 'Si una propiedad tiene keyframes, cambiarla pone un keyframe en el cabezal.',
   pickBlender: 'Elegir el motor Pro (blender.exe)…',
+  openPro: 'Modo Pro',
+  openProHint:
+    'Abre Zinarix 3D Pro con la IA integrada: pídele cosas en la barra lateral (tecla N → Zinarix)',
+  openProStarted: 'Abriendo Zinarix 3D Pro… puede tardar unos segundos.',
+  openProLaunching: 'Abriendo…',
+  proNeedsBlender:
+    'Zinarix 3D Pro funciona con Blender, un programa gratuito. Descárgalo o, si ya lo tienes, dinos dónde está.',
+  proOldBlender:
+    'Tienes Blender {v}, pero Zinarix 3D Pro necesita la versión 4.2 o más nueva. Descarga la última versión (es gratis).',
+  proDownload: 'Descargar Blender (gratis)',
+  proPick: 'Ya lo tengo: elegir blender.exe…',
+  proNotFound: 'Todavía no encuentro Blender en este equipo.',
+  proNoTemplate: 'Falta una parte de Zinarix 3D Pro. Reinstala Zinarix Studio para repararlo.',
+  proFailed: 'No se pudo abrir Zinarix 3D Pro: {msg}',
   notBlender: 'Ese archivo no sirve como motor Pro: hace falta Blender 3.6 o más nuevo.',
   curve: 'Curva',
   curveHint: 'Cómo viaja el valor desde este keyframe hasta el siguiente.',
@@ -218,6 +232,20 @@ const en: Record<keyof typeof es, string> = {
   key: 'Add or remove a keyframe at the playhead (K)',
   keyHint: 'When a property has keyframes, changing it adds a keyframe at the playhead.',
   pickBlender: 'Choose the Pro engine (blender.exe)…',
+  openPro: 'Pro Mode',
+  openProHint:
+    'Opens Zinarix 3D Pro with the built-in AI: ask it for things in the sidebar (N key → Zinarix)',
+  openProStarted: 'Opening Zinarix 3D Pro… this can take a few seconds.',
+  openProLaunching: 'Opening…',
+  proNeedsBlender:
+    'Zinarix 3D Pro runs on Blender, a free program. Download it or, if you already have it, show us where it is.',
+  proOldBlender:
+    'You have Blender {v}, but Zinarix 3D Pro needs version 4.2 or newer. Download the latest version (it’s free).',
+  proDownload: 'Download Blender (free)',
+  proPick: 'I already have it: choose blender.exe…',
+  proNotFound: 'Still can’t find Blender on this computer.',
+  proNoTemplate: 'Part of Zinarix 3D Pro is missing. Reinstall Zinarix Studio to repair it.',
+  proFailed: 'Couldn’t open Zinarix 3D Pro: {msg}',
   notBlender: 'That file can’t be the Pro engine: it needs Blender 3.6 or newer.',
   curve: 'Curve',
   curveHint: 'How the value travels from this keyframe to the next one.',

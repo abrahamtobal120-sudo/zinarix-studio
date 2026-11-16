@@ -2092,6 +2092,8 @@ export interface OmniApi {
     ): Promise<{ blender: { path: string; version: string } | null; outDir: string }>;
     /** File dialog for blender.exe (portable builds): null if cancelled, false if not Blender 3.6+. */
     pickBlender(): Promise<{ path: string; version: string } | null | false>;
+    /** Opens Zinarix 3D Pro: Blender's window with the Zinarix template (needs Blender 4.2+). */
+    openPro(lang: 'es' | 'en'): Promise<void>;
     /** Starts encoding viewer frames; then frame() each RGBA frame and end(). */
     begin(o: {
       width: number;
@@ -2577,6 +2579,7 @@ export const CHANNELS = [
   'media:abort',
   'scene3d:info',
   'scene3d:pickBlender',
+  'scene3d:openPro',
   'scene3d:begin',
   'scene3d:frame',
   'scene3d:end',

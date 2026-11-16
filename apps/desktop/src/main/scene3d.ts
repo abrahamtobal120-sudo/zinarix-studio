@@ -100,6 +100,13 @@ function runText(bin: string, args: string[], timeoutMs: number): Promise<string
   });
 }
 
+/** Why 3D Pro could not open; `code` lets the renderer show it in the user's language. */
+export type ProErrorCode = 'NO_BLENDER' | 'OLD_BLENDER' | 'NO_TEMPLATE';
+
+function proError(code: ProErrorCode, message: string): Error & { code: ProErrorCode } {
+  return Object.assign(new Error(message), { code });
+}
+
 export interface RenderResult {
   path: string;
   format: Render3DFormat;
@@ -137,6 +144,8 @@ export class Scene3DService {
   constructor(
     private readonly userData: string,
     private readonly ffmpeg: () => string | null,
+    /** 3D Pro: the local bridge to the models connected in Zinarix (main/blenderBridge.ts). */
+    private readonly bridge?: () => Promise<{ url: string; token: string }>,
   ) {}
 
   /** <project>/media/3d, or the app data folder when no folder is open. */
@@ -398,6 +407,52 @@ export class Scene3DService {
     } finally {
       await rm(work, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * Opens Blender with its window, dressed as Zinarix Studio 3D: the "Zinarix" app template
+   * (theme, menus, splash, AI panel) from `scriptsDir`. Its preferences live in the app data
+   * folder, so a normal Blender on the same PC keeps its own. Needs Blender 4.2+ (older ones
+   * replace their whole scripts folder with BLENDER_SYSTEM_SCRIPTS instead of adding to it).
+   */
+  async openPro(scriptsDir: string, lang: 'es' | 'en', file?: string): Promise<void> {
+    const b = await this.findBlender();
+    if (!b)
+      throw proError(
+        'NO_BLENDER',
+        'El motor Pro no está instalado (necesita Blender 4.2 o más nuevo).',
+      );
+    const [major = 0, minor = 0] = b.version.split('.').map(Number);
+    if (major < 4 || (major === 4 && minor < 2))
+      throw proError(
+        'OLD_BLENDER',
+        `Zinarix 3D Pro necesita Blender 4.2 o más nuevo (encontré ${b.version}).`,
+      );
+    if (!existsSync(join(scriptsDir, 'startup', 'bl_app_templates_system', 'Zinarix')))
+      throw proError('NO_TEMPLATE', 'Falta la plantilla de Zinarix 3D Pro en la instalación.');
+    const userRes = join(this.userData, 'zinarix-3d-pro');
+    mkdirSync(userRes, { recursive: true });
+    const args = ['--app-template', 'Zinarix', ...(file ? [file] : [])];
+    // Without the bridge Blender still opens; the add-on then uses its own providers.
+    const bridge = await this.bridge?.().catch(() => undefined);
+    await new Promise<void>((resolve, reject) => {
+      const p = spawn(b.path, args, {
+        detached: true,
+        stdio: 'ignore',
+        env: taskEnv(process.env, {
+          BLENDER_SYSTEM_SCRIPTS: scriptsDir,
+          BLENDER_USER_RESOURCES: userRes,
+          ZINARIX_LANG: lang,
+          ...(bridge && {
+            ZINARIX_BRIDGE_URL: bridge.url,
+            ZINARIX_BRIDGE_TOKEN: bridge.token,
+            ZINARIX_AI_PROVIDER: 'ZINARIX',
+          }),
+        }),
+      });
+      p.once('error', reject);
+      p.once('spawn', () => (p.unref(), resolve()));
+    });
   }
 
   /**
