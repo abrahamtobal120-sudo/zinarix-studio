@@ -1,1 +1,4 @@
+# Python bytecode from Blender runs, anywhere under this folder.
 __pycache__/
+*.pyc
+*.pyo

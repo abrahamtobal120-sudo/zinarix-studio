@@ -68,7 +68,7 @@ describe('custom provider headers', () => {
 
 // End to end against the built CLI (skipped when apps/cli/dist has not been built).
 const CLI = fileURLToPath(new URL('../dist/index.js', import.meta.url));
-const SECRET = 'hdr-SECRET-0123456789abcdef';
+const SECRET = 'hdr-SECRET-0123456789abcdef'; // zinarix-ignore: fake test value
 
 describe.skipIf(!existsSync(CLI))('omni CLI end to end', () => {
   let home: string;

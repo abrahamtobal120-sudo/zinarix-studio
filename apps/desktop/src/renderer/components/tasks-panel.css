@@ -267,7 +267,6 @@
   align-items: center;
   gap: 4px;
 }
-}
 
 /* Fase 5A: a task's terminal and diff */
 .tasks-parallel select {
@@ -295,7 +294,7 @@
   max-height: 320px;
   overflow: auto;
   font-family: var(--mono, monospace);
-  font-size: 12px;
+  font-size: var(--text-sm);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -308,11 +307,12 @@
   padding: 4px 8px;
 }
 .task-diff .add {
-  color: var(--green, #3fb950);
+  color: var(--ok);
 }
 .task-diff .del {
-  color: var(--red, #f85149);
+  color: var(--danger);
 }
 .task-diff .hunk {
-  color: var(--fg-dim, #8b949e);
+  color: var(--fg-dim);
+}
 }

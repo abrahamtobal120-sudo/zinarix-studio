@@ -104,6 +104,7 @@ import type {
   const host = document.createElement('zx-overlay');
   host.setAttribute('data-zx-ui', '');
   const shadow = host.attachShadow({ mode: 'closed' });
+  // zinarix-ignore: static markup of our own overlay.
   shadow.innerHTML = `
     <style>
       :host { all: initial; }
@@ -249,6 +250,7 @@ import type {
     if (!e) return;
     editing = null;
     e.el.removeAttribute('contenteditable');
+    // zinarix-ignore: puts back the element's own original HTML.
     if (!keep) e.el.innerHTML = e.before;
     else if (e.el.innerHTML !== e.before) post({ type: 'textChanged', src: srcOf(e.el)!, html: e.el.innerHTML });
     getSelection()?.removeAllRanges();

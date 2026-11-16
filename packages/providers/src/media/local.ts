@@ -1,6 +1,5 @@
 import { OmniError } from '@omni/shared';
 import { abortError, request, requestJson } from '../http.js';
-import type { ProviderConfig } from '../types.js';
 import { base64ToBytes, extFor, styledPrompt } from './types.js';
 import type { MediaAspect, MediaFile, MediaGenProvider, MediaRequest, MediaResult } from './types.js';
 

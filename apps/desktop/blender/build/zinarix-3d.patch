@@ -1,0 +1,163 @@
+diff --git a/release/freedesktop/blender.desktop b/release/freedesktop/blender.desktop
+index 06cd8bc2fb6..57567b0044a 100644
+--- a/release/freedesktop/blender.desktop
++++ b/release/freedesktop/blender.desktop
+@@ -1,5 +1,5 @@
+ [Desktop Entry]
+-Name=Blender
++Name=Zinarix Studio 3D
+ GenericName=3D modeler
+ GenericName[ar]=3D المنمذج ثلاثي الأبعاد
+ GenericName[ca]=Modelador 3D
+diff --git a/release/windows/icons/winblender.rc b/release/windows/icons/winblender.rc
+index f56ca3b4f40..bc155c1c51b 100644
+--- a/release/windows/icons/winblender.rc
++++ b/release/windows/icons/winblender.rc
+@@ -24,11 +24,11 @@ BEGIN
+     BEGIN
+       VALUE "FileVersion", BLEN_VER_RC_STR
+       VALUE "ProductVersion", BLEN_VER_RC_STR
+-      VALUE "CompanyName", "Blender Foundation"
+-      VALUE "FileDescription", "Blender"
+-      VALUE "LegalCopyright", "GPLv3 (Blender Foundation)"
++      VALUE "CompanyName", "Zinarix Studio"
++      VALUE "FileDescription", "Zinarix Studio 3D"
++      VALUE "LegalCopyright", "GPLv3. Based on Blender (Blender Foundation)"
+       VALUE "OriginalFilename", "blender.exe"
+-      VALUE "ProductName", "Blender"
++      VALUE "ProductName", "Zinarix Studio 3D"
+     END
+   END
+   BLOCK "VarFileInfo"
+diff --git a/scripts/startup/bl_ui/space_topbar.py b/scripts/startup/bl_ui/space_topbar.py
+index 9b1cd5131b9..aa40cd8c32b 100644
+--- a/scripts/startup/bl_ui/space_topbar.py
++++ b/scripts/startup/bl_ui/space_topbar.py
+@@ -114,7 +114,7 @@ class TOPBAR_MT_editor_menus(Menu):
+         if getattr(context.area, "show_menus", False):
+             layout.menu("TOPBAR_MT_blender", text="", icon='BLENDER')
+         else:
+-            layout.menu("TOPBAR_MT_blender", text="Blender")
++            layout.menu("TOPBAR_MT_blender", text="Zinarix")
+ 
+         layout.menu("TOPBAR_MT_file")
+         layout.menu("TOPBAR_MT_edit")
+@@ -129,7 +129,7 @@ class TOPBAR_MT_editor_menus(Menu):
+ 
+ 
+ class TOPBAR_MT_blender(Menu):
+-    bl_label = "Blender"
++    bl_label = "Zinarix"
+ 
+     def draw(self, _context):
+         layout = self.layout
+@@ -324,7 +324,7 @@ class TOPBAR_MT_file_defaults(Menu):
+         layout.operator("wm.save_homefile")
+         if app_template:
+             display_name = bpy.path.display_name(iface_(app_template))
+-            props = layout.operator("wm.read_factory_settings", text="Load Factory Blender Settings")
++            props = layout.operator("wm.read_factory_settings", text="Load Factory Settings")
+             props.app_template = app_template
+             props = layout.operator(
+                 "wm.read_factory_settings",
+diff --git a/source/blender/blenkernel/BKE_blender_version.h b/source/blender/blenkernel/BKE_blender_version.h
+index 6c1e083f135..aaa51bc29b9 100644
+--- a/source/blender/blenkernel/BKE_blender_version.h
++++ b/source/blender/blenkernel/BKE_blender_version.h
+@@ -30,6 +30,10 @@ namespace blender {
+ /** Blender release type suffix. LTS or blank. */
+ #define BLENDER_VERSION_SUFFIX
+ 
++/* Zinarix Studio: product name shown to the user (window title, About, installer).
++ * Based on Blender (GPL-3.0-or-later); copyright notices are kept as the GPL requires. */
++#define ZINARIX_APP_NAME "Zinarix Studio 3D"
++
+ /* Blender file format version. */
+ #define BLENDER_FILE_VERSION BLENDER_VERSION
+ #define BLENDER_FILE_SUBVERSION 6
+diff --git a/source/blender/blenkernel/intern/blendfile.cc b/source/blender/blenkernel/intern/blendfile.cc
+index e459c5b480e..ec00aeb754e 100644
+--- a/source/blender/blenkernel/intern/blendfile.cc
++++ b/source/blender/blenkernel/intern/blendfile.cc
+@@ -1548,6 +1548,7 @@ UserDef *BKE_blendfile_userdef_from_defaults()
+         "cycles",
+         "pose_library",
+         "bl_pkg",
++        "zinarix_ai",
+     };
+     for (int i = 0; i < ARRAY_SIZE(addons); i++) {
+       bAddon *addon = BKE_addon_new();
+diff --git a/source/blender/windowmanager/intern/wm_splash_screen.cc b/source/blender/windowmanager/intern/wm_splash_screen.cc
+index 9787662cf71..327b2d2606c 100644
+--- a/source/blender/windowmanager/intern/wm_splash_screen.cc
++++ b/source/blender/windowmanager/intern/wm_splash_screen.cc
+@@ -63,7 +63,10 @@ static void wm_block_splash_close(bContext *C, ui::Block *block)
+   popup_block_close(C, win, block);
+ }
+ 
+-static void wm_block_splash_add_label(ui::Block *block, const char *label, int x, int y)
++[[maybe_unused]] static void wm_block_splash_add_label(ui::Block *block,
++                                                       const char *label,
++                                                       int x,
++                                                       int y)
+ {
+   if (!(label && label[0])) {
+     return;
+@@ -414,10 +417,7 @@ static ui::Block *wm_block_splash_create(bContext *C, ARegion *region, void * /*
+ 
+     button_func_set(but, [block](bContext &C) { wm_block_splash_close(&C, block); });
+ 
+-    wm_block_splash_add_label(block,
+-                              BKE_blender_version_string(),
+-                              splash_width - 8.0 * UI_SCALE_FAC,
+-                              splash_height - 13.0 * UI_SCALE_FAC);
++    /* Zinarix Studio: no version number drawn over the splash image. */
+   }
+ 
+   /* Banner image passed through the environment, to overlay on the splash and
+@@ -607,7 +607,8 @@ static ui::Block *wm_block_about_create(bContext *C, ARegion *region, void * /*a
+ 
+   ui::Layout &col = layout.column(true);
+ 
+-  uiItemL_ex(&col, IFACE_("Blender"), ICON_NONE, true, false);
++  uiItemL_ex(&col, IFACE_(ZINARIX_APP_NAME), ICON_NONE, true, false);
++  uiItemL_ex(&col, IFACE_("Based on Blender, GPL-3.0-or-later"), ICON_NONE, false, false);
+ 
+   MenuType *mt = WM_menutype_find("WM_MT_splash_about", true);
+   if (mt) {
+@@ -630,9 +631,9 @@ static wmOperatorStatus wm_splash_about_invoke(bContext *C,
+ 
+ void WM_OT_splash_about(wmOperatorType *ot)
+ {
+-  ot->name = "About Blender";
++  ot->name = "About Zinarix Studio 3D";
+   ot->idname = "WM_OT_splash_about";
+-  ot->description = "Open a window with information about Blender";
++  ot->description = "Open a window with information about Zinarix Studio 3D";
+ 
+   ot->invoke = wm_splash_about_invoke;
+   ot->poll = WM_operator_winactive;
+diff --git a/source/blender/windowmanager/intern/wm_window.cc b/source/blender/windowmanager/intern/wm_window.cc
+index 3aec02c0d9b..a04a361f964 100644
+--- a/source/blender/windowmanager/intern/wm_window.cc
++++ b/source/blender/windowmanager/intern/wm_window.cc
+@@ -597,7 +597,7 @@ static void wm_window_title_text(wmWindowManager *wm,
+       }
+     }
+     else {
+-      win_title.append(StringRef("Blender"));
++      win_title.append(StringRef(ZINARIX_APP_NAME));
+     }
+     return;
+   }
+@@ -690,8 +690,8 @@ static void wm_window_title_text(wmWindowManager *wm,
+   /* If a project is active, display its name. */
+   wm_window_title_project_append(win_title);
+ 
+-  win_title.append(StringRef(" — Blender "));
+-  win_title.append(StringRef(BKE_blender_version_string()));
++  /* Zinarix Studio: product name only, without the Blender version number. */
++  win_title.append(StringRef(" — " ZINARIX_APP_NAME));
+ }
+ 
+ static void wm_window_title_state_refresh(wmWindowManager *wm, wmWindow *win)

@@ -74,7 +74,7 @@ export interface WatchDeps {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-const sha = (text: string) => createHash('sha1').update(text).digest('hex');
+const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 
 // Runs in the background, without a click: hooks and diff drivers of the repo stay off.
 const git = (ws: Workspace, args: string[]) => runUntrustedGit(args, ws.root, 30_000);

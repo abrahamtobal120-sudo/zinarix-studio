@@ -168,16 +168,64 @@ function ensureListener(): void {
   });
 }
 
+/**
+ * ANSI palettes. xterm's built-in one is made for black backgrounds: on a light theme its yellow
+ * and white are invisible and on our dark grays its blue is hard to read.
+ */
+const ANSI_DARK = {
+  black: '#3b3d45',
+  red: '#f47174',
+  green: '#7fd48a',
+  yellow: '#e8c36a',
+  blue: '#6cb6ff',
+  magenta: '#d197f5',
+  cyan: '#5fd4dd',
+  white: '#d6d6dc',
+  brightBlack: '#8a8c96',
+  brightRed: '#ff9496',
+  brightGreen: '#a2e8aa',
+  brightYellow: '#f5d98e',
+  brightBlue: '#96caff',
+  brightMagenta: '#e2b8ff',
+  brightCyan: '#8ee6ec',
+  brightWhite: '#ffffff',
+};
+const ANSI_LIGHT = {
+  black: '#2b2b31',
+  red: '#c4262e',
+  green: '#1d7a33',
+  yellow: '#8a6100',
+  blue: '#1a5fc8',
+  magenta: '#9133b8',
+  cyan: '#0e7686',
+  white: '#6b6d76',
+  brightBlack: '#5c5e66',
+  brightRed: '#d9363e',
+  brightGreen: '#25883d',
+  brightYellow: '#9c6e00',
+  brightBlue: '#2a6fd8',
+  brightMagenta: '#a043c8',
+  brightCyan: '#13808f',
+  brightWhite: '#2b2b31',
+};
+
 /** xterm colors taken from the app theme, so the terminal blends with the rest of the window. */
 function xtermTheme(dark: boolean) {
   const css = getComputedStyle(document.documentElement);
   const v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
   return {
+    ...(dark ? ANSI_DARK : ANSI_LIGHT),
     background: v('--bg', dark ? '#1e1e1e' : '#ffffff'),
-    foreground: v('--fg', dark ? '#cccccc' : '#333333'),
-    cursor: v('--focus', dark ? '#aeafad' : '#333333'),
+    foreground: v('--fg', dark ? '#d6d6dc' : '#2b2b31'),
+    cursor: v('--fg-strong', dark ? '#ffffff' : '#000000'),
     cursorAccent: v('--bg', dark ? '#1e1e1e' : '#ffffff'),
-    selectionBackground: v('--sel', dark ? '#264f78' : '#add6ff'),
+    // The theme's --sel is too faint for terminal text: use a clearly visible blue instead.
+    selectionBackground: dark ? '#3a5f9a' : '#b4d3ff',
+    selectionInactiveBackground: dark ? '#2f4366' : '#d6e6ff',
+    selectionForeground: dark ? '#ffffff' : '#000000',
+    scrollbarSliderBackground: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.2)',
+    scrollbarSliderHoverBackground: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.32)',
+    scrollbarSliderActiveBackground: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.42)',
   };
 }
 
@@ -214,11 +262,15 @@ export function TerminalPanel() {
     const el = document.createElement('div');
     el.className = 'xterm-host';
     const xterm = new XTerm({
-      fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Consolas, monospace",
+      fontFamily: "'JetBrains Mono', 'Cascadia Mono', 'Fira Code', Menlo, Consolas, monospace",
       fontSize: 13,
+      lineHeight: 1.15,
       cursorBlink: true,
+      cursorStyle: 'bar',
       allowProposedApi: false,
       theme: xtermTheme(isDark(getState().settings.theme)),
+      // Programs that print dim gray or yellow on our background stay readable.
+      minimumContrastRatio: 4.5,
       scrollback: 5000,
     });
     const fit = new FitAddon();
@@ -311,6 +363,13 @@ export function TerminalPanel() {
       });
     }
   }, [active, theme]);
+
+  // Coming back from Problems / Debug: the host was hidden (0×0), so measure the grid again.
+  useEffect(() => {
+    if (view !== 'terminal') return;
+    const term = active ? terms.get(active) : undefined;
+    if (term) requestAnimationFrame(() => term.el.offsetParent && term.fit.fit());
+  }, [view, active, maximized]);
 
   useEffect(() => {
     if (!host.current) return;

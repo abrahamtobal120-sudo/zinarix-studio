@@ -263,7 +263,7 @@ export class VideoService {
     } catch {
       // missing: the key still works
     }
-    return createHash('sha1').update(`${path}|${mtime}|${what}`).digest('hex').slice(0, 24);
+    return createHash('sha256').update(`${path}|${mtime}|${what}`).digest('hex').slice(0, 24);
   }
 
   /** A strip of `count` frames (one image) for the timeline; returns its URL. */

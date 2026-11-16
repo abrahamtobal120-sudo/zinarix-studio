@@ -245,7 +245,7 @@ describe('S6: child process environment', () => {
   });
 
   it.skipIf(process.platform === 'win32')('run_command never sees them', async () => {
-    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-should-not-leak';
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test-should-not-leak'; // zinarix-ignore: fake
     try {
       const r = await runCommand(
         'echo "k=${ANTHROPIC_API_KEY:-none}"',
@@ -355,6 +355,7 @@ describe('S10: postgres password', () => {
     const path = process.env.PATH;
     process.env.PATH = `${bin}:${path}`;
     try {
+      // zinarix-ignore: fake test value
       const out = await sqlQuery('postgres://app:pw-in-url-123@db.local:5432/app', 'select 1');
       expect(out).toMatch(/ARGS: postgres:\/\/app@db\.local:5432\/app/);
       expect(out).not.toMatch(/ARGS: .*pw-in-url-123/);

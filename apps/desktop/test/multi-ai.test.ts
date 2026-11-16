@@ -429,7 +429,7 @@ describe('review fixes', () => {
   });
 
   it('what a helper writes is redacted before it reaches the screen', async () => {
-    const key = 'sk-proj-ZX9secretvalue0123456789abcdefABCDEF';
+    const key = 'sk-proj-ZX9secretvalue0123456789abcdefABCDEF'; // zinarix-ignore: fake
     registerSecret(key);
     const r = await run({
       'p1/boss': {

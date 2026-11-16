@@ -266,7 +266,7 @@ function el(tag, cls, text) {
 function icon(name) {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   s.setAttribute('viewBox', '0 0 24 24');
-  s.innerHTML = ICONS[name] || '';
+  s.innerHTML = ICONS[name] || ''; // zinarix-ignore: constant SVG
   return s;
 }
 /** Text with \`\`\`code blocks\`\`\` and \`inline code\`, built with textContent only. */

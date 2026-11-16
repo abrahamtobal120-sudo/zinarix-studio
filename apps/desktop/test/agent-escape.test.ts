@@ -284,6 +284,7 @@ describe('what the UI receives', () => {
     expect(v.headers).toMatchObject({ Accept: 'json' });
     expect(viewArgs('set_env_var', { name: 'API_TOKEN', value: 'zz-short' }).value).toBe('•••');
     expect(
+      // zinarix-ignore: fake test value
       JSON.stringify(viewArgs('sql_query', { database: 'postgres://u:hunter2pw@db/app' })),
     ).not.toContain('hunter2pw');
   });

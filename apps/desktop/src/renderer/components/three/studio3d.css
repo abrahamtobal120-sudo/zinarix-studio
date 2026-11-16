@@ -549,7 +549,7 @@
   .s3-root .s3-primary {
     background: var(--brand-grad);
     border-color: transparent;
-    color: #fff;
+    color: var(--on-color);
   }
   .s3-root .s3-primary:hover:not(:disabled) {
     filter: brightness(1.1);
@@ -591,7 +591,7 @@
     animation: s3-splash-logo 1.4s ease forwards;
   }
   .s3-splash strong {
-    font-size: 28px;
+    font-size: var(--text-2xl);
   }
   .s3-splash span:last-child {
     color: var(--fg-dim);

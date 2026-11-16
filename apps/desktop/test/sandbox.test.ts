@@ -129,7 +129,9 @@ describe.skipIf(process.platform !== 'win32')('Windows sandbox, for real', () =>
     { timeout: 180_000 },
     async () => {
       const caps = await detectWindowsSandbox();
-      expect(caps).toMatchObject({ kind: 'windows', write: true, network: false, secrets: false });
+      expect(caps).toMatchObject({ kind: 'windows', write: true, network: false });
+      // secrets: true when the probe confirms the hidden folders cannot be read (depends on the PC).
+      expect(typeof caps.secrets).toBe('boolean');
       const root = mkdtempSync(join(tmpdir(), 'zx-wt-'));
       const tmp = mkdtempSync(join(tmpdir(), 'zx-wtmp-'));
       const outside = join(homedir(), `zx-sandbox-probe-${process.pid}.txt`);

@@ -322,11 +322,11 @@ def run_code(code):
         error = format_exception(ex, code)
 
     ok = error is None
-    if ok:
-        try:
-            bpy.ops.ed.undo_push(message="Zinarix AI")
-        except Exception:
-            pass
+    # Also after a failure: what the script changed before the error is one Ctrl+Z away.
+    try:
+        bpy.ops.ed.undo_push(message="Zinarix AI" if ok else "Zinarix AI (failed)")
+    except Exception:
+        pass
     return {"ok": ok, "output": truncate_tail(buffer.getvalue()), "error": error}
 
 

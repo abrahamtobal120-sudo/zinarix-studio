@@ -141,10 +141,29 @@ export function reportText(r: SecReport): string {
   return formatFindings(r.title, r.findings, r.notes);
 }
 
+/** Folders of code the project bundles but does not write (vendor/, third_party/). */
+const THIRD_PARTY_DIR = /(^|\/)(vendor|third[_-]party)\//;
+
+/**
+ * Drops third-party code from a project scan: vendor/third_party folders and git submodules
+ * (e.g. a Blender checkout). Its findings belong upstream and drown the project's own.
+ */
+async function ownFiles(ws: Workspace, files: string[]): Promise<string[]> {
+  const r = await execFile(bin('git'), ['-C', ws.root, 'ls-files', '-s'], { timeout: 15_000 });
+  const subs =
+    r.code === 0
+      ? r.out
+          .split('\n')
+          .filter((l) => l.startsWith('160000 ') && l.includes('\t'))
+          .map((l) => `${l.split('\t')[1]!.trim()}/`)
+      : [];
+  return files.filter((f) => !THIRD_PARTY_DIR.test(f) && !subs.some((s) => f.startsWith(s)));
+}
+
 export async function scanProject(ws: Workspace, checks: string[]): Promise<SecReport> {
   const doSecrets = !checks.length || checks.includes('secrets');
   const doCode = !checks.length || checks.includes('code');
-  const files = await ws.listFiles(20_000);
+  const files = await ownFiles(ws, await ws.listFiles(20_000));
   const findings: Finding[] = [];
   const notes: string[] = [];
   let scanned = 0;
@@ -291,7 +310,7 @@ export const LOCKFILES =
   /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|requirements[^/]*\.txt|poetry\.lock|Cargo\.lock|go\.sum|composer\.lock|Gemfile\.lock)$/;
 
 export async function auditDependencies(ws: Workspace, signal: AbortSignal): Promise<SecReport> {
-  const files = (await ws.listFiles(20_000)).filter(
+  const files = (await ownFiles(ws, await ws.listFiles(20_000))).filter(
     (f) => LOCKFILES.test(f) && !f.includes('node_modules/'),
   );
   if (!files.length)
@@ -950,6 +969,7 @@ function certInfo(
 }> {
   return new Promise((res, rej) => {
     const s = tlsConnect(
+      // zinarix-ignore: we inspect the certificate and report s.authorized; no data is sent.
       { host, port, servername: host, timeout: 10_000, rejectUnauthorized: false },
       () => {
         const c = s.getPeerCertificate();

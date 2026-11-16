@@ -38,6 +38,7 @@ import {
   type TemplateId,
   type Vec3,
 } from '../../../shared/scene3d';
+import type { Pro3DLook } from '../../../shared/api';
 import { lang } from '../../i18n';
 import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
@@ -372,7 +373,7 @@ function ProButton() {
     setPop(false);
     let started = false;
     try {
-      await api().scene3d.openPro(lang === 'en' ? 'en' : 'es');
+      await api().scene3d.openPro(lang === 'en' ? 'en' : 'es', appLook());
       started = true;
       toast(t3('openProStarted'));
     } catch (e) {
@@ -444,6 +445,23 @@ function ProButton() {
       )}
     </div>
   );
+}
+
+/** The app's current theme colors, so Zinarix 3D Pro (Blender) is light or dark like the app. */
+function appLook(): Pro3DLook {
+  const root = document.documentElement;
+  const css = getComputedStyle(root);
+  // The IPC schema caps each color at 64 characters; a longer value would fail the whole call.
+  const v = (name: string, fallback: string) => {
+    const c = css.getPropertyValue(name).trim();
+    return c && c.length <= 64 ? c : fallback;
+  };
+  return {
+    dark: root.dataset.theme !== 'light',
+    bg: v('--bg', '#1b1b1f'),
+    fg: v('--fg', '#d6d6dc'),
+    accent: v('--accent', '#6d5ef6'),
+  };
 }
 
 function TopBar() {

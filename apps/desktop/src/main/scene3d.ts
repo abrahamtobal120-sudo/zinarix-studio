@@ -20,6 +20,7 @@ import {
   type Render3DFormat,
   type Scene3D,
 } from '../shared/scene3d.js';
+import type { Pro3DLook } from '../shared/api.js';
 import { blenderProgress, FRAME_PATTERN, toBpy, type BlenderEngine } from '../shared/scene3dBpy.js';
 import { taskEnv } from '../shared/sandbox.js';
 
@@ -48,6 +49,9 @@ export function blenderCandidates(
 ): string[] {
   const out: string[] = [];
   if (env.ZINARIX_BLENDER) out.push(env.ZINARIX_BLENDER);
+  // Our own build (apps/desktop/blender/build/build-zinarix-3d.ps1 installs it here).
+  if (platform === 'win32' && env.LOCALAPPDATA)
+    out.push(join(env.LOCALAPPDATA, 'Programs', 'Zinarix Studio 3D', 'blender.exe'));
   const exe = platform === 'win32' ? 'blender.exe' : 'blender';
   for (const dir of (env.PATH ?? env.Path ?? '').split(delimiter))
     if (dir) out.push(join(dir, exe));
@@ -100,11 +104,14 @@ function runText(bin: string, args: string[], timeoutMs: number): Promise<string
   });
 }
 
-/** Why 3D Pro could not open; `code` lets the renderer show it in the user's language. */
+/**
+ * Why 3D Pro could not open; the code lets the renderer show it in the user's language. IPC
+ * drops custom error properties, so it also leads the message: "[NO_BLENDER] …".
+ */
 export type ProErrorCode = 'NO_BLENDER' | 'OLD_BLENDER' | 'NO_TEMPLATE';
 
 function proError(code: ProErrorCode, message: string): Error & { code: ProErrorCode } {
-  return Object.assign(new Error(message), { code });
+  return Object.assign(new Error(`[${code}] ${message}`), { code });
 }
 
 export interface RenderResult {
@@ -415,7 +422,12 @@ export class Scene3DService {
    * folder, so a normal Blender on the same PC keeps its own. Needs Blender 4.2+ (older ones
    * replace their whole scripts folder with BLENDER_SYSTEM_SCRIPTS instead of adding to it).
    */
-  async openPro(scriptsDir: string, lang: 'es' | 'en', file?: string): Promise<void> {
+  async openPro(
+    scriptsDir: string,
+    lang: 'es' | 'en',
+    file?: string,
+    look?: Pro3DLook,
+  ): Promise<void> {
     const b = await this.findBlender();
     if (!b)
       throw proError(
@@ -443,6 +455,7 @@ export class Scene3DService {
           BLENDER_SYSTEM_SCRIPTS: scriptsDir,
           BLENDER_USER_RESOURCES: userRes,
           ZINARIX_LANG: lang,
+          ...(look && { ZINARIX_LOOK: JSON.stringify(look) }),
           ...(bridge && {
             ZINARIX_BRIDGE_URL: bridge.url,
             ZINARIX_BRIDGE_TOKEN: bridge.token,

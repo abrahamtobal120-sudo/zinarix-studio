@@ -178,10 +178,12 @@
 .terminal-host {
   flex: 1;
   min-height: 0;
-  padding: 6px 4px 2px 12px;
+  padding: 6px 2px 6px 12px;
   position: relative;
+  overflow: hidden;
 }
 .xterm-host {
   height: 100%;
+  overflow: hidden;
 }
 }

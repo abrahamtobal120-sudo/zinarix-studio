@@ -264,6 +264,9 @@ describe('Fase 14: Blender bridge', () => {
     );
     expect(c[0]).toBe('D:\\b\\blender.exe');
     expect(c).toContain(join('C:\\bin', 'blender.exe'));
+    // Our own Zinarix 3D build wins over any other Blender on the PC.
+    const own = blenderCandidates({ LOCALAPPDATA: 'C:\\L', PATH: 'C:\\bin' }, 'win32');
+    expect(own[0]).toBe(join('C:\\L', 'Programs', 'Zinarix Studio 3D', 'blender.exe'));
     expect(blenderCandidates({}, 'darwin')).toContain(
       '/Applications/Blender.app/Contents/MacOS/Blender',
     );

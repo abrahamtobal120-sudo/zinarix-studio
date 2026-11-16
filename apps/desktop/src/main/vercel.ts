@@ -466,6 +466,7 @@ export class Vercel {
     let token = tok.token;
     const entries = files.map((f) => ({
       ...f,
+      // zinarix-ignore: Vercel's file API identifies uploads by their SHA-1.
       sha: createHash('sha1').update(f.data).digest('hex'),
     }));
     const upload = async (e: (typeof entries)[number]) => {

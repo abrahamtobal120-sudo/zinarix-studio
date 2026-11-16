@@ -45,6 +45,7 @@ describe('more secret detectors', () => {
       'A'.repeat(64),
       '==',
     );
+    // zinarix-ignore: fixture for the scanner itself
     const f = scanSecretsInText('a.txt', `${azure}\n{"type": "service_account"}`);
     expect(f.map((x) => x.title)).toContain('Llave de almacenamiento de Azure');
     expect(f.map((x) => x.title)).toContain('Credenciales de cuenta de servicio (Google Cloud)');
@@ -68,6 +69,25 @@ describe('insecure code patterns', () => {
     );
     expect(titles).toHaveLength(3);
     expect(scanCodeInText('test/api.ts', code)).toEqual([]);
+  });
+
+  it('skips reviewed lines and common false positives', () => {
+    const code = [
+      "import { spawn } from 'node:child_process';",
+      "await win.$$eval('.clip', (els) => els.length);",
+      "const title = 'http:// no redirige a https://';",
+      "const base = 'http://host:port/v1';",
+      '// zinarix-ignore: required by the protocol',
+      "createHash('sha1').update(x);",
+      "createHash('md5').update(x); // nosec",
+    ].join('\n');
+    expect(scanCodeInText('src/a.ts', code)).toEqual([]);
+    const bad = ["execSync(`git ${arg}`);", "spawn(cmd, { shell: true });"].join('\n');
+    expect(scanCodeInText('src/a.ts', bad)).toHaveLength(2);
+    expect(scanCodeInText('a.py', 'x = "no os.system here"\nos.system(cmd)')).toHaveLength(1);
+    expect(scanSecretsInText('a.ts', "const k = 'AKIA" + 'A'.repeat(16) + "'; // zinarix-ignore")).toEqual(
+      [],
+    );
   });
 });
 

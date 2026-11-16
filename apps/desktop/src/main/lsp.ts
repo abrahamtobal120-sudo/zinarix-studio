@@ -361,7 +361,7 @@ export class LspHost {
     const data = join(
       this.opts.dataDir ?? tmpdir(),
       'lsp-data',
-      createHash('sha1').update(this.root ?? '').digest('hex').slice(0, 12),
+      createHash('sha256').update(this.root ?? '').digest('hex').slice(0, 12),
     );
     return c.args.map((a) => {
       if (!a.includes('${dataDir}')) return a;

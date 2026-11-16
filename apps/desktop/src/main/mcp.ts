@@ -143,7 +143,7 @@ export function sanitizeName(s: string): string {
 export function toolName(server: string, tool: string, taken: Set<string>): string {
   let name = `${MCP_PREFIX}${sanitizeName(server)}__${sanitizeName(tool)}`;
   if (name.length > 64 || taken.has(name)) {
-    const h = createHash('sha1').update(`${server}\0${tool}`).digest('hex').slice(0, 6);
+    const h = createHash('sha256').update(`${server}\0${tool}`).digest('hex').slice(0, 6);
     name = `${name.slice(0, 57)}_${h}`;
   }
   taken.add(name);

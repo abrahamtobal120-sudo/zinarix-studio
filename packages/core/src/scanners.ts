@@ -83,12 +83,20 @@ export function mask(v: string): string {
   return s.length <= 8 ? '****' : `${s.slice(0, 3)}… (${s.length} caracteres)`;
 }
 
+/**
+ * `zinarix-ignore` (or the common `nosec` / `gitleaks:allow`) on a line, or on the line right
+ * above it, marks a reviewed finding: a fake test value, a hash a protocol requires, etc.
+ */
+const IGNORE_MARK = /\bzinarix-ignore\b|\bnosec\b|gitleaks:allow/;
+const ignored = (lines: string[], i: number): boolean =>
+  IGNORE_MARK.test(lines[i]!) || (i > 0 && IGNORE_MARK.test(lines[i - 1]!));
+
 export function scanSecretsInText(path: string, text: string): SecurityFinding[] {
   const out: SecurityFinding[] = [];
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    if (line.length > 2000) continue;
+    if (line.length > 2000 || ignored(lines, i)) continue;
     for (const r of SECRET_RULES) {
       const m = r.re.exec(line);
       if (!m) continue;
@@ -111,7 +119,8 @@ export function scanSecretsInText(path: string, text: string): SecurityFinding[]
 
 const CODE_RULES: { re: RegExp; ext: RegExp; f: Omit<SecurityFinding, 'where'> }[] = [
   {
-    re: /\beval\s*\(|new\s+Function\s*\(/,
+    // Not Playwright's `$$eval(` / `page.evaluate`-style methods.
+    re: /(?<![\w$.])eval\s*\(|new\s+Function\s*\(/,
     ext: /\.(m?[jt]sx?|cjs)$/,
     f: {
       severity: 'alto',
@@ -147,7 +156,8 @@ const CODE_RULES: { re: RegExp; ext: RegExp; f: Omit<SecurityFinding, 'where'> }
     },
   },
   {
-    re: /child_process|\bexecSync\s*\(|\bexec\s*\(\s*`[^`]*\$\{/,
+    // Importing child_process is not a finding; running through a shell is.
+    re: /\bexecSync\s*\(|\bexec\s*\(\s*`[^`]*\$\{|\bshell\s*:\s*true\b/,
     ext: /\.(m?[jt]sx?|cjs)$/,
     f: {
       severity: 'medio',
@@ -156,7 +166,7 @@ const CODE_RULES: { re: RegExp; ext: RegExp; f: Omit<SecurityFinding, 'where'> }
     },
   },
   {
-    re: /\b(?:os\.system|subprocess\.\w+\([^)]*shell\s*=\s*True)/,
+    re: /\b(?:os\.system\s*\(|subprocess\.\w+\([^)]*shell\s*=\s*True)/,
     ext: /\.py$/,
     f: {
       severity: 'alto',
@@ -237,7 +247,8 @@ const CODE_RULES: { re: RegExp; ext: RegExp; f: Omit<SecurityFinding, 'where'> }
     },
   },
   {
-    re: /["']http:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|schemas\.|www\.w3\.org|json-schema\.org|xmlns)/,
+    // A real host must follow (not "http://" alone in a message or a scheme list).
+    re: /["']http:\/\/(?=[\w[])(?!localhost|host:port|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|schemas\.|www\.w3\.org|json-schema\.org|xmlns)/,
     ext: /\.(m?[jt]sx?|py|php|go|java|cs|rb|json|ya?ml)$/,
     f: {
       severity: 'bajo',
@@ -273,7 +284,7 @@ export function scanCodeInText(path: string, text: string): SecurityFinding[] {
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    if (line.length > 1000 || /^\s*(\/\/|#|\*|--)/.test(line)) continue;
+    if (line.length > 1000 || /^\s*(\/\/|#|\*|--)/.test(line) || ignored(lines, i)) continue;
     for (const r of rules)
       if (r.re.test(line))
         out.push({

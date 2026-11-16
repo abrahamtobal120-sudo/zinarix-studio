@@ -64,7 +64,7 @@ interface StoredChunk extends Chunk {
 
 /** Hash of what gets embedded for a chunk. */
 function chunkHash(c: Chunk): string {
-  return createHash('sha1').update(`${c.title ?? c.source}\n${c.text}`).digest('base64').slice(0, 16);
+  return createHash('sha256').update(`${c.title ?? c.source}\n${c.text}`).digest('base64').slice(0, 16);
 }
 
 interface CodeFile {

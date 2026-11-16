@@ -1082,7 +1082,7 @@ function registerIpc(): void {
         const hist = join(
           videoDir(),
           'versions',
-          createHash('sha1').update(target).digest('hex').slice(0, 16),
+          createHash('sha256').update(target).digest('hex').slice(0, 16),
         );
         mkdirSync(hist, { recursive: true });
         writeFileSync(join(hist, `${Date.now()}.${PROJECT_EXT}`), readFileSync(target));

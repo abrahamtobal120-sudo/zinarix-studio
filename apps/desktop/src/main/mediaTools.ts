@@ -136,6 +136,7 @@ const WHAT: Record<GenKind, (n: number) => string> = {
   video: () => 'un video',
   speech: () => 'una voz en off',
   music: () => 'música',
+  sound: () => 'un efecto de sonido',
 };
 
 /** Approval card: what will be generated, with which model and how much it costs. */

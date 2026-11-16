@@ -322,7 +322,7 @@ export function mimeText(v: Json | undefined): string {
   return JSON.stringify(v, null, 2);
 }
 
-// eslint-disable-next-line no-control-regex
+ 
 const ANSI = /\u001b\[[0-9;?]*[A-Za-z]|\u001b\][^\u0007]*\u0007/g;
 export function stripAnsi(s: string): string {
   return s.replace(ANSI, '');
@@ -341,7 +341,7 @@ export function collapseCarriageReturns(s: string): string {
         while (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
         cur = parts[parts.length - 1]!;
       }
-      // eslint-disable-next-line no-control-regex
+       
       while (cur.includes('\b')) cur = cur.replace(/[^\x08]\x08|^\x08+/, '');
       return cur;
     })

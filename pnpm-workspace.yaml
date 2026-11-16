@@ -15,7 +15,9 @@ supportedArchitectures:
 # Security floors for transitive dependencies (see scripts/audit.mjs):
 # monaco-editor pins dompurify 3.4.15; electron / node-gyp bring older undici.
 # eslint-plugin-react-hooks brings zod <4.6.6 (GHSA-mrhx-c7xc-m3w5).
+# ajv (electron-builder) brings fast-uri 3.1.8 (GHSA-w74x-v6f9-j3xg and others).
 overrides:
+  'fast-uri@>=3 <3.1.9': ^3.1.9
   dompurify: ^3.4.17
   'undici@>=7 <7.30.2': ^7.30.2
   'undici@>=4 <6.29.1': ^6.29.1

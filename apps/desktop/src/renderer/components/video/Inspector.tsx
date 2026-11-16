@@ -360,6 +360,7 @@ const EASE_LABEL: Record<Ease, VideoKey> = {
   out: 'easeOut',
   back: 'easeBack',
   hold: 'easeHold',
+  bezier: 'easeBezier',
 };
 
 const SLIDERS: {

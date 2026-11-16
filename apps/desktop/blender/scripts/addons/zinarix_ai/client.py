@@ -173,6 +173,13 @@ def resolve_api_key(provider, api_key=""):
     return ""
 
 
+def _bridge_key(api_key, base_url):
+    """The bridge token from the environment, only for a loopback URL (never sent elsewhere)."""
+    if api_key:
+        return api_key
+    return resolve_api_key(BRIDGE_PROVIDER) if is_local_url(base_url) else ""
+
+
 def default_timeout(provider, base_url=""):
     """Seconds to wait for one chat answer from ``provider``."""
     timeout = _info(provider).get("timeout")
@@ -233,7 +240,8 @@ def build_request(provider, *, base_url, model, api_key, system, messages, max_t
     info = _info(provider)
     base_url = resolve_base_url(provider, base_url)
     model = (model or info["model"] or "").strip()
-    api_key = resolve_api_key(provider, api_key) if provider == BRIDGE_PROVIDER else api_key
+    if provider == BRIDGE_PROVIDER:
+        api_key = _bridge_key(api_key, base_url)
     if not base_url:
         if provider == BRIDGE_PROVIDER:
             raise ClientError(BRIDGE_NOT_RUNNING)
@@ -361,6 +369,10 @@ _RISKY_PATTERNS = tuple(
         ("shutil.rmtree", r"\bshutil\s*\.\s*rmtree\b"),
         ("shutil.move", r"\bshutil\s*\.\s*move\b"),
         ("Path.unlink", r"\.\s*(?:unlink|rmdir)\s*\("),
+        ("open", r"(?<![\w.])open\s*\(|\b(?:io|os|codecs)\s*\.\s*open\b"),
+        ("Path.write", r"\.\s*(?:write_text|write_bytes)\s*\("),
+        ("shutil.copy", r"\bshutil\s*\.\s*copy\w*"),
+        ("bpy.ops.wm.save_mainfile", r"\bwm\s*\.\s*save(?:_as)?_mainfile\b"),
         ("subprocess", r"\bsubprocess\b"),
         ("multiprocessing", r"\bmultiprocessing\b"),
         ("pty", r"\bimport\s+pty\b|\bpty\s*\.\s*spawn\b"),
@@ -577,7 +589,10 @@ def list_models(settings, timeout=TIMEOUT_LIST_MODELS):
         if provider == BRIDGE_PROVIDER:
             raise ClientError(BRIDGE_NOT_RUNNING)
         raise ClientError("Set the server URL in the add-on preferences.")
-    api_key = resolve_api_key(provider, settings.get("api_key", ""))
+    if provider == BRIDGE_PROVIDER:
+        api_key = _bridge_key(settings.get("api_key", ""), base_url)
+    else:
+        api_key = resolve_api_key(provider, settings.get("api_key", ""))
     headers = {"accept": "application/json", "user-agent": "zinarix-studio-3d"}
     if api_key:
         headers["authorization"] = "Bearer " + api_key
