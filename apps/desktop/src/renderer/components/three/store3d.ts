@@ -39,6 +39,8 @@ export interface S3 {
   render: RenderState | null;
   /** The render dialog is open. */
   dialog: boolean;
+  /** The "Generar con IA" dialog is open. */
+  genOpen: boolean;
 }
 
 const SAVE_KEY = 'zinarix.scene3d.autosave';
@@ -69,6 +71,7 @@ let state: S3 = {
   lastAt: 0,
   render: null,
   dialog: false,
+  genOpen: false,
 };
 const subs = new Set<() => void>();
 

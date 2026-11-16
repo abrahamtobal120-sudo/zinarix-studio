@@ -79,6 +79,15 @@ import {
   runMediaTool,
 } from './mediaTools.js';
 import {
+  VIDEO_PROMPT_PART,
+  VIDEO_READ_ONLY,
+  VIDEO_TOOL_NAMES,
+  VIDEO_TOOLS,
+  runVideoTool,
+  videoPreview,
+  type VideoUi,
+} from './videoTools.js';
+import {
   SCENE3D_PROMPT_PART,
   SCENE3D_TOOL_NAMES,
   SCENE3D_TOOLS,
@@ -87,6 +96,7 @@ import {
   type Scene3DUi,
 } from './scene3dTools.js';
 import type { Scene3DService } from './scene3d.js';
+import type { Gen3DService } from './gen3d.js';
 import type { MediaService } from './media.js';
 import {
   MAIL_PROMPT_PART,
@@ -225,6 +235,7 @@ ${MAIL_PROMPT_PART}
 ${CLOUD_PROMPT_PART}
 ${MEDIA_PROMPT_PART}
 ${SCENE3D_PROMPT_PART}
+${VIDEO_PROMPT_PART}
 - list_ai_models and delegate_to_ai: other AI models connected in Zinarix Studio can work for you as helpers (e.g. a second opinion, a cheaper model for a long chore, a model with a skill you lack). The user approves every delegation and every action the helper takes. Give the helper a complete, self-contained task; it does not see this conversation.
 ${SYSTEM_PROMPT_PART}
 ${SECURITY_PROMPT_PART}
@@ -425,6 +436,7 @@ export const TOOLS: ToolDefinition[] = [
   ...CLOUD_TOOLS,
   ...MEDIA_TOOLS,
   ...SCENE3D_TOOLS,
+  ...VIDEO_TOOLS,
   ...SYSTEM_TOOLS,
   ...SECURITY_TOOLS,
 ];
@@ -544,6 +556,7 @@ const CLI_TOOL_NAMES = new Set([
   ...MAIL_TOOL_NAMES,
   ...CLOUD_TOOL_NAMES,
   ...MEDIA_TOOL_NAMES,
+  ...VIDEO_TOOL_NAMES,
   ...KNOWLEDGE_TOOL_NAMES,
   'list_ai_models',
   'delegate_to_ai',
@@ -583,6 +596,7 @@ const READ_ONLY = new Set([
   ...MAIL_READ_ONLY,
   ...CLOUD_READ_ONLY,
   ...KNOWLEDGE_READ_ONLY,
+  ...VIDEO_READ_ONLY,
 ]);
 
 /**
@@ -940,6 +954,10 @@ export class Agent {
   /** Fase 14: 3D renders (Blender and the encoder) and the window's viewer. */
   scene3d?: Scene3DService;
   scene3dUi?: Scene3DUi;
+  /** Fase 13B: Video Studio in a window (video_* tools). */
+  videoUi?: VideoUi;
+  /** Fase 14: 3D models generated on Replicate (generate_3d_model). */
+  gen3d?: Gen3DService;
   /** Hook sets approved "always" per project (Fase 4). */
   hookTrust?: HookTrust;
   /** ~/.zinarix (user subagents, skills, commands, hooks); null = none (tests). */
@@ -1984,6 +2002,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
         !CLOUD_TOOL_NAMES.has(call.name) &&
         !MEDIA_TOOL_NAMES.has(call.name) &&
         !SCENE3D_TOOL_NAMES.has(call.name) &&
+        !VIDEO_TOOL_NAMES.has(call.name) &&
         !SYSTEM_TOOL_NAMES.has(call.name) &&
         !SECURITY_NO_PROJECT.has(call.name)
       )
@@ -1994,9 +2013,17 @@ A project hook did not let you finish yet. Address it, then answer.`,
         );
       if (MEDIA_TOOL_NAMES.has(call.name) && !this.media)
         return finish(false, 'Media generation is not available.', 'no disponible');
+      // Fase 13B: a dry run in Video Studio gives the approval card; a call that cannot apply
+      // (bad word numbers, no transcript…) goes back to the model without asking.
+      const video = VIDEO_TOOL_NAMES.has(call.name)
+        ? await videoPreview(this.videoUi, call.name, a)
+        : null;
+      if (video && 'error' in video) return finish(false, video.error, 'no aplica');
       // Actions beyond the project: risk level + warning, approved per action unless the
       // preview offers an "always" key (low-impact reads such as GET on one site).
-      const sys: SystemPreview | null = SYSTEM_TOOL_NAMES.has(call.name)
+      const sys: SystemPreview | null = video
+        ? video
+        : SYSTEM_TOOL_NAMES.has(call.name)
         ? await systemPreview(call.name, a)
         : SECURITY_APPROVAL.has(call.name)
           ? securityPreview(call.name, a)
@@ -2162,7 +2189,13 @@ A project hook did not let you finish yet. Address it, then answer.`,
           a,
           ws?.root,
           opts.signal,
+          this.gen3d,
+          call.id,
         );
+        return finish(r.ok, r.content, r.summary);
+      }
+      if (VIDEO_TOOL_NAMES.has(call.name)) {
+        const r = await runVideoTool(this.videoUi, call.name, a, opts.signal);
         return finish(r.ok, r.content, r.summary);
       }
       if (MEDIA_TOOL_NAMES.has(call.name) && this.media) {

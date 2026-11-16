@@ -364,4 +364,9 @@ export function applyThemeColors(id: ThemeId): void {
   root.removeAttribute('style');
   for (const [k, v] of Object.entries(th.vars)) root.style.setProperty(k, v);
   monaco.editor.setTheme(monacoTheme(id));
+  // Canvas views (the 3D viewport) can't read CSS variables live: tell them to repaint.
+  window.dispatchEvent(new Event(THEME_EVENT));
 }
+
+/** Fired on window after the app colors change. */
+export const THEME_EVENT = 'zs-theme-change';

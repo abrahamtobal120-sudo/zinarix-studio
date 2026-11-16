@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { wireVideoAgent } from './videoAgent';
 import {
   FORMAT_PRESETS,
   FPS_CHOICES,
@@ -90,6 +91,8 @@ function useWindowSize(): { w: number; h: number } {
 /** Mounted from the first time the studio opens, so closing it keeps everything as it was. */
 export function VideoStudioHost() {
   const open = useV((s) => s.open);
+  // Fase 13B: the agent's video_* tools work even before the studio is first opened.
+  useEffect(() => wireVideoAgent(), []);
   // Ctrl+Shift+V anywhere in the app (the menu has it too; toggleStudio ignores the double).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

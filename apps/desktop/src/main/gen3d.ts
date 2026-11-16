@@ -178,7 +178,7 @@ export class Gen3DService {
       for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
         total += chunk.byteLength;
         if (total > GEN3D_FILE_MAX) throw new Error('El modelo generado pasa de 300 MB.');
-        if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
+        if (!out.write(chunk)) await new Promise<void>((r) => out.once('drain', () => r()));
       }
       await new Promise<void>((resolve, reject) => out.end((e?: Error | null) => (e ? reject(e) : resolve())));
     } catch (e) {

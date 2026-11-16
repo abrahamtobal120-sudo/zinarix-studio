@@ -86,6 +86,8 @@ export function alwaysAsks(
   if (tool === 'mail_send') return true;
   // Fase 14: Python inside Blender runs outside any sandbox, even with full access.
   if (tool === 'blender_script') return true;
+  // Sends the user's description / picture to Replicate and bills an unknown amount.
+  if (tool === 'generate_3d_model') return true;
   if (tool === 'run_command') return isGitPush(str(args.command));
   if (tool.startsWith('vercel_')) return !VERCEL_READS.has(tool);
   if (tool === 'supabase_query') return (ctx.isWriteSql ?? (() => true))(str(args.sql));

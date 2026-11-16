@@ -20,6 +20,8 @@ import type {
   VideoProject,
 } from './video.js';
 import {
+  BACK_S,
+  EASES,
   MAX_KEYS,
   SPEED_MAX,
   SPEED_MIN,
@@ -203,10 +205,27 @@ function pieceKeys(pc: Piece, prop: KeyProp): PKey[] | null {
     .map((k) => ({
       t: (k.t - pc.srcIn) / pc.speed,
       v: clamp(k.v, lo, hi),
-      ease: k.ease === 'ease' || k.ease === 'hold' ? k.ease : undefined,
+      ease: k.ease && k.ease !== 'linear' && EASES.includes(k.ease) ? k.ease : undefined,
     }))
     .sort((a, b) => a.t - b.t);
   return out.length ? out : null;
+}
+
+/** FFmpeg form of easeCurve (video.ts) over the progress expression p: the same polynomials. */
+export function easeExpr(e: Ease | undefined, p: string): string {
+  const q = `(${p}-1)`;
+  switch (e) {
+    case 'ease':
+      return `(${p}*${p}*(3-2*${p}))`;
+    case 'in':
+      return `(${p}*${p}*${p})`;
+    case 'out':
+      return `(1-(1-${p})*(1-${p})*(1-${p}))`;
+    case 'back':
+      return `(1+${num(BACK_S + 1)}*${q}*${q}*${q}+${num(BACK_S)}*${q}*${q})`;
+    default:
+      return p;
+  }
 }
 
 /**
@@ -225,7 +244,7 @@ export function keyExpr(keys: PKey[], T: string, map: (v: number) => number = (v
     if (a.ease === 'hold' || d < 1e-6) seg = n(map(a.v));
     else {
       const p = `((${T}-${n(a.t)})/${n(d)})`;
-      const k = a.ease === 'ease' ? `(${p}*${p}*(3-2*${p}))` : p;
+      const k = easeExpr(a.ease, p);
       seg = `${n(map(a.v))}+${n(map(b.v) - map(a.v))}*${k}`;
     }
     e = `if(lt(${T},${n(b.t)}),${seg},${e})`;

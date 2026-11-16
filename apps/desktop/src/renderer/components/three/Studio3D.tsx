@@ -56,6 +56,7 @@ import {
 } from './store3d';
 import { t3, type Key3D } from './strings3d';
 import { Viewport } from './viewport3d';
+import { Gen3DDialog } from './Gen3DDialog';
 import './studio3d.css';
 
 export function Studio3DHost() {
@@ -96,6 +97,7 @@ function Studio3D() {
   const gizmo = use3((s) => s.gizmo);
   const playing = use3((s) => s.playing);
   const dialog = use3((s) => s.dialog);
+  const genOpen = use3((s) => s.genOpen);
   const rendering = use3((s) => s.render);
 
   // The viewport lives as long as the editor is open.
@@ -201,7 +203,8 @@ function Studio3D() {
       }
       if (e.key === 'Escape') {
         handled();
-        if (s.dialog) set3({ dialog: false });
+        if (s.genOpen) set3({ genOpen: false });
+        else if (s.dialog) set3({ dialog: false });
         else if (s.selected) set3({ selected: null });
         else close3d();
       }
@@ -248,6 +251,7 @@ function Studio3D() {
       </div>
       <KeyBar />
       {dialog && <RenderDialog />}
+      {genOpen && <Gen3DDialog />}
       {rendering && (
         <div className="s3-progress" role="status">
           <div className="s3-bar">
@@ -450,6 +454,16 @@ function Outline() {
               }}
             >
               {t3('importModel')}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenu(false);
+                set3({ genOpen: true });
+              }}
+            >
+              {t3('gen')}
             </button>
           </div>
         )}

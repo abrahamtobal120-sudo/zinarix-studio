@@ -20,6 +20,7 @@ import type {
 import type { LspStatus, NextEditRequestView, NextEditResultView } from './lsp.js';
 import type { SuggestionStatsRow } from './nextEdit.js';
 import type { ExportOptions, MediaItem, Transcript, VideoProject } from './video.js';
+import type { VideoAgentResult } from './videoAgent.js';
 
 /** Fase 13: a speech-to-text engine as the video editor lists it. */
 export type SttEngineId = 'local' | 'openai' | 'groq';
@@ -44,6 +45,7 @@ import type { CodeLang } from './playgroundCode.js';
 import type { GenEstimate, GenEvent, GenModelView, GenRequest, GenResult } from './mediaGen.js';
 import type { Render3DFormat, Scene3D } from './scene3d.js';
 import type { BlenderEngine } from './scene3dBpy.js';
+import type { Gen3DEvent, Gen3DModel, Gen3DRequest } from './gen3d.js';
 import type { BuildDeployView, BuildView } from './build.js';
 
 export interface WorkspaceInfo {
@@ -1083,6 +1085,17 @@ export type AppEvent =
   | { type: 'notice'; id: string; text: string; url?: string }
   /** A Video Studio export changed state or progressed. */
   | { type: 'video:job'; job: VideoJobView }
+  /** Fase 13B: the agent asks Video Studio to read or edit (answer with video.agentDone). */
+  | {
+      type: 'video:agent';
+      requestId: string;
+      name: string;
+      args: Record<string, unknown>;
+      /** Only describe the change (approval card): commit nothing. */
+      dry: boolean;
+    }
+  /** Fase 13B: the agent stopped waiting for this request (canceled turn). */
+  | { type: 'video:agentAbort'; requestId: string }
   /** The paired phone asked for something (see PhoneAction). */
   | { type: 'phone'; action: PhoneAction }
   /** The phone remote changed (started, stopped, a phone paired, new PIN). */
@@ -1131,7 +1144,9 @@ export type AppEvent =
       format: Render3DFormat;
     }
   /** Fase 14: a 3D render to put into Video Studio (library and timeline). */
-  | { type: 'scene3d:imported'; path: string };
+  | { type: 'scene3d:imported'; path: string }
+  /** Fase 14: progress of a 3D model generation (Replicate). */
+  | { type: 'gen3d'; requestId: string; event: Gen3DEvent };
 
 export interface Render3DResult {
   path: string;
@@ -1996,6 +2011,8 @@ export interface OmniApi {
     scenes(path: string, duration: number, threshold: number): Promise<number[]>;
     /** Save dialog for an .srt / .vtt; returns the path (null when canceled). */
     saveCaptions(name: string, text: string, ext: 'srt' | 'vtt'): Promise<string | null>;
+    /** Fase 13B: answer to a 'video:agent' event. */
+    agentDone(requestId: string, r: VideoAgentResult): Promise<void>;
   };
   /** Ayuda de Zinarix: the help assistant (a small local model that knows the app). */
   helper: {
@@ -2073,6 +2090,18 @@ export interface OmniApi {
     open(): Promise<{ scene: Scene3D; path: string } | null>;
     /** Answer to a 'scene3d:agent' event. */
     agentDone(requestId: string, r: { path: string } | { error: string }): Promise<void>;
+  };
+  /** Fase 14: 3D models generated from text or a picture (Replicate). */
+  gen3d: {
+    info(): Promise<{ connected: boolean; models: Gen3DModel[]; outDir: string }>;
+    /** File dialog for the reference picture (PNG, JPEG, WebP). */
+    pickImage(): Promise<string | null>;
+    /** Progress arrives as 'gen3d' events; resolves with the saved model and its viewer URL. */
+    generate(
+      requestId: string,
+      req: Gen3DRequest,
+    ): Promise<{ path: string; url: string; warnings: string[]; ms: number }>;
+    abort(requestId: string): Promise<void>;
   };
   /** Fase 9: model playground (one model or 2–4 side by side). */
   playground: {
@@ -2467,6 +2496,7 @@ export const CHANNELS = [
   'video:silences',
   'video:scenes',
   'video:saveCaptions',
+  'video:agentDone',
   'helper:status',
   'helper:ask',
   'helper:pull',
@@ -2514,6 +2544,10 @@ export const CHANNELS = [
   'scene3d:save',
   'scene3d:open',
   'scene3d:agentDone',
+  'gen3d:info',
+  'gen3d:pickImage',
+  'gen3d:generate',
+  'gen3d:abort',
   'playground:run',
   'playground:abort',
   'playground:code',

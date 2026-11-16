@@ -385,6 +385,7 @@ const api: OmniApi = {
     silences: call('video:silences') as OmniApi['video']['silences'],
     scenes: call('video:scenes') as OmniApi['video']['scenes'],
     saveCaptions: call('video:saveCaptions') as OmniApi['video']['saveCaptions'],
+    agentDone: call('video:agentDone') as OmniApi['video']['agentDone'],
   },
   helper: {
     status: call('helper:status') as OmniApi['helper']['status'],
@@ -442,6 +443,12 @@ const api: OmniApi = {
     save: call('scene3d:save') as OmniApi['scene3d']['save'],
     open: call('scene3d:open') as OmniApi['scene3d']['open'],
     agentDone: call('scene3d:agentDone') as OmniApi['scene3d']['agentDone'],
+  },
+  gen3d: {
+    info: call('gen3d:info') as OmniApi['gen3d']['info'],
+    pickImage: call('gen3d:pickImage') as OmniApi['gen3d']['pickImage'],
+    generate: call('gen3d:generate') as OmniApi['gen3d']['generate'],
+    abort: call('gen3d:abort') as OmniApi['gen3d']['abort'],
   },
   playground: {
     run: call('playground:run') as OmniApi['playground']['run'],

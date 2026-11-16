@@ -5,6 +5,7 @@
  */
 import {
   CameraHelper,
+  Color,
   GridHelper,
   PerspectiveCamera,
   Raycaster,
@@ -18,6 +19,18 @@ import type { Scene3D, Vec3 } from '../../../shared/scene3d';
 import { HELPER_LAYER, SceneBuilder } from './build3d';
 import { poseCamera, setupRenderer } from './render3d';
 import type { Gizmo } from './store3d';
+import { THEME_EVENT } from '../../themes';
+
+/** A theme CSS color (any format the browser accepts) as a three.js Color. */
+function cssColor(name: string, fallback: number): Color {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (!v) return new Color(fallback);
+  try {
+    return new Color(v);
+  } catch {
+    return new Color(fallback);
+  }
+}
 
 export interface ViewportEvents {
   select(id: string | null): void;
@@ -40,6 +53,7 @@ export class Viewport {
   private readonly controls: OrbitControls;
   private readonly gizmo: TransformControls;
   private readonly camHelper: CameraHelper;
+  private grid: GridHelper | null = null;
   /** A short copy of the render camera, so its outline is a small pyramid, not 2 km of lines. */
   private readonly camProxy = new PerspectiveCamera(40, 16 / 9, 0.1, 0.8);
   private readonly disposeEnv: () => void;
@@ -75,9 +89,8 @@ export class Viewport {
       this.controls.enabled = !this.dragging;
     });
     this.gizmo.addEventListener('objectChange', () => this.emitTransform());
-    const grid = new GridHelper(20, 20, 0x666c78, 0x3a3f48);
-    onHelperLayer(grid);
-    scene.add(grid);
+    this.applyTheme();
+    window.addEventListener(THEME_EVENT, this.applyTheme);
     this.camHelper = new CameraHelper(this.camProxy);
     onHelperLayer(this.camHelper);
     scene.add(this.camHelper);
@@ -90,6 +103,24 @@ export class Viewport {
     };
     loop();
   }
+
+  /** The grid takes the app's colors: the center lines as dim text, the rest as borders. */
+  private applyTheme = () => {
+    const scene = this.builder.scene;
+    if (this.grid) {
+      scene.remove(this.grid);
+      this.grid.dispose();
+    }
+    const grid = new GridHelper(
+      20,
+      20,
+      cssColor('--fg-dim', 0x666c78),
+      cssColor('--border', 0x3a3f48),
+    );
+    onHelperLayer(grid);
+    scene.add(grid);
+    this.grid = grid;
+  };
 
   private frame() {
     this.controls.update();
@@ -209,6 +240,8 @@ export class Viewport {
 
   dispose(): void {
     cancelAnimationFrame(this.raf);
+    window.removeEventListener(THEME_EVENT, this.applyTheme);
+    this.grid?.dispose();
     this.canvas.removeEventListener('pointerdown', this.onDown);
     this.canvas.removeEventListener('pointerup', this.onUp);
     this.gizmo.detach();

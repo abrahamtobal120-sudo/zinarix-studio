@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { readFile, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BrowserWindow, Menu, Notification, app, dialog, ipcMain, protocol, shell } from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
@@ -100,8 +100,11 @@ import { gitMention, webMention } from './mentions.js';
 import { VideoService, fromStored, readLut, toStored } from './video.js';
 import { Transcriber } from './transcribe.js';
 import { Scene3DService } from './scene3d.js';
+import { Gen3DService } from './gen3d.js';
+import { GEN3D_MODELS, isGen3dImage } from '../shared/gen3d.js';
 import { isModelPath, sanitizeScene, type Scene3D } from '../shared/scene3d.js';
 import type { VideoProject } from '../shared/video.js';
+import type { VideoAgentResult } from '../shared/videoAgent.js';
 import { MEDIA_EXTENSIONS, PROJECT_EXT, mediaKindOf, validProject } from '../shared/video.js';
 
 let mcp: McpManager | undefined;
@@ -2577,6 +2580,138 @@ function registerMediaIpc(): void {
   handle('media:abort', z.tuple([str]), (w, requestId) => media.abort(rid(w, requestId)));
 }
 
+/** Fase 14: 3D models generated on Replicate (editor dialog and generate_3d_model tool). */
+function registerGen3dIpc(): void {
+  const gen = new Gen3DService(ai.core, app.getPath('userData'));
+  ai.agent.gen3d = gen;
+  const req = z.object({
+    model: z.enum(GEN3D_MODELS.map((m) => m.id) as [string, ...string[]]),
+    prompt: z.string().max(1000).optional(),
+    image: z.string().max(4096).refine(isGen3dImage).optional(),
+    seed: z.number().int().min(0).max(2 ** 31).optional(),
+  });
+  handle('gen3d:info', z.tuple([]), async (w) => ({
+    connected: await gen.connected(),
+    models: [...GEN3D_MODELS],
+    outDir: gen.outDir(w.workspace?.root),
+  }));
+  handle('gen3d:pickImage', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Imagen del objeto',
+      properties: ['openFile'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+    });
+    const p = r.canceled ? undefined : r.filePaths[0];
+    return p && isGen3dImage(resolve(p)) ? resolve(p) : null;
+  });
+  handle('gen3d:generate', z.tuple([str, req]), async (w, requestId, r) => {
+    const id = rid(w, requestId);
+    w.requests.add(id);
+    try {
+      const out = await gen.generate(id, r, w.workspace?.root, (event) =>
+        send(w, { type: 'gen3d', requestId, event }),
+      );
+      return { ...out, url: videoService().urlFor(out.path) };
+    } finally {
+      w.requests.delete(id);
+    }
+  });
+  handle('gen3d:abort', z.tuple([str]), (w, requestId) => gen.abort(rid(w, requestId)));
+}
+
+/**
+ * Fase 13B: the agent's video_* tools run in the window that holds Video Studio (the focused
+ * one, else the first). Main only relays, and picks the export file: an agent export may write
+ * only the .mp4 shown on the approval card.
+ */
+function registerVideoAgentIpc(): void {
+  const pending = new Map<
+    string,
+    { resolve: (r: VideoAgentResult) => void; reject: (e: Error) => void }
+  >();
+  const target = (): Win | undefined => {
+    const f = BrowserWindow.getFocusedWindow();
+    return [...wins.values()].find((w) => w.win === f) ?? wins.values().next().value;
+  };
+  /** The export file for a call: its "path" (an absolute .mp4) or a new one in Videos. */
+  const outFor = (a: Record<string, unknown>): string => {
+    const asked = typeof a.path === 'string' ? a.path.trim() : '';
+    if (asked) {
+      if (!isAbsolute(asked)) throw new Error('"path" must be an absolute path.');
+      return resolve(asked.toLowerCase().endsWith('.mp4') ? asked : `${asked}.mp4`);
+    }
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    let out = join(app.getPath('videos'), `zinarix-${stamp}.mp4`);
+    for (let i = 2; existsSync(out); i++)
+      out = join(app.getPath('videos'), `zinarix-${stamp}-${i}.mp4`);
+    return out;
+  };
+  const outs = new Map<string, string>();
+  ai.agent.videoUi = {
+    call: (name, args, dry, signal) =>
+      new Promise((res, rej) => {
+        const w = target();
+        if (!w) return rej(new Error('No window is open.'));
+        let a = args;
+        if (name === 'video_export') {
+          // The dry run picks the file; the run after approval writes that same one.
+          const key = JSON.stringify(args);
+          const out = dry ? outFor(args) : (outs.get(key) ?? outFor(args));
+          if (dry) {
+            outs.set(key, out);
+            if (outs.size > 20) outs.delete(outs.keys().next().value!);
+          } else videoOutputs.add(out);
+          a = { ...args, __out: out };
+        }
+        const requestId = randomUUID();
+        const timer = setTimeout(
+          () => {
+            if (pending.delete(requestId)) rej(new Error('Video Studio did not answer in time.'));
+          },
+          dry ? 120_000 : 3 * 60 * 60_000,
+        );
+        pending.set(requestId, {
+          resolve: (r) => {
+            clearTimeout(timer);
+            res(r);
+          },
+          reject: (e) => {
+            clearTimeout(timer);
+            rej(e);
+          },
+        });
+        signal?.addEventListener(
+          'abort',
+          () => {
+            send(w, { type: 'video:agentAbort', requestId });
+            const p = pending.get(requestId);
+            pending.delete(requestId);
+            p?.reject(new Error('Canceled.'));
+          },
+          { once: true },
+        );
+        send(w, { type: 'video:agent', requestId, name, args: a, dry });
+      }),
+  };
+  handle(
+    'video:agentDone',
+    z.tuple([
+      z.string().uuid(),
+      z.object({
+        ok: z.boolean(),
+        content: z.string().max(400_000),
+        summary: z.string().max(4000),
+      }),
+    ]),
+    (_w, id, r) => {
+      const p = pending.get(id);
+      if (!p) return;
+      pending.delete(id);
+      p.resolve(r);
+    },
+  );
+}
+
 /** Fase 14: 3D scenes to video (viewer frames, Blender), and .z3d scene files. */
 function registerScene3dIpc(): void {
   const svc = new Scene3DService(app.getPath('userData'), () => videoService().tools().ffmpeg);
@@ -3472,6 +3607,8 @@ app.whenReady().then(async () => {
   registerPlaygroundIpc();
   registerMediaIpc();
   registerScene3dIpc();
+  registerVideoAgentIpc();
+  registerGen3dIpc();
   registerReviewIpc();
   buildMenu();
   // Start empty unless a folder is passed explicitly: the user drops or picks one.

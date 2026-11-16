@@ -356,6 +356,9 @@ const PROP_LABEL: Record<KeyProp, VideoKey> = {
 const EASE_LABEL: Record<Ease, VideoKey> = {
   linear: 'easeLinear',
   ease: 'easeEase',
+  in: 'easeIn',
+  out: 'easeOut',
+  back: 'easeBack',
   hold: 'easeHold',
 };
 

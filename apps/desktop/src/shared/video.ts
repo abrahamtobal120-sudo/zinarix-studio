@@ -87,8 +87,32 @@ export const isText = (c: Clip): boolean => !!c.text;
 export type KeyProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
 export const KEY_PROPS: readonly KeyProp[] = ['x', 'y', 'scale', 'rotation', 'opacity'];
 /** How a key moves to the next one: straight, smooth start and end, or a jump at the next key. */
-export type Ease = 'linear' | 'ease' | 'hold';
-export const EASES: readonly Ease[] = ['linear', 'ease', 'hold'];
+export type Ease = 'linear' | 'ease' | 'in' | 'out' | 'back' | 'hold';
+export const EASES: readonly Ease[] = ['linear', 'ease', 'in', 'out', 'back', 'hold'];
+
+/** Overshoot of 'back' (the classic 1.70158). */
+export const BACK_S = 1.70158;
+
+/**
+ * The eased progress (0→1, 'back' overshoots past 1) of a segment at progress k (0…1).
+ * 'in', 'out' and 'back' are easeInCubic, easeOutCubic and easeOutBack as in Motion Canvas
+ * (MIT, © 2022 motion-canvas, vendor/motion-canvas/packages/core/src/tweening/timingFunctions.ts).
+ * All are polynomials so the export (videoRender's easeExpr) draws the exact same curve.
+ */
+export function easeCurve(e: Ease | undefined, k: number): number {
+  switch (e) {
+    case 'ease':
+      return k * k * (3 - 2 * k);
+    case 'in':
+      return k * k * k;
+    case 'out':
+      return 1 - (1 - k) ** 3;
+    case 'back':
+      return 1 + (BACK_S + 1) * (k - 1) ** 3 + BACK_S * (k - 1) ** 2;
+    default:
+      return k;
+  }
+}
 
 export interface Keyframe {
   /**
@@ -158,8 +182,7 @@ export function interpKeys(keys: readonly Keyframe[], src: number): number {
     const b = keys[i + 1]!;
     if (src >= b.t) continue;
     if (a.ease === 'hold' || b.t - a.t < 1e-9) return a.v;
-    let k = (src - a.t) / (b.t - a.t);
-    if (a.ease === 'ease') k = k * k * (3 - 2 * k);
+    const k = easeCurve(a.ease, (src - a.t) / (b.t - a.t));
     return a.v + (b.v - a.v) * k;
   }
   return keys[keys.length - 1]!.v;
@@ -177,6 +200,9 @@ export function transformAt(c: Clip, t: number): Transform {
     const keys = c.keyframes[prop];
     if (keys?.length) tr[prop] = interpKeys(keys, src);
   }
+  // 'back' overshoots: keep opacity and scale where the export keeps them.
+  tr.opacity = Math.max(0, Math.min(1, tr.opacity));
+  tr.scale = Math.max(0.01, tr.scale);
   return tr;
 }
 
