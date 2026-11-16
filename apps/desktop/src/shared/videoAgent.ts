@@ -17,7 +17,9 @@ import {
   isText,
   mediaOf,
   moveClips,
+  prevAdjacent,
   projectDuration,
+  setTransition,
   removeClips,
   sizeFor,
   splitAt,
@@ -37,10 +39,26 @@ import {
   projectCues,
   wordCuts,
 } from './videoAi.js';
-import { TEXT_MAX, TEXT_PRESETS } from './videoFx.js';
+import {
+  TEXT_MAX,
+  TEXT_PRESETS,
+  TRANSITION_DEFAULT,
+  TRANSITION_KINDS,
+  TRANSITION_MAX,
+  TRANSITION_MIN,
+  type Transition,
+  type TransitionKind,
+} from './videoFx.js';
+import {
+  CHANNEL_END,
+  CHANNEL_RANGE,
+  TRANSITION_CHANNELS,
+  normalizeTransitionDef,
+  type TransitionDef,
+} from './videoTransitions.js';
 
 /** Tools that only read (no approval). */
-export const VIDEO_READ_TOOLS = ['video_state', 'video_transcript'] as const;
+export const VIDEO_READ_TOOLS = ['video_state', 'video_transcript', 'video_transitions'] as const;
 /** Edits that are undone with Ctrl+Z: approved once, "always" allowed in the conversation. */
 export const VIDEO_EDIT_TOOLS = [
   'video_add_media',
@@ -56,9 +74,14 @@ export const VIDEO_EDIT_TOOLS = [
   'video_add_title',
   'video_captions',
   'video_set_format',
+  'video_add_transition',
 ] as const;
 /** Upload audio to a provider or write a file: approved every time. */
-export const VIDEO_ASK_TOOLS = ['video_transcribe', 'video_export'] as const;
+export const VIDEO_ASK_TOOLS = [
+  'video_transcribe',
+  'video_export',
+  'video_share_transition',
+] as const;
 
 export type VideoToolName =
   | (typeof VIDEO_READ_TOOLS)[number]
@@ -567,6 +590,112 @@ export function describeChange(before: VideoProject, after: VideoProject): strin
       o && (o.start !== c.start || o.in !== c.in || o.out !== c.out || o.trackId !== c.trackId)
     );
   }).length;
+  const trs = (q: VideoProject) =>
+    new Map(q.clips.filter((c) => c.transition).map((c) => [c.id, JSON.stringify(c.transition)]));
+  const t0 = trs(before);
+  const t1 = trs(after);
+  const trChanged = [...new Set([...t0.keys(), ...t1.keys()])].filter(
+    (id) => t0.get(id) !== t1.get(id),
+  ).length;
+  if (trChanged) parts.push(`${trChanged} transición(es)`);
   if (moved && !parts.length) parts.push(`${moved} clip(s) movidos o recortados`);
   return parts.length ? parts.join(' · ') : 'sin cambios visibles en la línea de tiempo';
+}
+
+// ---------------- transitions ----------------
+
+/** What video_transitions prints: built-in kinds and the saved / shared custom ones. */
+export function describeTransitions(defs: readonly TransitionDef[]): string {
+  const lines = [
+    `Built-in kinds: ${TRANSITION_KINDS.join(', ')}.`,
+    defs.length
+      ? `Custom transitions (use with transition_id):\n${defs
+          .map(
+            (d) =>
+              `- ${d.id}: ${d.name}${d.description ? ` — ${d.description}` : ''} [${Object.keys(d.channels).join(', ')}]`,
+          )
+          .join('\n')}`
+      : 'No custom transitions saved yet: invent one with video_add_transition "custom".',
+    `Channels for a custom one (keys {t: 0…1, v}): ${TRANSITION_CHANNELS.map((c) => `${c} ${CHANNEL_RANGE[c][0]}…${CHANNEL_RANGE[c][1]} (ends at ${CHANNEL_END[c]})`).join('; ')}.`,
+  ];
+  return lines.join('\n');
+}
+
+/** The clips a transition goes on: the ones given, or every video clip that follows another. */
+function transitionTargets(p: VideoProject, a: Args): Clip[] | { error: string } {
+  const visual = (c: Clip) => trackOf(p, c.trackId)?.kind === 'video';
+  if (Array.isArray(a.clips) && a.clips.length) {
+    const ids = a.clips.map(String);
+    const found = p.clips.filter((c) => ids.includes(c.id));
+    const bad = ids.filter((id) => !found.some((c) => c.id === id));
+    if (bad.length) return { error: `Unknown clip id(s): ${bad.join(', ')} (see video_state).` };
+    const notVisual = found.filter((c) => !visual(c));
+    if (notVisual.length)
+      return {
+        error: `Transitions go on video-track clips; ${notVisual.map((c) => c.id).join(', ')} is not one.`,
+      };
+    return found;
+  }
+  const cuts = p.clips.filter((c) => visual(c) && !isText(c) && prevAdjacent(p, c));
+  if (!cuts.length)
+    return { error: 'No two clips touch on a video track. Give "clips" to reveal a clip instead.' };
+  return cuts;
+}
+
+/**
+ * video_add_transition: a built-in kind, a saved one (transition_id) or a new custom one the
+ * model describes (custom). `library` is what the user has (saved + shared). Returns the edit
+ * and, for a new one, the normalized definition so the caller keeps it in the library.
+ */
+export function addTransition(
+  p: VideoProject,
+  a: Args,
+  library: readonly TransitionDef[],
+): (VideoEdit & { def?: TransitionDef; isNew?: boolean }) | { error: string } {
+  const d0 = num(a, 'duration') ?? TRANSITION_DEFAULT;
+  const d = Math.min(TRANSITION_MAX, Math.max(TRANSITION_MIN, d0));
+  let tr: Transition | null = null;
+  let def: TransitionDef | undefined;
+  let isNew = false;
+  if (a.remove === true) tr = null;
+  else if (a.custom !== undefined) {
+    const n = normalizeTransitionDef(a.custom);
+    if ('error' in n) return { error: n.error };
+    const same = library.find((x) => x.id === n.id);
+    // Same id as one the user has but different curves: keep both.
+    if (same && JSON.stringify(same) !== JSON.stringify(n)) {
+      let i = 2;
+      while (library.some((x) => x.id === `${n.id}-${i}`)) i++;
+      n.id = `${n.id.slice(0, 36)}-${i}`;
+    }
+    def = n;
+    isNew = !same || JSON.stringify(same) !== JSON.stringify(n);
+    tr = { kind: 'custom', d, def };
+  } else if (str(a, 'transition_id')) {
+    const id = str(a, 'transition_id');
+    def = library.find((x) => x.id === id);
+    if (!def)
+      return { error: `No saved transition "${id}". See video_transitions, or pass "custom".` };
+    tr = { kind: 'custom', d, def };
+  } else {
+    const kind = str(a, 'kind') || 'dissolve';
+    if (!(TRANSITION_KINDS as readonly string[]).includes(kind))
+      return {
+        error: `Unknown kind "${kind}". Built-in: ${TRANSITION_KINDS.join(', ')}; or use "custom" / "transition_id".`,
+      };
+    tr = { kind: kind as TransitionKind, d };
+  }
+  const targets = transitionTargets(p, a);
+  if ('error' in targets) return targets;
+  let project = p;
+  for (const c of targets) project = setTransition(project, c.id, tr ?? undefined);
+  if (project === p) return { error: 'Nothing changed (the clips are on locked tracks?).' };
+  const what = tr ? (def ? `"${def.name}" (${def.id})` : tr.kind) : 'no transition';
+  return {
+    project,
+    label: 'IA: transición',
+    content: `${what} on ${targets.length} clip(s): ${targets.map((c) => c.id).join(', ')}${tr ? `, ${round(d)} s each` : ''}.${isNew ? ` Saved to the user's library as "${def!.id}"; video_share_transition proposes it to the Zinarix Studio repository.` : ''}`,
+    ...(def ? { def } : {}),
+    ...(isNew ? { isNew } : {}),
+  };
 }

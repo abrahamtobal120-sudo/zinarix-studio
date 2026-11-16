@@ -308,7 +308,7 @@ export class Scene3DService {
     signal?: AbortSignal,
   ): Promise<string> {
     const b = await this.findBlender();
-    if (!b) throw new Error('No se encontró Blender 3.6 o más nuevo en este equipo.');
+    if (!b) throw new Error('El motor Pro no está instalado (necesita Blender 3.6 o más nuevo).');
     const file = join(framesDir, '..', 'zinarix-scene.py');
     await writeFile(file, script, 'utf8');
     return new Promise((resolve, reject) => {
@@ -347,7 +347,7 @@ export class Scene3DService {
             .filter((l) => /error|Traceback|Exception/i.test(l));
           reject(
             new Error(
-              `Blender falló (código ${code}): ${(lines.slice(-4).join('\n') || log.slice(-500)).trim()}`,
+              `El motor Pro falló (código ${code}): ${(lines.slice(-4).join('\n') || log.slice(-500)).trim()}`,
             ),
           );
         }
@@ -361,7 +361,7 @@ export class Scene3DService {
     out: string,
   ): Promise<number> {
     const files = (await readdir(framesDir)).filter((f) => /^f_\d{4,}\.png$/.test(f)).sort();
-    if (!files.length) throw new Error('Blender no produjo ningún cuadro.');
+    if (!files.length) throw new Error('El motor Pro no produjo ningún cuadro.');
     const first = Number(/\d+/.exec(files[0]!)![0]);
     const enc = this.spawnEncoder(
       encodeArgs({ ...o, out, pngInput: join(framesDir, FRAME_PATTERN), startNumber: first }),
@@ -412,7 +412,7 @@ export class Scene3DService {
     signal?: AbortSignal,
   ): Promise<{ paths: string[]; log: string }> {
     const b = await this.findBlender();
-    if (!b) throw new Error('No se encontró Blender 3.6 o más nuevo en este equipo.');
+    if (!b) throw new Error('El motor Pro no está instalado (necesita Blender 3.6 o más nuevo).');
     const work = await mkdtemp(join(tmpdir(), 'zinarix-bpy-'));
     try {
       const outDir = join(work, 'out');
@@ -440,7 +440,7 @@ export class Scene3DService {
           clearTimeout(timer);
           signal?.removeEventListener('abort', onAbort);
           if (code === 0) resolve(text);
-          else reject(new Error(`Blender falló (código ${code}):\n${text.slice(-1500)}`));
+          else reject(new Error(`El motor Pro falló (código ${code}):\n${text.slice(-1500)}`));
         });
       });
       const files = await readdir(outDir);

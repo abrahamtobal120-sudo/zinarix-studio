@@ -21,8 +21,10 @@ import {
   type Range,
 } from '../../../shared/videoAi';
 import {
+  addTransition,
   applyCuts,
   describeChange,
+  describeTransitions,
   describeState,
   fmtTime,
   pickMedia,
@@ -31,7 +33,9 @@ import {
   type VideoAgentResult,
   type VideoEdit,
 } from '../../../shared/videoAgent';
+import { normalizeTransitionDef, shareUrl } from '../../../shared/videoTransitions';
 import { api, toast } from '../../store';
+import { allTransitions, saveTransition } from './transitionLibrary';
 import { textPngs } from './textDraw';
 import { commit, getV, importPaths, openStudio } from './videoStore';
 
@@ -62,6 +66,15 @@ const ACTION: Record<string, (a: Args, p: VideoProject) => string> = {
   video_add_title: (a) => `agregar el título "${str(a, 'text').slice(0, 80)}"`,
   video_captions: (a) => `poner subtítulos (estilo ${str(a, 'style') || 'classic'})`,
   video_set_format: (a) => `cambiar el formato a ${str(a, 'aspect')}`,
+  video_add_transition: (a) => {
+    if (a.remove === true) return 'quitar transiciones';
+    const c = a.custom as { name?: unknown } | undefined;
+    const what =
+      c && typeof c.name === 'string'
+        ? `crear la transición "${c.name.slice(0, 40)}" (se guarda en tu biblioteca) y ponerla`
+        : `poner la transición ${str(a, 'transition_id') || str(a, 'kind') || 'dissolve'}`;
+    return `${what} en ${Array.isArray(a.clips) && a.clips.length ? `${a.clips.length} clip(s)` : 'cada corte'}`;
+  },
 };
 
 /** Analyses (silences, scenes) measured for the approval card, reused by the real run. */
@@ -101,6 +114,13 @@ async function run(
   signal: AbortSignal,
 ): Promise<VideoAgentResult> {
   const v = getV();
+  if (name === 'video_transitions')
+    return {
+      ok: true,
+      content: describeTransitions(allTransitions()),
+      summary: `${allTransitions().length} personalizadas`,
+    };
+  if (name === 'video_share_transition') return shareTransition(a, dry);
   if (!v.open && name !== 'video_add_media')
     return fail(
       'Video Studio is not open. Ask the user to open it (Ctrl+Shift+V or the Video button), or start with video_add_media, which opens it.',
@@ -166,6 +186,11 @@ async function run(
         },
         dry,
       );
+    }
+    case 'video_add_transition': {
+      const e = addTransition(p, a, allTransitions());
+      if (!('error' in e) && !dry && e.isNew && e.def) saveTransition(e.def);
+      return finishEdit(name, a, p, e, dry);
     }
     case 'video_transcribe':
       return transcribe(a, dry, id, signal);
@@ -308,4 +333,27 @@ export function wireVideoAgent(): void {
       .then((r) => api().video.agentDone(ev.requestId, r))
       .finally(() => live.delete(ev.requestId));
   });
+}
+
+/** Opens GitHub with the transition file filled in; publishing is confirmed there. */
+async function shareTransition(a: Args, dry: boolean): Promise<VideoAgentResult> {
+  const id = str(a, 'transition_id');
+  const found = allTransitions().find((d) => d.id === id);
+  if (!found) return fail(`No transition "${id}". See video_transitions.`);
+  const author = str(a, 'author');
+  const n = normalizeTransitionDef(author ? { ...found, author } : found);
+  if ('error' in n) return fail(n.error);
+  if (dry)
+    return {
+      ok: true,
+      content: `proponer la transición "${n.name}" al repositorio público de Zinarix Studio en GitHub`,
+      summary:
+        'Se abre GitHub en tu navegador con el archivo listo. Solo se publica si inicias sesión y confirmas allí; entonces cualquiera podrá verla y usarla',
+    };
+  await api().app.openExternal(shareUrl(n));
+  return {
+    ok: true,
+    content: `Opened GitHub with community/transitions/${n.id}.json filled in. The user signs in and presses "Commit changes" / "Propose changes" to open the pull request; once merged, every Zinarix Studio user gets it in the Transitions panel.`,
+    summary: 'GitHub abierto',
+  };
 }

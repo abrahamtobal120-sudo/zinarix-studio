@@ -436,7 +436,7 @@
     font: inherit;
     resize: vertical;
   }
-  .s3-row {
+  .s3-pickrow {
     display: flex;
     align-items: center;
     gap: 8px;

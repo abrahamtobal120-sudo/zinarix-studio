@@ -32,6 +32,8 @@ export interface PageSnapshot {
 }
 
 const PARTITION = 'persist:zinarix-browser';
+/** Session (cookie store) of the built-in browser. */
+export const BROWSER_PARTITION = PARTITION;
 /** Sessions already given the permission/download handlers. */
 const configured = new WeakSet<Session>();
 const NAV_TIMEOUT = 25_000;

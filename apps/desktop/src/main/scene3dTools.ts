@@ -233,7 +233,7 @@ export function scene3dPreview(name: string, a: Record<string, unknown>): System
     const blender = text(a, 'engine') === 'blender';
     return {
       risk: 'medium',
-      action: `renderizar la escena 3D abierta ${blender ? `con Blender (${text(a, 'quality') === 'cycles' ? 'Cycles' : 'EEVEE'})` : 'en el visor'}`,
+      action: `renderizar la escena 3D abierta ${blender ? `con Zinarix Pro (${text(a, 'quality') === 'cycles' ? 'realista' : 'calidad'})` : 'con Zinarix (rápido)'}`,
       warning: 'El video se guarda en media/3d y se agrega a Video Studio.',
     };
   }
@@ -254,7 +254,7 @@ export function scene3dPreview(name: string, a: Record<string, unknown>): System
     const script = text(a, 'script');
     return {
       risk: 'high',
-      action: 'ejecutar un script de Python en Blender',
+      action: 'ejecutar un script de Python en el motor Pro (Blender)',
       warning:
         'El script corre con tus permisos y puede leer o cambiar archivos fuera del proyecto. Léelo antes de aprobar. No recibe tus claves ni tokens.',
       command: script.slice(0, 20_000),
@@ -265,7 +265,7 @@ export function scene3dPreview(name: string, a: Record<string, unknown>): System
     const blender = text(a, 'engine') === 'blender';
     return {
       risk: 'medium',
-      action: `renderizar una animación 3D ${blender ? `con Blender (${text(a, 'quality') === 'cycles' ? 'Cycles' : 'EEVEE'})` : 'en el visor'}`,
+      action: `renderizar una animación 3D ${blender ? `con Zinarix Pro (${text(a, 'quality') === 'cycles' ? 'realista' : 'calidad'})` : 'con Zinarix (rápido)'}`,
       warning: `${describeScene(s)}. El video se guarda en media/3d y se agrega a Video Studio.`,
     };
   } catch (e) {
@@ -341,7 +341,7 @@ export async function runScene3dTool(
           ok: false,
           content:
             'Blender 3.6 or newer is not installed. Use engine "viewer", or ask the user to install Blender.',
-          summary: 'sin Blender',
+          summary: 'sin motor Pro',
         };
       const r = await svc.renderWithBlender(
         scene,

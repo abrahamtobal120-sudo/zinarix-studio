@@ -107,7 +107,7 @@ export function Gen3DDialog() {
             </label>
             <div className="s3-field">
               <span>{t3('genImage')}</span>
-              <div className="s3-row">
+              <div className="s3-pickrow">
                 <button
                   type="button"
                   className="s3-btn"

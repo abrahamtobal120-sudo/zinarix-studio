@@ -325,6 +325,26 @@
   color: var(--fg-strong);
   background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
+.browser-cookies-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: min(560px, 100%);
+  margin-top: 22px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  font-size: var(--text-base);
+  color: var(--fg);
+}
+.browser-cookies-card > span {
+  flex: 1 1 260px;
+}
+.browser-cookies-card .browser-chip {
+  padding: 6px 12px;
+}
 .browser-safety {
   max-width: 560px;
   margin: 26px 0 0;

@@ -777,9 +777,11 @@ function TransitionSection({ clip }: { clip: Clip }) {
           value={tr?.kind ?? ''}
           onChange={(e) =>
             set(
-              e.target.value
-                ? { kind: e.target.value as TransitionKind, d: tr?.d ?? TRANSITION_DEFAULT }
-                : undefined,
+              e.target.value === 'custom'
+                ? tr
+                : e.target.value
+                  ? { kind: e.target.value as TransitionKind, d: tr?.d ?? TRANSITION_DEFAULT }
+                  : undefined,
             )
           }
         >
@@ -789,6 +791,9 @@ function TransitionSection({ clip }: { clip: Clip }) {
               {tv(`tr_${k}` as VideoKey)}
             </option>
           ))}
+          {tr?.kind === 'custom' && (
+            <option value="custom">{tr.def?.name ?? tv('trCustom')}</option>
+          )}
         </select>
       </div>
       {tr && (
@@ -801,7 +806,7 @@ function TransitionSection({ clip }: { clip: Clip }) {
             max={TRANSITION_MAX}
             step={0.05}
             unit="s"
-            onChange={(d) => set({ kind: tr.kind, d }, true)}
+            onChange={(d) => set({ ...tr, d }, true)}
           />
           <p className="vs-dim vs-note">{w?.prev ? tv('trJoin') : tv('trReveal')}</p>
         </>

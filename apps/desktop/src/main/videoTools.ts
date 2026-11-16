@@ -153,6 +153,115 @@ export const VIDEO_TOOLS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'video_transitions',
+    description:
+      'List the transitions available: the built-in kinds and the custom ones the user saved or that people shared in the Zinarix Studio repository (ids for video_add_transition "transition_id").',
+    parameters: obj({}),
+  },
+  {
+    name: 'video_add_transition',
+    description:
+      'Put a transition on clips (default: every video clip that follows another, i.e. every cut). Use a built-in "kind", a saved "transition_id", or INVENT a new one with "custom": curves of how the incoming clip looks from t=0 (start) to t=1 (fully in). Channels: alpha 0…1 (opacity), dx / dy -1…1 (offset as share of the frame width / height, + is right / down), scale 0.1…3, reveal 0…1 (share shown from the left). Every channel is forced to end in place at t=1 (alpha 1, dx 0, dy 0, scale 1, reveal 1). Example "zoom with a turn-in from the right": {"name":"Zoom desde la derecha","channels":{"alpha":[{"t":0,"v":0},{"t":0.4,"v":1}],"dx":[{"t":0,"v":0.3}],"scale":[{"t":0,"v":1.6},{"t":0.7,"v":0.95}]}}. A new custom transition is saved in the user’s library. remove=true takes the transitions off.',
+    parameters: obj({
+      clips: { type: 'array', items: { type: 'string' }, description: 'Clip ids (optional)' },
+      kind: { type: 'string', enum: ['dissolve', 'wipe', 'slide', 'zoomIn'] },
+      transition_id: { type: 'string', description: 'A custom transition from video_transitions' },
+      custom: {
+        type: 'object',
+        description: 'A new transition (data only)',
+        properties: {
+          name: { type: 'string', maxLength: 40 },
+          description: { type: 'string', maxLength: 200 },
+          ease: { type: 'string', enum: ['smooth', 'linear'] },
+          channels: {
+            type: 'object',
+            properties: {
+              alpha: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    t: { type: 'number', minimum: 0, maximum: 1 },
+                    v: { type: 'number' },
+                  },
+                  required: ['t', 'v'],
+                },
+                maxItems: 12,
+              },
+              dx: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    t: { type: 'number', minimum: 0, maximum: 1 },
+                    v: { type: 'number' },
+                  },
+                  required: ['t', 'v'],
+                },
+                maxItems: 12,
+              },
+              dy: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    t: { type: 'number', minimum: 0, maximum: 1 },
+                    v: { type: 'number' },
+                  },
+                  required: ['t', 'v'],
+                },
+                maxItems: 12,
+              },
+              scale: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    t: { type: 'number', minimum: 0, maximum: 1 },
+                    v: { type: 'number' },
+                  },
+                  required: ['t', 'v'],
+                },
+                maxItems: 12,
+              },
+              reveal: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    t: { type: 'number', minimum: 0, maximum: 1 },
+                    v: { type: 'number' },
+                  },
+                  required: ['t', 'v'],
+                },
+                maxItems: 12,
+              },
+            },
+          },
+        },
+        required: ['name', 'channels'],
+      },
+      duration: { type: 'number', minimum: 0.1, maximum: 4, description: 'Seconds (default 0.6)' },
+      remove: { type: 'boolean' },
+    }),
+  },
+  {
+    name: 'video_share_transition',
+    description:
+      'Propose one of the user’s custom transitions to the Zinarix Studio repository on GitHub so every user gets it: opens GitHub in the browser with the file filled in (a fork and a pull request for people who cannot write to the repo). Nothing is published until the user confirms on GitHub.',
+    parameters: obj(
+      {
+        transition_id: { type: 'string' },
+        author: {
+          type: 'string',
+          maxLength: 40,
+          description: 'Name to credit (optional, only if the user gave it)',
+        },
+      },
+      ['transition_id'],
+    ),
+  },
+  {
     name: 'video_transcribe',
     description:
       'Transcribe a media item with word times (local whisper.cpp when installed, else a connected provider, which uploads the audio). Needed before video_transcript, video_keep_ranges, video_cut_words, video_remove_fillers and video_captions.',
@@ -179,7 +288,7 @@ export const VIDEO_READ_ONLY = new Set<string>(VIDEO_READ_TOOLS);
 const ASK = new Set<string>(VIDEO_ASK_TOOLS);
 
 export const VIDEO_PROMPT_PART =
-  '- video_*: edit the project open in Video Studio. Flow for edits of what is said: video_state → video_transcribe (if no transcript) → video_transcript → video_keep_ranges (shorts, highlights) or video_cut_words / video_remove_fillers / video_remove_silences → video_set_format (9:16 for shorts) → video_captions → video_export. Every edit is one Ctrl+Z step for the user. Choose word ranges that make complete sentences. Generated media goes onto the timeline with video_add_media.';
+  '- video_*: edit the project open in Video Studio. Flow for edits of what is said: video_state → video_transcribe (if no transcript) → video_transcript → video_keep_ranges (shorts, highlights) or video_cut_words / video_remove_fillers / video_remove_silences → video_set_format (9:16 for shorts) → video_captions → video_export. Every edit is one Ctrl+Z step for the user. Choose word ranges that make complete sentences. Generated media goes onto the timeline with video_add_media. Transitions: video_transitions lists them; video_add_transition puts one on the cuts, and can invent a new one ("custom" curves), which is saved in the user’s library; video_share_transition proposes it to the Zinarix Studio repository so other users get it (only when the user asks to share).';
 
 /** The window that holds Video Studio: dry runs a call (approval card) or applies it. */
 export interface VideoUi {

@@ -13,7 +13,8 @@ import {
   trackVolume,
   updateTrack,
 } from '../../../shared/video';
-import type { TransitionKind } from '../../../shared/videoFx';
+import type { TransitionDef } from '../../../shared/videoTransitions';
+import type { TransitionName } from '../../../shared/videoFx';
 import { useState } from 'react';
 import type { StickerGroup } from '../../../shared/videoFx';
 import {
@@ -28,6 +29,7 @@ import {
   cssFilter,
 } from '../../../shared/videoFx';
 import { toast } from '../../store';
+import { CustomTransitions } from './CustomTransitions';
 import { DuckControl } from './EasyPanel';
 import { FONT_FAMILY } from './textDraw';
 import { type VideoKey, tv } from './strings';
@@ -196,11 +198,13 @@ export function TransitionsPanel() {
           </button>
         ))}
       </div>
+      <CustomTransitions targets={targets} />
     </div>
   );
 }
 
-export const transitionLabel = (k: TransitionKind): string => tv(`tr_${k}` as VideoKey);
+export const transitionLabel = (k: TransitionName, def?: TransitionDef): string =>
+  k === 'custom' ? (def?.name ?? tv('trCustom')) : tv(`tr_${k}` as VideoKey);
 
 export function MixerPanel() {
   const project = useV((s) => s.project);

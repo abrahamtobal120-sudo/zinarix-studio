@@ -119,11 +119,103 @@
     cursor: pointer;
   }
   .q3-name {
-    margin: 10px 0 0;
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0 2px;
+  }
+  .q3-name strong {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .q3-link {
+    border: 0;
+    background: none;
+    padding: 2px 4px;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 11px;
+    border-radius: 4px;
+  }
+  .q3-link:hover {
+    background: var(--hover);
+  }
+  .q3-title {
+    margin: 12px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .q3-sec {
+    margin-top: 8px;
+  }
+  .q3-sec > summary {
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-dim);
+    cursor: pointer;
+    user-select: none;
+    border-radius: 4px;
+  }
+  .q3-sec > summary:hover {
+    color: var(--fg);
+  }
+  .q3-wide {
+    grid-column: 1 / -1;
+  }
+  .q3-gap {
+    margin-top: 4px;
+  }
+  .q3-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  .q3-row .q3-btn {
+    justify-content: center;
+    padding: 6px 2px;
+  }
+  .q3-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .q3-pad .q3-btn {
+    flex-direction: column;
+    gap: 0;
+    padding: 4px 2px;
+    font-size: 10px;
+    text-align: center;
+  }
+  .q3-pad .q3-btn > span:last-child {
+    max-width: 100%;
+  }
+  .q3-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 6px;
+    color: var(--fg-dim);
+    font-size: 11px;
+  }
+  .q3-text input {
+    padding: 5px 7px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 13px;
+  }
+  .q3-text input:focus-visible,
+  .q3-sec > summary:focus-visible,
+  .q3-link:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
   }
   .q3-hint {
     margin: 10px 0 0;

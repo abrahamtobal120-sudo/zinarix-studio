@@ -22,6 +22,7 @@ import { McpSection } from './McpSettings';
 import { DocsSection, MemoriesSection } from './KnowledgeSettings';
 import { HelperSettings } from './helper/HelperSettings';
 import { CloudSection } from './CloudSettings';
+import { BrowserSection } from './BrowserSettings';
 import { SuggestionSettings } from './SuggestionSettings';
 import { ModalShell } from './ModalShell';
 import { tl } from '../layout/i18nLayout';
@@ -60,6 +61,7 @@ type Section =
   | 'docs'
   | 'mcp'
   | 'cloud'
+  | 'browser'
   | 'phone'
   | 'keys';
 
@@ -396,7 +398,10 @@ function ThemeCard({ id, active }: { id: ThemeId; active: boolean }) {
 export function SettingsPanel() {
   const prefs = useStore((s) => s.prefs);
   const settings = useStore((s) => s.settings);
-  const [section, setSection] = useState<Section>('appearance');
+  const [section, setSection] = useState<Section>(() => {
+    const m = getState().modal;
+    return m?.kind === 'settings' && m.section ? (m.section as Section) : 'appearance';
+  });
   const [recording, setRecording] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
 
@@ -426,6 +431,7 @@ export function SettingsPanel() {
         {nav('memories', t('setMemories'), 'sparkle')}
         {nav('docs', t('setDocsNav'), 'books')}
         {nav('cloud', t('cloudTitle'), 'cloud')}
+        {nav('browser', t('setBrowser'), 'globe')}
         {nav('phone', t('phoneTitle'), 'smartphone')}
         {nav('keys', t('shortcuts'), 'keyboard')}
       </nav>
@@ -603,6 +609,7 @@ export function SettingsPanel() {
         {section === 'docs' && <DocsSection />}
         {section === 'mcp' && <McpSection />}
         {section === 'cloud' && <CloudSection />}
+        {section === 'browser' && <BrowserSection />}
 
         {section === 'phone' && <PhoneSection />}
 

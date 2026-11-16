@@ -989,6 +989,18 @@ export interface BrowserTabView {
   ai: boolean;
 }
 
+export interface BrowserCookieInfo {
+  count: number;
+  importedAt: number | null;
+  imported: number;
+}
+
+export interface BrowserCookieImport {
+  imported: number;
+  skipped: number;
+  sites: number;
+}
+
 export interface BrowserTabsView {
   tabs: BrowserTabView[];
   active: string | null;
@@ -1767,6 +1779,12 @@ export interface OmniApi {
     selectTab(id: string): Promise<void>;
     closeTab(id: string): Promise<void>;
     newTab(): Promise<void>;
+    /** Cookies the browser keeps and the last import (null: never imported). */
+    cookieInfo(): Promise<BrowserCookieInfo>;
+    /** Asks for a cookie export (JSON or cookies.txt) and loads it; null if cancelled. */
+    importCookies(): Promise<BrowserCookieImport | null>;
+    /** Deletes every cookie of the built-in browser (signs out of every site). */
+    clearCookies(): Promise<void>;
   };
   terminal: {
     /**
@@ -2378,6 +2396,9 @@ export const CHANNELS = [
   'browser:selectTab',
   'browser:closeTab',
   'browser:newTab',
+  'browser:cookieInfo',
+  'browser:importCookies',
+  'browser:clearCookies',
   'terminal:create',
   'terminal:profiles',
   'terminal:write',

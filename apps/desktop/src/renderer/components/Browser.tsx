@@ -12,6 +12,7 @@ import { lang, t } from '../i18n';
 import { askInChat } from './Chat';
 import { Icon as UiIcon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
+import { importCookies, useCookieInfo } from './BrowserSettings';
 import './browser.css';
 
 const EMPTY: BrowserStateView = {
@@ -286,6 +287,8 @@ export function BrowserPane({ visible }: { visible: boolean }) {
   const [suggest, setSuggest] = useState<BrowserHistoryView>(NO_LIST);
   const [pick, setPick] = useState(-1);
   const [marks, setMarks] = useState<BrowserHistoryView>(NO_LIST);
+  /** The start page offers the cookie import only until the user has imported some. */
+  const [cookies] = useCookieInfo();
   const host = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   /** Tab shown when the user started typing an address (an AI may switch the view meanwhile). */
@@ -743,6 +746,22 @@ export function BrowserPane({ visible }: { visible: boolean }) {
                   </button>
                 ))}
               </div>
+              {cookies && cookies.importedAt === null && (
+                <div className="browser-cookies-card">
+                  <span>
+                    <UiIcon name="key" size={14} /> {t('browserCookiesCard')}
+                  </span>
+                  <button className="browser-chip" onClick={() => void importCookies()}>
+                    {t('browserCookiesImport')}
+                  </button>
+                  <button
+                    className="browser-chip"
+                    onClick={() => setState({ modal: { kind: 'settings', section: 'browser' } })}
+                  >
+                    {t('browserCookiesMore')}
+                  </button>
+                </div>
+              )}
               <p className="browser-safety">
                 <UiIcon name="lock" size={13} /> {t('browserEmptyHint')}
               </p>

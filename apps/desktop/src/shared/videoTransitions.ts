@@ -139,7 +139,8 @@ export function normalizeTransitionDef(raw: unknown): TransitionDef | { error: s
   const name = clean(r.name, NAME_MAX);
   if (!name) return { error: 'Give the transition a "name".' };
   const src = r.channels;
-  if (!src || typeof src !== 'object') return { error: 'Give "channels" (alpha, dx, dy, scale, reveal).' };
+  if (!src || typeof src !== 'object')
+    return { error: 'Give "channels" (alpha, dx, dy, scale, reveal).' };
   const channels: TransitionDef['channels'] = {};
   for (const [ch, keys] of Object.entries(src as Record<string, unknown>)) {
     if (!(TRANSITION_CHANNELS as readonly string[]).includes(ch))

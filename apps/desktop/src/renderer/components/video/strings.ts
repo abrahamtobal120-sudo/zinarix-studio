@@ -245,7 +245,8 @@ const es = {
   tp_quote: 'Cita',
   addText: 'Agregar título',
   addSticker: 'Agregar sticker',
-  stickerHint: 'Haz clic en un sticker para ponerlo en el cabezal. Muévelo, cámbialo de tamaño o de color en el inspector.',
+  stickerHint:
+    'Haz clic en un sticker para ponerlo en el cabezal. Muévelo, cámbialo de tamaño o de color en el inspector.',
   stickerColor: 'Color de formas y flechas',
   st_emoji: 'Emojis',
   st_shapes: 'Formas',
@@ -321,6 +322,20 @@ const es = {
   trReveal:
     'No hay un clip justo antes en la pista: la transición revela este clip sobre lo de abajo.',
   trJoin: 'Une con el clip anterior, centrada en el corte.',
+  trMine: 'Mis transiciones',
+  trCommunity: 'De la comunidad',
+  trMineEmpty:
+    'Todavía no tienes transiciones propias. Pídele a la IA una nueva (por ejemplo: "crea una transición que entre girando con zoom") o importa un archivo .json.',
+  trCommunityEmpty: 'Nadie ha compartido transiciones todavía.',
+  trCommunityError: 'No se pudo descargar la lista de GitHub.',
+  trRefresh: 'Actualizar',
+  trImport: 'Importar .json',
+  trImported: 'Transición "{name}" agregada a tu biblioteca',
+  trShare: 'Compartir en GitHub',
+  trShareConfirm:
+    'Se abrirá GitHub con el archivo de "{name}" listo para proponerlo al repositorio público de Zinarix Studio. Solo se publica si inicias sesión y confirmas allí; después de aprobarse, cualquier usuario podrá usarla.',
+  trDelete: 'Borrar de mi biblioteca',
+  trCustom: 'Personalizada',
   editTransition: 'Transición',
   mixer: 'Mezclador',
   mixVolume: 'Volumen',
@@ -581,7 +596,8 @@ const en: Record<VideoKey, string> = {
   tp_quote: 'Quote',
   addText: 'Add title',
   addSticker: 'Add sticker',
-  stickerHint: 'Click a sticker to place it at the playhead. Move it, resize it or change its colour in the inspector.',
+  stickerHint:
+    'Click a sticker to place it at the playhead. Move it, resize it or change its colour in the inspector.',
   stickerColor: 'Colour of shapes and arrows',
   st_emoji: 'Emojis',
   st_shapes: 'Shapes',
@@ -657,6 +673,20 @@ const en: Record<VideoKey, string> = {
   trReveal:
     'There is no clip right before it on the track: the transition reveals this clip over what is below.',
   trJoin: 'Joins the previous clip, centred on the cut.',
+  trMine: 'My transitions',
+  trCommunity: 'From the community',
+  trMineEmpty:
+    'You have no transitions of your own yet. Ask the AI for a new one (for example: "make a transition that spins in with a zoom") or import a .json file.',
+  trCommunityEmpty: 'Nobody has shared transitions yet.',
+  trCommunityError: 'Could not download the list from GitHub.',
+  trRefresh: 'Refresh',
+  trImport: 'Import .json',
+  trImported: 'Transition "{name}" added to your library',
+  trShare: 'Share on GitHub',
+  trShareConfirm:
+    'GitHub will open with the file of "{name}" ready to propose it to the public Zinarix Studio repository. It is only published if you sign in and confirm there; once approved, every user can use it.',
+  trDelete: 'Delete from my library',
+  trCustom: 'Custom',
   editTransition: 'Transition',
   mixer: 'Mixer',
   mixVolume: 'Volume',

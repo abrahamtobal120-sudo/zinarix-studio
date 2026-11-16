@@ -807,7 +807,7 @@ function ClipView({
       {clip.transition && (
         <div
           className="vs-tr-mark"
-          title={`${tv('editTransition')} · ${transitionLabel(clip.transition.kind)} · ${clip.transition.d} s`}
+          title={`${tv('editTransition')} · ${transitionLabel(clip.transition.kind, clip.transition.def)} · ${clip.transition.d} s`}
         />
       )}
       {!!clip.fadeIn && (

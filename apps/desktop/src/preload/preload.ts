@@ -245,6 +245,9 @@ const api: OmniApi = {
     selectTab: call('browser:selectTab') as OmniApi['browser']['selectTab'],
     closeTab: call('browser:closeTab') as OmniApi['browser']['closeTab'],
     newTab: call('browser:newTab') as OmniApi['browser']['newTab'],
+    cookieInfo: call('browser:cookieInfo') as OmniApi['browser']['cookieInfo'],
+    importCookies: call('browser:importCookies') as OmniApi['browser']['importCookies'],
+    clearCookies: call('browser:clearCookies') as OmniApi['browser']['clearCookies'],
   },
   terminal: {
     create: call('terminal:create') as OmniApi['terminal']['create'],

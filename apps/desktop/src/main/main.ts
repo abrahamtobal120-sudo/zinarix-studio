@@ -40,6 +40,7 @@ import {
   runUntrustedGit,
 } from './git.js';
 import { BrowserController, browserData } from './browser.js';
+import { clearCookies, cookieInfo, importCookieFile } from './browserCookies.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
 import { CloudSync } from './cloudSync.js';
@@ -2155,6 +2156,23 @@ function registerIpc(): void {
   handle('browser:selectTab', z.tuple([z.string().max(64)]), (w, id) => w.browser.select(id));
   handle('browser:closeTab', z.tuple([z.string().max(64)]), (w, id) => w.browser.close(id));
   handle('browser:newTab', z.tuple([]), (w) => void w.browser.newTab());
+  // Cookies exported from a regular browser (Cookie-Editor JSON or cookies.txt): the user
+  // picks the file, so logins carry over to the built-in browser.
+  handle('browser:cookieInfo', z.tuple([]), () => cookieInfo());
+  handle('browser:importCookies', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Cookies', extensions: ['json', 'txt'] },
+        { name: '*', extensions: ['*'] },
+      ],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const res = await importCookieFile(r.filePaths[0]);
+    for (const x of wins.values()) x.browser.refresh();
+    return res;
+  });
+  handle('browser:clearCookies', z.tuple([]), () => clearCookies());
 
   handle('terminal:profiles', z.tuple([]), () => shellProfiles());
   handle(
@@ -2811,10 +2829,9 @@ function registerScene3dIpc(): void {
   }));
   handle('scene3d:pickBlender', z.tuple([]), async (w) => {
     const r = await dialog.showOpenDialog(w.win, {
-      title: 'Elegir Blender',
+      title: 'Elegir el motor Pro (Blender)',
       properties: ['openFile'],
-      filters:
-        process.platform === 'win32' ? [{ name: 'Blender', extensions: ['exe'] }] : [],
+      filters: process.platform === 'win32' ? [{ name: 'Blender', extensions: ['exe'] }] : [],
     });
     const p = r.canceled ? undefined : r.filePaths[0];
     if (!p) return null;

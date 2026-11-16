@@ -76,7 +76,8 @@ export type Modal =
   | { kind: 'usage' }
   | { kind: 'security' }
   | { kind: 'scanner' }
-  | { kind: 'settings' }
+  /** section: the page of the settings to open on (e.g. 'browser'). */
+  | { kind: 'settings'; section?: string }
   | { kind: 'diff'; path: string; staged: boolean }
   | { kind: 'commit'; hash: string; subject: string }
   | { kind: 'clone' }
