@@ -11,7 +11,7 @@
  * Works with Blender 3.6 – 5.x: no fcurve API (it changed in 4.4 / 5.0); interpolation is set
  * through the "new keyframe" preference before each insert, and EEVEE's engine id is probed.
  */
-import type { Scene3D } from './scene3d.js';
+import { bakeScene, type Scene3D } from './scene3d.js';
 
 export type BlenderEngine = 'eevee' | 'cycles';
 
@@ -35,7 +35,8 @@ export const FRAME_PATTERN = 'f_%04d.png';
 export function toBpy(scene: Scene3D, o: BpyOptions): string {
   const data = b64(
     JSON.stringify({
-      scene,
+      // Curves Blender has no exact match for travel as per-frame keys.
+      scene: bakeScene(scene),
       framesDir: o.framesDir,
       engine: o.engine,
       samples: Math.max(1, Math.min(4096, Math.round(o.samples ?? 64))),
@@ -187,7 +188,8 @@ def add_model(n, holder):
                 o.data.materials.clear()
                 o.data.materials.append(mat)
 
-INTERP = {'linear': 'LINEAR', 'ease': 'BEZIER', 'hold': 'CONSTANT'}
+# Keys arrive baked (bakeScene): only linear and hold segments are left.
+INTERP = {'linear': 'LINEAR', 'hold': 'CONSTANT'}
 PATHS = {
     'px': ('location', 0), 'py': ('location', 1), 'pz': ('location', 2),
     'rx': ('rotation_euler', 0), 'ry': ('rotation_euler', 1), 'rz': ('rotation_euler', 2),

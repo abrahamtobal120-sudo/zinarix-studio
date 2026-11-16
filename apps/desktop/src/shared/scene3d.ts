@@ -6,7 +6,115 @@
  * Coordinates follow three.js and glTF: Y up, metres, rotations in degrees (Euler XYZ).
  * The Blender script (toBpy) converts to Blender's Z up by parenting everything to one root.
  */
-import { interpKeys, type Ease, type Keyframe } from './video.js';
+/**
+ * Curves of a key (how the value travels to the next key). The first three are the ones of the
+ * video keys (Fase 12); the 3D editor adds the classic motion-design ones. Blender gets them
+ * baked into per-frame keys (bakeKeys), so both renderers draw the same motion.
+ */
+export type Ease3D = 'linear' | 'ease' | 'in' | 'out' | 'back' | 'bounce' | 'elastic' | 'hold';
+export const EASES_3D: readonly Ease3D[] = [
+  'linear',
+  'ease',
+  'in',
+  'out',
+  'back',
+  'bounce',
+  'elastic',
+  'hold',
+];
+
+export interface Keyframe {
+  /** Scene seconds. */
+  t: number;
+  v: number;
+  /** Curve towards the next key (default linear). */
+  ease?: Ease3D;
+}
+
+function bounceOut(k: number): number {
+  const n = 7.5625;
+  const d = 2.75;
+  if (k < 1 / d) return n * k * k;
+  if (k < 2 / d) return n * (k -= 1.5 / d) * k + 0.75;
+  if (k < 2.5 / d) return n * (k -= 2.25 / d) * k + 0.9375;
+  return n * (k -= 2.625 / d) * k + 0.984375;
+}
+
+/** 0→1 progress through a segment for each curve ('hold' is handled by the caller). */
+export function easeK(ease: Ease3D | undefined, k: number): number {
+  switch (ease) {
+    case 'ease':
+      return k * k * (3 - 2 * k);
+    case 'in':
+      return k * k * k;
+    case 'out':
+      return 1 - (1 - k) ** 3;
+    case 'back': {
+      // Overshoots ~10 % and settles (easeOutBack).
+      const c = 1.70158;
+      return 1 + (c + 1) * (k - 1) ** 3 + c * (k - 1) ** 2;
+    }
+    case 'bounce':
+      return bounceOut(k);
+    case 'elastic':
+      if (k <= 0 || k >= 1) return k;
+      return 2 ** (-10 * k) * Math.sin((k * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1;
+    default:
+      return k;
+  }
+}
+
+/** Value of sorted keys at scene time t (held before the first and after the last). */
+export function interpKeys(keys: readonly Keyframe[], t: number): number {
+  const first = keys[0]!;
+  if (keys.length === 1 || t <= first.t) return first.v;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const a = keys[i]!;
+    const b = keys[i + 1]!;
+    if (t >= b.t) continue;
+    if (a.ease === 'hold' || b.t - a.t < 1e-9) return a.v;
+    return a.v + (b.v - a.v) * easeK(a.ease, (t - a.t) / (b.t - a.t));
+  }
+  return keys[keys.length - 1]!.v;
+}
+
+/**
+ * Keys Blender can reproduce exactly: linear and hold segments stay as they are; every other
+ * curve becomes one linear key per frame. Exact on frames, which is all a render samples.
+ */
+export function bakeKeys(keys: readonly Keyframe[], fps: number): Keyframe[] {
+  const out: Keyframe[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const a = keys[i]!;
+    const b = keys[i + 1];
+    const plain = !a.ease || a.ease === 'linear' || a.ease === 'hold';
+    out.push(plain ? { ...a } : { t: a.t, v: a.v });
+    if (!b || plain) continue;
+    const f0 = Math.floor(a.t * fps + 1e-6) + 1;
+    const f1 = Math.ceil(b.t * fps - 1e-6) - 1;
+    for (let f = f0; f <= f1; f++) {
+      const t = f / fps;
+      out.push({ t: round4(t), v: round4(interpKeys(keys, t)) });
+    }
+  }
+  return out;
+}
+
+/** Every key list of a scene baked for Blender. */
+export function bakeScene(s: Scene3D): Scene3D {
+  const bake = <P extends string>(k: Keys<P> | undefined): Keys<P> | undefined => {
+    if (!k) return k;
+    const out: Keys<P> = {};
+    for (const [p, list] of Object.entries(k) as [P, Keyframe[] | undefined][])
+      if (list?.length) out[p] = bakeKeys(list, s.fps);
+    return out;
+  };
+  return {
+    ...s,
+    camera: { ...s.camera, ...(s.camera.keys ? { keys: bake(s.camera.keys) } : {}) },
+    nodes: s.nodes.map((n) => (n.keys ? { ...n, keys: bake(n.keys) } : n)),
+  };
+}
 
 export type Vec3 = [number, number, number];
 export type Shape = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'plane' | 'text';
@@ -380,11 +488,15 @@ export function withKey<P extends string>(
   t: number,
   v: number,
   fps: number,
-  ease?: Ease,
+  ease?: Ease3D,
 ): Keys<P> {
-  const list = [...(keys?.[p] ?? [])].filter((k) => Math.abs(k.t - t) >= 0.5 / fps);
+  const old = keys?.[p] ?? [];
+  // Re-keying keeps the curve the key had.
+  const prev = old.find((k) => Math.abs(k.t - t) < 0.5 / fps)?.ease;
+  const list = old.filter((k) => Math.abs(k.t - t) >= 0.5 / fps);
   const key: Keyframe = { t: round4(t), v: round4(v) };
-  if (ease && ease !== 'linear') key.ease = ease;
+  const e = ease ?? prev;
+  if (e && e !== 'linear') key.ease = e;
   list.push(key);
   list.sort((a, b) => a.t - b.t);
   return { ...keys, [p]: list.slice(0, LIMITS.keys) } as Keys<P>;
@@ -416,6 +528,40 @@ export function keyAllAt(n: Node3D, props: readonly NodeProp[], t: number, fps: 
 
 export const hasKeyAt = (list: readonly Keyframe[] | undefined, t: number, fps: number): boolean =>
   !!list?.some((k) => Math.abs(k.t - t) < 0.5 / fps);
+
+/** The curve of the keys at t of a node or the camera ('mixed' when they differ). */
+export function easeAt(
+  keys: Keys<string> | undefined,
+  t: number,
+  fps: number,
+): Ease3D | 'mixed' | null {
+  const found = new Set<Ease3D>();
+  for (const list of Object.values(keys ?? {}))
+    for (const k of list ?? []) if (Math.abs(k.t - t) < 0.5 / fps) found.add(k.ease ?? 'linear');
+  if (!found.size) return null;
+  return found.size === 1 ? [...found][0]! : 'mixed';
+}
+
+/** Sets the curve of every key at t (the segment that starts there). */
+export function withEaseAt<P extends string>(
+  keys: Keys<P> | undefined,
+  t: number,
+  fps: number,
+  ease: Ease3D,
+): Keys<P> | undefined {
+  if (!keys) return keys;
+  const out: Keys<P> = {};
+  for (const [p, list] of Object.entries(keys) as [P, Keyframe[] | undefined][]) {
+    if (!list) continue;
+    out[p] = list.map((k) => {
+      if (Math.abs(k.t - t) >= 0.5 / fps) return k;
+      const next: Keyframe = { t: k.t, v: k.v };
+      if (ease !== 'linear') next.ease = ease;
+      return next;
+    });
+  }
+  return out;
+}
 
 export function updateNode(s: Scene3D, id: string, fn: (n: Node3D) => Node3D): Scene3D {
   return { ...s, nodes: s.nodes.map((n) => (n.id === id ? fn(n) : n)) };
@@ -479,7 +625,7 @@ function keys<P extends string>(
       if (typeof t !== 'number' || typeof val !== 'number') continue;
       if (!Number.isFinite(t) || !Number.isFinite(val)) continue;
       const key: Keyframe = { t: clampNum(t, 0, duration), v: clampNum(val, -1e5, 1e5) };
-      if (ease === 'ease' || ease === 'hold') key.ease = ease;
+      if (EASES_3D.includes(ease as Ease3D) && ease !== 'linear') key.ease = ease as Ease3D;
       clean.push(key);
     }
     clean.sort((a, b) => a.t - b.t);

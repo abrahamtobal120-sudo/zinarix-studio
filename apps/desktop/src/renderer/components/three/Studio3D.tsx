@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   CAMERA_PROPS,
+  EASES_3D,
   LIGHT_TYPES,
   LIMITS,
   ROW_PROPS,
@@ -12,6 +13,7 @@ import {
   TEMPLATES,
   cameraAt as cameraNow,
   duplicateNode,
+  easeAt,
   formatFor,
   fromTemplate,
   hasKeyAt,
@@ -23,9 +25,12 @@ import {
   removeNode,
   setCameraProp,
   setNodeProp,
+  withEaseAt,
   withKey,
   withoutKey,
   type CameraProp,
+  type Ease3D,
+  type Keys,
   type Node3D,
   type NodeProp,
   type Render3DFormat,
@@ -1017,8 +1022,45 @@ function KeyBar() {
         ))}
       </div>
       <span className="s3-time">{fmtTime(s.duration)}</span>
+      <CurvePick />
       <ToolBtn icon="flag" title={t3('key')} onClick={toggleKeys} disabled={sel === null} />
     </footer>
+  );
+}
+
+/** Curve of the selected object's keys at the playhead (hidden when there is none there). */
+function CurvePick() {
+  const s = use3((x) => x.scene);
+  const t = use3((x) => x.time);
+  const sel = use3((x) => x.selected);
+  const n = sel && sel !== 'camera' ? s.nodes.find((x) => x.id === sel) : undefined;
+  const keys = (sel === 'camera' ? s.camera.keys : n?.keys) as Keys<string> | undefined;
+  const now = easeAt(keys, t, s.fps);
+  if (!now) return null;
+  const pick = (ease: Ease3D) => {
+    if (sel === 'camera') {
+      const k = withEaseAt(s.camera.keys, t, s.fps, ease);
+      commit({ ...s, camera: { ...s.camera, ...(k ? { keys: k } : {}) } }, t3('editCurve'));
+    } else if (n) {
+      commitNode(n.id, (x) => ({ ...x, keys: withEaseAt(x.keys, t, s.fps, ease) }), t3('editCurve'));
+    }
+  };
+  return (
+    <label className="s3-curve" title={t3('curveHint')}>
+      <span>{t3('curve')}</span>
+      <select value={now} onChange={(e) => pick(e.target.value as Ease3D)}>
+        {now === 'mixed' && (
+          <option value="mixed" disabled>
+            {t3('curveMixed')}
+          </option>
+        )}
+        {EASES_3D.map((e) => (
+          <option key={e} value={e}>
+            {t3(`e_${e}`)}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

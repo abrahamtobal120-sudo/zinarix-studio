@@ -161,3 +161,5 @@ export const selectedNode = (s: S3): Node3D | undefined =>
 
 export const open3d = (): void => set3({ open: true });
 export const close3d = (): void => set3({ open: false, playing: false });
+/** Activity bar / command: opens the editor on its own (no Video Studio needed) or closes it. */
+export const toggle3d = (): void => (state.open ? close3d() : open3d());

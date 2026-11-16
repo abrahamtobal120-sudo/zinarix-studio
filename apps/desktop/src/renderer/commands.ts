@@ -18,6 +18,8 @@ import { tp } from './i18nPlayground';
 import { rerunFailed, runAll as runAllTests, runAtCursor } from './testExplorer';
 import { studioCommand, videoCommands } from './components/video/videoCommands';
 import { lang, setLang, t } from './i18n';
+import { toggle3d } from './components/three/store3d';
+import { t3 } from './components/three/strings3d';
 import { layoutCommands } from './layout/layoutCommands';
 import { comboFromEvent } from './keys';
 import {
@@ -278,6 +280,11 @@ function baseCommands(): Command[] {
       id: 'view.watch',
       label: t('wtTitle'),
       run: () => setState((s) => ({ sidebar: s.sidebar === 'watch' ? null : 'watch' })),
+    },
+    {
+      id: 'app.studio3d',
+      label: t3('title'),
+      run: toggle3d,
     },
     {
       id: 'view.design',

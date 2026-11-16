@@ -11,6 +11,8 @@ import { tp } from '../i18nPlayground';
 import { useProblemCounts } from './Problems';
 import { useDebug } from '../debug';
 import { toggleStudio, useV } from './video/videoStore';
+import { toggle3d, use3 } from './three/store3d';
+import { t3 } from './three/strings3d';
 import {
   BROWSER_TAB,
   PLAYGROUND_TAB,
@@ -55,6 +57,7 @@ function useBarItems() {
   const sideMax = useStore((s) => s.maximized === 'side');
   const watchNew = useStore((s) => s.watch?.reports.filter((r) => !r.seen).length ?? 0);
   const videoOn = useV((s) => s.open && !s.minimized);
+  const studio3dOn = use3((s) => s.open);
   type View = Exclude<typeof sidebar, null>;
   const view = (key: View, title: string, icon: IconName, badge?: number): BarItem => ({
     key,
@@ -93,6 +96,7 @@ function useBarItems() {
       setState({ sidebar: sidebar === 'design' ? 'explorer' : 'design', maximized: null }),
     ),
     video: tool('video', tv('openStudioHint'), 'film', 'toggle', videoOn, toggleStudio),
+    studio3d: tool('studio3d', t3('title'), 'cube', 'toggle', studio3dOn, toggle3d),
     terminal: tool('terminal', t('terminal'), 'terminal', 'toggle', panelOpen, () =>
       setState({ panelOpen: !panelOpen }),
     ),
@@ -234,6 +238,7 @@ export function ActivityBar() {
       {button(items.watch)}
       {button(items.design)}
       {button(items.video)}
+      {button(items.studio3d)}
       {button(items.terminal)}
       {sep('s2')}
       {button(items.more)}
