@@ -37,6 +37,8 @@ import { TASK_LIMIT_NOTICE, runCommand, type TaskScope } from './agent.js';
 import type { Scope } from './ai.js';
 import { run, runUntrustedGit } from './git.js';
 import { Workspace } from './workspace.js';
+import { sandboxCaps, sandboxPaths } from './sandbox.js';
+import type { SandboxCaps } from '../shared/sandbox.js';
 
 /** What the manager needs from AiService (an interface, so tests can fake it). */
 export interface TaskRunner {
@@ -63,6 +65,8 @@ export interface TaskManagerOptions {
   maxParallel?: number;
   /** git (tests can point it elsewhere). */
   git?: (args: string[], cwd: string) => Promise<string>;
+  /** Fase 5B: this machine's sandbox (tests fake it). Default: detected once. */
+  sandbox?: () => Promise<SandboxCaps>;
 }
 
 /** Name of the optional setup script the repository may ship (run in the new worktree). */
@@ -81,6 +85,9 @@ export class TaskManager {
   maxParallel: number;
   private seq = 0;
   private usageCache?: { at: number; value: Promise<TasksUsageView> };
+  /** Fase 5B: what the sandbox protects on this machine (undefined until detected). */
+  private box?: SandboxCaps;
+  private readonly boxReady: Promise<SandboxCaps>;
 
   constructor(private readonly o: TaskManagerOptions) {
     this.file = join(o.dir, 'tasks.json');
@@ -88,6 +95,11 @@ export class TaskManager {
     this.git = o.git ?? ((args, cwd) => runUntrustedGit(args, cwd));
     this.tasks = afterRestart(this.load());
     this.save();
+    this.boxReady = (o.sandbox ?? sandboxCaps)().then((c) => {
+      this.box = c;
+      this.changed();
+      return c;
+    });
   }
 
   /**
@@ -108,6 +120,7 @@ export class TaskManager {
     return {
       tasks: this.tasks.map((t) => ({ ...t, pending: [...t.pending] })),
       maxParallel: this.maxParallel,
+      sandbox: this.box,
     };
   }
 
@@ -518,9 +531,9 @@ export class TaskManager {
         SETUP_TIMEOUT,
         new AbortController().signal,
         () => undefined,
-        {
-          env: { PORT: String(t.port) },
-        },
+        // The repository's own setup script (the user turned it on): no sandbox, since it
+        // usually installs packages, but no tokens or keys either.
+        { env: { PORT: String(t.port) }, strict: true },
       );
       if (r.code !== 0)
         throw new Error(`${SETUP_SCRIPT} falló (exit ${r.code}): ${r.output.slice(-400)}`);
@@ -547,6 +560,12 @@ export class TaskManager {
         }))
       : [];
     const ws = new Workspace(t.path);
+    const caps = await this.boxReady;
+    // The sandbox hides the app data folder (other worktrees, tokens) from the command.
+    const box =
+      caps.kind === 'none'
+        ? undefined
+        : { caps, paths: sandboxPaths(t.path, dirname(this.o.dir), t.id) };
     const left = t.maxMinutes ? t.maxMinutes * 60_000 - t.workedMs : undefined;
     try {
       await this.o.runner.chat(
@@ -572,6 +591,7 @@ export class TaskManager {
             env: { PORT: String(t.port), ZINARIX_TASK: t.id },
             maxUsd: t.maxUsd !== undefined ? Math.max(0, t.maxUsd - (t.usd ?? 0)) : undefined,
             deadline: left !== undefined ? Date.now() + Math.max(0, left) : undefined,
+            sandbox: box,
           },
         },
       );

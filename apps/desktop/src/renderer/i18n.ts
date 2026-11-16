@@ -781,6 +781,11 @@ const es = {
     '¿Qué debe hacer la tarea? Trabaja en una copia aparte (worktree) y no toca tu árbol de trabajo. Ctrl+Enter para crear.',
   taskBase: 'Rama base',
   taskMode: 'Aprobación',
+  taskSandboxChecking: 'Revisando el sandbox de este equipo…',
+  taskSandbox:
+    'Sandbox: escritura solo en el worktree {write} · sin red {network} · sin tokens ni claves ✓.',
+  taskSandboxOn: 'Los comandos corren solos, dentro del sandbox.',
+  taskSandboxOff: 'Cada comando pide aprobación.',
   taskMaxUsd: 'Tope US$',
   taskMaxMin: 'Tope min',
   taskCopy: 'Copiar mis cambios sin commit',
@@ -2929,6 +2934,11 @@ const en: Record<Key, string> = {
     'What should the task do? It works on a separate copy (worktree) and never touches your working tree. Ctrl+Enter to create.',
   taskBase: 'Base branch',
   taskMode: 'Approval',
+  taskSandboxChecking: "Checking this computer's sandbox…",
+  taskSandbox:
+    'Sandbox: writes only in the worktree {write} · no network {network} · no tokens or keys ✓.',
+  taskSandboxOn: 'Commands run on their own, inside the sandbox.',
+  taskSandboxOff: 'Every command asks for approval.',
   taskMaxUsd: 'Max US$',
   taskMaxMin: 'Max min',
   taskCopy: 'Copy my uncommitted changes',

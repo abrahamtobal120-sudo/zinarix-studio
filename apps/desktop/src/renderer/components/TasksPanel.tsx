@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { TaskView, TasksStatusView, TasksUsageView } from '../../shared/api';
 import { fmtBytes, isIdle, USAGE_WARN_BYTES, type TaskApprovalView } from '../../shared/tasks';
+import { sandboxComplete, type SandboxCaps } from '../../shared/sandbox';
 import { confirmDialog } from '../confirm';
 import { errText } from '../errText';
 import { t, type Key } from '../i18n';
@@ -10,6 +11,25 @@ import { ModalShell } from './ModalShell';
 import './tasks-panel.css';
 
 /** Fase 5A: background tasks, each one in a git worktree of its own. */
+
+/**
+ * Fase 5B: what "Auto in the worktree" can run on its own on this machine. Commands run
+ * without asking only inside a complete sandbox; a missing protection is shown, not faked.
+ */
+function SandboxLine({ caps }: { caps: SandboxCaps | undefined }) {
+  if (!caps) return <p className="tasks-hint">{t('taskSandboxChecking')}</p>;
+  const mark = (on: boolean) => (on ? '✓' : '✗');
+  const on = caps.kind !== 'none';
+  return (
+    <p className="tasks-hint tasks-sandbox" role="note">
+      {t('taskSandbox', {
+        write: mark(on && caps.write),
+        network: mark(on && caps.network),
+      })}{' '}
+      {sandboxComplete(caps) ? t('taskSandboxOn') : `${caps.reason ?? ''} ${t('taskSandboxOff')}`}
+    </p>
+  );
+}
 
 const ACTIVE = new Set(['queued', 'preparing', 'working', 'waiting']);
 
@@ -280,6 +300,7 @@ export function TasksPanel({
             />
           </label>
         </div>
+        {mode === 'auto' && <SandboxLine caps={status?.sandbox} />}
         <div className="tasks-opts">
           <label className="check" title={t('taskCopyHint')}>
             <input

@@ -13,6 +13,7 @@
  */
 import type { ChatMode } from './agentModes.js';
 import { planAllows } from './agentModes.js';
+import { sandboxComplete, type SandboxCaps } from './sandbox.js';
 
 export type Decision = 'auto' | 'ask' | 'deny';
 
@@ -26,6 +27,10 @@ export interface PolicyContext {
   isProtected?: (path: string) => boolean;
   /** Whether a SQL text changes data. Missing = every query counts as a write. */
   isWriteSql?: (sql: string) => boolean;
+  /** Fase 5B: the sandbox a background task's commands run in. Auto mode runs run_command
+   * without asking only when every protection is active (writes and network); otherwise,
+   * or outside a task (undefined), commands ask as always. */
+  sandbox?: SandboxCaps;
 }
 
 /** Tools that need no approval in any mode that runs the agent. */
@@ -102,6 +107,10 @@ export function decide(
   if (mode === 'auto' && FILE_EDITS.has(tool)) {
     const isProtected = ctx.isProtected ?? (() => true);
     return isProtected(str(args.path)) ? 'ask' : 'auto';
+  }
+  // Auto in the worktree: a command confined by a complete sandbox runs on its own.
+  if (mode === 'auto' && tool === 'run_command' && sandboxComplete(ctx.sandbox)) {
+    return args.admin === true ? 'deny' : 'auto';
   }
   return 'ask';
 }

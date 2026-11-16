@@ -4,6 +4,8 @@
  * states and their transitions, the branch name, the cwd limit and the queue.
  */
 
+import type { SandboxCaps } from './sandbox.js';
+
 export type TaskState =
   | 'queued'
   | 'preparing'
@@ -123,6 +125,8 @@ export interface TasksStatusView {
   tasks: TaskView[];
   /** How many run at the same time. */
   maxParallel: number;
+  /** Fase 5B: what this machine's sandbox protects (undefined while it is detected). */
+  sandbox?: SandboxCaps;
 }
 
 /** Changes a task's state, refusing transitions that make no sense (a bug, not the user). */

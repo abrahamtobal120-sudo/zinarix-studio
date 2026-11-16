@@ -44,6 +44,8 @@ import {
 } from './textTools.js';
 import { globToRegExp } from '../shared/glob.js';
 import { childEnv } from './env.js';
+import { taskEnv, type SandboxCaps, type SandboxPaths } from '../shared/sandbox.js';
+import { sandboxedSpawn } from './sandbox.js';
 import { MCP_PREFIX, type McpManager } from './mcp.js';
 import { dropOldImages } from './chatImages.js';
 import { isSecretFile, protectedWrite } from './guard.js';
@@ -816,6 +818,9 @@ export interface TaskScope {
   maxUsd?: number;
   /** Epoch ms. */
   deadline?: number;
+  /** Fase 5B: this machine's sandbox and the folders of this task. In auto mode a command
+   * runs without approval only when the sandbox is complete, and then it runs confined. */
+  sandbox?: { caps: SandboxCaps; paths: SandboxPaths };
 }
 
 /** Notice kind a run emits when it stops at a task limit (cost or time). */
@@ -1992,6 +1997,17 @@ A project hook did not let you finish yet. Address it, then answer.`,
       }
       // mail_send, git push, Vercel changes, Supabase writes: asked every time, no "Always".
       const forced = alwaysAsks(call.name, a, POLICY);
+      // Fase 5B: in a task, auto mode lets a command through only inside a complete sandbox.
+      const box = opts.scope?.task?.sandbox;
+      const policy: PolicyContext = box ? { ...POLICY, sandbox: box.caps } : POLICY;
+      const confine =
+        call.name === 'run_command' &&
+        box &&
+        !sys &&
+        !forced &&
+        decide(opts.mode ?? 'agent', call.name, a, policy) === 'auto'
+          ? box
+          : undefined;
       if (sys) {
         if (call.name === 'run_command') {
           const blocked = blockedReason(str(a.command, 'command'));
@@ -2020,8 +2036,9 @@ A project hook did not let you finish yet. Address it, then answer.`,
         ws &&
         NEEDS_APPROVAL.has(call.name) &&
         (forced || !s.alwaysAllow.has(approvalKey(call.name, a) ?? '')) &&
-        // Auto-approve: edits of ordinary project files; commands and protected files still ask.
-        decide(opts.mode ?? 'agent', call.name, a, POLICY) !== 'auto'
+        // Auto-approve: edits of ordinary project files; commands and protected files still ask
+        // (in a task with a complete sandbox, commands run confined without asking).
+        decide(opts.mode ?? 'agent', call.name, a, policy) !== 'auto'
       ) {
         // "Always" covers the same command, or ordinary project files; never files that make
         // other programs run code or hold secrets (a later injection could abuse it).
@@ -2669,7 +2686,13 @@ A project hook did not let you finish yet. Address it, then answer.`,
             timeout,
             opts.signal,
             (chunk) => opts.emit({ type: 'tool_output', id: call.id, chunk: redact(chunk) }),
-            { env: { ...s.env, ...task?.env }, admin: !task && a.admin === true },
+            {
+              env: { ...s.env, ...task?.env, ...(confine ? { TMPDIR: confine.paths.tmp } : {}) },
+              admin: !task && a.admin === true,
+              // A task's commands never get tokens or keys, with or without sandbox.
+              strict: !!task,
+              spawnAs: confine ? sandboxedSpawn(confine.caps, confine.paths, command) : undefined,
+            },
           );
           const out = redact(truncate(r.output));
           return finish(
@@ -2981,14 +3004,21 @@ export function runCommand(
   timeoutMs: number,
   signal: AbortSignal,
   onChunk: (s: string) => void,
-  extra: { env?: Record<string, string>; admin?: boolean } = {},
+  extra: {
+    env?: Record<string, string>;
+    admin?: boolean;
+    /** Removes every variable that may hold a credential (background tasks). */
+    strict?: boolean;
+    /** Start this instead of the shell (the sandbox wrapping the command). */
+    spawnAs?: { file: string; args: string[] };
+  } = {},
 ): Promise<{ code: number; output: string; timedOut: boolean }> {
   return new Promise((resolve) => {
     const isWin = process.platform === 'win32';
     // Provider keys the app can read (catalog envVars, OMNI_KEY_*) never reach the command;
     // variables the user approved with set_env_var (extra.env) do.
     const env: Record<string, string> = {
-      ...childEnv(process.env),
+      ...(extra.strict ? taskEnv(childEnv(process.env)) : childEnv(process.env)),
       CI: '1',
       GIT_TERMINAL_PROMPT: '0',
       PAGER: 'cat',
@@ -2997,7 +3027,7 @@ export function runCommand(
       ...extra.env,
     };
     // Admin: the OS asks for the password in its own dialog (pkexec / osascript / UAC).
-    const elevated = extra.admin ? adminCommand(command) : undefined;
+    const elevated = extra.spawnAs ?? (extra.admin ? adminCommand(command) : undefined);
     const child = spawn(
       elevated?.file ?? (isWin ? 'powershell.exe' : process.env.SHELL || '/bin/bash'),
       elevated?.args ?? (isWin ? ['-NoProfile', '-Command', command] : ['-lc', command]),
