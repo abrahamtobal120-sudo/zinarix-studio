@@ -13,7 +13,6 @@ import {
   FORMAT_PRESETS,
   IDENTITY,
   MIN_CLIP,
-  clipDur,
   clipEnd,
   isText,
   mediaOf,
@@ -549,7 +548,3 @@ export function describeChange(before: VideoProject, after: VideoProject): strin
   if (moved && !parts.length) parts.push(`${moved} clip(s) movidos o recortados`);
   return parts.length ? parts.join(' · ') : 'sin cambios visibles en la línea de tiempo';
 }
-
-/** Total seconds a list of clips lasts (for summaries). */
-export const totalDur = (clips: readonly Clip[]): number =>
-  clips.reduce((n, c) => n + clipDur(c), 0);

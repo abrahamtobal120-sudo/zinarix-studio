@@ -211,7 +211,7 @@ export async function videoPreview(
   if (!r.ok) return { error: r.content };
   const ask = ASK.has(name);
   return {
-    risk: ask ? 'medium' : 'low',
+    risk: 'medium',
     action: r.content,
     warning: ask ? r.summary : `${r.summary}. Se deshace con Ctrl+Z en Video Studio.`,
     ...(ask ? {} : { allowKey: 'video:edit' }),
