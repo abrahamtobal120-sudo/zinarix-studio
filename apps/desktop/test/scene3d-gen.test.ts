@@ -269,7 +269,7 @@ describe('Fase 14: 3D generation against a fake Replicate', () => {
     const core = {
       connectedProviders: async () => [{ id: 'replicate', store: 'vault' }],
       providerConfig: async () => ({
-        entry: { id: 'replicate' },
+        entry: { id: 'replicate', auth: { type: 'bearer', header: 'Authorization' } },
         baseUrl: base,
         maxRetries: 0,
         // https:// output URLs of the fake are served by the same plain-HTTP server.

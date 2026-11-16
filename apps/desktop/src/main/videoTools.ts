@@ -224,7 +224,8 @@ export async function runVideoTool(
   a: Record<string, unknown>,
   signal: AbortSignal,
 ): Promise<VideoAgentResult> {
-  if (!ui) return { ok: false, content: 'Video Studio is not available.', summary: 'no disponible' };
+  if (!ui)
+    return { ok: false, content: 'Video Studio is not available.', summary: 'no disponible' };
   try {
     return await ui.call(name, a, false, signal);
   } catch (e) {

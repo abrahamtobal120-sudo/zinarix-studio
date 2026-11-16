@@ -94,7 +94,7 @@ export function bakeKeys(keys: readonly Keyframe[], fps: number): Keyframe[] {
     const f1 = Math.ceil(b.t * fps - 1e-6) - 1;
     for (let f = f0; f <= f1; f++) {
       const t = f / fps;
-      out.push({ t: round4(t), v: round4(interpKeys(keys, t)) });
+      out.push({ t, v: round4(interpKeys(keys, t)) });
     }
   }
   return out;

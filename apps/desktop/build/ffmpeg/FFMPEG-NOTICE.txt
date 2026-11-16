@@ -1,7 +1,7 @@
 FFmpeg / FFprobe in Zinarix Studio
 ==================================
 
-Zinarix Studio (MIT license) ships two separate programs in this folder:
+Zinarix Studio (GNU GPL v3 or later) ships two separate programs in this folder:
 ffmpeg and ffprobe, from the FFmpeg project (https://ffmpeg.org).
 Zinarix runs them as independent programs; it does not link to them.
 
@@ -9,8 +9,7 @@ These builds include GPL components (for example libx264 and libx265),
 so they are distributed under the GNU General Public License,
 version 3 or later. The full text is in COPYING.GPLv3.txt, next to this
 file. You may copy, change and share these programs under that license.
-This license applies only to ffmpeg and ffprobe, not to the rest of
-Zinarix Studio.
+Zinarix Studio itself is under the same license (see its LICENSE file).
 
 Builds included
 ---------------
@@ -44,7 +43,7 @@ affiliated with the FFmpeg project.
 
 ----------------------------------------------------------------------
 Español: ffmpeg y ffprobe son programas aparte, con licencia GPL v3 o
-posterior (texto completo en COPYING.GPLv3.txt). Esa licencia aplica
-solo a ellos, no al resto de Zinarix Studio (MIT). El código fuente
+posterior (texto completo en COPYING.GPLv3.txt). Zinarix Studio
+también tiene licencia GPL v3 o posterior. El código fuente
 está en los enlaces de arriba; también puedes pedirlo abriendo un issue
 "FFmpeg source request" en el repositorio de Zinarix Studio.

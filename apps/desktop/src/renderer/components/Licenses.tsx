@@ -12,7 +12,7 @@ const pre = {
   overflow: 'auto',
 } as const;
 
-/** Ayuda → Acerca de → Licencias: Zinarix (MIT) and the third-party parts it ships. */
+/** Ayuda → Acerca de → Licencias: Zinarix (GPL-3.0-or-later) and the third-party parts it ships. */
 export function Licenses() {
   return (
     <ModalShell

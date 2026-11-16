@@ -4,7 +4,7 @@
   "version": "0.6.1",
   "private": true,
   "description": "Zinarix Studio — editor de código con cualquier modelo de IA",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "author": {
     "name": "Abraham Tobal",
     "email": "abrahamtobal120@gmail.com"

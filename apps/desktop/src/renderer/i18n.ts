@@ -433,9 +433,10 @@ const es = {
   resizePanel: 'Cambiar la altura del panel',
   shortcuts: 'Atajos de teclado',
   licensesTitle: 'Licencias',
-  licensesApp: 'Zinarix Studio tiene licencia MIT.',
+  licensesApp:
+    'Zinarix Studio es software libre con licencia GNU GPL versión 3 o posterior. Puedes copiarlo, modificarlo y compartirlo bajo esa licencia, sin ninguna garantía. Código fuente: https://github.com/abrahamtobal120-sudo/zinarix-studio',
   licensesFfmpeg:
-    'Zinarix Studio incluye ffmpeg y ffprobe del proyecto FFmpeg como programas aparte, en la carpeta resources/ffmpeg. Tienen licencia GNU GPL versión 3 o posterior, que aplica solo a ellos y no al resto de Zinarix Studio.',
+    'Zinarix Studio incluye ffmpeg y ffprobe del proyecto FFmpeg como programas aparte, en la carpeta resources/ffmpeg. También tienen licencia GNU GPL versión 3 o posterior.',
   licensesFfmpegSource: 'Código fuente de cada compilación (FFMPEG-SOURCE.txt)',
   licensesGpl: 'Texto de la licencia GPL v3 (COPYING.GPLv3.txt)',
   lightTheme: 'Tema claro',
@@ -2593,9 +2594,10 @@ const en: Record<Key, string> = {
   resizePanel: 'Resize the panel',
   shortcuts: 'Keyboard shortcuts',
   licensesTitle: 'Licenses',
-  licensesApp: 'Zinarix Studio is licensed under the MIT license.',
+  licensesApp:
+    'Zinarix Studio is free software under the GNU GPL version 3 or later. You may copy, change and share it under that license, with no warranty. Source code: https://github.com/abrahamtobal120-sudo/zinarix-studio',
   licensesFfmpeg:
-    'Zinarix Studio ships ffmpeg and ffprobe from the FFmpeg project as separate programs, in the resources/ffmpeg folder. They are licensed under the GNU GPL version 3 or later, which applies only to them and not to the rest of Zinarix Studio.',
+    'Zinarix Studio ships ffmpeg and ffprobe from the FFmpeg project as separate programs, in the resources/ffmpeg folder. They are also licensed under the GNU GPL version 3 or later.',
   licensesFfmpegSource: 'Source code of each build (FFMPEG-SOURCE.txt)',
   licensesGpl: 'GPL v3 license text (COPYING.GPLv3.txt)',
   lightTheme: 'Light theme',

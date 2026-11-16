@@ -157,7 +157,7 @@ Zinarix Studio is a VS Code–style, multi-AI IDE: bring your own API keys for 6
 Requires Node ≥ 24.7 and pnpm. `pnpm install && pnpm build && pnpm test`. Set `OMNI_LANG=en` or pass `--lang en` for English UI strings.
 See [.md/en/architecture.md](.md/en/architecture.md) and [.md/en/adding-a-provider.md](.md/en/adding-a-provider.md).
 
-License: MIT. The installers also include FFmpeg and FFprobe as separate programs under the GPL v3; see `apps/desktop/build/ffmpeg/FFMPEG-NOTICE.txt`.
+License: GNU GPL v3 or later (see `LICENSE`). Copyright (C) 2026 Zinarix Studio contributors. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY. The installers also include FFmpeg and FFprobe as separate programs under the GPL v3; see `apps/desktop/build/ffmpeg/FFMPEG-NOTICE.txt`.
 
 ## Créditos
 

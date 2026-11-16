@@ -16,6 +16,7 @@ import type { Gen3DService } from './gen3d.js';
 import { EASES_3D } from '../shared/scene3d.js';
 import { GEN3D_MODELS, findGen3dModel, gen3dIssue, type Gen3DRequest } from '../shared/gen3d.js';
 import type { SystemPreview } from './system.js';
+import { SCENE3D_OPS, describeOps } from '../shared/scene3dAgent.js';
 
 /**
  * Fase 14: agent tools for 3D. render_3d builds a scene (a template or full scene JSON) and
@@ -23,6 +24,55 @@ import type { SystemPreview } from './system.js';
  * first. Both are approved every time: a render takes minutes and the script is code.
  */
 export const SCENE3D_TOOLS: ToolDefinition[] = [
+  {
+    name: 'scene3d_state',
+    description:
+      'Read the scene open in the 3D editor: size, fps, duration, camera, and every node (id, name, kind, shape, position, rotation, scale, material, keyframes). Call it before scene3d_edit; ids change when nodes are added or deleted.',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'scene3d_edit',
+    description:
+      'Edit the scene open in the 3D editor (the user sees it change; all ops are one Ctrl+Z step). Pass "ops", applied in order; if one fails nothing changes. Refer to nodes by id or exact name (a name given in "add" can be used by later ops of the same call). Ops: ' +
+      '{op:"add", kind:"mesh"|"light"|"model", shape:' +
+      SHAPES.join('|') +
+      ', light:"ambient"|"directional"|"point", model:"<absolute .glb/.gltf/.obj/.fbx>", name, text, depth, position:[x,y,z], rotation:[deg,deg,deg], scale:[x,y,z], color:"#rrggbb", metalness, roughness, emissive, emissiveIntensity, opacity, intensity, visible}; ' +
+      '{op:"set", id, ...same fields}; {op:"delete", id}; {op:"duplicate", id, ...fields for the copy}; ' +
+      '{op:"key", id (node or "camera"), prop (node: px py pz rx ry rz sx sy sz intensity; camera: px py pz tx ty tz), t (seconds, default the playhead), v, ease} to animate: put at least two keys per property; ' +
+      '{op:"clear_keys", id, prop?, t?}; {op:"camera", position, target, fov}; {op:"scene", width, height, fps, duration, background, transparent}; ' +
+      '{op:"template", template:logo|turntable|orbit, text, color, shape, model, duration} replaces the whole scene. Y is up, units are metres; the ground is y=0 around the origin. ease: ' +
+      EASES_3D.join(' | ') +
+      '. To make a video of it afterwards, use scene3d_render.',
+    parameters: {
+      type: 'object',
+      properties: {
+        ops: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 100,
+          items: {
+            type: 'object',
+            properties: { op: { type: 'string', enum: [...SCENE3D_OPS] } },
+            required: ['op'],
+          },
+        },
+      },
+      required: ['ops'],
+    },
+  },
+  {
+    name: 'scene3d_render',
+    description:
+      'Render the scene open in the 3D editor (as it is now) to a video in media/3d and add it to Video Studio. engine "viewer" (default) or "blender". The user approves it.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'File name (no extension)' },
+        engine: { type: 'string', enum: ['viewer', 'blender'] },
+        quality: { type: 'string', enum: ['eevee', 'cycles'], description: 'Blender only' },
+      },
+    },
+  },
   {
     name: 'render_3d',
     description:
@@ -108,10 +158,15 @@ export const SCENE3D_TOOLS: ToolDefinition[] = [
 export const SCENE3D_TOOL_NAMES = new Set(SCENE3D_TOOLS.map((t) => t.name));
 
 export const SCENE3D_PROMPT_PART =
-  '- render_3d and blender_script: 3D animations (logos, products, titles) rendered to video in media/3d and added to Video Studio. Prefer render_3d with a template; write a full scene only when needed, and blender_script only when Blender is required (both need approval). generate_3d_model makes a GLB of an object (paid, on Replicate) that render_3d can then animate.';
+  '- scene3d_state, scene3d_edit and scene3d_render: the scene open in the 3D editor. When the user asks to add, change, move, colour, light or animate something "in 3D" / "in the scene", read scene3d_state, then change it with scene3d_edit (one call with many ops is better than many calls), and render it with scene3d_render only if they want a video.\n- render_3d and blender_script: 3D animations (logos, products, titles) rendered to video in media/3d and added to Video Studio. Prefer render_3d with a template; write a full scene only when needed, and blender_script only when Blender is required (both need approval). generate_3d_model makes a GLB of an object (paid, on Replicate) that render_3d can then animate.';
 
 /** The viewer lives in the renderer: main asks the window to render and waits. */
 export interface Scene3DUi {
+  /** scene3d_state / scene3d_edit / scene3d_render, answered by the window's 3D editor. */
+  editor(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<{ ok: boolean; content: string; summary: string }>;
   render(scene: Scene3D, name: string, format: Render3DFormat): Promise<{ path: string }>;
   /** A file to put into Video Studio (library + timeline). */
   imported(path: string): void;
@@ -158,7 +213,25 @@ export function gen3dRequestOf(a: Record<string, unknown>): Gen3DRequest {
   };
 }
 
-export function scene3dPreview(name: string, a: Record<string, unknown>): SystemPreview {
+export function scene3dPreview(name: string, a: Record<string, unknown>): SystemPreview | null {
+  // Reading the open scene changes nothing.
+  if (name === 'scene3d_state') return null;
+  if (name === 'scene3d_edit')
+    return {
+      risk: 'low',
+      action: 'editar la escena 3D abierta',
+      warning: `${describeOps(a.ops)}. Se deshace con Ctrl+Z en el editor 3D.`,
+      // Undoable: may be allowed for the rest of the conversation.
+      allowKey: 'scene3d_edit',
+    };
+  if (name === 'scene3d_render') {
+    const blender = text(a, 'engine') === 'blender';
+    return {
+      risk: 'medium',
+      action: `renderizar la escena 3D abierta ${blender ? `con Blender (${text(a, 'quality') === 'cycles' ? 'Cycles' : 'EEVEE'})` : 'en el visor'}`,
+      warning: 'El video se guarda en media/3d y se agrega a Video Studio.',
+    };
+  }
   if (name === 'generate_3d_model') {
     const r = gen3dRequestOf(a);
     const m = findGen3dModel(r.model)!;
@@ -206,6 +279,10 @@ export async function runScene3dTool(
   callId = 'gen3d',
 ): Promise<{ ok: boolean; content: string; summary: string }> {
   try {
+    if (name === 'scene3d_state' || name === 'scene3d_edit' || name === 'scene3d_render') {
+      if (!ui) return { ok: false, content: 'The 3D editor is not available.', summary: 'sin editor' };
+      return await ui.editor(name, a);
+    }
     if (name === 'generate_3d_model') {
       if (!gen)
         return { ok: false, content: '3D generation is not available.', summary: 'no disponible' };

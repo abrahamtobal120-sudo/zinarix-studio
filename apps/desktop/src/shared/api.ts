@@ -1145,6 +1145,8 @@ export type AppEvent =
     }
   /** Fase 14: a 3D render to put into Video Studio (library and timeline). */
   | { type: 'scene3d:imported'; path: string }
+  /** Fase 14: the agent reads / edits / renders the scene open in the 3D editor (agentDone). */
+  | { type: 'scene3d:edit'; requestId: string; name: string; args: Record<string, unknown> }
   /** Fase 14: progress of a 3D model generation (Replicate). */
   | { type: 'gen3d'; requestId: string; event: Gen3DEvent };
 
@@ -2089,7 +2091,11 @@ export interface OmniApi {
     save(scene: Scene3D, path: string | null, saveAs: boolean): Promise<string | null>;
     open(): Promise<{ scene: Scene3D; path: string } | null>;
     /** Answer to a 'scene3d:agent' event. */
-    agentDone(requestId: string, r: { path: string } | { error: string }): Promise<void>;
+    /** Also answers a 'scene3d:edit' event (ok, content, summary). */
+    agentDone(
+      requestId: string,
+      r: { path: string } | { error: string } | { ok: boolean; content: string; summary: string },
+    ): Promise<void>;
   };
   /** Fase 14: 3D models generated from text or a picture (Replicate). */
   gen3d: {

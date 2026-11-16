@@ -2,7 +2,7 @@
   "name": "@omni/shared",
   "version": "0.6.1",
   "private": true,
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

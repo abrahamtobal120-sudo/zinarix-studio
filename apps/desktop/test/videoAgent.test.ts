@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { VIDEO_TOOLS, VIDEO_TOOL_NAMES, videoPreview, type VideoUi } from '../src/main/videoTools.js';
+import {
+  VIDEO_TOOLS,
+  VIDEO_TOOL_NAMES,
+  videoPreview,
+  type VideoUi,
+} from '../src/main/videoTools.js';
 import type { MediaItem, TranscriptWord, VideoProject } from '../src/shared/video.js';
 import {
   clipEnd,
@@ -48,7 +53,7 @@ function interview(): VideoProject {
   return setTranscript(p, m.id, { engine: 'test', lang: 'es', words, at: 0 });
 }
 
-const ok = <T,>(e: T | { error: string }): T => {
+const ok = <T>(e: T | { error: string }): T => {
   if (e && typeof e === 'object' && 'error' in e) throw new Error((e as { error: string }).error);
   return e as T;
 };
@@ -85,14 +90,16 @@ describe('Fase 13B: reading the project', () => {
 describe('Fase 13B: the short (video_keep_ranges)', () => {
   it('keeps only the stretches, in the given order, back to back', () => {
     const p = interview();
-    const r = ok(keepRanges(p, '', [
-      [300, 319],
-      [100, 124],
-    ]));
+    const r = ok(
+      keepRanges(p, '', [
+        [300, 319],
+        [100, 124],
+      ]),
+    );
     const clips = r.project.clips.filter((c) => !isText(c)).sort((a, b) => a.start - b.start);
     expect(clips).toHaveLength(2);
     // The later stretch first, as asked.
-    expect(clips[0]!.in).toBeCloseTo(299.6 + 0.0, 1);
+    expect(clips[0]!.in).toBeCloseTo(299.95, 3); // word 300 minus the 0.05 s pad
     expect(clips[1]!.start).toBeCloseTo(clipEnd(clips[0]!), 6);
     expect(clips[1]!.in).toBeLessThan(clips[0]!.in);
     // About 20 s + 25 s, never 10 minutes.
@@ -106,10 +113,12 @@ describe('Fase 13B: the short (video_keep_ranges)', () => {
     let p = interview();
     p = { ...p, media: [...p.media, m2] };
     p = insertMedia(p, m2, { trackId: p.clips[0]!.trackId }).project; // at 600 s
-    const r = ok(keepRanges(p, 'm1', [
-      [0, 4],
-      [5, 9],
-    ]));
+    const r = ok(
+      keepRanges(p, 'm1', [
+        [0, 4],
+        [5, 9],
+      ]),
+    );
     const mine = r.project.clips.filter((c) => c.mediaId === 'm1');
     expect(mine).toHaveLength(1);
     const after = r.project.clips.find((c) => c.mediaId === 'm2')!;
@@ -135,7 +144,9 @@ describe('Fase 13B: the other edits', () => {
     // A 16:9 shot fills the vertical frame (centre crop): 1920/1080 squared.
     const shot = p.clips.find((c) => !isText(c))!;
     expect(shot.transform?.scale).toBeCloseTo((1920 / 1080) ** 2, 1);
-    const withTitle = ok(pureEdit(p, 'video_add_title', { text: 'Hola', start: 1, style: 'title' }, 0));
+    const withTitle = ok(
+      pureEdit(p, 'video_add_title', { text: 'Hola', start: 1, style: 'title' }, 0),
+    );
     expect(withTitle.project.clips.some((c) => c.text?.content === 'Hola')).toBe(true);
     const cap = ok(pureEdit(withTitle.project, 'video_captions', { style: 'yellow' }, 0));
     const track = captionTrack(cap.project)!;

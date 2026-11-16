@@ -57,8 +57,8 @@ ZINARIX_LICENSE_KEY=~/Desktop/zinarix-licencias-PRIVADO/license-private.pem   no
 Pégala en **Ayuda → Plan y licencia…**. Esa copia queda como "Dueño": todo, en cualquier
 edición, sin importar el cobro. Para probar un plan, hazte una clave de ese plan con `--days 1`.
 
-> El código es público (licencia MIT). Quien quiera puede quitar el cobro y compilar su propia
-> copia; lo que ya no se puede es activar planes en las apps oficiales sin una clave firmada.
+> El código es público (licencia GPL v3 o posterior). Quien reciba la app tiene derecho al código
+> fuente, y quien quiera puede quitar el cobro y compilar o redistribuir su propia copia; lo que ya no se puede es activar planes en las apps oficiales sin una clave firmada.
 
 ## Cobrar con Stripe (las licencias se entregan solas)
 

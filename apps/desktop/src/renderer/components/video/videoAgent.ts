@@ -58,8 +58,7 @@ const ACTION: Record<string, (a: Args, p: VideoProject) => string> = {
   video_split: (a) => `dividir el clip ${str(a, 'clip')}`,
   video_trim: (a) => `recortar el clip ${str(a, 'clip')}`,
   video_move: (a) => `mover el clip ${str(a, 'clip')}`,
-  video_delete: (a) =>
-    `borrar ${Array.isArray(a.clips) ? a.clips.length : 1} clip(s)`,
+  video_delete: (a) => `borrar ${Array.isArray(a.clips) ? a.clips.length : 1} clip(s)`,
   video_add_title: (a) => `agregar el título "${str(a, 'text').slice(0, 80)}"`,
   video_captions: (a) => `poner subtítulos (estilo ${str(a, 'style') || 'classic'})`,
   video_set_format: (a) => `cambiar el formato a ${str(a, 'aspect')}`,
@@ -79,7 +78,13 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
 }
 
 /** Shows (dry) or commits an edit. */
-function finishEdit(name: string, a: Args, before: VideoProject, e: VideoEdit, dry: boolean): VideoAgentResult {
+function finishEdit(
+  name: string,
+  a: Args,
+  before: VideoProject,
+  e: VideoEdit,
+  dry: boolean,
+): VideoAgentResult {
   if ('error' in e) return fail(e.error);
   const change = describeChange(before, e.project);
   if (dry) return { ok: true, content: (ACTION[name] ?? (() => name))(a, before), summary: change };
@@ -88,7 +93,13 @@ function finishEdit(name: string, a: Args, before: VideoProject, e: VideoEdit, d
   return { ok: true, content: e.content, summary: change };
 }
 
-async function run(name: string, a: Args, dry: boolean, id: string, signal: AbortSignal): Promise<VideoAgentResult> {
+async function run(
+  name: string,
+  a: Args,
+  dry: boolean,
+  id: string,
+  signal: AbortSignal,
+): Promise<VideoAgentResult> {
   const v = getV();
   if (!v.open && name !== 'video_add_media')
     return fail(
@@ -98,10 +109,18 @@ async function run(name: string, a: Args, dry: boolean, id: string, signal: Abor
   const p = v.project;
   switch (name) {
     case 'video_state':
-      return { ok: true, content: describeState(p, v.playhead), summary: `${p.clips.length} clips · ${fmtTime(projectDuration(p))}` };
+      return {
+        ok: true,
+        content: describeState(p, v.playhead),
+        summary: `${p.clips.length} clips · ${fmtTime(projectDuration(p))}`,
+      };
     case 'video_transcript': {
       const page = num(a, 'page') ?? 1;
-      return { ok: true, content: transcriptPage(p, str(a, 'media'), page), summary: `página ${page}` };
+      return {
+        ok: true,
+        content: transcriptPage(p, str(a, 'media'), page),
+        summary: `página ${page}`,
+      };
     }
     case 'video_add_media':
       return addMedia(a, dry);
@@ -121,7 +140,11 @@ async function run(name: string, a: Args, dry: boolean, id: string, signal: Abor
       const id0 = str(a, 'clip');
       const c =
         p.clips.find((x) => x.id === id0) ??
-        (!id0 ? [...p.clips].sort((x, y) => x.start - y.start).find((x) => !isText(x) && p.media.find((m) => m.id === x.mediaId)?.kind === 'video') : undefined);
+        (!id0
+          ? [...p.clips]
+              .sort((x, y) => x.start - y.start)
+              .find((x) => !isText(x) && p.media.find((m) => m.id === x.mediaId)?.kind === 'video')
+          : undefined);
       if (!c) return fail(id0 ? `No clip "${id0}".` : 'There is no video clip on the timeline.');
       const m = p.media.find((x) => x.id === c.mediaId);
       if (!m || m.kind !== 'video') return fail('That clip is not a video.');
@@ -132,7 +155,17 @@ async function run(name: string, a: Args, dry: boolean, id: string, signal: Abor
       const now = getV().project;
       const r = splitClipAtSource(now, c.id, times);
       if (!r.cuts) return fail('No scene changes were found in that clip.');
-      return finishEdit(name, a, now, { project: r.project, label: 'IA: escenas', content: `Split ${c.id} at ${r.cuts} scene change(s).` }, dry);
+      return finishEdit(
+        name,
+        a,
+        now,
+        {
+          project: r.project,
+          label: 'IA: escenas',
+          content: `Split ${c.id} at ${r.cuts} scene change(s).`,
+        },
+        dry,
+      );
     }
     case 'video_transcribe':
       return transcribe(a, dry, id, signal);
@@ -167,7 +200,12 @@ async function addMedia(a: Args, dry: boolean): Promise<VideoAgentResult> {
   };
 }
 
-async function transcribe(a: Args, dry: boolean, id: string, signal: AbortSignal): Promise<VideoAgentResult> {
+async function transcribe(
+  a: Args,
+  dry: boolean,
+  id: string,
+  signal: AbortSignal,
+): Promise<VideoAgentResult> {
   const p = getV().project;
   const m = pickMedia(p, str(a, 'media'), 'audio');
   if ('error' in m) return fail(m.error);
@@ -175,7 +213,7 @@ async function transcribe(a: Args, dry: boolean, id: string, signal: AbortSignal
   const asked = str(a, 'engine');
   const eng = asked
     ? engines.find((e) => e.id === asked || e.label.toLowerCase().includes(asked.toLowerCase()))
-    : engines.find((e) => e.ready && !e.cloud) ?? engines.find((e) => e.ready);
+    : (engines.find((e) => e.ready && !e.cloud) ?? engines.find((e) => e.ready));
   if (!eng || !eng.ready)
     return fail(
       `No speech-to-text engine is ready${eng ? ` (${eng.label}: ${eng.note})` : ''}. Available: ${engines.map((e) => `${e.id} (${e.ready ? 'ready' : e.note})`).join(', ') || 'none'}.`,

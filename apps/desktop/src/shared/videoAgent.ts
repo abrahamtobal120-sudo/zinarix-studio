@@ -75,15 +75,13 @@ export const isVideoTool = (n: string): n is VideoToolName =>
 
 /** What the renderer answers for a call (dry: only `summary`, nothing committed). */
 export type VideoAgentResult =
-  | { ok: true; content: string; summary: string }
-  | { ok: false; content: string; summary: string };
+  { ok: true; content: string; summary: string } | { ok: false; content: string; summary: string };
 
 export type Args = Record<string, unknown>;
 
 /** A pure edit: the next project, the undo label, and what to tell the model / the user. */
 export type VideoEdit =
-  | { project: VideoProject; label: string; content: string }
-  | { error: string };
+  { project: VideoProject; label: string; content: string } | { error: string };
 
 /** Words per video_transcript page. */
 export const TRANSCRIPT_PAGE = 600;
@@ -253,17 +251,30 @@ export function keepRanges(p: VideoProject, mediaRef: string, raw: unknown): Vid
   const t0 = base.start;
   const oldEnd = Math.max(...mine.filter((c) => c.trackId === base.trackId).map(clipEnd));
   const others = p.clips.filter(
-    (c) => c.trackId === base.trackId && c.mediaId !== m.id && c.start < oldEnd - 1e-6 && clipEnd(c) > t0 + 1e-6,
+    (c) =>
+      c.trackId === base.trackId &&
+      c.mediaId !== m.id &&
+      c.start < oldEnd - 1e-6 &&
+      clipEnd(c) > t0 + 1e-6,
   );
   if (others.length)
     return {
       error: `Other clips sit between the clips of "${m.name}" on ${track.name}; use video_cut_words instead.`,
     };
+  // Word ranges that continue each other ([0,4] then [5,9]) are one stretch.
+  const joined: [number, number][] = [];
+  for (const [a, b] of ranges) {
+    const last = joined[joined.length - 1];
+    if (last && a === last[1] + 1) last[1] = b;
+    else joined.push([a, b]);
+  }
   // Source stretches, joined when one runs straight into the next.
   const src: [number, number][] = [];
-  for (const [a, b] of ranges) {
+  for (const [a, b] of joined) {
     const s = round(Math.max(words[a - 1]?.e ?? 0, words[a]!.s - PAD, 0));
-    const e = round(Math.min(words[b + 1]?.s ?? m.duration, words[b]!.e + PAD, m.duration || Infinity));
+    const e = round(
+      Math.min(words[b + 1]?.s ?? m.duration, words[b]!.e + PAD, m.duration || Infinity),
+    );
     if (e - s < MIN_CLIP) continue;
     const last = src[src.length - 1];
     if (last && Math.abs(last[1] - s) < 1e-3) last[1] = e;
@@ -304,7 +315,9 @@ export function keepRanges(p: VideoProject, mediaRef: string, raw: unknown): Vid
     else clips.push(c);
   }
   const project = { ...p, clips: [...clips, ...pieces] };
-  const caps = captionTrack(project) ? ' The caption track still has the old times: run video_captions again.' : '';
+  const caps = captionTrack(project)
+    ? ' The caption track still has the old times: run video_captions again.'
+    : '';
   return {
     project,
     label: 'IA: dejar fragmentos',
@@ -366,10 +379,16 @@ export function splitClip(p: VideoProject, a: Args): VideoEdit {
   if ('error' in c) return c;
   const at = num(a, 'at');
   if (at === undefined || at <= c.start + MIN_CLIP || at >= clipEnd(c) - MIN_CLIP)
-    return { error: `"at" must be a timeline second inside the clip (${round(c.start)}–${round(clipEnd(c))}).` };
+    return {
+      error: `"at" must be a timeline second inside the clip (${round(c.start)}–${round(clipEnd(c))}).`,
+    };
   const r = splitAt(p, at, new Set([c.id]));
   if (!r.created.length) return { error: 'The clip could not be split there.' };
-  return { project: r.project, label: 'IA: dividir', content: `Split ${c.id} at ${round(at)} s; the right part is ${r.created[0]}.` };
+  return {
+    project: r.project,
+    label: 'IA: dividir',
+    content: `Split ${c.id} at ${round(at)} s; the right part is ${r.created[0]}.`,
+  };
 }
 
 export function trim(p: VideoProject, a: Args): VideoEdit {
@@ -463,7 +482,8 @@ export function captions(p: VideoProject, a: Args): VideoEdit {
  */
 export function setFormat(p: VideoProject, a: Args): VideoEdit {
   const preset = FORMAT_PRESETS.find((f) => f.id === str(a, 'aspect'));
-  if (!preset) return { error: `"aspect" must be one of ${FORMAT_PRESETS.map((f) => f.id).join(', ')}.` };
+  if (!preset)
+    return { error: `"aspect" must be one of ${FORMAT_PRESETS.map((f) => f.id).join(', ')}.` };
   const size = sizeFor(preset.width, preset.height, Math.min(p.width, p.height));
   if (size.width === p.width && size.height === p.height)
     return { error: `The project is already ${preset.id}.` };
@@ -543,7 +563,9 @@ export function describeChange(before: VideoProject, after: VideoProject): strin
     parts.push(`formato ${before.width}x${before.height} → ${after.width}x${after.height}`);
   const moved = after.clips.filter((c) => {
     const o = before.clips.find((x) => x.id === c.id);
-    return o && (o.start !== c.start || o.in !== c.in || o.out !== c.out || o.trackId !== c.trackId);
+    return (
+      o && (o.start !== c.start || o.in !== c.in || o.out !== c.out || o.trackId !== c.trackId)
+    );
   }).length;
   if (moved && !parts.length) parts.push(`${moved} clip(s) movidos o recortados`);
   return parts.length ? parts.join(' · ') : 'sin cambios visibles en la línea de tiempo';

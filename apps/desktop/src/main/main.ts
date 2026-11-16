@@ -2718,10 +2718,13 @@ function registerScene3dIpc(): void {
   ai.agent.scene3d = svc;
   const id = z.string().uuid();
   // The agent's viewer renders run in a window: the focused one, else the first.
+  type EditorAnswer = { ok: boolean; content: string; summary: string };
   const pending = new Map<
     string,
     { resolve: (r: { path: string }) => void; reject: (e: Error) => void }
   >();
+  // scene3d_state / scene3d_edit / scene3d_render: answered by the window's 3D editor.
+  const editing = new Map<string, (r: EditorAnswer) => void>();
   const target = (): Win | undefined => {
     const f = BrowserWindow.getFocusedWindow();
     return [...wins.values()].find((w) => w.win === f) ?? wins.values().next().value;
@@ -2742,6 +2745,22 @@ function registerScene3dIpc(): void {
       const w = target();
       if (w) send(w, { type: 'scene3d:imported', path });
     },
+    editor: (name, args) =>
+      new Promise((resolve) => {
+        const w = target();
+        if (!w)
+          return resolve({ ok: false, content: 'No window is open.', summary: 'sin ventana' });
+        const requestId = randomUUID();
+        editing.set(requestId, resolve);
+        send(w, { type: 'scene3d:edit', requestId, name, args });
+        setTimeout(
+          () => {
+            if (editing.delete(requestId))
+              resolve({ ok: false, content: 'The 3D editor did not answer.', summary: 'sin respuesta' });
+          },
+          name === 'scene3d_render' ? 30 * 60_000 : 30_000,
+        );
+      }),
   };
   handle(
     'scene3d:agentDone',
@@ -2750,9 +2769,19 @@ function registerScene3dIpc(): void {
       z.union([
         z.object({ path: z.string().min(1).max(4096) }),
         z.object({ error: z.string().max(2000) }),
+        z.object({
+          ok: z.boolean(),
+          content: z.string().max(200_000),
+          summary: z.string().max(200),
+        }),
       ]),
     ]),
     (_w, i, r) => {
+      if ('ok' in r) {
+        editing.get(i)?.(r);
+        editing.delete(i);
+        return;
+      }
       const p = pending.get(i);
       if (!p) return;
       pending.delete(i);
@@ -3332,7 +3361,7 @@ function buildMenu(): void {
             const { response } = await dialog.showMessageBox(w.win, {
               title: APP_NAME,
               message: `${APP_NAME} ${app.getVersion()} · ${planName()}`,
-              detail: `Electron ${process.versions.electron} · Node ${process.versions.node}\nEditor multi-IA · MIT`,
+              detail: `Electron ${process.versions.electron} · Node ${process.versions.node}\nEditor multi-IA · GPL-3.0-or-later`,
               buttons: ['Aceptar', 'Licencias'],
               defaultId: 0,
               cancelId: 0,

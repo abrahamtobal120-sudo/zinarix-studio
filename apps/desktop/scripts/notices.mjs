@@ -26,7 +26,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Licenses that are fine to bundle in a closed or MIT app (they only ask for this notice). */
+/**
+ * Licenses accepted for npm packages in the bundle (they only ask for this notice). Zinarix is
+ * GPL-3.0-or-later, but the bundle stays free of copyleft npm packages on purpose: anything
+ * GPL goes in as reviewed source or as a separate program (like FFmpeg or Blender).
+ */
 export const ALLOWED = new Set([
   'MIT',
   'MIT-0',
@@ -48,7 +52,7 @@ export const ALLOWED = new Set([
   'MPL-2.0',
 ]);
 
-/** Copyleft or non-commercial: never inside the bundle (run them as a separate program instead). */
+/** Copyleft or non-commercial npm packages: never inside the bundle without a review. */
 const DENIED = /^(A?GPL|LGPL|SSPL|EUPL|OSL|CPAL|BUSL|CC-BY-NC|CC-BY-SA|Commons-Clause)/i;
 
 /**
@@ -61,7 +65,7 @@ export const REVIEWED = {};
 const shippedDeps = () =>
   Object.keys(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).dependencies ?? {});
 
-/** Our own workspace packages (MIT, part of Zinarix): never listed as third party. */
+/** Our own workspace packages (GPL-3.0-or-later, part of Zinarix): never listed as third party. */
 const OWN = /^@omni\//;
 
 const norm = (p) => p.replace(/\\/g, '/');
@@ -309,7 +313,8 @@ export function renderMarkdown(pkgs, extras, version) {
   const out = [
     `# Third-party notices — Zinarix Studio ${version}`,
     '',
-    'Zinarix Studio is licensed under the MIT license. It includes the open-source software',
+    'Zinarix Studio is licensed under the GNU GPL version 3 or later (LICENSE). It includes the',
+    'open-source software',
     'listed below, under the license of each one. This file is generated at build time from',
     'what is actually bundled in the app (scripts/notices.mjs).',
     '',
