@@ -17,7 +17,7 @@ import { clampFeatures, EDITIONS } from '../shared/edition.js';
  * key below, so it can check a key offline but never make one.
  */
 export const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA8L5XRiEBieWNmEXBKBQENGnNfXs3bcTX/WYhD0tuBiU=
+MCowBQYDK2VwAyEAfSgMdavaSyr1+Zcx1gqM0htObE9eBCiZvYaakw+J4JI=
 -----END PUBLIC KEY-----`;
 
 const PAID: PaidPlan[] = ['pro', 'ai', 'proai'];

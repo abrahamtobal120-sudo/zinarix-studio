@@ -46,7 +46,7 @@ function loadPrivate() {
 }
 
 if (cmd === 'issue') {
-  if (!arg || !arg.includes('@')) {
+  if (!arg || (!arg.includes('@') && !flag('owner'))) {
     console.error(
       'usage: license.mjs issue <email> [--name "Nombre"] [--days 365] [--plan pro|ai|proai]',
     );
