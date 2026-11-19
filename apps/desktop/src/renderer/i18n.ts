@@ -274,6 +274,29 @@ const es = {
   phoneScanRemote: 'Escanea el código con la cámara del celular o envíate este enlace:',
   phoneRemoteOn: 'Activar acceso desde cualquier lugar',
   phoneRemoteOff: 'Desactivar acceso desde cualquier lugar',
+  phoneLanSame:
+    'Este enlace no cambia: tus celulares siguen conectados aunque cierres y abras Zinarix.',
+  phoneDevices: 'Celulares conectados',
+  phoneNoDevices: 'Todavía no hay celulares conectados.',
+  phoneForget: 'Desconectar',
+  phoneForgetAll: 'Desconectar todos',
+  phoneForgetAllConfirm:
+    '¿Desconectar todos los celulares? Tendrán que escribir el PIN otra vez y el enlace de internet cambiará.',
+  phoneSeen: 'Usado {when}',
+  phoneNow: 'ahora',
+  phoneAgo: 'hace {n}',
+  phoneViaNet: 'por internet',
+  phoneAuto: 'Se enciende solo al abrir Zinarix',
+  phoneFixedTitle: 'Enlace fijo de internet',
+  phoneFixedHint:
+    'El enlace gratuito puede cambiar al reiniciar. Para que sea siempre el mismo: en tu cuenta de Cloudflare crea un túnel (Zero Trust → Networks → Tunnels), agrega un dominio tuyo que apunte a http://localhost:47390 y pega aquí el dominio y el token.',
+  phoneFixedHost: 'Dominio (ej. zinarix.midominio.com)',
+  phoneFixedToken: 'Token del túnel',
+  phoneFixedSave: 'Guardar enlace fijo',
+  phoneFixedOn: 'Enlace fijo activo: {host}',
+  phoneFixedRemove: 'Quitar enlace fijo',
+  phoneRandomNote:
+    'Tus celulares siguen emparejados, pero este enlace gratuito puede cambiar al reiniciar. Configura un enlace fijo abajo para que nunca cambie.',
   phoneRemoteStarting: 'Conectando…',
   phoneHint:
     'Controla Zinarix desde tu celular: ve los chats, escribe mensajes, aprueba o rechaza lo que pide el agente y detén respuestas. En la misma red Wi-Fi, o desde cualquier lugar si activas el acceso a distancia.',
@@ -2469,6 +2492,28 @@ const en: Record<Key, string> = {
   phoneScanRemote: "Scan the code with the phone's camera or send yourself this link:",
   phoneRemoteOn: 'Turn on access from anywhere',
   phoneRemoteOff: 'Turn off access from anywhere',
+  phoneLanSame: "This link doesn't change: your phones stay connected even if you close and reopen Zinarix.",
+  phoneDevices: 'Connected phones',
+  phoneNoDevices: 'No phones connected yet.',
+  phoneForget: 'Disconnect',
+  phoneForgetAll: 'Disconnect all',
+  phoneForgetAllConfirm:
+    'Disconnect every phone? They will have to type the PIN again and the internet link will change.',
+  phoneSeen: 'Used {when}',
+  phoneNow: 'now',
+  phoneAgo: '{n} ago',
+  phoneViaNet: 'over the internet',
+  phoneAuto: 'Turns on by itself when Zinarix opens',
+  phoneFixedTitle: 'Fixed internet link',
+  phoneFixedHint:
+    'The free link may change on restart. To keep it the same forever: create a tunnel in your Cloudflare account (Zero Trust → Networks → Tunnels), add a domain of yours pointing to http://localhost:47390 and paste the domain and token here.',
+  phoneFixedHost: 'Domain (e.g. zinarix.mydomain.com)',
+  phoneFixedToken: 'Tunnel token',
+  phoneFixedSave: 'Save fixed link',
+  phoneFixedOn: 'Fixed link on: {host}',
+  phoneFixedRemove: 'Remove fixed link',
+  phoneRandomNote:
+    'Your phones stay paired, but this free link may change on restart. Set a fixed link below so it never changes.',
   phoneRemoteStarting: 'Connecting…',
   phoneHint:
     'Control Zinarix from your phone: see the chats, write messages, approve or deny what the agent asks and stop answers. On the same Wi-Fi network, or from anywhere if you turn on remote access.',

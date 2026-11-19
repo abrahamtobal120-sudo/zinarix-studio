@@ -25,6 +25,46 @@ de API): **no hacen falta claves de API en Blender**. Las variables de entorno c
 de la app no pasan a Blender. Sin el puente, el complemento puede usar su propio proveedor
 (Anthropic, OpenAI, OpenRouter, Ollama o uno compatible) desde sus preferencias.
 
+**Puente permanente.** El botón "Puente" de la barra de estado (abajo, en cualquier parte de Zinarix) lo deja abierto siempre (también al
+iniciar la app) en un puerto fijo (`47815`, o uno libre si está ocupado) con un token que se
+guarda en `blender-bridge.json` de la carpeta de datos. Mientras está abierto, la app escribe
+`~/.zinarix/blender-bridge.json` (`{url, token, pid}`; otra ruta con `ZINARIX_BRIDGE_FILE`):
+cualquier Blender con el complemento Zinarix AI instalado lo lee y usa tus modelos aunque no
+lo hayas abierto desde Zinarix. El entorno de "Modo Pro" tiene prioridad sobre el archivo, y
+una URL que no sea de loopback se ignora. Al apagarlo se borra el archivo y el token cambia.
+Ojo: con el puente abierto, cualquier programa de tu usuario que lea ese archivo puede usar
+tus modelos.
+
+**Puente para la web.** Con el puente permanente abierto, una app web también puede usar tus
+modelos: en el menú "Puente" copia la URL (`http://127.0.0.1:47815/v1`) y el token, y úsalos
+como una API compatible con OpenAI (`Authorization: Bearer <token>`, `GET /models`,
+`POST /chat/completions`). Las páginas de `localhost` / `127.0.0.1` pueden siempre; cualquier
+otro sitio (p. ej. `https://mi-app.vercel.app`) solo si lo añades en "Sitios web permitidos"
+(CORS, también la respuesta de Private Network Access de Chrome). El token sigue siendo
+obligatorio: no lo pongas en el código de una web pública, pídeselo al usuario.
+
+```js
+const r = await fetch('http://127.0.0.1:47815/v1/chat/completions', {
+  method: 'POST',
+  headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+  body: JSON.stringify({ messages: [{ role: 'user', content: 'Hola' }] }),
+});
+```
+
+**Sigue activo con la ventana cerrada.** Con el puente permanente encendido, cerrar la ventana
+no cierra Zinarix: se queda en la bandeja del sistema (icono junto al reloj) con el puente
+abierto, y en Windows y Linux también arranca oculto al iniciar sesión. "Salir del todo" en el
+menú de la bandeja (o Ctrl+Q) lo cierra de verdad.
+
+**Dejar tareas.** `POST /v1/jobs` (el mismo cuerpo que `/chat/completions`, más un `title`
+opcional) deja la tarea en cola y responde enseguida `202 {id, status: "queued"}`. Zinarix la
+ejecuta en segundo plano y guarda la respuesta en disco; si se apaga la computadora antes de
+terminar, la tarea sigue la próxima vez que Zinarix abra (hasta 3 intentos). `GET /v1/jobs/<id>`
+da `status` (`queued`, `running`, `done`, `error`, `cancelled`) y, cuando termina, `completion`
+con la respuesta; `GET /v1/jobs` las lista y `DELETE /v1/jobs/<id>` cancela o borra una. Las
+terminadas se guardan 7 días. Desde Python del complemento: `client.submit_job(...)` y
+`client.get_job(id)`.
+
 **Seguridad.**
 
 - Sin "Ejecución automática", cada script espera a "Ejecutar paso" u "Omitir"; el script

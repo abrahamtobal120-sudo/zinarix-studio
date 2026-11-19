@@ -26,6 +26,7 @@ __all__ = (
     "BRIDGE_PROVIDER",
     "BRIDGE_NOT_RUNNING",
     "bridge_available",
+    "bridge_endpoint",
     "resolve_base_url",
     "resolve_api_key",
     "default_timeout",
@@ -50,6 +51,9 @@ ANTHROPIC_VERSION = "2023-06-01"
 BRIDGE_PROVIDER = "ZINARIX"
 BRIDGE_URL_ENV = "ZINARIX_BRIDGE_URL"
 BRIDGE_TOKEN_ENV = "ZINARIX_BRIDGE_TOKEN"
+# Permanent bridge: Zinarix Studio announces it in this file so a Blender opened
+# outside Zinarix finds it too. ZINARIX_BRIDGE_FILE overrides the path.
+BRIDGE_FILE_ENV = "ZINARIX_BRIDGE_FILE"
 BRIDGE_NOT_RUNNING = (
     "Zinarix Studio is not running or the bridge is closed; open 3D Pro from Zinarix Studio."
 )
@@ -149,6 +153,35 @@ def _join(base_url, path):
 # Settings resolution
 
 
+def _bridge_file():
+    path = os.environ.get(BRIDGE_FILE_ENV, "").strip()
+    return path or os.path.join(os.path.expanduser("~"), ".zinarix", "blender-bridge.json")
+
+
+def bridge_endpoint():
+    """``(url, token)`` of the Zinarix Studio bridge, or ``("", "")``.
+
+    The environment set by Zinarix Studio ("Modo Pro") wins; otherwise the
+    permanent bridge's discovery file. A file URL that is not loopback is ignored,
+    so its token is never sent anywhere else.
+    """
+    url = os.environ.get(BRIDGE_URL_ENV, "").strip()
+    if url:
+        return url, os.environ.get(BRIDGE_TOKEN_ENV, "")
+    try:
+        with open(_bridge_file(), "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return "", ""
+    if not isinstance(data, dict):
+        return "", ""
+    url = data.get("url")
+    token = data.get("token")
+    if not isinstance(url, str) or not url.strip() or not is_local_url(url.strip()):
+        return "", ""
+    return url.strip(), token if isinstance(token, str) else ""
+
+
 def resolve_base_url(provider, base_url=""):
     """Return the effective base URL: explicit value, then environment, then default.
 
@@ -158,7 +191,7 @@ def resolve_base_url(provider, base_url=""):
     info = _info(provider)
     url = (base_url or "").strip()
     if not url and provider == BRIDGE_PROVIDER:
-        url = os.environ.get(BRIDGE_URL_ENV, "").strip()
+        url = bridge_endpoint()[0]
     return url or info["base_url"]
 
 
@@ -170,11 +203,13 @@ def resolve_api_key(provider, api_key=""):
         value = os.environ.get(name, "")
         if value:
             return value
+    if provider == BRIDGE_PROVIDER:
+        return bridge_endpoint()[1]
     return ""
 
 
 def _bridge_key(api_key, base_url):
-    """The bridge token from the environment, only for a loopback URL (never sent elsewhere)."""
+    """The bridge token (environment or discovery file), only for a loopback URL."""
     if api_key:
         return api_key
     return resolve_api_key(BRIDGE_PROVIDER) if is_local_url(base_url) else ""
@@ -189,12 +224,12 @@ def default_timeout(provider, base_url=""):
 
 
 def bridge_available(probe=False, timeout=0.5):
-    """True when Zinarix Studio exported a bridge URL.
+    """True when Zinarix Studio exported a bridge URL or announced a permanent bridge.
 
     With ``probe=True`` also check that something accepts TCP connections on it
     (blocks up to ``timeout`` seconds, so do not probe from a draw callback).
     """
-    url = os.environ.get(BRIDGE_URL_ENV, "").strip()
+    url = bridge_endpoint()[0]
     if not url:
         return False
     if not probe:
@@ -610,3 +645,58 @@ def list_models(settings, timeout=TIMEOUT_LIST_MODELS):
         if isinstance(model_id, str) and model_id and model_id not in ids:
             ids.append(model_id)
     return ids
+
+
+def _bridge_call(path, body=None, timeout=TIMEOUT_LIST_MODELS):
+    """One request to the Zinarix Studio bridge (``/v1/<path>``). Raises ``ClientError``."""
+    url, token = bridge_endpoint()
+    if not url:
+        raise ClientError(BRIDGE_NOT_RUNNING)
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "user-agent": "zinarix-studio-3d",
+        "authorization": "Bearer " + token,
+    }
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    return _request_json(
+        BRIDGE_PROVIDER, _join(url, path), data=data, headers=headers, timeout=timeout,
+        secret=token, retries=0,
+    )
+
+
+def submit_job(messages, *, system="", model="", title="", max_tokens=4096):
+    """Leave a task on the permanent bridge and return its id at once.
+
+    Zinarix Studio runs it in the background and keeps the answer, also with its
+    window closed; if the computer turns off first, it runs when Zinarix opens again.
+    Read it later with ``get_job``. Raises ``ClientError``.
+    """
+    msgs = ([{"role": "system", "content": system}] if system else []) + list(messages)
+    body = {"messages": msgs, "max_tokens": max_tokens}
+    if model:
+        body["model"] = model
+    if title:
+        body["title"] = title
+    data = _bridge_call("jobs", body)
+    job_id = data.get("id") if isinstance(data, dict) else None
+    if not isinstance(job_id, str) or not job_id:
+        raise ClientError("The Zinarix Studio bridge did not accept the task.")
+    return job_id
+
+
+def get_job(job_id):
+    """``(status, text, error)`` of a task left with ``submit_job``.
+
+    ``status`` is queued, running, done, error or cancelled; ``text`` is the answer
+    once done. Raises ``ClientError`` (an unknown id too).
+    """
+    data = _bridge_call("jobs/" + urllib.parse.quote(job_id, safe=""))
+    if not isinstance(data, dict):
+        raise ClientError("Invalid answer from the Zinarix Studio bridge.")
+    text = ""
+    completion = data.get("completion")
+    if isinstance(completion, dict):
+        text = parse_response(BRIDGE_PROVIDER, completion)
+    error = data.get("error") if isinstance(data.get("error"), dict) else {}
+    return str(data.get("status", "")), text, str(error.get("message", ""))

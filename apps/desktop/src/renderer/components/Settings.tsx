@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { BotKind, BotsStatus, ThemeId } from '../../shared/api';
+import type { BotKind, BotsStatus, PhoneStatus, ThemeId } from '../../shared/api';
 import { THEME_IDS } from '../../shared/api';
 import { commands, defaultKeys, runCommand } from '../commands';
 import { lang, t } from '../i18n';
@@ -221,12 +221,17 @@ function PhoneSection() {
             </button>
           </div>
 
-          {where === 'lan' && link && pairing(link, t('phoneFirewall'))}
+          {where === 'lan' && link && pairing(link, `${t('phoneLanSame')} ${t('phoneFirewall')}`)}
 
           {where === 'remote' && (
             <>
               {remote?.url ? (
-                pairing(remote.url, t('phoneRemoteWarn'))
+                pairing(
+                  remote.url,
+                  remote.fixed
+                    ? `${t('phoneFixedOn', { host: status.fixedHost ?? '' })}. ${t('phoneRemoteWarn')}`
+                    : `${t('phoneRandomNote')} ${t('phoneRemoteWarn')}`,
+                )
               ) : (
                 <div className="phone-remote-off">
                   <Icon name="globe" size={28} />
@@ -251,13 +256,122 @@ function PhoneSection() {
                   </button>
                 </div>
               )}
+              <FixedLink status={status} />
             </>
           )}
         </div>
       )}
 
+      {status.running && <PhoneDevices status={status} />}
+
       {status.running && <BotsSection pin={status.pin} />}
     </>
+  );
+}
+
+/** "now", "5 min ago"… */
+function ago(ms: number): string {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 90) return t('phoneNow');
+  const n =
+    s < 3600
+      ? `${Math.round(s / 60)} min`
+      : s < 86400
+        ? `${Math.round(s / 3600)} h`
+        : `${Math.round(s / 86400)} d`;
+  return t('phoneAgo', { n });
+}
+
+/** The paired phones (kept across restarts): disconnect one or all. */
+function PhoneDevices({ status }: { status: PhoneStatus }) {
+  const devices = status.devices ?? [];
+  const forget = async (id: string | null) => {
+    if (!id && !(await confirmDialog(t('phoneForgetAllConfirm')))) return;
+    setState({ phone: await api().phone.forget(id) });
+  };
+  return (
+    <div className="phone-card phone-devices">
+      <div className="phone-devices-head">
+        <b>{t('phoneDevices')}</b>
+        {status.autostart && <span className="dim small">{t('phoneAuto')}</span>}
+      </div>
+      {!devices.length && <p className="dim small">{t('phoneNoDevices')}</p>}
+      {devices.map((d) => (
+        <div className="phone-device" key={d.id}>
+          <Icon name="smartphone" size={16} />
+          <span className="phone-device-name">
+            {d.name}
+            <small className="dim">
+              {t('phoneSeen', { when: ago(d.seen ?? d.at) })}
+              {d.remote ? ` · ${t('phoneViaNet')}` : ''}
+            </small>
+          </span>
+          <button onClick={() => void forget(d.id)}>{t('phoneForget')}</button>
+        </div>
+      ))}
+      {devices.length > 1 && (
+        <div className="phone-card-foot">
+          <button className="danger" onClick={() => void forget(null)}>
+            {t('phoneForgetAll')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The user's own Cloudflare tunnel: an internet link that never changes. */
+function FixedLink({ status }: { status: PhoneStatus }) {
+  const [host, setHost] = useState('');
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async (tunnel: { host: string; token: string } | null) => {
+    setBusy(true);
+    try {
+      const phone = await api().phone.fixed(tunnel);
+      setState({ phone });
+      if (phone.error) toast(phone.error);
+      else setToken('');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="phone-fixed">
+      <b className="small">{t('phoneFixedTitle')}</b>
+      {status.fixedHost ? (
+        <div className="phone-fixed-row">
+          <span className="small">{t('phoneFixedOn', { host: status.fixedHost })}</span>
+          <button disabled={busy} onClick={() => void save(null)}>
+            {t('phoneFixedRemove')}
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="settings-hint">{t('phoneFixedHint')}</p>
+          <input
+            placeholder={t('phoneFixedHost')}
+            value={host}
+            spellCheck={false}
+            onChange={(e) => setHost(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder={t('phoneFixedToken')}
+            value={token}
+            autoComplete="off"
+            onChange={(e) => setToken(e.target.value)}
+          />
+          <button
+            className="primary"
+            disabled={busy || !host.trim() || !token.trim()}
+            onClick={() => void save({ host, token })}
+          >
+            {t('phoneFixedSave')}
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

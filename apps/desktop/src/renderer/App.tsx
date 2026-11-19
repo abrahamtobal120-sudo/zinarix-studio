@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { runCommand } from './commands';
-import { ChatPanel, runPhoneAction } from './components/Chat';
+import { ChatPanel, runPhoneAction, setPhoneTarget } from './components/Chat';
 import { ActivityBar, AppsPanel, StatusBar } from './components/Chrome';
 import { EditorArea } from './components/Editor';
 import { Explorer } from './components/Explorer';
@@ -477,6 +477,13 @@ export function App() {
           }
         })
         .catch(() => undefined);
+      // The phone remote was on when Zinarix closed: on again, same link, phones still paired.
+      void api()
+        .phone.resume()
+        .then((phone) => {
+          if (phone.running) setState({ phone });
+        })
+        .catch(() => undefined);
       await refreshModels().catch(() => undefined);
       // The guided setup (no AI connected yet) or what's new in this version, once.
       const s = getState();
@@ -488,6 +495,7 @@ export function App() {
       if (ev.type === 'fs:changed') setState((s) => ({ fsVersion: s.fsVersion + 1 }));
       if (ev.type === 'command') void runCommand(ev.command);
       if (ev.type === 'phone') runPhoneAction(ev.action);
+      if (ev.type === 'phone:target') setPhoneTarget(ev.on);
       if (ev.type === 'phone:status') {
         if (ev.status.phones > getState().phone.phones) showToast(t('phonePaired'));
         setState({ phone: ev.status });

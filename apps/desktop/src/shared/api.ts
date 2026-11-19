@@ -1124,6 +1124,8 @@ export type AppEvent =
   | { type: 'phone'; action: PhoneAction }
   /** The phone remote changed (started, stopped, a phone paired, new PIN). */
   | { type: 'phone:status'; status: PhoneStatus }
+  /** This window is (or stops being) the one the phone controls: it sends its chats then. */
+  | { type: 'phone:target'; on: boolean }
   /** A Telegram or Discord bot connected, failed or got a new linked chat. */
   | { type: 'bots:status'; status: BotsStatus }
   /** WhatsApp Web changed (unread count, chat open, control, answers waiting). */
@@ -1305,8 +1307,14 @@ export interface PhoneStatus {
   url?: string;
   /** Code the phone asks for once; changes after too many wrong tries. */
   pin?: string;
-  /** Phones paired since it started. */
+  /** Phones paired (they stay paired after a restart). */
   phones: number;
+  /** The paired phones. */
+  devices?: PhoneDevice[];
+  /** It turns on by itself when Zinarix opens (it was on when it closed). */
+  autostart?: boolean;
+  /** Address of the user's own Cloudflare tunnel, when set (the link never changes). */
+  fixedHost?: string;
   /** Access from anywhere (a Cloudflare tunnel), when it was turned on. */
   remote?: {
     /** Link to open on the phone from any network (carries the pairing key after #). */
@@ -1314,8 +1322,23 @@ export interface PhoneStatus {
     /** What it is doing while it starts (downloading, connecting). */
     progress?: string;
     error?: string;
+    /** It goes through the user's own tunnel (fixed address). */
+    fixed?: boolean;
   };
   error?: string;
+}
+
+/** A phone paired with the remote (kept across restarts). */
+export interface PhoneDevice {
+  id: string;
+  /** "Android · Chrome", or the name the user gave it. */
+  name: string;
+  /** Paired at (ms). */
+  at: number;
+  /** Last request (ms). */
+  seen?: number;
+  /** Paired through the link from anywhere. */
+  remote?: boolean;
 }
 
 /** What the phone shows: the chats of the window and the one being controlled. */
@@ -1323,13 +1346,65 @@ export interface PhoneSnapshot {
   chats: { id: string; title: string; busy: boolean; waiting: boolean }[];
   chatId: string;
   agent: boolean;
+  /** How the chat works: ask / plan / agent / auto / full (see agentModes.ts). */
+  mode?: PhoneChatMode;
+  /** The chat's own model ("provider/model"); null = the app default. */
+  model?: string | null;
+  /** The model that answers now (its own, or the default for the mode). */
+  shownModel?: string | null;
+  /** Messages waiting for the current answer to end. */
+  queued?: number;
   busy: boolean;
   turns: {
     role: 'user' | 'assistant';
     text: string;
     error?: string;
+    /** The model that wrote the answer. */
+    model?: string;
     tools: { id: string; title: string; status: 'running' | 'approval' | 'ok' | 'error' }[];
   }[];
+  /** The open windows (one folder each); the phone switches between them. Added by main. */
+  windows?: PhoneWindow[];
+  /** Spent today on every provider (USD). Added by main. */
+  todayUsd?: number;
+}
+
+/** The chat modes, as the phone names them (same values as ChatMode). */
+export type PhoneChatMode = 'ask' | 'plan' | 'agent' | 'auto' | 'full';
+
+/** A connected model, as the phone's model picker lists it. */
+export interface PhoneModel {
+  /** "provider/model". */
+  ref: string;
+  provider: string;
+  label: string;
+  /** Runs on this computer (free, works offline). */
+  local: boolean;
+  tools: boolean;
+  vision: boolean;
+  reasoning: boolean;
+  context: number | null;
+  /** USD per million tokens. */
+  inputPrice: number | null;
+  outputPrice: number | null;
+}
+
+/** What the phone's model picker shows. */
+export interface PhoneModels {
+  models: PhoneModel[];
+  defaultModel: string | null;
+  roles: { chat?: string; agent?: string; inline?: string };
+  errors: { provider: string; error: string }[];
+}
+
+/** A window of Zinarix as the phone lists it (its tabs of projects). */
+export interface PhoneWindow {
+  id: number;
+  /** Folder name ('' when the window has no folder open). */
+  name: string;
+  path?: string;
+  /** It is the window the phone controls now. */
+  current: boolean;
 }
 
 /** A git repository of this computer, as the phone lists it (to pull it from anywhere). */
@@ -1371,7 +1446,16 @@ export type PhoneAction =
   | { kind: 'stop' }
   | { kind: 'select'; chatId: string }
   | { kind: 'newChat' }
-  | { kind: 'agent'; on: boolean };
+  | { kind: 'agent'; on: boolean }
+  /** Change how the current chat works (ask / plan / agent / auto / full). */
+  | { kind: 'mode'; mode: PhoneChatMode }
+  /** The model of the current chat (null = the app default). */
+  | { kind: 'model'; ref: string | null }
+  | { kind: 'closeChat'; chatId: string }
+  /** Drop the messages waiting for the current answer. */
+  | { kind: 'clearQueue' }
+  /** Control another window (another open folder) from now on. Handled by main. */
+  | { kind: 'window'; id: number };
 
 /** An MCP server of the global config or of the open project (Settings → MCP). */
 export interface McpServerView {
@@ -1392,6 +1476,17 @@ export interface McpProjectView {
   file: string | null;
   trusted: boolean;
   errors: string[];
+}
+
+/** The permanent local bridge to the connected models (Blender's add-on, web apps). */
+export interface BridgeState {
+  permanent: boolean;
+  /** OpenAI-style base URL while open, e.g. http://127.0.0.1:47815/v1; null = closed. */
+  url: string | null;
+  /** Bearer token, only while the permanent bridge is open. */
+  token: string | null;
+  /** Web origins allowed to call it from a browser (loopback ones always are). */
+  origins: string[];
 }
 
 export interface OmniApi {
@@ -1939,6 +2034,12 @@ export interface OmniApi {
     stop(): Promise<PhoneStatus>;
     /** Turns access from anywhere on or off (the remote must be running). */
     remote(on: boolean): Promise<PhoneStatus>;
+    /** Turns the remote on again if it was on when Zinarix closed (same link, same phones). */
+    resume(): Promise<PhoneStatus>;
+    /** Unpairs one phone, or all of them (null; also changes the link from anywhere). */
+    forget(id: string | null): Promise<PhoneStatus>;
+    /** The user's own Cloudflare tunnel for a link that never changes (null = random one). */
+    fixed(tunnel: { host: string; token: string } | null): Promise<PhoneStatus>;
     /** What the phone should show now (sent while the remote runs). */
     push(snapshot: PhoneSnapshot): Promise<void>;
   };
@@ -2102,6 +2203,12 @@ export interface OmniApi {
     pickBlender(): Promise<{ path: string; version: string } | null | false>;
     /** Opens Zinarix 3D Pro: Blender's window with the Zinarix template (needs Blender 4.2+). */
     openPro(lang: 'es' | 'en', look?: Pro3DLook): Promise<void>;
+    /** Permanent bridge (Blender, web apps): on/off, its URL while open (null = closed). */
+    bridge(): Promise<BridgeState>;
+    /** Turns the permanent bridge on (opens now and with the app) or off. */
+    setBridge(on: boolean): Promise<BridgeState>;
+    /** Web origins allowed to use the bridge from a browser (invalid ones are dropped). */
+    setBridgeOrigins(origins: string[]): Promise<BridgeState>;
     /** Starts encoding viewer frames; then frame() each RGBA frame and end(). */
     begin(o: {
       width: number;
@@ -2438,6 +2545,9 @@ export const CHANNELS = [
   'phone:start',
   'phone:stop',
   'phone:remote',
+  'phone:resume',
+  'phone:forget',
+  'phone:fixed',
   'phone:push',
   'bots:status',
   'bots:connect',
@@ -2588,6 +2698,9 @@ export const CHANNELS = [
   'scene3d:info',
   'scene3d:pickBlender',
   'scene3d:openPro',
+  'scene3d:bridge',
+  'scene3d:setBridge',
+  'scene3d:setBridgeOrigins',
   'scene3d:begin',
   'scene3d:frame',
   'scene3d:end',

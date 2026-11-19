@@ -13,7 +13,19 @@ import { homedir } from 'node:os';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BrowserWindow, Menu, Notification, app, dialog, ipcMain, protocol, shell } from 'electron';
+import {
+  BrowserWindow,
+  Menu,
+  Notification,
+  Tray,
+  app,
+  dialog,
+  ipcMain,
+  nativeImage,
+  protocol,
+  safeStorage,
+  shell,
+} from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
 import { z } from 'zod';
 import type {
@@ -21,7 +33,9 @@ import type {
   BotKind,
   Channel,
   PhoneAction,
+  PhoneModels,
   PhoneRepo,
+  PhoneWindow,
   Prefs,
   ThemeId,
   WorkspaceInfo,
@@ -102,7 +116,9 @@ import { gitMention, webMention } from './mentions.js';
 import { VideoService, fromStored, readLut, toStored } from './video.js';
 import { Transcriber } from './transcribe.js';
 import { Scene3DService } from './scene3d.js';
-import { BlenderBridge } from './blenderBridge.js';
+import { BlenderBridge, newBridgeToken, type BridgeDeps } from './blenderBridge.js';
+import { BridgeStore, MAX_ORIGINS, cleanOrigins } from './blenderBridgeStore.js';
+import { BridgeJobQueue } from './bridgeJobs.js';
 import { withProtocol } from './textTools.js';
 import { Gen3DService } from './gen3d.js';
 import { GEN3D_MODELS, isGen3dImage } from '../shared/gen3d.js';
@@ -198,20 +214,113 @@ const terminals = new Terminals(
 
 // ---------------- phone remote ----------------
 
-/** The window the phone controls (the one that started the remote). */
+/** The window that started the remote (its Settings show the PIN; closing it stops it). */
 let phoneOwner: Win | undefined;
+/**
+ * The window the phone works on now: the owner at first, another one when the phone switches
+ * project (each window has its own folder, chats and browser, like on the computer).
+ */
+let phoneTarget: Win | undefined;
+/** The last chats the target sent, re-sent with a fresh window list when windows change. */
+let phoneSnap: PhoneSnapshotData | null = null;
+
+function phoneWin(): Win | undefined {
+  if (phoneTarget && wins.has(phoneTarget.id) && !phoneTarget.win.isDestroyed()) return phoneTarget;
+  return phoneOwner;
+}
+
+/** The open windows for the phone's project tabs. */
+function phoneWindows(): PhoneWindow[] {
+  const cur = phoneWin();
+  return [...wins.values()]
+    .filter((o) => !o.win.isDestroyed())
+    .map((o) => ({
+      id: o.id,
+      name: o.workspace ? basename(o.workspace.root) : '',
+      ...(o.workspace ? { path: o.workspace.root } : {}),
+      current: o === cur,
+    }));
+}
+
+/** Sends the phone the last chats with the windows as they are now. */
+function phoneRefresh(): void {
+  if (!phoneOwner || !phoneSnap) return;
+  phone.push({ ...phoneSnap, windows: phoneWindows(), todayUsd: ai.todayUsd() });
+}
+
+/** The phone works on `w` from now on; that window starts sending its chats. */
+function setPhoneTarget(w: Win | undefined): void {
+  const old = phoneWin();
+  phoneTarget = w;
+  if (old && old !== w) send(old, { type: 'phone:target', on: false });
+  // Always (also to the same window): it answers with its chats right away.
+  if (w) send(w, { type: 'phone:target', on: true });
+  if (old !== w) phoneSnap = null;
+  phoneRefresh();
+}
+
+/** The phone stopped: no window sends its chats any more. */
+function clearPhoneTarget(): void {
+  const cur = phoneWin();
+  if (cur) send(cur, { type: 'phone:target', on: false });
+  phoneTarget = undefined;
+  phoneSnap = null;
+}
+
 const phoneRepos: PhoneRepos = {
   list: async () => {
-    const open = phoneOwner?.workspace?.root;
+    const open = phoneWin()?.workspace?.root;
     return mapLimit(findRepos(), 8, (p) => repoView(p, p === open));
   },
   pull: async (path) => runUntrustedGit(['pull', '--ff-only'], knownRepo(path), 300_000),
-  open: async (path) => {
-    if (!phoneOwner) throw new Error('No hay ninguna ventana conectada al celular.');
-    if (!(await openFolder(phoneOwner, knownRepo(path))))
-      throw new Error('No se pudo abrir la carpeta.');
+  open: async (path, newWindow) => {
+    const target = phoneWin();
+    if (!target) throw new Error('No hay ninguna ventana conectada al celular.');
+    const abs = knownRepo(path);
+    // Already open somewhere: the phone just moves to that window.
+    const there = [...wins.values()].find((o) => o.workspace?.root === abs);
+    if (there) return setPhoneTarget(there);
+    if (newWindow) {
+      if (wins.size >= MAX_PHONE_WINDOWS)
+        throw new Error(`Ya hay ${wins.size} ventanas abiertas: cierra alguna en la computadora.`);
+      const w = await createWindow({ folder: abs, near: target });
+      if (!w.workspace) throw new Error('No se pudo abrir la carpeta.');
+      return setPhoneTarget(w);
+    }
+    if (!(await openFolder(target, abs))) throw new Error('No se pudo abrir la carpeta.');
   },
 };
+/** The connected models for the phone's model picker, and the app default it can change. */
+const phoneModels = {
+  list: async (): Promise<PhoneModels> => {
+    const [r, providers] = await Promise.all([ai.models(false), ai.providers()]);
+    const local = new Set(providers.filter((p) => p.local).map((p) => p.id));
+    const cfg = ai.core.config;
+    return {
+      models: r.models.slice(0, 1500).map((m) => ({
+        ref: `${m.provider}/${m.id}`,
+        provider: m.provider,
+        label: m.label ?? m.id,
+        local: local.has(m.provider),
+        tools: m.capabilities.tools === true,
+        vision: m.capabilities.vision === true,
+        reasoning: m.capabilities.reasoning === true,
+        context: m.context,
+        inputPrice: m.inputPrice,
+        outputPrice: m.outputPrice,
+      })),
+      defaultModel: cfg.defaultModel ?? null,
+      roles: { chat: cfg.roles.chat, agent: cfg.roles.agent, inline: cfg.roles.inline },
+      errors: r.errors,
+    };
+  },
+  setDefault: (ref: string): void => {
+    ai.setDefaultModel(ref);
+    for (const w of wins.values()) send(w, { type: 'settings:changed' });
+  },
+};
+/** Windows the phone may have open at once (each one runs its own editor, chats, browser). */
+const MAX_PHONE_WINDOWS = 12;
 /** How long the approval dialog waits before it counts as "no" (Cloudflare cuts at ~100 s). */
 const PAIR_APPROVAL_MS = 90_000;
 /**
@@ -254,7 +363,14 @@ async function approvePairing(req: PairRequest): Promise<boolean> {
   }
 }
 const phoneAction = (action: PhoneAction) => {
-  if (phoneOwner) send(phoneOwner, { type: 'phone', action });
+  if (!phoneOwner) return;
+  if (action.kind === 'window') {
+    const w = wins.get(action.id);
+    if (w && !w.win.isDestroyed()) setPhoneTarget(w);
+    return;
+  }
+  const w = phoneWin();
+  if (w) send(w, { type: 'phone', action });
 };
 const phone = new PhoneRemote(
   phoneAction,
@@ -264,6 +380,16 @@ const phone = new PhoneRemote(
   phoneRepos,
   approvePairing,
   () => join(app.getPath('userData'), 'pairing-guard.json'),
+  phoneModels,
+  {
+    // Paired phones and the link survive a restart (same link, no new pairing).
+    file: () => join(app.getPath('userData'), 'phone-remote.json'),
+    seal: (plain) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('no safeStorage');
+      return safeStorage.encryptString(plain).toString('base64');
+    },
+    open: (sealed) => safeStorage.decryptString(Buffer.from(sealed, 'base64')),
+  },
 );
 /** Telegram / Discord bots: the same remote control, from those apps (see bots.ts). */
 const bots = new ChatBots({
@@ -294,6 +420,7 @@ bots.plug({
 });
 /** Stops the phone remote and the bots that ride on it. */
 function stopPhone(): void {
+  clearPhoneTarget();
   bots.detach();
   phone.stop();
   for (const w of wins.values()) send(w, { type: 'whatsapp:status', status: whatsapp.status() });
@@ -378,6 +505,10 @@ const PhoneSnapshot = z.object({
     .max(200),
   chatId: id200,
   agent: z.boolean(),
+  mode: z.enum(['ask', 'plan', 'agent', 'auto', 'full']).optional(),
+  model: z.string().max(300).nullable().optional(),
+  shownModel: z.string().max(300).nullable().optional(),
+  queued: z.number().int().nonnegative().max(10_000).optional(),
   busy: z.boolean(),
   turns: z
     .array(
@@ -385,6 +516,7 @@ const PhoneSnapshot = z.object({
         role: z.enum(['user', 'assistant']),
         text: z.string().max(100_000),
         error: z.string().max(5000).optional(),
+        model: z.string().max(300).optional(),
         tools: z
           .array(z.object({ id: id200, title: z.string().max(500), status: toolState }))
           .max(200),
@@ -392,6 +524,7 @@ const PhoneSnapshot = z.object({
     )
     .max(100),
 });
+type PhoneSnapshotData = z.infer<typeof PhoneSnapshot>;
 
 // ---------------- desktop state (last folder, theme) ----------------
 
@@ -451,8 +584,21 @@ function upgrade(w: Win | undefined, feature: string): void {
 /** Conversations whose agent run the last shutdown cut, until the first window asks. */
 let interruptedRuns: string[] = [];
 
+/** Login item reasons: a chat to resume (opens the window), the permanent bridge (hidden). */
+const loginWants = { resume: false, background: false };
+/** Started at login only for the bridge: no window, just the tray. */
+const BACKGROUND_ARG = '--background';
+
 function resumeOnLogin(on: boolean): void {
+  loginWants.resume = on;
+  applyLoginItem();
+}
+
+function applyLoginItem(): void {
   if (!app.isPackaged) return;
+  const on = loginWants.resume || loginWants.background;
+  // A chat to continue needs the window; the bridge alone starts out of sight.
+  const args = loginWants.resume ? [] : [BACKGROUND_ARG];
   try {
     if (process.platform === 'linux') {
       const file = join(homedir(), '.config', 'autostart', 'zinarix-studio-resume.desktop');
@@ -465,11 +611,12 @@ function resumeOnLogin(on: boolean): void {
       writeFileSync(
         file,
         '[Desktop Entry]\nType=Application\n' +
-          `Name=${APP_NAME}\nExec="${exec.replace(/"/g, '\\"')}"\n` +
+          `Name=${APP_NAME}\nExec="${exec.replace(/"/g, '\\"')}"${args.map((a) => ` ${a}`).join('')}\n` +
           'X-GNOME-Autostart-enabled=true\nNoDisplay=true\n',
       );
     } else {
-      app.setLoginItemSettings({ openAtLogin: on });
+      // args: Windows only (macOS opens with its window).
+      app.setLoginItemSettings({ openAtLogin: on, args });
     }
   } catch {
     // not allowed here: the task still goes on the next time the app is opened by hand
@@ -564,6 +711,7 @@ async function openFolder(w: Win, path: string): Promise<WorkspaceInfo | null> {
   const info = await workspace.info();
   if (!w.win.isDestroyed()) w.win.setTitle(`${info.name} — ${APP_NAME}`);
   send(w, { type: 'workspace', workspace: info });
+  phoneRefresh();
   return info;
 }
 
@@ -2241,9 +2389,11 @@ function registerIpc(): void {
   });
   handle('app:installUpdate', z.tuple([]), () => updates?.install());
 
-  handle('phone:status', z.tuple([]), (w) =>
-    phoneOwner === w ? phone.status() : { running: false, phones: 0 },
-  );
+  handle('phone:status', z.tuple([]), (w) => {
+    // A reloaded window learns again that the phone works on it.
+    if (phoneOwner && phoneWin() === w) send(w, { type: 'phone:target', on: true });
+    return phoneOwner === w ? phone.status() : { running: false, phones: 0 };
+  });
   handle('phone:start', z.tuple([]), async (w) => {
     // One window at a time: starting it here takes it from the other one.
     if (phoneOwner && phoneOwner !== w) {
@@ -2253,7 +2403,15 @@ function registerIpc(): void {
     phoneOwner = w;
     try {
       const status = await phone.start();
-      if (status.running) bots.attach();
+      // Access from anywhere was on last time: it opens again with the same link.
+      if (status.running && phone.wanted().remote && !status.remote)
+        void phone.setRemote(true, false).then((st) => {
+          if (phoneOwner) send(phoneOwner, { type: 'phone:status', status: st });
+        });
+      if (status.running) {
+        bots.attach();
+        setPhoneTarget(w);
+      }
       for (const o of wins.values())
         send(o, { type: 'whatsapp:status', status: whatsapp.status() });
       return status;
@@ -2264,18 +2422,64 @@ function registerIpc(): void {
   });
   handle('phone:stop', z.tuple([]), (w) => {
     if (phoneOwner !== w) return { running: false, phones: 0 };
+    clearPhoneTarget();
     phoneOwner = undefined;
     bots.detach();
-    const status = phone.stop();
+    const status = phone.stop(true);
     for (const o of wins.values()) send(o, { type: 'whatsapp:status', status: whatsapp.status() });
     return status;
   });
   handle('phone:remote', z.tuple([z.boolean()]), (w, on) =>
     phoneOwner === w ? phone.setRemote(on) : { running: false, phones: 0 },
   );
+  // A window opened: the remote comes back on by itself if it was on when Zinarix closed.
+  handle('phone:resume', z.tuple([]), async (w) => {
+    if (phoneOwner) return phoneOwner === w ? phone.status() : { running: false, phones: 0 };
+    if (!phone.wanted().enabled) return { running: false, phones: 0 };
+    phoneOwner = w;
+    try {
+      const status = await phone.start();
+      if (!status.running) {
+        phoneOwner = undefined;
+        return status;
+      }
+      bots.attach();
+      setPhoneTarget(w);
+      for (const o of wins.values())
+        send(o, { type: 'whatsapp:status', status: whatsapp.status() });
+      if (phone.wanted().remote)
+        void phone.setRemote(true, false).then((st) => {
+          if (phoneOwner) send(phoneOwner, { type: 'phone:status', status: st });
+        });
+      return status;
+    } catch (e) {
+      phoneOwner = undefined;
+      return { running: false, phones: 0, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+  handle('phone:forget', z.tuple([z.string().max(64).nullable()]), (w, id) => {
+    const status = phone.forget(id);
+    return phoneOwner === w || !phoneOwner ? status : { running: false, phones: 0 };
+  });
+  handle(
+    'phone:fixed',
+    z.tuple([z.object({ host: z.string().max(255), token: z.string().max(4000) }).nullable()]),
+    async (w, tunnel) => {
+      try {
+        const status = await phone.setFixed(tunnel);
+        return phoneOwner === w || !phoneOwner ? status : { running: false, phones: 0 };
+      } catch (e) {
+        return {
+          ...(phoneOwner === w ? phone.status() : { running: false, phones: 0 }),
+          error: e instanceof Error ? e.message : String(e),
+        };
+      }
+    },
+  );
   handle('phone:push', z.tuple([PhoneSnapshot]), (w, snapshot) => {
-    if (phoneOwner !== w) return;
-    phone.push(snapshot);
+    if (!phoneOwner || phoneWin() !== w) return;
+    phoneSnap = snapshot;
+    phone.push({ ...snapshot, windows: phoneWindows(), todayUsd: ai.todayUsd() });
     bots.push(snapshot);
   });
   const botKind = z.enum(['telegram', 'discord']) satisfies z.ZodType<BotKind>;
@@ -2743,7 +2947,7 @@ function registerVideoAgentIpc(): void {
 /** Fase 14: 3D scenes to video (viewer frames, Blender), and .z3d scene files. */
 function registerScene3dIpc(): void {
   // 3D Pro: Blender's AI add-on uses the models connected here through a local bridge.
-  const bridge = new BlenderBridge({
+  const bridgeDeps: BridgeDeps = {
     models: async () =>
       (await ai.models(false)).models.map((m) => ({
         id: `${m.provider}/${m.id}`,
@@ -2768,12 +2972,93 @@ function registerScene3dIpc(): void {
         throw new Error(describeError(e).message);
       }
     },
+  };
+  // Permanent bridge: fixed port and token, opened with the app and announced in
+  // ~/.zinarix/blender-bridge.json so any Blender with the add-on finds it. Off: it opens
+  // only for "Modo Pro", on a random port, and Blender gets it in its environment.
+  const bridgeStore = new BridgeStore(app.getPath('userData'));
+  let bridgeCfg = bridgeStore.load();
+  // Tasks left on the bridge (POST /v1/jobs): saved to disk, they go on with the window
+  // closed and continue after a shutdown, the next time Zinarix opens.
+  const bridgeJobs = new BridgeJobQueue(app.getPath('userData'), bridgeDeps);
+  bridgeJobs.onChange = () => updateTray();
+  bridgeJobs.start();
+  const makeBridge = () =>
+    new BlenderBridge(
+      bridgeDeps,
+      // Web origins are read live, so editing the list needs no restart.
+      bridgeCfg.permanent
+        ? {
+            port: bridgeCfg.port,
+            token: bridgeCfg.token,
+            origins: () => bridgeCfg.origins,
+            jobs: bridgeJobs,
+          }
+        : {},
+    );
+  let bridge = makeBridge();
+  const openPermanent = async () => {
+    const info = await bridge.start();
+    bridgeStore.publish(info);
+    return info;
+  };
+  // The token goes to the app's own UI only, so the user can paste it into a web app.
+  const bridgeState = () => ({
+    permanent: bridgeCfg.permanent,
+    url: bridge.info?.url ?? null,
+    token: bridgeCfg.permanent && bridge.info ? bridgeCfg.token : null,
+    origins: bridgeCfg.origins,
   });
-  app.on('will-quit', () => void bridge.close());
+  // On: Zinarix stays in the tray when its windows close and opens (hidden) at login, so
+  // Blender and web apps keep the bridge and the tasks left on it keep running.
+  background = {
+    on: () => bridgeCfg.permanent || bridgeJobs.pending > 0,
+    url: () => bridge.info?.url ?? null,
+    pending: () => bridgeJobs.pending,
+    stop: () => bridgeJobs.stop(),
+  };
+  const syncBackground = () => {
+    loginWants.background = bridgeCfg.permanent;
+    applyLoginItem();
+    updateTray();
+  };
+  syncBackground();
+  if (bridgeCfg.permanent)
+    void openPermanent()
+      .then(() => updateTray())
+      .catch((e) => console.warn('[3d-pro] permanent bridge:', e));
+  app.on('will-quit', () => {
+    bridgeJobs.stop();
+    bridgeStore.unpublish();
+    void bridge.close();
+  });
+  handle('scene3d:bridge', z.tuple([]), async () => bridgeState());
+  handle('scene3d:setBridge', z.tuple([z.boolean()]), async (_w, on) => {
+    if (on !== bridgeCfg.permanent) {
+      bridgeStore.unpublish();
+      await bridge.close();
+      // Turning it off retires the token: Blenders that read the old file can no longer use it.
+      bridgeCfg = { ...bridgeCfg, permanent: on, ...(on ? {} : { token: newBridgeToken() }) };
+      bridgeStore.save(bridgeCfg);
+      bridge = makeBridge();
+    }
+    if (on) await openPermanent();
+    syncBackground();
+    return bridgeState();
+  });
+  handle(
+    'scene3d:setBridgeOrigins',
+    z.tuple([z.array(z.string().max(500)).max(MAX_ORIGINS * 2)]),
+    async (_w, list) => {
+      bridgeCfg = { ...bridgeCfg, origins: cleanOrigins(list) };
+      bridgeStore.save(bridgeCfg);
+      return bridgeState();
+    },
+  );
   const svc = new Scene3DService(
     app.getPath('userData'),
     () => videoService().tools().ffmpeg,
-    () => bridge.start(),
+    () => (bridgeCfg.permanent ? openPermanent() : bridge.start()),
   );
   ai.agent.scene3d = svc;
   const id = z.string().uuid();
@@ -3585,11 +3870,30 @@ async function createWindow(
     }
     w.workspace?.dispose();
     for (const f of w.chatFolders.values()) f.dispose();
-    if (phoneOwner === w) {
-      phoneOwner = undefined;
-      stopPhone();
-    }
     wins.delete(w.id);
+    if (phoneOwner === w) {
+      // Another window stays open: the phone keeps working, now through that one.
+      const next = [...wins.values()].find((o) => !o.win.isDestroyed());
+      if (next) {
+        phoneOwner = next;
+        send(next, { type: 'phone:status', status: phone.status() });
+        // It was working on the closed window: now on this one (another target stays).
+        if (!phoneTarget || phoneTarget === w) {
+          phoneTarget = undefined;
+          phoneSnap = null;
+          setPhoneTarget(next);
+        }
+      } else {
+        stopPhone();
+        phoneOwner = undefined;
+      }
+    }
+    // The phone was working on this window: it goes back to the one that started it.
+    if (phoneOwner && phoneTarget === w) {
+      phoneTarget = undefined;
+      phoneSnap = null;
+      setPhoneTarget(phoneOwner);
+    } else phoneRefresh();
   });
   await win
     .loadURL(`app://zinarix/index.html${opts.restore ? '?restore=1' : ''}`)
@@ -3734,7 +4038,11 @@ app.whenReady().then(async () => {
   buildMenu();
   // Start empty unless a folder is passed explicitly: the user drops or picks one.
   const initial = folderFromArgv(process.argv) ?? process.env.OMNI_OPEN_FOLDER;
-  await createWindow({ folder: initial, restore: true });
+  // Opened at login for the bridge only: stay in the tray (a chat to resume needs a window).
+  const hidden =
+    process.argv.includes(BACKGROUND_ARG) && background.on() && !interruptedRuns.length && !initial;
+  if (hidden) updateTray();
+  else await createWindow({ folder: initial, restore: true });
   // WhatsApp control left on: its page opens out of sight and keeps listening.
   whatsapp.resume();
   // Installed copies update themselves from the GitHub releases (silently when offline).
@@ -3747,6 +4055,19 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  terminals.killAll();
+  video?.dispose();
+  // Permanent bridge (or tasks left on it): keep serving from the tray, the models stay up.
+  if (background.on()) {
+    updateTray();
+    return;
+  }
+  quitFully();
+});
+
+/** Stops every service and quits (last window closed, or "Salir" in the tray). */
+function quitFully(): void {
+  background.stop();
   watcher?.stop();
   mcp?.shutdown();
   stopPhone();
@@ -3754,8 +4075,79 @@ app.on('window-all-closed', () => {
   terminals.killAll();
   video?.dispose();
   ai?.close();
+  tray?.destroy();
+  tray = null;
   app.quit();
-});
+}
+
+/** What the tray needs from the bridge (set in registerScene3dIpc). */
+let background: {
+  on(): boolean;
+  url(): string | null;
+  pending(): number;
+  /** Puts the running task back in the queue (before the models close). */
+  stop(): void;
+} = {
+  stop: () => undefined,
+  on: () => false,
+  url: () => null,
+  pending: () => 0,
+};
+let tray: Tray | null = null;
+
+/** Opens a window again from the tray (or shows the one that is open). */
+function showFromTray(): void {
+  const w = focused() ?? [...wins.values()][0];
+  if (!w) return void createWindow({ restore: true });
+  if (w.win.isMinimized()) w.win.restore();
+  w.win.show();
+  w.win.focus();
+}
+
+/** The tray icon, while Zinarix works in the background for the bridge. */
+function updateTray(): void {
+  if (!app.isReady()) return;
+  if (!background.on()) {
+    tray?.destroy();
+    tray = null;
+    return;
+  }
+  if (!tray) {
+    const ico = join(appRoot, 'build', 'icon.ico');
+    const file = process.platform === 'win32' && existsSync(ico) ? ico : iconPath();
+    let img = file ? nativeImage.createFromPath(file) : nativeImage.createEmpty();
+    if (!img.isEmpty() && process.platform !== 'win32') img = img.resize({ width: 18, height: 18 });
+    tray = new Tray(img);
+    tray.on('click', showFromTray);
+    // Installed copies have no build/ folder: the executable's own icon then.
+    if (img.isEmpty())
+      void app
+        .getFileIcon(process.execPath, { size: 'small' })
+        .then((i) => tray?.setImage(i))
+        .catch(() => undefined);
+  }
+  const url = background.url();
+  const pending = background.pending();
+  const status = url ? `Puente activo · ${url}` : 'Puente cerrado';
+  const tasks = pending ? `${pending} tarea(s) en cola` : 'Sin tareas en cola';
+  tray.setToolTip(`${APP_NAME} — ${status} — ${tasks}`);
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: status, enabled: false },
+      { label: tasks, enabled: false },
+      { type: 'separator' },
+      { label: `Abrir ${APP_NAME}`, click: showFromTray },
+      {
+        label: 'Salir del todo (cierra el puente)',
+        click: () => {
+          // Tasks still waiting stay saved: they continue the next time Zinarix opens.
+          if (!wins.size) quitFully();
+          else app.quit();
+        },
+      },
+    ]),
+  );
+}
 
 app.on('activate', () => {
   if (!wins.size) void createWindow({ restore: true });

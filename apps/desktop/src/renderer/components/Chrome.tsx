@@ -5,6 +5,7 @@ import { SpaceSwitcher } from '../layout/SpaceSwitcher';
 import { t } from '../i18n';
 import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
+import { BridgeStatus } from './BridgeStatus';
 import { tv } from './video/strings';
 import { td } from '../i18nDebug';
 import { tp } from '../i18nPlayground';
@@ -391,6 +392,7 @@ export function StatusBar() {
           <Icon name="lock" size={13} /> {t('localOnly')}
         </span>
       )}
+      <BridgeStatus />
       <span
         className="status-item model"
         title={t('pickModel')}

@@ -109,13 +109,20 @@ export class Tunnel {
     port: number,
     onProgress: (msg: string) => void,
     onExit: (error: string) => void,
+    /** A tunnel of the user's Cloudflare account: always the same address (see PhoneRemote). */
+    fixed?: { host: string; token: string },
   ): Promise<string> {
     this.stop();
     const bin = await binary(onProgress);
     onProgress('Abriendo la conexión segura…');
-    const proc = spawn(bin, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`], {
+    // The token goes in the environment, not the command line (other programs can read that).
+    const args = fixed
+      ? ['tunnel', '--no-autoupdate', 'run']
+      : ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`];
+    const proc = spawn(bin, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      env: fixed ? { ...process.env, TUNNEL_TOKEN: fixed.token } : process.env,
     });
     this.proc = proc;
     return await new Promise<string>((ok, fail) => {
@@ -129,7 +136,9 @@ export class Tunnel {
       const read = (chunk: Buffer) => {
         if (found) return;
         log = (log + chunk.toString('utf8')).slice(-4000);
-        url ||= /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(log)?.[0] ?? '';
+        url ||= fixed
+          ? `https://${fixed.host}`
+          : (/https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(log)?.[0] ?? '');
         // The address is printed before Cloudflare can route it: opened that early, the phone
         // gets an error (and may remember the name as missing). Wait for the first connection.
         if (url && /Registered tunnel connection/.test(log)) {
@@ -149,7 +158,14 @@ export class Tunnel {
         clearTimeout(timer);
         const mine = this.proc === proc;
         if (mine) this.proc = null;
-        if (!found) fail(new Error('No se pudo abrir la conexión a distancia.'));
+        if (!found)
+          fail(
+            new Error(
+              fixed && /Unauthorized|invalid|token/i.test(log)
+                ? 'Cloudflare rechazó el token del túnel: cópialo otra vez del panel de Cloudflare.'
+                : 'No se pudo abrir la conexión a distancia.',
+            ),
+          );
         else if (mine) onExit('Se cerró la conexión a distancia.');
       });
     });

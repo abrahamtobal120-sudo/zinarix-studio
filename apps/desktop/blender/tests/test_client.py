@@ -28,6 +28,12 @@ _spec.loader.exec_module(client)
 
 TOKEN = "zx-secret-token-1234567890"
 
+# Never read the real permanent-bridge file of this PC (~/.zinarix/blender-bridge.json).
+import tempfile  # noqa: E402
+
+_TMP = tempfile.mkdtemp(prefix="zx-bridge-test-")
+os.environ["ZINARIX_BRIDGE_FILE"] = os.path.join(_TMP, "missing.json")
+
 
 class _Handler(http.server.BaseHTTPRequestHandler):
     # Set per test: list of (status, body) or callables, consumed in order.
@@ -391,6 +397,119 @@ class TestListModels(StubServerCase):
         _Handler.script = [(200, {"weird": True})]
         with self.assertRaises(client.ClientError):
             client.list_models({"provider": "ZINARIX"})
+
+
+class TestPermanentBridgeFile(unittest.TestCase):
+    """Without Zinarix's environment the add-on finds the permanent bridge in its file."""
+
+    def _file(self, data):
+        path = os.path.join(_TMP, "bridge-{:d}.json".format(id(data)))
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(data if isinstance(data, str) else json.dumps(data))
+        return mock.patch.dict(os.environ, {
+            "ZINARIX_BRIDGE_FILE": path, "ZINARIX_BRIDGE_URL": "", "ZINARIX_BRIDGE_TOKEN": "",
+        })
+
+    def test_reads_url_and_token(self):
+        with self._file({"url": "http://127.0.0.1:47815/v1", "token": TOKEN, "pid": 1}):
+            self.assertEqual(client.bridge_endpoint(), ("http://127.0.0.1:47815/v1", TOKEN))
+            self.assertTrue(client.bridge_available())
+            self.assertEqual(client.resolve_base_url("ZINARIX"), "http://127.0.0.1:47815/v1")
+            self.assertEqual(client.resolve_api_key("ZINARIX"), TOKEN)
+            url, headers, _ = client.build_request(
+                "ZINARIX", base_url="", model="", api_key="", system="s",
+                messages=[{"role": "user", "content": "hi"}], max_tokens=10,
+            )
+            self.assertEqual(url, "http://127.0.0.1:47815/v1/chat/completions")
+            self.assertEqual(headers.get("authorization"), "Bearer " + TOKEN)
+
+    def test_environment_wins(self):
+        with self._file({"url": "http://127.0.0.1:47815/v1", "token": "file-token"}):
+            env = {"ZINARIX_BRIDGE_URL": "http://127.0.0.1:5/v1", "ZINARIX_BRIDGE_TOKEN": TOKEN}
+            with mock.patch.dict(os.environ, env):
+                self.assertEqual(client.bridge_endpoint(), ("http://127.0.0.1:5/v1", TOKEN))
+                self.assertEqual(client.resolve_api_key("ZINARIX"), TOKEN)
+
+    def test_ignores_remote_or_broken_files(self):
+        for data in ({"url": "http://evil.example/v1", "token": TOKEN}, "{not json", [1, 2], {"url": 3}):
+            with self._file(data):
+                self.assertEqual(client.bridge_endpoint(), ("", ""))
+                self.assertFalse(client.bridge_available())
+                self.assertEqual(client.resolve_api_key("ZINARIX"), "")
+
+    def test_missing_file(self):
+        with mock.patch.dict(os.environ, {
+            "ZINARIX_BRIDGE_FILE": os.path.join(_TMP, "nope.json"), "ZINARIX_BRIDGE_URL": "",
+        }):
+            self.assertEqual(client.bridge_endpoint(), ("", ""))
+
+
+class _JobsHandler(http.server.BaseHTTPRequestHandler):
+    """A fake permanent bridge with one task."""
+
+    seen = []
+
+    def log_message(self, *args):
+        pass
+
+    def _send(self, status, body):
+        data = json.dumps(body).encode("utf-8")
+        self.send_response(status)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+        type(self).seen.append((self.path, self.headers.get("authorization"), body))
+        self._send(202, {"id": "job_1", "object": "bridge.job", "status": "queued"})
+
+    def do_GET(self):
+        if self.path != "/v1/jobs/job_1":
+            return self._send(404, {"error": {"message": "Unknown job."}})
+        self._send(200, {
+            "id": "job_1", "status": "done",
+            "completion": {"choices": [{"message": {"role": "assistant", "content": "listo"}}]},
+        })
+
+
+class JobsTest(unittest.TestCase):
+    def setUp(self):
+        _JobsHandler.seen = []
+        self.server = http.server.HTTPServer(("127.0.0.1", 0), _JobsHandler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        port = self.server.server_address[1]
+        env = {
+            client.BRIDGE_URL_ENV: "http://127.0.0.1:{:d}/v1".format(port),
+            client.BRIDGE_TOKEN_ENV: TOKEN,
+        }
+        self.env = mock.patch.dict(os.environ, env)
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.server.shutdown()
+        self.server.server_close()
+
+    def test_submit_and_read(self):
+        job = client.submit_job([{"role": "user", "content": "hola"}], system="s", title="t")
+        self.assertEqual(job, "job_1")
+        path, auth, body = _JobsHandler.seen[0]
+        self.assertEqual(path, "/v1/jobs")
+        self.assertEqual(auth, "Bearer " + TOKEN)
+        self.assertEqual(body["title"], "t")
+        self.assertEqual(body["messages"][0], {"role": "system", "content": "s"})
+        self.assertEqual(client.get_job("job_1"), ("done", "listo", ""))
+
+    def test_unknown_job(self):
+        with self.assertRaises(client.ClientError):
+            client.get_job("job_nope")
+
+    def test_no_bridge(self):
+        with mock.patch.dict(os.environ, {client.BRIDGE_URL_ENV: "", client.BRIDGE_FILE_ENV: os.devnull}):
+            with self.assertRaises(client.ClientError):
+                client.submit_job([{"role": "user", "content": "x"}])
 
 
 if __name__ == "__main__":

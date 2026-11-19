@@ -23,3 +23,6 @@ google-oauth.local.json
 # Code - OSS descargado; se reproduce con code:prepare.
 vendor/
 apps/desktop/release-*/
+CALAVES*
+*.license
+licencia*.txt

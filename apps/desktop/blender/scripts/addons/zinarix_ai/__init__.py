@@ -104,7 +104,10 @@ def _lang():
 
 
 def _bridge_env():
-    return bool(os.environ.get("ZINARIX_BRIDGE_URL"))
+    """A bridge URL from Zinarix Studio: its environment or the permanent bridge's file."""
+    if os.environ.get("ZINARIX_BRIDGE_URL"):
+        return True
+    return bool(hasattr(client, "bridge_endpoint") and client.bridge_endpoint()[0])
 
 
 def _default_provider():

@@ -138,6 +138,10 @@
     opacity: 0.5;
     cursor: default;
   }
+  .s3-btn.s3-on {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
   .s3-primary {
     background: var(--accent);
     border-color: var(--accent);

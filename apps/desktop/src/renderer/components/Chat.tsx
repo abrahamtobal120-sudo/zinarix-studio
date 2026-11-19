@@ -321,6 +321,7 @@ function phoneTurns(turns: Turn[]): PhoneSnapshot['turns'] {
       role: x.role,
       text: text.length > PHONE_TEXT ? '…' + text.slice(-PHONE_TEXT) : text,
       ...(x.error ? { error: x.error.slice(0, 2000) } : {}),
+      ...(x.role === 'assistant' && x.model ? { model: x.model.slice(0, 300) } : {}),
       tools: (x.parts ?? [])
         .filter((p): p is ToolStep => p.kind === 'tool')
         .slice(-60)
@@ -334,15 +335,26 @@ function phoneTurns(turns: Turn[]): PhoneSnapshot['turns'] {
 }
 
 let phoneTimer: ReturnType<typeof setTimeout> | undefined;
+/** The phone works on this window (main says so; it can switch between windows). */
+let phoneLinked = false;
+export function setPhoneTarget(on: boolean): void {
+  phoneLinked = on;
+  if (on) pushToPhone();
+}
 /** Sends the phone what the controlled chat looks like now (a few times a second at most). */
 export function pushToPhone(): void {
-  if (!getState().phone.running || phoneTimer) return;
+  if (!phoneLinked || phoneTimer) return;
   phoneTimer = setTimeout(() => {
     phoneTimer = undefined;
     const s = getState();
-    if (!s.phone.running) return;
+    if (!phoneLinked) return;
     const id = focusedChat();
     const h = handles.get(id);
+    const tab = chatTab(id);
+    const mode: ChatMode = tab ? modeFrom(tab.mode, tab.agent) : 'agent';
+    const own = tab?.model ?? null;
+    const shown =
+      own ?? (usesAgent(mode) ? s.settings.roles.agent : undefined) ?? s.settings.defaultModel;
     void api()
       .phone.push({
         chats: s.chats.map((c, i) => ({
@@ -352,7 +364,11 @@ export function pushToPhone(): void {
           waiting: c.waiting,
         })),
         chatId: id,
-        agent: chatTab(id)?.agent ?? true,
+        agent: tab?.agent ?? true,
+        mode,
+        model: own,
+        shownModel: shown ?? null,
+        queued: tab?.queued.length ?? 0,
         busy: h?.busy() ?? false,
         turns: h?.view() ?? [],
       })
@@ -389,6 +405,27 @@ export function runPhoneAction(a: PhoneAction): void {
         updateChat(id, { agent: a.on });
         saveAgentMode(a.on);
       }
+      break;
+    case 'mode':
+      if (chatTab(id)) {
+        updateChat(id, { mode: a.mode });
+        saveChatMode(a.mode);
+      }
+      break;
+    case 'model':
+      if (chatTab(id)) updateChat(id, { model: a.ref });
+      break;
+    case 'closeChat':
+      if (getState().chats.some((c) => c.id === a.chatId)) {
+        // The phone already asked "are you sure": no dialog on the computer.
+        const busy = handles.get(a.chatId);
+        if (busy?.busy()) busy.abort();
+        if (getState().chatHistoryFor === a.chatId) setState({ chatHistoryFor: null });
+        closeChat(a.chatId);
+      }
+      break;
+    case 'clearQueue':
+      if (chatTab(id)) updateChat(id, { queued: [] });
       break;
   }
   pushToPhone();
@@ -3580,9 +3617,10 @@ export function ChatPanel() {
   const focusedId = focus === 1 && split ? split : activeChat;
   const strip = useRef<HTMLDivElement>(null);
   const phoneOn = useStore((s) => s.phone.running);
+  const appSettings = useStore((s) => s.settings);
   useEffect(() => {
     if (phoneOn) pushToPhone();
-  }, [phoneOn, chats, focusedId]);
+  }, [phoneOn, chats, focusedId, appSettings]);
 
   /** Tab that holds the keyboard focus stop (← / → move it; Enter shows that chat). */
   const [rove, setRove] = useState<string | null>(null);
