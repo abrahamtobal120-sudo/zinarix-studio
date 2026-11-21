@@ -26,3 +26,6 @@ apps/desktop/release-*/
 CALAVES*
 *.license
 licencia*.txt
+
+# Copia local del código fuente de Blender (no es parte del proyecto)
+/blender/
