@@ -57,6 +57,19 @@ El modo agente deja que la IA trabaje en tu proyecto: lee y busca archivos, edit
 - Una IA puede pedirle a otra que haga una tarea (delegar), siempre con tu permiso.
 - Sin modo agente, el chat es simple: la IA solo ve lo que adjuntas.
 
+## Controlar la compu (que la IA use tu computadora entera)
+
+Con el modo agente activo, el botón **Compu** (ícono de monitor, junto a "Razonar") le da a la IA el control de toda tu computadora: ve tu pantalla y usa el mouse y el teclado en cualquier programa (Excel, ajustes de Windows, otras apps).
+- Al encenderlo te pide confirmar. Luego el botón dice **"Controla la compu"** en color ámbar.
+- Mientras está encendido, la IA no pide permiso en cada clic. Los atajos delicados (cerrar programas con Alt+F4, borrar sin papelera, bloquear la sesión) sí se preguntan.
+- Cuando la IA empieza a mover el mouse, Zinarix se minimiza y arriba aparece una barra: **"Zinarix está controlando tu compu"**, con el paso en que va y los botones **Pausar**, **Ver chat** y **Detener**.
+- Para pausarla: botón **Pausar**, o simplemente mueve el mouse: la IA se detiene hasta que pulses **Continuar**, y después vuelve a mirar la pantalla antes de seguir. **Ver chat** también la pausa.
+- Para pararla: botón **Detener** de la barra, el atajo **Ctrl+Alt+Esc** (desde cualquier programa), el botón de parar del chat, o mover el mouse a la esquina de arriba a la izquierda de la pantalla.
+- La IA puede abrir programas por su nombre, páginas web y páginas de Configuración de Windows directamente, cambiar a una ventana abierta y ver de cerca una parte de la pantalla para leer texto pequeño. No abre programas ni scripts por su ruta.
+- Si la IA necesita tu permiso o te hace una pregunta, la ventana de Zinarix vuelve sola.
+- Se enciende por chat y se apaga al cerrar Zinarix. Necesita un modelo que vea imágenes.
+- Sin el botón, la IA también puede usar la compu, pero pide permiso para ver la pantalla y para controlarla.
+
 ## Reglas del proyecto
 
 Puedes escribir instrucciones fijas para la IA en tu proyecto (estilo, convenciones). Ve a **IA > Editar reglas del proyecto**: se crea el archivo .zinarix/rules.md. También se usan AGENTS.md o CLAUDE.md. Se activa o desactiva en **Ajustes > Inteligencia artificial > Reglas del proyecto**.
@@ -99,6 +112,8 @@ Abre los ajustes con **Archivo > Ajustes…** (Ctrl+,) o el icono de engranaje a
 **Ajustes > Apariencia > Idioma**, o en la Paleta de comandos (Ctrl+Shift+P) busca "Idioma". La ventana se recarga. Hay español e inglés.
 
 ## Atajos de teclado
+
+Los más usados: guardar **Ctrl+S**, abrir carpeta **Ctrl+O**, abrir archivo rápido **Ctrl+P**, buscar en el proyecto **Ctrl+Shift+F**, paleta de comandos **Ctrl+Shift+P**, editar con IA **Ctrl+K**, nueva ventana **Ctrl+Shift+N**, depurar **F5**.
 
 Ver todos: **Ayuda > Atajos de teclado**. Para cambiarlos: **Ajustes > Atajos de teclado**, haz clic en un atajo y presiona la nueva combinación (Esc cancela).
 

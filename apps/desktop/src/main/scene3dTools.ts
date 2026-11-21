@@ -144,7 +144,7 @@ export const SCENE3D_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        script: { type: 'string', description: 'The Python code' },
+        script: { type: 'string', description: 'The Python code (at most 20000 characters)' },
         name: { type: 'string' },
         fps: { type: 'integer', minimum: 12, maximum: 60 },
         transparent: {
@@ -215,6 +215,9 @@ export function gen3dRequestOf(a: Record<string, unknown>): Gen3DRequest {
   };
 }
 
+/** Longest blender_script accepted: the whole of it fits in the approval card. */
+export const MAX_SCRIPT = 20_000;
+
 /** null for scene3d_state (a read: no approval); the agent's gate takes null as "nothing to ask". */
 export function scene3dPreview(name: 'scene3d_state', a: Record<string, unknown>): null;
 export function scene3dPreview(name: string, a: Record<string, unknown>): SystemPreview;
@@ -252,12 +255,15 @@ export function scene3dPreview(name: string, a: Record<string, unknown>): System
   }
   if (name === 'blender_script') {
     const script = text(a, 'script');
+    const tooLong = script.length > MAX_SCRIPT;
     return {
       risk: 'high',
       action: 'ejecutar un script de Python en el motor Pro (Blender)',
-      warning:
-        'El script corre con tus permisos y puede leer o cambiar archivos fuera del proyecto. Léelo antes de aprobar. No recibe tus claves ni tokens.',
-      command: script.slice(0, 20_000),
+      warning: tooLong
+        ? `El script tiene ${script.length} caracteres y no cabe entero aquí (máximo ${MAX_SCRIPT}): no se ejecutará aunque lo apruebes.`
+        : 'El script corre con tus permisos: puede leer o cambiar cualquier archivo tuyo (también los de configuración de Zinarix, como el token del puente con Blender). Léelo entero antes de aprobar.',
+      // What is approved is what runs: a longer script is refused in runScene3dTool.
+      command: script.slice(0, MAX_SCRIPT),
     };
   }
   try {
@@ -307,6 +313,13 @@ export async function runScene3dTool(
     if (name === 'blender_script') {
       const script = text(a, 'script');
       if (!script) return { ok: false, content: 'The script is empty.', summary: 'sin script' };
+      // The approval card shows MAX_SCRIPT characters: nothing the user did not see may run.
+      if (script.length > MAX_SCRIPT)
+        return {
+          ok: false,
+          content: `The script is ${script.length} characters; the most is ${MAX_SCRIPT} (the user must be able to read all of it). Write a shorter one or split the work into several blender_script calls.`,
+          summary: 'script demasiado largo',
+        };
       const r = await svc.runScript(
         script,
         {

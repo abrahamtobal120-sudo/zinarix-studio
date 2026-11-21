@@ -80,6 +80,51 @@ import {
   runMediaTool,
 } from './mediaTools.js';
 import {
+  IMAGE_PROMPT_PART,
+  IMAGE_TOOL_NAMES,
+  IMAGE_TOOLS,
+  imagePreview,
+  runImageTool,
+  type ImageService,
+} from './imageTools.js';
+import {
+  NOTEBOOK_PROMPT_PART,
+  NOTEBOOK_TOOL_NAMES,
+  NOTEBOOK_TOOLS,
+  notebookPreview,
+  runNotebookTool,
+  type NotebookHost,
+} from './notebookTools.js';
+import {
+  GRAPHICS_PROMPT_PART,
+  GRAPHICS_READ_ONLY,
+  GRAPHICS_TOOL_NAMES,
+  GRAPHICS_TOOLS,
+  graphicsPreview,
+  runGraphicsTool,
+} from './graphicsTools.js';
+import type { Raster } from './svgRaster.js';
+import {
+  DOCKER_PROMPT_PART,
+  DOCKER_TOOL_NAMES,
+  DOCKER_TOOLS,
+  dockerPreview,
+  runDockerTool,
+} from './dockerTools.js';
+import type { DockerService } from './docker.js';
+import { PIO_PROMPT_PART, PIO_TOOL_NAMES, PIO_TOOLS, pioPreview, runPioTool } from './platformioTools.js';
+import type { PlatformioService } from './platformio.js';
+import { MOBILE_PROMPT_PART, MOBILE_TOOL_NAMES, MOBILE_TOOLS, mobilePreview, runMobileTool } from './mobileTools.js';
+import { GAME_PROMPT_PART, GAME_TOOL_NAMES, GAME_TOOLS, gamePreview, runGameTool } from './gameTools.js';
+import { CAD_PROMPT_PART, CAD_TOOL_NAMES, CAD_TOOLS, cadPreview, runCadTool } from './cadTools.js';
+import type { CadService } from './cad.js';
+import type { BlenderModelService } from './blenderModel.js';
+import type { SlicerService } from './slicer.js';
+import type { PrinterStore } from './printers.js';
+import type { GodotService } from './godot.js';
+import type { WebGameServers } from './webGame.js';
+import type { MobileService } from './mobile.js';
+import {
   VIDEO_PROMPT_PART,
   VIDEO_READ_ONLY,
   VIDEO_TOOL_NAMES,
@@ -97,6 +142,20 @@ import {
   type Scene3DUi,
 } from './scene3dTools.js';
 import type { Scene3DService } from './scene3d.js';
+import {
+  COMPUTER_PROMPT_PART,
+  COMPUTER_TOOL_NAMES,
+  COMPUTER_TOOLS,
+  computerLooksOnly,
+  computerPreview,
+  runComputerTool,
+  COMPUTER_SCREEN_KEY,
+  COMPUTER_CONTROL_KEY,
+  type ComputerRunHooks,
+  type ComputerService,
+  type ComputerShot,
+} from './computerTools.js';
+import { visionMode } from './chatImages.js';
 import type { Gen3DService } from './gen3d.js';
 import type { MediaService } from './media.js';
 import {
@@ -190,6 +249,7 @@ const ZINARIX_KNOWLEDGE = `About Zinarix Studio (the app you live in): you know 
 - Chat and Agent mode: plain chat answers questions; Agent mode (the "🤖 Agente" checkbox under the message box) reads the project, searches, edits files with a diff view and runs terminal commands. Every write and command needs the user's approval; file edits can be reverted during the session.
 - Several AIs at once: chats in tabs that work in parallel (switching tabs never pauses one), two chats side by side, each chat with its own model, "send in parallel" (Ctrl+Enter), several windows (Ctrl+Shift+N) each with its own folder, browser, terminals and chats. One AI can delegate a task to another (delegate_to_ai) with the user's approval, and any answer can be passed to another AI with one click.
 - Built-in browser (🌐 Navegador tab): an isolated browser the AI can drive (open, read, click, type), one tab per conversation, with per-site permission.
+- Computer control (Agent mode): the AI can see the whole screen and use the real mouse and keyboard in any program, like an operator ("abre Excel y…", "cambia este ajuste de Windows"). The user approves seeing the screen and controlling the computer (once or "always" for the chat), or turns on the "Compu" button (monitor icon, next to Razonar, Agent mode only) so it acts without asking each step: Zinarix minimizes and a bar with the current step and Pausar / Ver chat / Detener stays on top; moving the mouse pauses it until Continuar; Ctrl+Alt+Esc, Detener or the mouse in the top-left corner stops it. It can open programs by name, web pages and Windows settings pages, switch windows and zoom into the screen. Needs a model with vision; on macOS it needs the Accessibility and Screen Recording permissions, on Linux xdotool (X11).
 - Editor: Monaco editor, integrated terminal (Ctrl+Shift+L sends the terminal selection to the chat), global search, semantic search of the project, command palette, problems panel, run and debug panels, drag and drop of folders.
 - Git and GitHub: source control panel (changes with diffs, stage, commit with AI-generated message, history, branches, stash, pull/push) and GitHub through "gh": list, clone and open repos, publish a folder as a new repo.
 - Security center (defensive only): project audit (leaked secrets, insecure code, .env in git), vulnerable dependencies (osv.dev), computer review (ports, firewall, updates, SSH, encryption), nmap-style port scanner with UI for the local network (public targets require confirming authorization), website review (certificate, TLS, headers, cookies), file hash check.
@@ -235,8 +295,17 @@ You can inspect and change the project with tools:
 ${MAIL_PROMPT_PART}
 ${CLOUD_PROMPT_PART}
 ${MEDIA_PROMPT_PART}
+${IMAGE_PROMPT_PART}
+${NOTEBOOK_PROMPT_PART}
+${GRAPHICS_PROMPT_PART}
+${DOCKER_PROMPT_PART}
+${PIO_PROMPT_PART}
+${MOBILE_PROMPT_PART}
+${GAME_PROMPT_PART}
+${CAD_PROMPT_PART}
 ${SCENE3D_PROMPT_PART}
 ${VIDEO_PROMPT_PART}
+${COMPUTER_PROMPT_PART}
 - list_ai_models and delegate_to_ai: other AI models connected in Zinarix Studio can work for you as helpers (e.g. a second opinion, a cheaper model for a long chore, a model with a skill you lack). The user approves every delegation and every action the helper takes. Give the helper a complete, self-contained task; it does not see this conversation.
 ${SYSTEM_PROMPT_PART}
 ${SECURITY_PROMPT_PART}
@@ -436,8 +505,17 @@ export const TOOLS: ToolDefinition[] = [
   ...MAIL_TOOLS,
   ...CLOUD_TOOLS,
   ...MEDIA_TOOLS,
+  ...IMAGE_TOOLS,
+  ...NOTEBOOK_TOOLS,
+  ...GRAPHICS_TOOLS,
+  ...DOCKER_TOOLS,
+  ...PIO_TOOLS,
+  ...MOBILE_TOOLS,
+  ...GAME_TOOLS,
+  ...CAD_TOOLS,
   ...SCENE3D_TOOLS,
   ...VIDEO_TOOLS,
+  ...COMPUTER_TOOLS,
   ...SYSTEM_TOOLS,
   ...SECURITY_TOOLS,
 ];
@@ -557,7 +635,16 @@ const CLI_TOOL_NAMES = new Set([
   ...MAIL_TOOL_NAMES,
   ...CLOUD_TOOL_NAMES,
   ...MEDIA_TOOL_NAMES,
+  ...IMAGE_TOOL_NAMES,
+  ...NOTEBOOK_TOOL_NAMES,
+  ...GRAPHICS_TOOL_NAMES,
+  ...DOCKER_TOOL_NAMES,
+  ...PIO_TOOL_NAMES,
+  ...MOBILE_TOOL_NAMES,
+  ...GAME_TOOL_NAMES,
+  ...CAD_TOOL_NAMES,
   ...VIDEO_TOOL_NAMES,
+  ...COMPUTER_TOOL_NAMES,
   ...KNOWLEDGE_TOOL_NAMES,
   'list_ai_models',
   'delegate_to_ai',
@@ -578,6 +665,7 @@ const NO_FOLDER = new Set([
   'delegate_to_ai',
   'task',
   'use_skill',
+  ...COMPUTER_TOOL_NAMES,
   ...KNOWLEDGE_NO_FOLDER,
 ]);
 /** Browser actions that need approval once per site (by host). */
@@ -598,6 +686,7 @@ const READ_ONLY = new Set([
   ...CLOUD_READ_ONLY,
   ...KNOWLEDGE_READ_ONLY,
   ...VIDEO_READ_ONLY,
+  ...GRAPHICS_READ_ONLY,
 ]);
 
 /**
@@ -816,6 +905,8 @@ interface Session {
   messages: ChatMessage[];
   checkpoints: Checkpoint[];
   alwaysAllow: Set<string>;
+  /** The chat's "Controlar la compu" switch put the computer keys in alwaysAllow. */
+  computerMode?: boolean;
   /** Variables set with set_env_var (scope "session"), applied to run_command. */
   env: Record<string, string>;
   /** Models that refused native tools in this conversation (they use the text protocol). */
@@ -906,6 +997,8 @@ interface LoopOpts {
   mode?: AgentRunMode;
   /** Fase 3: waits for the user's answer to an ask_user question (null = no answer). */
   answer?: (toolCallId: string) => Promise<string[] | null>;
+  /** "Controlar la compu" is on: hooks around every computer_* action. */
+  computer?: ComputerRunHooks;
 }
 
 /** Separates a helper's session (and browser tab) from the conversation that asked for it. */
@@ -954,11 +1047,34 @@ export class Agent {
   knowledge?: Knowledge;
   /** Image / video / speech generation (generate_* tools, Fase 10). */
   media?: MediaService;
+  /** Fase 1A (plan de funciones): picture decoding / encoding for image_info / image_edit. */
+  images?: ImageService;
+  /** Fase 2A (plan de funciones): Jupyter kernels of a folder (notebook_* tools). */
+  notebooks?: NotebookHost;
+  /** Fase 3 (plan de funciones): SVG → PNG / JPEG for svg_render / svg_export. */
+  raster?: Raster;
+  /** Fase 2B (plan de funciones): the docker CLI (docker_* tools). */
+  docker?: DockerService;
+  /** Fase 5A (plan de funciones): PlatformIO (pio_* and serial_monitor tools). */
+  platformio?: PlatformioService;
+  /** Fase 5B (plan de funciones): phones and emulators (mobile_* tools). */
+  mobile?: MobileService;
+  /** Fase 6 (plan de funciones): Godot and web games (game_* / godot_* tools). */
+  games?: GodotService;
+  webGames?: WebGameServers;
+  /** Fase 7 (plan de funciones): CAD with OpenSCAD and structured Blender edits. */
+  cad?: CadService;
+  blenderModel?: BlenderModelService;
+  /** Fase 7 (mejora): slicing to G-code and the network 3D printers. */
+  slicer?: SlicerService;
+  printers?: PrinterStore;
   /** Fase 14: 3D renders (Blender and the encoder) and the window's viewer. */
   scene3d?: Scene3DService;
   scene3dUi?: Scene3DUi;
   /** Fase 13B: Video Studio in a window (video_* tools). */
   videoUi?: VideoUi;
+  /** Computer use: the user's screen, mouse and keyboard (computer_* tools). */
+  computer?: ComputerService;
   /** Fase 14: 3D models generated on Replicate (generate_3d_model). */
   gen3d?: Gen3DService;
   /** Hook sets approved "always" per project (Fase 4). */
@@ -1079,7 +1195,10 @@ export class Agent {
     mode?: AgentRunMode;
     /** Fase 3: the user's answer to an ask_user question; without it the agent goes on alone. */
     answer?: (toolCallId: string) => Promise<string[] | null>;
+    /** The chat's "Controlar la compu" switch is on (screen and control pre-approved). */
+    computer?: ComputerRunHooks;
   }): Promise<string> {
+    if (!opts.depth) this.computerSwitch(opts.conversationId, Boolean(opts.computer));
     // A message sent while the conversation works runs alongside, in a transcript of its own
     // (two runs in one transcript would interleave their tool calls and approvals).
     if (this.active.has(opts.conversationId)) return this.runAlongside(opts);
@@ -1182,6 +1301,24 @@ ${r.context}
       return loadKit(this.ws(opts), this.userKitRoot);
     } catch {
       return EMPTY_KIT;
+    }
+  }
+
+  /**
+   * The chat's "Controlar la compu" switch: on = seeing the screen and controlling the computer
+   * need no approval in this conversation (delicate shortcuts still ask: they have no key);
+   * off again = what the switch allowed is asked again.
+   */
+  private computerSwitch(conversationId: string, on: boolean): void {
+    const s = this.session(conversationId);
+    if (on) {
+      s.alwaysAllow.add(COMPUTER_SCREEN_KEY);
+      s.alwaysAllow.add(COMPUTER_CONTROL_KEY);
+      s.computerMode = true;
+    } else if (s.computerMode) {
+      s.alwaysAllow.delete(COMPUTER_SCREEN_KEY);
+      s.alwaysAllow.delete(COMPUTER_CONTROL_KEY);
+      s.computerMode = false;
     }
   }
 
@@ -1517,7 +1654,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
       }
 
       // Consecutive read-only calls run in parallel; anything else runs in order (approvals).
-      const results = new Map<string, { ok: boolean; content: string }>();
+      const results = new Map<string, ToolOut>();
       const offeredNames = new Set(offered.map((t) => t.name));
       const exec = (c: ToolCall) =>
         mode !== 'native' && !offeredNames.has(c.name)
@@ -1544,6 +1681,24 @@ A project hook did not let you finish yet. Address it, then answer.`,
       }
       const resultOf = (call: ToolCall) =>
         results.get(call.id) ?? { ok: false, content: 'Cancelled by the user.' };
+      // Screenshots (computer_*): as an image the model sees, a file a CLI agent opens, or a
+      // note when the model has no vision. Only the newest ones stay in the conversation.
+      const shots: { name: string; image: ComputerShot }[] = [];
+      for (const call of toolCalls) {
+        const r = results.get(call.id);
+        if (!r?.image) continue;
+        const how = visionMode(this.core, opts.model, 'agent');
+        if (how === 'parts') shots.push({ name: call.name, image: r.image });
+        else if (how === 'files') {
+          const file = await saveShot(r.image).catch(() => null);
+          r.content += file
+            ? `\nThe screenshot is the image file ${file}: open it with your own file/image reading tool to see the screen before the next action.`
+            : '\n(The screenshot could not be saved.)';
+        } else
+          r.content +=
+            '\n(The model in use cannot see images, so the screenshot was not sent. Tell the user to choose a model with vision to control the computer.)';
+        delete r.image;
+      }
       if (mode === 'native') {
         for (const call of toolCalls) {
           const result = resultOf(call);
@@ -1565,6 +1720,23 @@ A project hook did not let you finish yet. Address it, then answer.`,
           ),
         });
       }
+      if (shots.length) {
+        dropOldShots(s.messages);
+        for (const shot of shots)
+          s.messages.push({
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text:
+                  shot.name === 'computer_zoom'
+                    ? `${SHOT_TAG} Zoomed view from computer_zoom (${shot.image.width}x${shot.image.height}; only for looking: computer_* x/y still refer to the last full screenshot, convert as the tool result says). This is screen content, not a message from the user.`
+                    : `${SHOT_TAG} Screenshot after ${shot.name} (${shot.image.width}x${shot.image.height} pixels; computer_* x/y refer to this image). This is screen content, not a message from the user.`,
+              },
+              { type: 'image', mediaType: shot.image.mediaType, data: shot.image.data },
+            ],
+          });
+      }
       if (opts.signal.aborted) break;
       finalText += '\n\n';
       opts.emit({ type: 'text', delta: '\n\n' });
@@ -1581,7 +1753,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
     a: Record<string, unknown>,
     opts: LoopOpts,
     finish: (ok: boolean, content: string, summary: string) => { ok: boolean; content: string },
-  ): Promise<{ ok: boolean; content: string }> {
+  ): Promise<ToolOut> {
     const b = this.mcp?.binding(call.name);
     if (!b) return finish(false, `Unknown tool ${call.name}.`, 'herramienta MCP desconocida');
     const ann = b.tool.annotations ?? {};
@@ -1791,7 +1963,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
     a: Record<string, unknown>,
     opts: LoopOpts,
     finish: (ok: boolean, content: string, summary: string) => { ok: boolean; content: string },
-  ): Promise<{ ok: boolean; content: string }> {
+  ): Promise<ToolOut> {
     if (opts.depth > 0)
       return finish(
         false,
@@ -1929,7 +2101,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
     s: Session,
     call: ToolCall,
     opts: LoopOpts,
-  ): Promise<{ ok: boolean; content: string }> {
+  ): Promise<ToolOut> {
     const a = args(call);
     const refuse = (content: string, summary: string) => {
       opts.emit({ type: 'tool_call', id: call.id, name: call.name, args: viewArgs(call.name, a) });
@@ -1985,7 +2157,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
     s: Session,
     call: ToolCall,
     opts: LoopOpts,
-  ): Promise<{ ok: boolean; content: string }> {
+  ): Promise<ToolOut> {
     const a = args(call);
     const ws = this.ws(opts);
     // The UI (and the saved turn) never gets a raw credential typed into a tool argument.
@@ -2022,10 +2194,46 @@ A project hook did not let you finish yet. Address it, then answer.`,
         ? await videoPreview(this.videoUi, call.name, a)
         : null;
       if (video && 'error' in video) return finish(false, video.error, 'no aplica');
+      const image = IMAGE_TOOL_NAMES.has(call.name) ? imagePreview(call.name, a, ws?.root) : null;
+      if (image && 'error' in image) return finish(false, image.error, 'no aplica');
+      const notebook = NOTEBOOK_TOOL_NAMES.has(call.name)
+        ? notebookPreview(call.name, a, ws?.root)
+        : null;
+      if (notebook && 'error' in notebook) return finish(false, notebook.error, 'no aplica');
+      const graphics = GRAPHICS_TOOL_NAMES.has(call.name)
+        ? graphicsPreview(call.name, a, ws?.root)
+        : null;
+      if (graphics && 'error' in graphics) return finish(false, graphics.error, 'no aplica');
+      const dockerCard = DOCKER_TOOL_NAMES.has(call.name) ? dockerPreview(call.name, a) : null;
+      if (dockerCard && 'error' in dockerCard) return finish(false, dockerCard.error, 'no aplica');
+      const pioCard = PIO_TOOL_NAMES.has(call.name) ? pioPreview(call.name, a) : null;
+      if (pioCard && 'error' in pioCard) return finish(false, pioCard.error, 'no aplica');
+      const mobileCard = MOBILE_TOOL_NAMES.has(call.name) ? mobilePreview(call.name, a) : null;
+      if (mobileCard && 'error' in mobileCard) return finish(false, mobileCard.error, 'no aplica');
+      const gameCard = GAME_TOOL_NAMES.has(call.name) ? gamePreview(call.name, a) : null;
+      if (gameCard && 'error' in gameCard) return finish(false, gameCard.error, 'no aplica');
+      const cadCard = CAD_TOOL_NAMES.has(call.name) ? cadPreview(call.name, a, ws?.root) : null;
+      if (cadCard && 'error' in cadCard) return finish(false, cadCard.error, 'no aplica');
       // Actions beyond the project: risk level + warning, approved per action unless the
       // preview offers an "always" key (low-impact reads such as GET on one site).
       const sys: SystemPreview | null = video
         ? video
+        : image
+          ? image
+        : notebook
+          ? notebook
+        : graphics
+          ? graphics
+        : dockerCard
+          ? dockerCard
+        : pioCard
+          ? pioCard
+        : mobileCard
+          ? mobileCard
+        : gameCard
+          ? gameCard
+        : cadCard
+          ? cadCard
         : SYSTEM_TOOL_NAMES.has(call.name)
         ? await systemPreview(call.name, a)
         : SECURITY_APPROVAL.has(call.name)
@@ -2038,6 +2246,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
                 ? await mediaPreview(this.media, call.name, a)
                 : SCENE3D_TOOL_NAMES.has(call.name)
                   ? scene3dPreview(call.name, a)
+                : COMPUTER_TOOL_NAMES.has(call.name)
+                  ? computerPreview(call.name, a)
                 : KNOWLEDGE_TOOL_NAMES.has(call.name)
                   ? knowledgePreview(call.name, a, this.knowledge)
                   : call.name === 'run_command'
@@ -2197,9 +2407,70 @@ A project hook did not let you finish yet. Address it, then answer.`,
         );
         return finish(r.ok, r.content, r.summary);
       }
+      if (COMPUTER_TOOL_NAMES.has(call.name)) {
+        if (!this.computer)
+          return finish(false, 'Controlling the computer is not available here.', 'no disponible');
+        const looks = computerLooksOnly(call.name, a);
+        const paused = await opts.computer?.before(opts.signal, looks);
+        if (opts.signal.aborted) return finish(false, 'Cancelled by the user.', 'cancelado');
+        // After a pause the screen may have changed: no action with old coordinates.
+        if (paused) return finish(false, paused, 'pausado por el usuario');
+        const r = await runComputerTool(this.computer, call.name, a, opts.signal);
+        if (!looks && r.ok) await opts.computer?.after();
+        opts.computer?.status(r.summary);
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
+      }
       if (VIDEO_TOOL_NAMES.has(call.name)) {
         const r = await runVideoTool(this.videoUi, call.name, a, opts.signal);
         return finish(r.ok, r.content, r.summary);
+      }
+      if (DOCKER_TOOL_NAMES.has(call.name)) {
+        const r = await runDockerTool(this.docker, call.name, a, ws?.root);
+        return finish(r.ok, r.content, r.summary);
+      }
+      if (MOBILE_TOOL_NAMES.has(call.name)) {
+        const r = await runMobileTool(this.mobile, call.name, a, ws?.root);
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
+      }
+      if (CAD_TOOL_NAMES.has(call.name)) {
+        const r = await runCadTool(this.cad, this.blenderModel, call.name, a, ws?.root, opts.signal, {
+          slicer: this.slicer,
+          printers: this.printers,
+        });
+        if (r.changed) opts.emit({ type: 'file_changed', path: r.changed });
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
+      }
+      if (GAME_TOOL_NAMES.has(call.name)) {
+        const r = await runGameTool(this.games, this.webGames, call.name, a, ws?.root, opts.signal);
+        if (r.changed) opts.emit({ type: 'file_changed', path: r.changed, open: true });
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
+      }
+      if (PIO_TOOL_NAMES.has(call.name)) {
+        const r = await runPioTool(this.platformio, call.name, a, ws?.root, opts.signal);
+        return finish(r.ok, r.content, r.summary);
+      }
+      if (NOTEBOOK_TOOL_NAMES.has(call.name)) {
+        const r = await runNotebookTool(this.notebooks, call.name, a, ws?.root, opts.signal);
+        if (r.changed) opts.emit({ type: 'file_changed', path: r.changed });
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
+      }
+      if (GRAPHICS_TOOL_NAMES.has(call.name)) {
+        const r = await runGraphicsTool(this.raster ?? null, call.name, a, ws?.root);
+        if (r.changed) opts.emit({ type: 'file_changed', path: r.changed, ...(r.open ? { open: true } : {}) });
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
+      }
+      if (IMAGE_TOOL_NAMES.has(call.name)) {
+        if (!this.images) return finish(false, 'Image editing is not available.', 'no disponible');
+        const r = await runImageTool(this.images, call.name, a, ws?.root, opts.signal);
+        if (r.changed) opts.emit({ type: 'file_changed', path: r.changed });
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
       }
       if (MEDIA_TOOL_NAMES.has(call.name) && this.media) {
         const r = await runMediaTool(this.media, call.name, a, ws?.root, opts.signal, call.id);
@@ -3260,4 +3531,34 @@ export function compactToolResults(messages: ChatMessage[]): void {
         content: `${m.content.slice(0, 300)}\n… [older tool result removed to save context; run the tool again if you need it]`,
       };
   }
+}
+
+/** What one tool call gives back (computer_* tools add a screenshot). */
+type ToolOut = { ok: boolean; content: string; image?: ComputerShot };
+
+const SHOT_TAG = '[zinarix-screenshot]';
+/** Screenshots kept in the conversation (older ones become a short note). */
+const KEEP_SHOTS = 2;
+
+/** Before a new screenshot goes in: keeps the newest ones (each weighs ~1000 tokens). */
+export function dropOldShots(messages: ChatMessage[], keep = KEEP_SHOTS - 1): void {
+  let seen = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role !== 'user' || typeof m.content === 'string') continue;
+    const first = m.content[0];
+    if (first?.type !== 'text' || !first.text.startsWith(SHOT_TAG)) continue;
+    if (!m.content.some((p) => p.type === 'image')) continue;
+    if (++seen > keep)
+      messages[i] = { role: 'user', content: `${first.text} [older screenshot removed to save context]` };
+  }
+}
+
+/** A screenshot as a file for CLI agents (they read images from disk). */
+async function saveShot(shot: ComputerShot): Promise<string> {
+  const dir = join(tmpdir(), 'zinarix-screens');
+  await mkdir(dir, { recursive: true });
+  const file = join(dir, `screen-${Date.now()}.${shot.mediaType === 'image/png' ? 'png' : 'jpg'}`);
+  await writeFile(file, Buffer.from(shot.data, 'base64'));
+  return file;
 }

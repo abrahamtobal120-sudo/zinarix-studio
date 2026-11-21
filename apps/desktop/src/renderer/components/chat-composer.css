@@ -148,4 +148,14 @@
     transition: none;
   }
 }
+
+/* "Controlar la compu" switched on: tinted, so it is clear the AI may use the mouse. */
+.chat-input .chat-input-bar > .computer-pill.on {
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn);
+}
+.chat-input .chat-input-bar > .computer-pill.on:hover {
+  background: color-mix(in srgb, var(--warn) 26%, transparent);
+  color: var(--warn);
+}
 }

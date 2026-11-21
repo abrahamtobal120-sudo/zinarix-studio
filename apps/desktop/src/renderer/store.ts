@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { isMeshPath } from '../shared/cad';
 import type { ModelInfo } from '@omni/shared';
 import type {
   FileContent,
@@ -43,7 +44,53 @@ export interface Tab {
   size?: number;
 }
 
-export type FileViewer = 'image' | 'hex' | 'large';
+export type FileViewer = 'image' | 'hex' | 'large' | 'notebook' | 'design' | 'paint' | 'scene' | 'model' | 'gcode';
+
+/** Fase 7 (mejora): G-code opens as its toolpaths, layer by layer (with a switch to the text). */
+export const isGcodePath = (path: string): boolean => /\.(gcode|gco)$/i.test(path);
+
+/** Fase 3 (plan de funciones): SVG files open in the design editor (a text model behind it). */
+export const isSvgPath = (path: string): boolean => /\.svg$/i.test(path);
+/** Layered drawings of the paint canvas. */
+export const isPaintPath = (path: string): boolean => /\.zdraw$/i.test(path);
+/** Fase 6: Godot text scenes open as a node tree (with a switch to the text). */
+export const isScenePath = (path: string): boolean => /\.tscn$/i.test(path);
+
+/** Switches a tab between its viewer and the text editor (SVG: design ⇄ code). */
+export function setTabViewer(path: string, viewer: FileViewer | undefined): void {
+  setState((s) => ({
+    tabs: s.tabs.map((tab) => {
+      if (tab.path !== path) return tab;
+      const { viewer: _old, ...rest } = tab;
+      return viewer ? { ...rest, viewer } : rest;
+    }),
+  }));
+}
+
+/** Jupyter notebooks open in the notebook view (cells with their outputs). */
+export const isNotebookPath = (path: string): boolean => /\.ipynb$/i.test(path);
+
+/** Viewer tabs that save themselves (the notebook view): path -> save. */
+const viewerSavers = new Map<string, () => Promise<void>>();
+export function registerViewerSaver(path: string, fn: () => Promise<void>): () => void {
+  viewerSavers.set(path, fn);
+  return () => {
+    if (viewerSavers.get(path) === fn) viewerSavers.delete(path);
+  };
+}
+/** Files that changed on disk without a text editor model (the path may be absolute). */
+const diskListeners = new Set<(path: string) => void>();
+export function onDiskChange(fn: (path: string) => void): () => void {
+  diskListeners.add(fn);
+  return () => diskListeners.delete(fn);
+}
+/** Marks a viewer tab as having unsaved changes (or not). */
+export function setTabDirty(path: string, dirty: boolean): void {
+  if (state.tabs.some((x) => x.path === path && x.dirty !== dirty))
+    setState((s) => ({
+      tabs: s.tabs.map((tab) => (tab.path === path ? { ...tab, dirty } : tab)),
+    }));
+}
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|ico|avif|apng|jfif)$/i;
 export const isImagePath = (path: string): boolean => IMAGE_EXT.test(path);
@@ -53,6 +100,11 @@ async function viewerFor(
   path: string,
   file: FileContent,
 ): Promise<{ viewer: FileViewer; size: number } | null> {
+  if (isNotebookPath(path)) return { viewer: 'notebook', size: 0 };
+  if (isPaintPath(path)) return { viewer: 'paint', size: 0 };
+  // Fase 7: meshes (STL, 3MF, glTF…) open in the 3D model viewer.
+  if (isMeshPath(path)) return { viewer: 'model', size: 0 };
+  if (isGcodePath(path)) return { viewer: 'gcode', size: 0 };
   if (!isImagePath(path) && !file.binary && !file.tooLarge) return null;
   const head = await api().workspace.readBytes(path, 0, 8000);
   if (isImagePath(path)) return { viewer: 'image', size: head.size };
@@ -113,6 +165,18 @@ export interface State {
     | 'debug'
     /** Test Explorer (Vitest, Jest, Pytest). */
     | 'testing'
+    /** Fase 2B (plan de funciones): Docker (containers, images, volumes, compose). */
+    | 'docker'
+    /** Fase 5A (plan de funciones): Arduino / PlatformIO (build, upload, serial monitor). */
+    | 'hardware'
+    /** Fase 5B (plan de funciones): phones, emulators and phone app projects. */
+    | 'mobile'
+    /** Fase 6 (plan de funciones): games (Godot, web games, Unity / Unreal). */
+    | 'games'
+    /** Fase 7 (plan de funciones): CAD with OpenSCAD and 3D printing. */
+    | 'cad'
+    /** Fase 3 (plan de funciones): graphics studio (templates, new drawing, designs). */
+    | 'graphics'
     /** Panel de Edición: takes the whole editor area (the chat stays beside it). */
     | 'design'
     | null;
@@ -175,6 +239,9 @@ export interface ChatTab {
   agent: boolean;
   /** Fase 3: ask / plan / agent / auto-approve. */
   mode: ChatMode;
+  /** "Controlar la compu": the agent sees the screen and uses the mouse and keyboard without
+   * asking each step. Not saved: it is off again after a restart. */
+  computer?: boolean;
   /** Folder this chat works in (absolute); undefined = the window's open folder. */
   folder?: string;
   /** Works in no folder at all (questions only): not even the window's open folder. */
@@ -252,6 +319,11 @@ export function setState(patch: Partial<State> | ((s: State) => Partial<State>))
 }
 export function getState(): State {
   return state;
+}
+/** Called after every state change (outside React). */
+export function subscribeStore(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
 }
 export function useStore<T>(select: (s: State) => T): T {
   return useSyncExternalStore(
@@ -331,7 +403,8 @@ export async function openFile(
 async function loadTab(path: string): Promise<void> {
   const name = path.split('/').pop() ?? path;
   {
-    const file = isImagePath(path)
+    const file =
+      isImagePath(path) || isNotebookPath(path) || isPaintPath(path) || isMeshPath(path) || isGcodePath(path)
       ? { content: '', binary: true, tooLarge: false }
       : await api().workspace.readFile(path);
     const view = await viewerFor(path, file).catch(() => null);
@@ -353,7 +426,17 @@ async function loadTab(path: string): Promise<void> {
       return;
     }
     createDoc(path, file.content);
-    setState((s) => ({ tabs: [...s.tabs, { path, name, dirty: false }] }));
+    setState((s) => ({
+      tabs: [
+        ...s.tabs,
+        {
+          path,
+          name,
+          dirty: false,
+          ...(isSvgPath(path) ? { viewer: 'design' as const } : isScenePath(path) ? { viewer: 'scene' as const } : {}),
+        },
+      ],
+    }));
   }
 }
 
@@ -464,7 +547,10 @@ export function onSaved(fn: (path: string) => void): () => void {
 export async function save(path = state.active, format = true): Promise<void> {
   if (!path) return;
   const d = docs.get(path);
-  if (!d) return;
+  if (!d) {
+    await viewerSavers.get(path)?.();
+    return;
+  }
   // Format on save works on the visible editor (Monaco formatters need a view).
   if (format && state.prefs.formatOnSave && editor?.getModel() === d.model) {
     await editor
@@ -533,7 +619,10 @@ export async function renamePath(from: string, to: string): Promise<void> {
 /** Re-reads a file changed outside the editor (e.g. by the agent) into its open tab. */
 export async function reloadFromDisk(path: string): Promise<void> {
   const d = docs.get(path);
-  if (!d) return;
+  if (!d) {
+    for (const fn of diskListeners) fn(path);
+    return;
+  }
   const tab = state.tabs.find((x) => x.path === path);
   if (tab?.dirty) {
     toast(t('diskChangedDirty', { name: tab.name }));

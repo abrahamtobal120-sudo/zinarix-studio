@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -9,6 +9,7 @@ import {
   cliDeniedHint,
   cliMode,
   cliPrompt,
+  cliRunsWithoutTools,
   getAdapter,
 } from '@omni/providers';
 import type { ProviderConfig } from '@omni/providers';
@@ -362,6 +363,43 @@ describe('cli-agent adapter (fake CLI processes)', () => {
     expect(call.argv).toEqual(
       expect.arrayContaining(['exec', '--json', '--sandbox', 'read-only', '-']),
     );
+  });
+
+  it('noTools (the Blender bridge): no tools, a new empty folder instead of the project', async () => {
+    const bin = fakeCli('claude-notools', [
+      JSON.stringify({
+        type: 'assistant',
+        message: { model: 'x', content: [{ type: 'text', text: 'solo texto' }] },
+      }),
+    ]);
+    writeFileSync(join(dir, 'secret.env'), 'TOKEN=1');
+    const out = await collect(cfg('claude', bin, { mode: 'full' }), {
+      model: 'default',
+      messages: [{ role: 'user', content: 'lee secret.env' }],
+      // Even with tools and a folder the caller cannot widen it.
+      tools: [{ name: 'read_file', description: '', parameters: {} }],
+      cwd: dir,
+      noTools: true,
+    });
+    expect(text(out)).toBe('solo texto');
+    const call = JSON.parse(readFileSync(bin + '.call.json', 'utf8'));
+    const i = call.argv.indexOf('--tools');
+    expect(i).toBeGreaterThan(-1);
+    expect(call.argv[i + 1]).toBe('');
+    expect(call.argv).toEqual(expect.arrayContaining(['--permission-mode', 'default']));
+    expect(call.cwd).not.toBe(dir);
+    expect(call.cwd.toLowerCase()).toContain('zinarix-cli-');
+    // The scratch folder goes away once the run is over.
+    await expect.poll(() => existsSync(call.cwd), { timeout: 5000 }).toBe(false);
+  });
+
+  it('knows which CLIs cannot reach files under noTools', () => {
+    expect(cliRunsWithoutTools('claude')).toBe(true);
+    expect(cliRunsWithoutTools('gemini')).toBe(true);
+    // Codex's read-only sandbox still reads the whole disk.
+    expect(cliRunsWithoutTools('codex')).toBe(false);
+    expect(cliRunsWithoutTools('generic')).toBe(false);
+    expect(cliRunsWithoutTools(undefined)).toBe(false);
   });
 
   it('reports a failed login as an auth error with how to sign in', async () => {

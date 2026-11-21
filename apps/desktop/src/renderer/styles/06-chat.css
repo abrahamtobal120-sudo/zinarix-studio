@@ -105,6 +105,17 @@
   font: inherit;
   cursor: pointer;
   outline: none;
+  /* As wide as the chosen option (not the longest one), with our own caret. */
+  appearance: none;
+  field-sizing: content;
+  padding: 0;
+}
+.reasoning-pick .reasoning-caret {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.reasoning-pick:has(select:focus-visible) {
+  outline: 1px solid var(--accent);
 }
 .typing {
   display: inline-flex;

@@ -13,6 +13,9 @@ import {
   FORMAT_PRESETS,
   IDENTITY,
   MIN_CLIP,
+  SPEED_MAX,
+  SPEED_MIN,
+  clipDur,
   clipEnd,
   isText,
   mediaOf,
@@ -27,7 +30,10 @@ import {
   trimClip,
   uid,
   addTextClip,
+  setGrade,
 } from './video.js';
+import type { ColorGrade, CurveKey, Wheel } from './videoColor.js';
+import { CURVE_KEYS, CURVE_PRESETS, GRADE_PRESETS, WHEELS, WHEEL_KEYS, cleanCurve, cleanGrade } from './videoColor.js';
 import type { Range } from './videoAi.js';
 import {
   CAPTION_STYLES,
@@ -49,6 +55,13 @@ import {
   type Transition,
   type TransitionKind,
 } from './videoFx.js';
+import {
+  RAMP_PRESET_IDS,
+  applyRamp,
+  removeRamp,
+  type RampPoint,
+  type RampPreset,
+} from './videoRamp.js';
 import {
   CHANNEL_END,
   CHANNEL_RANGE,
@@ -75,6 +88,10 @@ export const VIDEO_EDIT_TOOLS = [
   'video_captions',
   'video_set_format',
   'video_add_transition',
+  'video_speed_ramp',
+  'video_color',
+  'video_auto_zoom',
+  'video_proxies',
 ] as const;
 /** Upload audio to a provider or write a file: approved every time. */
 export const VIDEO_ASK_TOOLS = [
@@ -161,7 +178,7 @@ export function describeState(p: VideoProject, playhead = 0): string {
         ? `title "${c.text.content.slice(0, 60).replace(/\n/g, ' ')}"`
         : `"${mediaOf(p, c.mediaId)?.name ?? c.mediaId}" source ${round(c.in)}–${round(c.out)}`;
       lines.push(
-        `  ${c.id} ${round(c.start)}–${round(clipEnd(c))} ${what}${(c.speed ?? 1) !== 1 ? ` x${c.speed}` : ''}`,
+        `  ${c.id} ${round(c.start)}–${round(clipEnd(c))} ${what}${(c.speed ?? 1) !== 1 ? ` x${c.speed}` : ''}${c.ramp ? ` (speed ramp ${c.ramp.preset}, group ${c.ramp.group})` : ''}${c.color ? ` color ${JSON.stringify(c.color)}` : ''}`,
       );
     }
     if (clips.length > 200) lines.push(`  … ${clips.length - 200} more`);
@@ -527,6 +544,105 @@ export function setFormat(p: VideoProject, a: Args): VideoEdit {
   };
 }
 
+/** Fase 4B: puts, changes or removes a speed ramp on a clip. */
+export function speedRamp(p: VideoProject, a: Args): VideoEdit {
+  const id = str(a, 'clip');
+  const c = p.clips.find((x) => x.id === id);
+  if (!c) return { error: `No clip "${id}". Call video_state to see the clip ids.` };
+  try {
+    if (a.remove === true) {
+      if (!c.ramp) return { error: `Clip ${id} has no speed ramp.` };
+      const r = removeRamp(p, id);
+      return {
+        project: r.project,
+        label: 'IA: quitar rampa',
+        content: `Speed ramp removed: ${r.id} is one clip again (${round(clipDur(r.project.clips.find((x) => x.id === r.id)!))} s).`,
+      };
+    }
+    const preset = str(a, 'preset');
+    let curve: RampPreset | RampPoint[];
+    if (Array.isArray(a.points) && a.points.length) {
+      curve = (a.points as unknown[]).map((x) => {
+        const o = (x ?? {}) as Record<string, unknown>;
+        return { u: Number(o.at), s: Number(o.speed) };
+      });
+    } else if ((RAMP_PRESET_IDS as string[]).includes(preset)) curve = preset as RampPreset;
+    else
+      return {
+        error: `Give "preset" (${RAMP_PRESET_IDS.join(', ')}) or "points" ([{at: 0…1, speed: ${SPEED_MIN}…${SPEED_MAX}}]).`,
+      };
+    const r = applyRamp(p, id, curve, { steps: num(a, 'steps') });
+    const sp = r.ids.map((x) => r.project.clips.find((y) => y.id === x)!.speed ?? 1);
+    return {
+      project: r.project,
+      label: 'IA: rampa de velocidad',
+      content: `Speed ramp ${typeof curve === 'string' ? curve : 'custom'} on ${id}: ${r.ids.length} steps from x${Math.min(...sp)} to x${Math.max(...sp)}, now ${round(r.duration)} s (${r.delta >= 0 ? '+' : ''}${round(r.delta)} s; later clips on the track moved). Step ids: ${r.ids.join(', ')}.`,
+    };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+/** Fase 4 (mejora): colour correction of clips (style, wheels, balance, RGB curves). */
+export function colorGrade(p: VideoProject, a: Args): VideoEdit {
+  const visual = (c: Clip) => !isText(c) && trackOf(p, c.trackId)?.kind === 'video';
+  const ids = Array.isArray(a.clips) ? (a.clips as unknown[]).map(String) : [];
+  const targets = ids.length ? p.clips.filter((c) => ids.includes(c.id)) : p.clips.filter(visual);
+  const missing = ids.filter((id) => !p.clips.some((c) => c.id === id));
+  if (missing.length) return { error: `No clip ${missing.join(', ')}. Call video_state to see the clip ids.` };
+  const bad = targets.filter((c) => !visual(c));
+  if (bad.length) return { error: `Clips ${bad.map((c) => c.id).join(', ')} are not pictures (audio or titles).` };
+  if (!targets.length) return { error: 'There are no video or image clips on the timeline.' };
+  const preset = str(a, 'preset');
+  if (preset && !GRADE_PRESETS.some((g) => g.id === preset))
+    return { error: `Unknown preset "${preset}". Use: ${GRADE_PRESETS.map((g) => g.id).join(', ')}.` };
+  const curve = str(a, 'curve');
+  if (curve && !CURVE_PRESETS.some((c) => c.id === curve))
+    return { error: `Unknown curve "${curve}". Use: ${CURVE_PRESETS.map((c) => c.id).join(', ')}.` };
+  const build = (old: ColorGrade | undefined): ColorGrade | undefined => {
+    if (a.reset === true) return undefined;
+    let g: ColorGrade = { ...(old ?? {}) };
+    if (preset) g = { ...GRADE_PRESETS.find((x) => x.id === preset)!.grade, lut: g.lut, lutMix: g.lutMix, curves: g.curves };
+    for (const w of WHEELS) {
+      const src = a[w];
+      if (!src || typeof src !== 'object') continue;
+      const wheel: Wheel = { ...g[w] };
+      for (const k of WHEEL_KEYS) {
+        const v = (src as Record<string, unknown>)[k];
+        if (typeof v === 'number') wheel[k] = v;
+      }
+      g[w] = wheel;
+    }
+    if (typeof a.temperature === 'number') g.temperature = a.temperature;
+    if (typeof a.tint === 'number') g.tint = a.tint;
+    const curves = { ...g.curves };
+    if (curve) curves.m = CURVE_PRESETS.find((c) => c.id === curve)!.pts;
+    if (a.curves && typeof a.curves === 'object')
+      for (const k of CURVE_KEYS) {
+        const pts = (a.curves as Record<string, unknown>)[k];
+        if (pts === null || (Array.isArray(pts) && !pts.length)) delete curves[k as CurveKey];
+        else if (Array.isArray(pts)) {
+          const c = cleanCurve(pts.map((x) => (Array.isArray(x) ? x : [(x as { x?: unknown })?.x, (x as { y?: unknown })?.y])));
+          if (c) curves[k as CurveKey] = c;
+          else delete curves[k as CurveKey];
+        }
+      }
+    g.curves = curves;
+    return cleanGrade(g);
+  };
+  let next = p;
+  for (const c of targets) next = setGrade(next, new Set([c.id]), build(c.color));
+  const first = cleanGrade(next.clips.find((c) => c.id === targets[0]!.id)?.color);
+  return {
+    project: next,
+    label: 'IA: color',
+    content:
+      a.reset === true
+        ? `Colour correction removed from ${targets.length} clip(s).`
+        : `Colour of ${targets.length} clip(s) (${targets.map((c) => c.id).join(', ')}): ${first ? JSON.stringify(first) : 'neutral'}.`,
+  };
+}
+
 /** The pure edits, by tool name (the renderer adds the ones that need FFmpeg or files). */
 export function pureEdit(
   p: VideoProject,
@@ -555,6 +671,10 @@ export function pureEdit(
       return captions(p, a);
     case 'video_set_format':
       return setFormat(p, a);
+    case 'video_speed_ramp':
+      return speedRamp(p, a);
+    case 'video_color':
+      return colorGrade(p, a);
     default:
       return null;
   }

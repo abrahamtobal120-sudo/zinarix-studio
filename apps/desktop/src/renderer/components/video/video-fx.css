@@ -131,6 +131,13 @@
     gap: 6px;
     padding: 4px 12px 12px;
   }
+  /* video.css has another .vs-strip (the timeline's thumbnails, absolute): undo it here. */
+  .vs-mixer > .vs-strip {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+    pointer-events: auto;
+  }
   .vs-strip {
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -152,9 +159,64 @@
   }
   .vs-strip-row {
     display: grid;
-    grid-template-columns: 56px 1fr 56px;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
     align-items: center;
     gap: 6px;
+  }
+  /* Fase 4 (mejora): level meters */
+  .vs-meter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 6px;
+  }
+  .vs-meter-chs {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .vs-meter-chs::after {
+    /* 0 dB mark */
+    content: '';
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    left: var(--meter-0db);
+    width: 1px;
+    background: var(--fg-dim);
+  }
+  .vs-meter-ch {
+    /* The colours sit still under a cover that uncovers them as the level rises. */
+    position: relative;
+    height: 5px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--ok) 0%, var(--ok) 70%, var(--warn) 85%, var(--danger) 100%);
+    overflow: hidden;
+  }
+  .vs-meter-fill {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    background: var(--bg-4);
+    transition: width 40ms linear;
+  }
+  .vs-meter-ch.vs-meter-over {
+    background: var(--danger);
+  }
+  .vs-meter-db {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-xs);
+  }
+  .vs-meter-db.vs-meter-over {
+    color: var(--danger);
+  }
+  .vs-strip-master {
+    border-color: var(--accent);
   }
   .vs-strip-row code {
     text-align: right;
@@ -174,11 +236,12 @@
     font: inherit;
   }
   .vs-textarea:focus-visible,
-  .vs-color:focus-visible {
+  input.vs-color:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
-  .vs-color {
+  /* Only the colour inputs: the Color panel's root also carries .vs-color. */
+  input.vs-color {
     width: 34px;
     height: 22px;
     padding: 0;
@@ -252,6 +315,9 @@
     color: inherit;
     cursor: pointer;
     font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+    /* The shapes take the chosen sticker colour (white by default): a thin outline keeps
+       them visible on the light theme too. */
+    filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.6));
   }
   .vs-sticker:hover,
   .vs-sticker:focus-visible {

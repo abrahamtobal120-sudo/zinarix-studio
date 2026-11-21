@@ -158,12 +158,50 @@ def _bridge_file():
     return path or os.path.join(os.path.expanduser("~"), ".zinarix", "blender-bridge.json")
 
 
+def _pid_alive(pid):
+    """Whether a process with this id is running (the Zinarix that wrote the bridge file)."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        # PROCESS_QUERY_LIMITED_INFORMATION: enough to read the exit code.
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            # Access denied (5) still means it exists; anything else (gone) does not.
+            return ctypes.get_last_error() == 5
+        try:
+            code = wintypes.DWORD()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 def bridge_endpoint():
     """``(url, token)`` of the Zinarix Studio bridge, or ``("", "")``.
 
     The environment set by Zinarix Studio ("Modo Pro") wins; otherwise the
     permanent bridge's discovery file. A file URL that is not loopback is ignored,
-    so its token is never sent anywhere else.
+    so its token is never sent anywhere else, and so is a file whose Zinarix
+    process (``pid``) is no longer running.
     """
     url = os.environ.get(BRIDGE_URL_ENV, "").strip()
     if url:
@@ -178,6 +216,10 @@ def bridge_endpoint():
     url = data.get("url")
     token = data.get("token")
     if not isinstance(url, str) or not url.strip() or not is_local_url(url.strip()):
+        return "", ""
+    # Left behind by a Zinarix that crashed: another program may now hold that port and
+    # would get the token and answer with code the add-on runs. Only a live Zinarix counts.
+    if not _pid_alive(data.get("pid")):
         return "", ""
     return url.strip(), token if isinstance(token, str) else ""
 

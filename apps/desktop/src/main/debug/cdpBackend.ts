@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { Breakpoint, DebugVariable } from '../../shared/devtools.js';
+import { type Breakpoint, type DebugVariable, logpointCondition } from '../../shared/devtools.js';
 import { lineSplitter, type BackendEvents, type DebugBackend, type RawFrame } from './backend.js';
 import { loadSourceMap, pathKey, type SourceMap } from './sourceMap.js';
 
@@ -359,7 +359,7 @@ export class CdpBackend implements DebugBackend {
         actualLocation: { lineNumber: number; columnNumber?: number };
       }>('Debugger.setBreakpoint', {
         location: { scriptId, lineNumber: at.line, columnNumber: at.column },
-        ...(b.condition ? { condition: b.condition } : {}),
+        ...cdpCondition(b),
       }).catch(() => undefined);
       if (!r) continue;
       ids.push(r.breakpointId);
@@ -396,7 +396,7 @@ export class CdpBackend implements DebugBackend {
       }>('Debugger.setBreakpointByUrl', {
         lineNumber: b.line - 1,
         urlRegex,
-        ...(b.condition ? { condition: b.condition } : {}),
+        ...cdpCondition(b),
       }).catch(() => undefined);
       if (!r) continue;
       ids.push(r.breakpointId);
@@ -540,4 +540,10 @@ export class CdpBackend implements DebugBackend {
     }
     if (!proc) this.finish();
   }
+}
+
+/** The CDP condition of a breakpoint (logpoints become a condition that prints, see logpointCondition). */
+function cdpCondition(b: Breakpoint): { condition?: string } {
+  if (b.logMessage?.trim()) return { condition: logpointCondition(b.logMessage, b.condition) };
+  return b.condition ? { condition: b.condition } : {};
 }

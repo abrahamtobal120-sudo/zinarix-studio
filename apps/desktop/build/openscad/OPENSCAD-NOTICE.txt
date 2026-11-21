@@ -1,0 +1,21 @@
+OpenSCAD (WebAssembly) in Zinarix Studio
+========================================
+
+Zinarix Studio (GNU GPL v3 or later) ships OpenSCAD as a separate program in this
+folder: cadWorker.mjs. It is the OpenSCAD project's code (https://openscad.org)
+compiled to WebAssembly, plus a small launcher from Zinarix, and it runs as its own
+process (Node.js inside Electron). Zinarix starts it to turn .scad files into 3D
+models when OpenSCAD is not installed on the computer; it does not link to it.
+
+OpenSCAD is distributed under the GNU General Public License, version 2 or (at your
+option) any later version. The full text of version 2 is in COPYING.GPLv2.txt, next
+to this file. As combined with Zinarix's launcher it is distributed under the GNU
+GPL version 3 or later, the same license as Zinarix Studio (see its LICENSE file).
+You may copy, change and share it under that license.
+
+Build included
+--------------
+OpenSCAD 2025.01.19 (Manifold 3.0.1, CGAL 6.0.1, lib3mf 2.3.2, fontconfig 2.16.0,
+freetype 2.13.3, harfbuzz 10.2.0), from the npm package openscad-wasm-prebuilt 1.2.0.
+
+The source code is listed in OPENSCAD-SOURCE.txt, next to this file.

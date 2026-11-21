@@ -32,7 +32,13 @@ export const SIDE_VIEWS = [
   'apps',
   'debug',
   'testing',
+  'docker',
+  'hardware',
+  'mobile',
+  'games',
+  'cad',
   'design',
+  'graphics',
 ] as const;
 export type SideView = (typeof SIDE_VIEWS)[number];
 

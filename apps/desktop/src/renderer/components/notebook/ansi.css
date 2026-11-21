@@ -1,0 +1,79 @@
+@layer features {
+/* ANSI colors (tracebacks, colored prints) from the theme colors */
+.ansi-b {
+  font-weight: 700;
+}
+.ansi-dim {
+  opacity: 0.7;
+}
+.ansi-i {
+  font-style: italic;
+}
+.ansi-u {
+  text-decoration: underline;
+}
+.ansi-fg-0,
+.ansi-fg-8 {
+  color: var(--fg-dim);
+}
+.ansi-fg-1,
+.ansi-fg-9 {
+  color: var(--danger);
+}
+.ansi-fg-2,
+.ansi-fg-10 {
+  color: var(--ok);
+}
+.ansi-fg-3,
+.ansi-fg-11 {
+  color: var(--warn);
+}
+.ansi-fg-4,
+.ansi-fg-12 {
+  color: var(--accent);
+}
+.ansi-fg-5,
+.ansi-fg-13 {
+  color: color-mix(in srgb, var(--danger) 55%, var(--accent));
+}
+.ansi-fg-6,
+.ansi-fg-14 {
+  color: color-mix(in srgb, var(--ok) 55%, var(--accent));
+}
+.ansi-fg-7,
+.ansi-fg-15 {
+  color: var(--fg);
+}
+.ansi-bg-0,
+.ansi-bg-8 {
+  background: color-mix(in srgb, var(--fg) 15%, transparent);
+}
+.ansi-bg-1,
+.ansi-bg-9 {
+  background: color-mix(in srgb, var(--danger) 25%, transparent);
+}
+.ansi-bg-2,
+.ansi-bg-10 {
+  background: color-mix(in srgb, var(--ok) 25%, transparent);
+}
+.ansi-bg-3,
+.ansi-bg-11 {
+  background: color-mix(in srgb, var(--warn) 25%, transparent);
+}
+.ansi-bg-4,
+.ansi-bg-12 {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.ansi-bg-5,
+.ansi-bg-13 {
+  background: color-mix(in srgb, var(--danger) 20%, color-mix(in srgb, var(--accent) 20%, transparent));
+}
+.ansi-bg-6,
+.ansi-bg-14 {
+  background: color-mix(in srgb, var(--ok) 20%, color-mix(in srgb, var(--accent) 20%, transparent));
+}
+.ansi-bg-7,
+.ansi-bg-15 {
+  background: color-mix(in srgb, var(--fg) 30%, transparent);
+}
+}

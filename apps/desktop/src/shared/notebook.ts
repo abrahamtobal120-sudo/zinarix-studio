@@ -518,3 +518,265 @@ export type NotebookEvent =
 
 /** pip line shown when Jupyter is missing (the editor never pretends to run cells). */
 export const JUPYTER_INSTALL = 'python -m pip install jupyter_server ipykernel';
+
+// ---------------- Fase 2A mejoras: ANSI colors, .py export, completions, variables ----------------
+
+/** A run of output text with the terminal style it was printed with. */
+export interface AnsiSpan {
+  text: string;
+  /** 0–15 = the 16 terminal colors (a class), or a CSS "rgb(…)" for 256-color / true color. */
+  fg?: number | string;
+  bg?: number | string;
+  bold?: boolean;
+  dim?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
+
+function color256(n: number): number | string {
+  if (n < 16) return n;
+  if (n >= 232) {
+    const v = 8 + (n - 232) * 10;
+    return `rgb(${v},${v},${v})`;
+  }
+  const i = n - 16;
+  const c = (x: number) => (x ? 55 + x * 40 : 0);
+  return `rgb(${c(Math.floor(i / 36))},${c(Math.floor(i / 6) % 6)},${c(i % 6)})`;
+}
+
+type AnsiStyle = Omit<AnsiSpan, 'text'>;
+const sameStyle = (a: AnsiStyle, b: AnsiStyle) =>
+  a.fg === b.fg &&
+  a.bg === b.bg &&
+  !!a.bold === !!b.bold &&
+  !!a.dim === !!b.dim &&
+  !!a.italic === !!b.italic &&
+  !!a.underline === !!b.underline;
+
+/**
+ * Splits text with ANSI SGR codes (IPython tracebacks, colored logs) into styled runs.
+ * Other escape codes (cursor moves, window titles) are dropped.
+ */
+export function ansiSpans(s: string): AnsiSpan[] {
+  const out: AnsiSpan[] = [];
+  let st: AnsiStyle = {};
+  const re = /\u001b\[([0-9;?]*)([A-Za-z])|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
+  let last = 0;
+  const push = (text: string) => {
+    if (!text) return;
+    const prev = out[out.length - 1];
+    if (prev && sameStyle(prev, st)) prev.text += text;
+    else out.push({ text, ...st });
+  };
+  for (let m = re.exec(s); m; m = re.exec(s)) {
+    push(s.slice(last, m.index));
+    last = re.lastIndex;
+    if (m[2] !== 'm') continue;
+    const codes = (m[1] || '0').split(';').map((x) => Number(x || 0));
+    const next: AnsiStyle = { ...st };
+    for (let i = 0; i < codes.length; i++) {
+      const c = codes[i]!;
+      if (c === 0) {
+        delete next.fg;
+        delete next.bg;
+        delete next.bold;
+        delete next.dim;
+        delete next.italic;
+        delete next.underline;
+      } else if (c === 1) next.bold = true;
+      else if (c === 2) next.dim = true;
+      else if (c === 3) next.italic = true;
+      else if (c === 4) next.underline = true;
+      else if (c === 22) {
+        delete next.bold;
+        delete next.dim;
+      } else if (c === 23) delete next.italic;
+      else if (c === 24) delete next.underline;
+      else if (c >= 30 && c <= 37) next.fg = c - 30;
+      else if (c >= 90 && c <= 97) next.fg = c - 90 + 8;
+      else if (c === 39) delete next.fg;
+      else if (c >= 40 && c <= 47) next.bg = c - 40;
+      else if (c >= 100 && c <= 107) next.bg = c - 100 + 8;
+      else if (c === 49) delete next.bg;
+      else if (c === 38 || c === 48) {
+        const key = c === 38 ? 'fg' : 'bg';
+        if (codes[i + 1] === 5 && codes[i + 2] !== undefined) {
+          next[key] = color256(Math.max(0, Math.min(255, codes[i + 2]!)));
+          i += 2;
+        } else if (codes[i + 1] === 2 && codes[i + 4] !== undefined) {
+          const [r, g, b] = [codes[i + 2]!, codes[i + 3]!, codes[i + 4]!].map((v) =>
+            Math.max(0, Math.min(255, v)),
+          );
+          next[key] = `rgb(${r},${g},${b})`;
+          i += 4;
+        }
+      }
+    }
+    st = next;
+  }
+  push(s.slice(last));
+  return out;
+}
+
+/**
+ * The notebook as a script in the "percent" format that VS Code, Spyder, PyCharm and jupytext
+ * read back as cells: `# %%` before code, `# %% [markdown]` with the text commented out.
+ */
+export function notebookToScript(nb: Notebook): string {
+  const lang = notebookLanguage(nb);
+  const comment = ['python', 'julia', 'r', 'ruby', 'bash', 'sh', 'perl'].includes(lang) ? '#' : '//';
+  const parts: string[] = [];
+  for (const c of nb.cells) {
+    const src = c.source.replace(/\s+$/, '');
+    if (c.cell_type === 'code') parts.push(`${comment} %%\n${src}`);
+    else
+      parts.push(
+        `${comment} %% [${c.cell_type === 'markdown' ? 'markdown' : 'raw'}]\n` +
+          src
+            .split('\n')
+            .map((l) => (l ? `${comment} ${l}` : comment))
+            .join('\n'),
+      );
+  }
+  return `${parts.join('\n\n')}\n`;
+}
+
+/** File extension of the exported script. */
+export function scriptExtension(nb: Notebook): string {
+  const li = nb.metadata.language_info;
+  const ext = isObj(li) && typeof li.file_extension === 'string' ? li.file_extension : '';
+  if (/^\.[A-Za-z0-9]{1,8}$/.test(ext)) return ext;
+  const lang = notebookLanguage(nb);
+  return lang === 'julia' ? '.jl' : lang === 'r' ? '.r' : lang === 'javascript' ? '.js' : '.py';
+}
+
+/** UTF-16 offset (JavaScript strings) → Unicode code points (Jupyter's cursor_pos). */
+export function toCodePoints(s: string, offset: number): number {
+  return [...s.slice(0, offset)].length;
+}
+
+/** Unicode code points (Jupyter) → UTF-16 offset in the same string. */
+export function fromCodePoints(s: string, cp: number): number {
+  let n = 0;
+  let i = 0;
+  for (const ch of s) {
+    if (n >= cp) break;
+    i += ch.length;
+    n++;
+  }
+  return i;
+}
+
+export interface NbCompletion {
+  text: string;
+  /** function, class, module, keyword, instance, statement, param, path, property… */
+  type?: string;
+  signature?: string;
+}
+
+export interface NbCompletions {
+  /** Replaced range, as UTF-16 offsets of the cell's code. */
+  start: number;
+  end: number;
+  matches: NbCompletion[];
+}
+
+/** complete_reply → matches (with their kind when the kernel says it). */
+export function parseCompleteReply(code: string, content: JsonObject): NbCompletions | null {
+  if (content.status !== 'ok' || !Array.isArray(content.matches)) return null;
+  const start = fromCodePoints(code, Number(content.cursor_start ?? 0));
+  const end = fromCodePoints(code, Number(content.cursor_end ?? 0));
+  const meta = isObj(content.metadata) ? content.metadata._jupyter_types_experimental : undefined;
+  const types = new Map<string, { type?: string; signature?: string }>();
+  if (Array.isArray(meta))
+    for (const t of meta)
+      if (isObj(t) && typeof t.text === 'string')
+        types.set(t.text, {
+          ...(typeof t.type === 'string' && t.type !== '<unknown>' ? { type: t.type } : {}),
+          ...(typeof t.signature === 'string' && t.signature ? { signature: t.signature } : {}),
+        });
+  const seen = new Set<string>();
+  const matches: NbCompletion[] = [];
+  for (const m of content.matches)
+    if (typeof m === 'string' && !seen.has(m)) {
+      seen.add(m);
+      matches.push({ text: m, ...types.get(m) });
+    }
+  return { start, end, matches };
+}
+
+/** One variable of the kernel, for the variables panel and notebook_variables. */
+export interface NbVariable {
+  name: string;
+  type: string;
+  /** "3x4" for arrays and data frames. */
+  shape: string;
+  /** len() when the value has one, else -1. */
+  size: number;
+  /** Short repr (≤ 200 characters). */
+  value: string;
+}
+
+/**
+ * Python run silently (no history, no execution count) to list the user's variables; the
+ * result comes back as a user_expression, base64 JSON so no quoting can break it. Modules,
+ * functions, classes and IPython's own names are left out.
+ */
+export const PY_VARIABLES_CODE = `def __zinarix_vars():
+    import base64, json, reprlib
+    r = reprlib.Repr()
+    r.maxstring = 200; r.maxother = 200; r.maxlist = 20; r.maxdict = 20; r.maxlevel = 2
+    skip = {'In', 'Out', 'exit', 'quit', 'get_ipython'}
+    hide = {'module', 'function', 'builtin_function_or_method', 'type', 'method', 'ABCMeta'}
+    out = []
+    for n, v in list(get_ipython().user_ns.items()):
+        if n.startswith('_') or n in skip:
+            continue
+        t = type(v)
+        if t.__name__ in hide:
+            continue
+        try:
+            sh = getattr(v, 'shape', None)
+            shape = 'x'.join(str(x) for x in sh) if isinstance(sh, tuple) else ''
+        except Exception:
+            shape = ''
+        try:
+            size = len(v)
+        except Exception:
+            size = -1
+        try:
+            val = r.repr(v)
+        except Exception:
+            val = '<?>'
+        if len(val) > 200:
+            val = val[:200] + '...'
+        mod = getattr(t, '__module__', '') or ''
+        name = t.__name__ if mod in ('builtins', '') else mod.split('.')[0] + '.' + t.__name__
+        out.append([n, name, shape, size if isinstance(size, int) else -1, val])
+        if len(out) >= 500:
+            break
+    return base64.b64encode(json.dumps(out).encode()).decode()
+`;
+export const PY_VARIABLES_EXPR = '__zinarix_vars()';
+
+/** The user_expression of PY_VARIABLES_CODE → variables (null when it failed). */
+export function parseVariables(expr: Json | undefined): NbVariable[] | null {
+  if (!isObj(expr) || expr.status !== 'ok' || !isObj(expr.data)) return null;
+  const raw = mimeText(expr.data['text/plain']).trim().replace(/^['"]|['"]$/g, '');
+  let rows: unknown;
+  try {
+    rows = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))));
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(rows)) return null;
+  return rows
+    .filter((r): r is unknown[] => Array.isArray(r) && r.length === 5)
+    .map(([name, type, shape, size, value]) => ({
+      name: String(name),
+      type: String(type),
+      shape: String(shape),
+      size: typeof size === 'number' ? size : -1,
+      value: String(value),
+    }));
+}

@@ -71,4 +71,45 @@
   color: var(--fg-dim);
   cursor: default;
 }
+
+/* Fase 4 (mejora): RGB curves. */
+.vs-curve-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.vs-curve-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+}
+.vs-curve {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1;
+  align-self: center;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+}
+.vs-curve-grid line,
+.vs-curve-diag {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.vs-curve-diag {
+  stroke-dasharray: 4 4;
+}
+.vs-curve-pt {
+  fill: var(--bg);
+  stroke-width: 2;
+  cursor: grab;
+}
+.vs-curve-pt:hover {
+  fill: var(--accent);
+}
 }

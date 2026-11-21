@@ -15,6 +15,7 @@ import {
   scopes,
   selectFrame,
   setCondition,
+  setLogMessage,
   setConfigIndex,
   startDebug,
   stepInto,
@@ -225,14 +226,15 @@ function Breakpoints() {
           <div
             key={`${b.path}:${b.line}`}
             className="dbg-bp-row"
-            title={b.condition ? `${b.path}:${b.line} — ${b.condition}` : `${b.path}:${b.line}`}
+            title={`${b.path}:${b.line}${b.condition ? ` — ${b.condition}` : ''}${b.logMessage ? ` — ${td('dbgLogpoint')}: ${b.logMessage}` : ''}`}
             {...pressable(() => void openFile(b.path, { line: b.line, column: 1 }))}
           >
-            <span className={`dbg-bp-dot ${b.condition ? 'cond' : ''} ${unbound ? 'unbound' : ''}`} />
+            <span className={`dbg-bp-dot ${b.logMessage ? 'log' : b.condition ? 'cond' : ''} ${unbound ? 'unbound' : ''}`} />
             <span className="dbg-bp-file">{b.path.split('/').pop()}</span>
             <span className="dim small dbg-bp-line">
               {b.line}
               {b.condition ? ` · ${b.condition}` : ''}
+              {b.logMessage ? ` · ✎ ${b.logMessage}` : ''}
             </span>
             <span className="spacer" />
             <button
@@ -247,6 +249,19 @@ function Breakpoints() {
               }}
             >
               <Icon name="edit" size={11} />
+            </button>
+            <button
+              className="dbg-row-x"
+              title={td('dbgEditLogpoint')}
+              aria-label={td('dbgEditLogpoint')}
+              onClick={(e) => {
+                e.stopPropagation();
+                void askText(td('dbgLogpointAsk'), b.logMessage ?? '').then(
+                  (m) => m !== null && setLogMessage(b.path, b.line, m),
+                );
+              }}
+            >
+              <Icon name="message" size={11} />
             </button>
             <button
               className="dbg-row-x"

@@ -19,6 +19,7 @@ import {
   trimClip,
   updateTrack,
 } from '../../../shared/video';
+import { rampGroup } from '../../../shared/videoRamp';
 import { confirmDialog } from '../../confirm';
 import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
@@ -298,6 +299,9 @@ export function Timeline() {
       return;
     }
     if (!ids.has(c.id) || edge) ids = new Set([c.id]);
+    // Fase 4B: a speed ramp moves as one clip (its edges still trim the outer steps).
+    if (c.ramp && !edge && ids.size === 1)
+      ids = new Set(rampGroup(s.project, c.id).map((x) => x.id));
     setV({ selection: [...ids] });
     if (s.project.tracks.find((t) => t.id === c.trackId)?.locked) return;
     const x0 = e.clientX;
@@ -782,7 +786,7 @@ function ClipView({
   const waveH = track.kind === 'audio' ? h - 16 : 14;
   return (
     <div
-      className={`vs-clip vs-clip-${kind} ${selected ? 'selected' : ''} ${invalid ? 'invalid' : ''} ${media?.missing ? 'vs-missing' : ''}`}
+      className={`vs-clip vs-clip-${kind} ${clip.ramp ? 'vs-clip-ramp' : ''} ${selected ? 'selected' : ''} ${invalid ? 'invalid' : ''} ${media?.missing ? 'vs-missing' : ''}`}
       style={{ left, width }}
       onMouseDown={(e) => onDown(e, clip, null)}
       onContextMenu={onMenu}
@@ -802,7 +806,11 @@ function ClipView({
         {clip.text && <span className="vs-clip-t">T</span>}
         {name ?? '?'}
         {clip.effects && <span className="vs-clip-speed">fx</span>}
-        {speedOf(clip) !== 1 && <span className="vs-clip-speed">{`${speedOf(clip)}×`}</span>}
+        {clip.ramp ? (
+          <span className="vs-clip-speed" title={`${speedOf(clip)}×`}>⤳</span>
+        ) : (
+          speedOf(clip) !== 1 && <span className="vs-clip-speed">{`${speedOf(clip)}×`}</span>
+        )}
       </div>
       {clip.transition && (
         <div

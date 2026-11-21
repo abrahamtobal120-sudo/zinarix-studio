@@ -1,90 +1,92 @@
 /* Permanent bridge in the status bar: on/off, URL and token for web apps, allowed sites. */
-.bridge-status {
-  position: relative;
-  height: 100%;
-  display: flex;
-}
-.bridge-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.bridge-trigger.on svg {
-  color: var(--ok);
-}
-.bridge-trigger:focus-visible {
-  outline: 1px solid var(--focus);
-  outline-offset: -1px;
-}
-.bridge-pop {
-  position: absolute;
-  bottom: calc(100% + var(--space-1));
-  right: 0;
-  z-index: var(--z-dropdown);
-  width: 320px;
-  padding: var(--space-1);
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--elevation-3);
-  color: var(--fg);
-}
-.bridge-hint {
-  margin: 4px var(--space-2) 6px;
-  font-size: var(--text-xs);
-  color: var(--fg-dim);
-  line-height: 1.4;
-}
-.bridge-opt {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: 28px;
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  font-size: var(--text-base);
-  text-align: left;
-  cursor: pointer;
-}
-.bridge-opt:hover,
-.bridge-opt:focus-visible {
-  background: var(--hover);
-  outline: none;
-}
-.bridge-opt:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.bridge-sep {
-  height: 1px;
-  margin: var(--space-1) 0;
-  background: var(--border);
-}
-.bridge-url {
-  margin: 0 var(--space-2) 4px;
-  font-size: var(--text-xs);
-  word-break: break-all;
-  user-select: all;
-}
-.bridge-sites {
-  margin: 0 var(--space-2) 4px;
-  padding: 6px;
-  resize: vertical;
-  font-family: var(--font-mono, monospace);
-  font-size: var(--text-xs);
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 5px;
+@layer features {
+  .bridge-status {
+    position: relative;
+    height: 100%;
+    display: flex;
+  }
+  .bridge-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .bridge-trigger.on svg {
+    color: var(--ok);
+  }
+  .bridge-trigger:focus-visible {
+    outline: 1px solid var(--focus);
+    outline-offset: -1px;
+  }
+  .bridge-pop {
+    position: absolute;
+    bottom: calc(100% + var(--space-1));
+    right: 0;
+    z-index: var(--z-dropdown);
+    width: 320px;
+    padding: var(--space-1);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elevation-3);
+    color: var(--fg);
+  }
+  .bridge-hint {
+    margin: 4px var(--space-2) 6px;
+    font-size: var(--text-xs);
+    color: var(--fg-dim);
+    line-height: 1.4;
+  }
+  .bridge-opt {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 28px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    font-size: var(--text-base);
+    text-align: left;
+    cursor: pointer;
+  }
+  .bridge-opt:hover,
+  .bridge-opt:focus-visible {
+    background: var(--hover);
+    outline: none;
+  }
+  .bridge-opt:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .bridge-sep {
+    height: 1px;
+    margin: var(--space-1) 0;
+    background: var(--border);
+  }
+  .bridge-url {
+    margin: 0 var(--space-2) 4px;
+    font-size: var(--text-xs);
+    word-break: break-all;
+    user-select: all;
+  }
+  .bridge-sites {
+    margin: 0 var(--space-2) 4px;
+    padding: 6px;
+    resize: vertical;
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs);
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+  }
 }

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
-import { accessSync, constants, readdirSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { accessSync, constants, mkdtempSync, readdirSync, statSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { delimiter, dirname, extname, isAbsolute, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { OmniError } from '@omni/shared';
@@ -151,6 +152,20 @@ const PROFILES: Record<CliProfile, Profile> = {
   },
 };
 
+/**
+ * CLIs that cannot reach the user's files when run with `noTools` in an empty folder:
+ * Claude Code switches every tool off (`--tools ""`); Gemini / Qwen in their default
+ * approval mode only read inside the workspace (the empty folder) and nobody can approve
+ * their shell or writes headless. The others (Codex's read-only sandbox reads the whole
+ * disk, Copilot, Cursor, OpenCode, Amp, generic) can still read files outside it.
+ */
+const TOOL_FREE: ReadonlySet<CliProfile> = new Set(['claude', 'gemini', 'qwen']);
+
+/** True when this CLI profile answers without access to the user's files under `noTools`. */
+export function cliRunsWithoutTools(profile: CliProfile | undefined): boolean {
+  return !!profile && TOOL_FREE.has(profile);
+}
+
 /** "default" (or nothing) lets the CLI use the model the user picked in it. */
 const SAFE_ARG = /^[A-Za-z0-9._:/@[\]=-]+$/;
 const MAX_ARG_PROMPT = 100_000;
@@ -210,7 +225,7 @@ export function cliPrompt(messages: ChatMessage[]): string {
  * open project with the permission level chosen in the provider settings.
  */
 export function cliMode(cfg: ProviderConfig, req: ChatRequest): CliMode {
-  if (!req.tools?.length || !req.cwd || req.readOnly) return 'read';
+  if (req.noTools || !req.tools?.length || !req.cwd || req.readOnly) return 'read';
   const m = cfg.params?.mode;
   return m === 'read' || m === 'full' ? m : 'edit';
 }
@@ -639,6 +654,8 @@ async function* run(
     });
   const mode = cliMode(cfg, req);
   const args = spec.args({ model, mode, reasoning: req.reasoning });
+  // Answer only: Claude Code gets no tools at all (`""` = none).
+  if (req.noTools && profile === 'claude') args.push('--tools', '');
   let target = launch(file, args);
   if (spec.prompt === 'arg') {
     if (target.verbatim)
@@ -656,8 +673,11 @@ async function* run(
   }
   cfg.logger?.debug('cli-agent run', { provider: cfg.entry.id, mode, model: model ?? 'default' });
 
+  // noTools: a new empty folder, so nothing the CLI reads by default (the project, the home
+  // folder, AGENTS.md / CLAUDE.md) is the user's. Removed when the run ends.
+  const scratch = req.noTools ? mkdtempSync(join(tmpdir(), 'zinarix-cli-')) : undefined;
   const child = spawn(target.file, target.args, {
-    cwd: req.cwd ?? homedir(),
+    cwd: scratch ?? req.cwd ?? homedir(),
     env: cliEnv(
       profile === 'claude' && req.reasoning ? CLAUDE_THINKING[req.reasoning] : undefined,
     ),
@@ -734,6 +754,12 @@ async function* run(
     signal.removeEventListener('abort', onAbort);
     lines.close();
     kill();
+    if (scratch) {
+      // The CLI may still hold the folder for a moment after it is killed (Windows).
+      void exited.then(() =>
+        rm(scratch, { recursive: true, force: true, maxRetries: 5 }).catch(() => undefined),
+      );
+    }
   }
 }
 

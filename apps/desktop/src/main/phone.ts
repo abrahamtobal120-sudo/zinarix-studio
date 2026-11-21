@@ -6,16 +6,21 @@ import { networkInterfaces } from 'node:os';
 import { z } from 'zod';
 import type {
   PhoneAction,
+  PhoneAllow,
+  PhoneConfigPatch,
+  PhoneConfigView,
   PhoneDevice,
   PhoneModels,
   PhoneRepo,
   PhoneSnapshot,
   PhoneStatus,
 } from '../shared/api.js';
+import { THEME_IDS, UI_ZOOM_STEPS } from '../shared/api.js';
 import { PairingGuard, sameSecret } from './pairing.js';
 import type { PairChannel, PinCheck } from './pairing.js';
 import { phoneLang, phonePage } from './phonePage.js';
 import { Tunnel } from './tunnel.js';
+import { beaconError, RELAY_PAGE, relayLink, type PhoneBeacon } from './phoneBeacon.js';
 
 /** Preferred port (the phone keeps working after a restart); another one if it is taken. */
 const PORT = 47390;
@@ -36,7 +41,128 @@ const Action = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('closeChat'), chatId: z.string().min(1).max(200) }),
   z.object({ kind: z.literal('clearQueue') }),
   z.object({ kind: z.literal('window'), id: z.number().int().nonnegative() }),
+  z.object({ kind: z.literal('openFile'), path: z.string().min(1).max(4096) }),
 ]);
+
+/** A file or folder of the project, for the phone's file browser. */
+export interface PhoneFileEntry {
+  name: string;
+  /** Relative to the project root, '/' separated. */
+  path: string;
+  dir: boolean;
+  size?: number;
+  mtime?: number;
+}
+
+/** The project files of the window the phone controls (see main.ts). Paths are relative. */
+export interface PhoneFiles {
+  list(path: string): Promise<{ root: string; name: string; entries: PhoneFileEntry[] }>;
+  read(path: string): Promise<{ content: string; binary: boolean; tooLarge: boolean; size: number }>;
+  /** The bytes of a file (images, downloads), up to a few MB. */
+  raw(path: string): Promise<Uint8Array>;
+  write(path: string, content: string): Promise<void>;
+  create(path: string, dir: boolean): Promise<void>;
+  rename(from: string, to: string): Promise<void>;
+  /** To the recycle bin of the computer (it can be restored from there). */
+  trash(path: string): Promise<void>;
+  /** Project files whose path contains `query`. */
+  find(query: string): Promise<string[]>;
+}
+
+/** A terminal the phone can see: one of the computer's or one the phone opened. */
+export interface PhoneTerm {
+  id: number;
+  name: string;
+  /** Opened from the phone (it may close it and change its size). */
+  phone: boolean;
+  alive: boolean;
+  cols: number;
+  rows: number;
+}
+
+/** The terminals of the window the phone controls (see main.ts). */
+export interface PhoneTerminals {
+  list(): PhoneTerm[];
+  create(cols: number, rows: number): PhoneTerm;
+  /**
+   * Output after `since` (an offset in the terminal's output). Waits up to ~20 s for new
+   * output when there is none. `from` > `since` when older output was dropped.
+   */
+  read(
+    id: number,
+    since: number,
+    abort: AbortSignal,
+  ): Promise<{ from: number; data: string; next: number; alive: boolean; cols: number; rows: number }>;
+  write(id: number, data: string): void;
+  resize(id: number, cols: number, rows: number): void;
+  kill(id: number): void;
+}
+
+/** Git of the project the phone controls (see main.ts). */
+export interface PhoneGit {
+  status(): Promise<unknown>;
+  diff(path: string): Promise<string>;
+  /** Stages everything (or `paths`) and commits. */
+  commit(message: string, paths?: string[]): Promise<void>;
+  sync(op: 'pull' | 'push' | 'fetch'): Promise<string>;
+  log(): Promise<unknown>;
+}
+
+/** Zinarix's settings for the phone's "Configuración" screen (see main.ts). */
+export interface PhoneConfig {
+  get(): Promise<PhoneConfigView>;
+  /** Applies a change already checked by PhoneConfigPatchSchema; throws a message for the phone. */
+  set(patch: PhoneConfigPatch): Promise<void>;
+}
+
+export interface PhoneTools {
+  files?: PhoneFiles;
+  terminals?: PhoneTerminals;
+  git?: PhoneGit;
+  config?: PhoneConfig;
+}
+
+const Ref = z.string().min(3).max(300);
+const Usd = z.number().min(0).max(1_000_000);
+/** What the phone may change in Zinarix's settings (keys, fonts and commands stay on the PC). */
+export const PhoneConfigPatchSchema = z
+  .object({
+    defaultModel: Ref,
+    role: z.object({ role: z.enum(['chat', 'agent', 'inline']), ref: Ref.nullable() }),
+    localOnly: z.boolean(),
+    theme: z.enum(THEME_IDS),
+    prefs: z
+      .object({
+        uiZoom: z.number().int().refine((n) => UI_ZOOM_STEPS.includes(n)),
+        fontSize: z.number().int().min(8).max(40),
+        tabSize: z.number().int().min(1).max(16),
+        wordWrap: z.boolean(),
+        minimap: z.boolean(),
+        lineNumbers: z.boolean(),
+        formatOnSave: z.boolean(),
+        autoSave: z.boolean(),
+        inlineCompletions: z.boolean(),
+        nextEdit: z.boolean(),
+        autoImport: z.boolean(),
+        projectRules: z.boolean(),
+        lsp: z.boolean(),
+        helperBubble: z.boolean(),
+        windowEffects: z.boolean(),
+        taskParallel: z.number().int().min(1).max(8),
+      })
+      .partial()
+      .strict(),
+    budget: z.object({
+      provider: z.string().min(1).max(100),
+      daily: Usd.optional(),
+      monthly: Usd.optional(),
+    }),
+  })
+  .partial()
+  .strict();
+
+const Rel = z.string().max(4096);
+const Dim = z.number().int().min(2).max(500);
 
 /** The repositories of this computer, for the phone (see main.ts). */
 export interface PhoneRepos {
@@ -126,11 +252,17 @@ interface SavedDevice extends PhoneDevice {
 interface Saved {
   enabled?: boolean;
   remote?: boolean;
+  /** The port it listened on last time (the link keeps it, also when 47390 was taken). */
+  port?: number;
   /** The secret after # in the link from anywhere (the same one every time). */
   key?: string;
   devices?: SavedDevice[];
   /** The user's own Cloudflare tunnel: always the same address. Token sealed by `store.seal`. */
   fixed?: { host: string; token: string };
+  /** Gist that holds the current tunnel address: the permanent link (see phoneBeacon.ts). */
+  relay?: string;
+  /** What the phones may use besides the chats (missing = on). */
+  allow?: Partial<PhoneAllow>;
 }
 
 /** Where the state is kept, and how the tunnel token is sealed (Electron safeStorage). */
@@ -177,7 +309,16 @@ export class PhoneRemote {
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private port = 0;
   private tunnel = new Tunnel();
-  private remote: { url?: string; key: string; progress?: string; error?: string } | null = null;
+  private remote: {
+    url?: string;
+    key: string;
+    progress?: string;
+    error?: string;
+    /** The gist already points to `url`: the permanent link works. */
+    relayed?: boolean;
+    /** Why there is no permanent link (no gh, not signed in). */
+    relayError?: string;
+  } | null = null;
 
   constructor(
     private onAction: (a: PhoneAction) => void,
@@ -189,6 +330,9 @@ export class PhoneRemote {
     guardFile?: () => string,
     private models?: PhoneModelSource,
     private store?: PhoneStore,
+    private tools: PhoneTools = {},
+    /** Writes the current address where the permanent link reads it (none: no such link). */
+    private beacon?: PhoneBeacon,
   ) {
     this.guard = new PairingGuard(Date.now, guardFile);
   }
@@ -288,6 +432,34 @@ export class PhoneRemote {
     return this.status();
   }
 
+  /** Files, terminal and git for the phones (each one can be turned off on the computer). */
+  allowed(): PhoneAllow {
+    const a = this.state().allow ?? {};
+    return {
+      files: a.files !== false && !!this.tools.files,
+      terminal: a.terminal !== false && !!this.tools.terminals,
+      git: a.git !== false && !!this.tools.git,
+      config: a.config !== false && !!this.tools.config,
+    };
+  }
+
+  setAllow(allow: PhoneAllow): PhoneStatus {
+    const s = this.state();
+    s.allow = {
+      files: allow.files,
+      terminal: allow.terminal,
+      git: allow.git,
+      config: allow.config ?? s.allow?.config,
+    };
+    this.save();
+    if (!allow.terminal) this.onTerminalOff?.();
+    this.wake();
+    return this.status();
+  }
+
+  /** Called when the terminal is turned off for the phones (main closes the phone's shells). */
+  onTerminalOff?: () => void;
+
   private fixedTunnel(): { host: string; token: string } | undefined {
     const f = this.state().fixed;
     if (!f || !this.store?.open) return undefined;
@@ -311,6 +483,7 @@ export class PhoneRemote {
       devices: this.devices(),
       fixedHost: s.fixed?.host,
       autostart: !!s.enabled,
+      allow: this.allowed(),
     };
     if (!this.server) return { running: false, phones: 0, ...common };
     const r = this.remote;
@@ -322,10 +495,16 @@ export class PhoneRemote {
       phones: s.devices!.length,
       remote: r
         ? {
-            url: r.url ? `${r.url}/#k=${r.key}` : undefined,
+            url: r.url
+              ? r.relayed && s.relay && !s.fixed
+                ? relayLink(s.relay, r.key)
+                : `${r.url}/#k=${r.key}`
+              : undefined,
             progress: r.progress,
             error: r.error,
             fixed: !!s.fixed,
+            permanent: !!s.fixed || (!!r.url && !!r.relayed && !!s.relay),
+            relayError: s.fixed ? undefined : r.relayError,
           }
         : undefined,
       ...common,
@@ -350,7 +529,7 @@ export class PhoneRemote {
     const port = await new Promise<number>((ok, fail) => {
       const listen = (p: number) => {
         const onError = (e: NodeJS.ErrnoException) =>
-          e.code === 'EADDRINUSE' && p !== 0 ? listen(0) : fail(e);
+          e.code === 'EADDRINUSE' && p !== 0 ? listen(p === PORT ? 0 : PORT) : fail(e);
         server.once('error', onError);
         server.listen(p, '0.0.0.0', () => {
           // Listening: this attempt's handler must not stay attached (nor fire on a later error).
@@ -359,8 +538,13 @@ export class PhoneRemote {
           ok(typeof a === 'object' && a ? a.port : p);
         });
       };
-      listen(PORT);
+      const last = saved.port;
+      listen(typeof last === 'number' && last > 1024 && last < 65536 ? last : PORT);
     });
+    if (saved.port !== port) {
+      saved.port = port;
+      this.save();
+    }
     this.server = server;
     this.port = port;
     this.host = `${ip}:${port}`;
@@ -380,6 +564,7 @@ export class PhoneRemote {
       this.save();
     }
     if (!on || !this.server) {
+      if (user && !on && this.remote) this.unpublish();
       this.closeTunnel();
       return this.status();
     }
@@ -414,6 +599,7 @@ export class PhoneRemote {
       }
       remote.url = url;
       this.retries = 0;
+      if (!fixed) this.publish(remote, url);
     } catch (e) {
       if (live()) {
         remote.error = e instanceof Error ? e.message : String(e);
@@ -423,6 +609,38 @@ export class PhoneRemote {
     }
     remote.progress = undefined;
     return this.status();
+  }
+
+  /**
+   * Writes the new address in the gist of the permanent link. Until it is written the status
+   * shows the direct address; a phone that has the permanent link waits on the relay page.
+   */
+  private publish(remote: NonNullable<PhoneRemote['remote']>, url: string): void {
+    if (!this.beacon) return;
+    const s = this.state();
+    this.beacon(url, s.relay).then(
+      (id) => {
+        if (id && id !== s.relay) {
+          s.relay = id;
+          this.save();
+        }
+        if (this.remote !== remote || remote.url !== url) return;
+        remote.relayed = true;
+        remote.relayError = undefined;
+        this.onStatus(this.status());
+      },
+      (e) => {
+        if (this.remote !== remote) return;
+        remote.relayError = beaconError(e);
+        this.onStatus(this.status());
+      },
+    );
+  }
+
+  /** The remote was turned off by the user: the permanent link says so (best effort). */
+  private unpublish(): void {
+    const id = this.state().relay;
+    if (id && this.beacon) this.beacon(null, id).catch(() => {});
   }
 
   /** The tunnel fell (internet cut, sleep): open it again, waiting longer each time. */
@@ -445,6 +663,7 @@ export class PhoneRemote {
       saved.enabled = false;
       saved.remote = false;
       this.save();
+      if (this.remote) this.unpublish();
     }
     this.closeTunnel();
     if (this.heartbeat) clearInterval(this.heartbeat);
@@ -569,7 +788,7 @@ export class PhoneRemote {
           'Cache-Control': 'no-store',
           'X-Frame-Options': 'DENY',
           'Referrer-Policy': 'no-referrer',
-          'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+          'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data: blob:; media-src blob:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
         });
         return void res.end(phonePage(nonce, phoneLang(req.headers['accept-language'])));
       }
@@ -580,6 +799,15 @@ export class PhoneRemote {
           'Cache-Control': 'no-cache',
         });
         return void res.end(JSON.stringify(MANIFEST));
+      }
+      // The permanent link's page asks whether this address is alive before sending the phone
+      // here (a dead tunnel answers with Cloudflare's error page, without this header).
+      if (req.method === 'GET' && url.pathname === '/api/alive') {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': new URL(RELAY_PAGE).origin,
+          'Cache-Control': 'no-store',
+        });
+        return void res.end();
       }
       if (req.method === 'GET' && url.pathname === '/icon.svg') {
         res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400' });
@@ -698,11 +926,175 @@ export class PhoneRemote {
           return end(res, 409, { error: e instanceof Error ? e.message : String(e) });
         }
       }
+      if (req.method === 'GET' && url.pathname === '/api/caps') return end(res, 200, this.allowed());
+      if (url.pathname.startsWith('/api/files/')) return await this.filesRoute(req, res, url);
+      if (url.pathname.startsWith('/api/term')) return await this.termRoute(req, res, url);
+      if (url.pathname.startsWith('/api/git/')) return await this.gitRoute(req, res, url);
+      if (url.pathname === '/api/config') return await this.configRoute(req, res);
       end(res, 404, { error: 'not found' });
     } catch {
       end(res, 400, { error: 'bad request' });
     }
   }
+
+  /** Turned off on the computer (Configuración → Celular): the phone explains where. */
+  private off(res: ServerResponse): void {
+    end(res, 403, {
+      error: 'Desactivado en la computadora (Configuración → Celular).',
+      off: true,
+    });
+  }
+
+  private async filesRoute(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const files = this.tools.files;
+    if (!files || !this.allowed().files) return this.off(res);
+    const op = url.pathname.slice('/api/files/'.length);
+    const path = Rel.parse(url.searchParams.get('path') ?? '');
+    try {
+      if (req.method === 'GET' && op === 'list') return end(res, 200, await files.list(path));
+      if (req.method === 'GET' && op === 'read') return end(res, 200, await files.read(path));
+      if (req.method === 'GET' && op === 'find') {
+        const q = z.string().min(1).max(200).parse(url.searchParams.get('q'));
+        return end(res, 200, { paths: await files.find(q) });
+      }
+      if (req.method === 'GET' && op === 'raw') {
+        const bytes = await files.raw(path);
+        res.writeHead(200, {
+          // Never rendered as a page of this origin: the phone shows it as a blob.
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': bytes.length,
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Disposition': 'attachment',
+        });
+        return void res.end(bytes);
+      }
+      if (req.method !== 'POST') return end(res, 404, { error: 'not found' });
+      if (op === 'write') {
+        const b = z
+          .object({ path: Rel.min(1), content: z.string().max(4_000_000) })
+          .parse(await body(req, 6_000_000));
+        await files.write(b.path, b.content);
+        return end(res, 200, { ok: true });
+      }
+      if (op === 'create') {
+        const b = z.object({ path: Rel.min(1), dir: z.boolean() }).parse(await body(req));
+        await files.create(b.path, b.dir);
+        return end(res, 200, { ok: true });
+      }
+      if (op === 'rename') {
+        const b = z.object({ from: Rel.min(1), to: Rel.min(1) }).parse(await body(req));
+        await files.rename(b.from, b.to);
+        return end(res, 200, { ok: true });
+      }
+      if (op === 'trash') {
+        const b = z.object({ path: Rel.min(1) }).parse(await body(req));
+        await files.trash(b.path);
+        return end(res, 200, { ok: true });
+      }
+      end(res, 404, { error: 'not found' });
+    } catch (e) {
+      if (e instanceof z.ZodError) throw e;
+      end(res, 409, { error: friendly(e) });
+    }
+  }
+
+  private async termRoute(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const t = this.tools.terminals;
+    if (!t || !this.allowed().terminal) return this.off(res);
+    const op = url.pathname.slice('/api/term'.length);
+    try {
+      if (req.method === 'GET' && op === 's') return end(res, 200, { terms: t.list() });
+      if (req.method === 'GET' && op === '/read') {
+        const id = z.coerce.number().int().parse(url.searchParams.get('id'));
+        const since = z.coerce.number().int().min(0).parse(url.searchParams.get('since') ?? 0);
+        if (!t.list().some((x) => x.id === id))
+          return end(res, 404, { error: 'Esa terminal ya no existe.' });
+        const abort = new AbortController();
+        req.on('close', () => abort.abort());
+        return end(res, 200, await t.read(id, since, abort.signal));
+      }
+      if (req.method !== 'POST') return end(res, 404, { error: 'not found' });
+      if (op === '/new') {
+        const b = z.object({ cols: Dim, rows: Dim }).parse(await body(req));
+        return end(res, 200, t.create(b.cols, b.rows));
+      }
+      const b = z
+        .object({
+          id: z.number().int(),
+          data: z.string().max(100_000).optional(),
+          cols: Dim.optional(),
+          rows: Dim.optional(),
+        })
+        .parse(await body(req, 200_000));
+      if (!t.list().some((x) => x.id === b.id))
+        return end(res, 404, { error: 'Esa terminal ya no existe.' });
+      if (op === '/write' && b.data !== undefined) t.write(b.id, b.data);
+      else if (op === '/resize' && b.cols && b.rows) t.resize(b.id, b.cols, b.rows);
+      else if (op === '/kill') t.kill(b.id);
+      else return end(res, 404, { error: 'not found' });
+      return end(res, 200, { ok: true });
+    } catch (e) {
+      if (e instanceof z.ZodError) throw e;
+      end(res, 409, { error: friendly(e) });
+    }
+  }
+
+  private async configRoute(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const c = this.tools.config;
+    if (!c || !this.allowed().config) return this.off(res);
+    try {
+      if (req.method === 'GET') return end(res, 200, await c.get());
+      if (req.method === 'POST') {
+        await c.set(PhoneConfigPatchSchema.parse(await body(req)));
+        return end(res, 200, await c.get());
+      }
+      end(res, 404, { error: 'not found' });
+    } catch (e) {
+      if (e instanceof z.ZodError) throw e;
+      end(res, 409, { error: friendly(e) });
+    }
+  }
+
+  private async gitRoute(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    const g = this.tools.git;
+    if (!g || !this.allowed().git) return this.off(res);
+    const op = url.pathname.slice('/api/git/'.length);
+    try {
+      if (req.method === 'GET' && op === 'status') return end(res, 200, await g.status());
+      if (req.method === 'GET' && op === 'log') return end(res, 200, { commits: await g.log() });
+      if (req.method === 'GET' && op === 'diff')
+        return end(res, 200, { diff: await g.diff(Rel.min(1).parse(url.searchParams.get('path'))) });
+      if (req.method === 'POST' && op === 'commit') {
+        const b = z
+          .object({
+            message: z.string().trim().min(1).max(20_000),
+            paths: z.array(Rel.min(1)).max(5000).optional(),
+          })
+          .parse(await body(req, 1_000_000));
+        await g.commit(b.message, b.paths);
+        return end(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && op === 'sync') {
+        const b = z.object({ op: z.enum(['pull', 'push', 'fetch']) }).parse(await body(req));
+        return end(res, 200, { output: await g.sync(b.op) });
+      }
+      end(res, 404, { error: 'not found' });
+    } catch (e) {
+      if (e instanceof z.ZodError) throw e;
+      end(res, 409, { error: friendly(e) });
+    }
+  }
+}
+
+/** An error for the phone, in words (no stack). */
+function friendly(e: unknown): string {
+  const m = e instanceof Error ? e.message : String(e);
+  if (/ENOENT/.test(m)) return 'No existe.';
+  if (/EEXIST|already exists/.test(m)) return 'Ya existe uno con ese nombre.';
+  if (/EACCES|EPERM/.test(m)) return 'Sin permiso para hacerlo en la computadora.';
+  if (/escapes the workspace|absolute paths/.test(m)) return 'Solo se puede dentro del proyecto.';
+  return m.slice(0, 2000);
 }
 
 const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cff"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#g)"/><path d="M150 150h212v40L208 322h154v40H150v-40l154-132H150z" fill="#fff"/></svg>`;
@@ -729,13 +1121,13 @@ function end(res: ServerResponse, code: number, json: unknown): void {
 }
 
 /** A JSON body (only JSON: a page on another site cannot post it without asking first). */
-async function body(req: IncomingMessage): Promise<unknown> {
+async function body(req: IncomingMessage, max = 64_000): Promise<unknown> {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new Error('json only');
   let size = 0;
   const chunks: Buffer[] = [];
   for await (const c of req as AsyncIterable<Buffer>) {
     size += c.length;
-    if (size > 64_000) throw new Error('too big');
+    if (size > max) throw new Error('too big');
     chunks.push(c);
   }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));

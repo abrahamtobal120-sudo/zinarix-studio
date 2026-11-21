@@ -125,6 +125,36 @@ function baseCommands(): Command[] {
         getState().workspace ? setState({ modal: { kind: 'tasks' } }) : toast(t('noFolder')),
     },
     {
+      id: 'graphics.open',
+      label: 'Estudio gráfico: nuevo diseño, logo o dibujo / Graphics studio',
+      run: () => setState({ sidebar: 'graphics' }),
+    },
+    {
+      id: 'docker.open',
+      label: 'Docker: abrir panel / open panel',
+      run: () => setState({ sidebar: 'docker' }),
+    },
+    {
+      id: 'hardware.open',
+      label: 'Hardware: Arduino / PlatformIO',
+      run: () => setState({ sidebar: 'hardware' }),
+    },
+    {
+      id: 'games.open',
+      label: 'Juegos / Games: Godot, web, Unity, Unreal',
+      run: () => setState({ sidebar: 'games' }),
+    },
+    {
+      id: 'cad.open',
+      label: 'CAD 3D: OpenSCAD, impresión 3D / 3D printing',
+      run: () => setState({ sidebar: 'cad' }),
+    },
+    {
+      id: 'mobile.open',
+      label: 'Celular / Phone: Android, Flutter, Expo',
+      run: () => setState({ sidebar: 'mobile' }),
+    },
+    {
       id: 'tests.open',
       label: t('cmdTestsOpen'),
       run: () => setState({ sidebar: 'testing' }),

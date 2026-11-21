@@ -52,6 +52,10 @@
   margin: 4px 0 12px;
   font-weight: 600;
 }
+/* Each later section starts with some air, not glued to the line of the row above. */
+.settings-body h3:not(:first-of-type) {
+  margin-top: 28px;
+}
 .settings-field,
 .settings-toggle {
   display: flex;

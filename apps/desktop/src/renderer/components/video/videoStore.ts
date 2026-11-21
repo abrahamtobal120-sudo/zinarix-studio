@@ -17,6 +17,7 @@ import {
 import { confirmDialog } from '../../confirm';
 import { api, toast } from '../../store';
 import { tv } from './strings';
+import { autoProxy, findProxies } from './proxies';
 
 export type StudioTab =
   | 'media'
@@ -43,6 +44,13 @@ export interface VState {
   future: { project: VideoProject; label: string }[];
   /** zmedia:// URLs by media id (runtime only, never saved). */
   urls: Record<string, string>;
+  /** Fase 4C: proxy URLs by media id, and the progress (0–1) of the ones being made. */
+  proxies: Record<string, string>;
+  proxyProg: Record<string, number>;
+  /** Play the proxies instead of the originals (the export always reads the originals). */
+  useProxy: boolean;
+  /** Make proxies on import for videos above 1080p. */
+  autoProxy: boolean;
   thumbs: Record<string, string>;
   waves: Record<string, { pps: number; peaks: number[] }>;
   importing: string[];
@@ -70,6 +78,29 @@ export interface VState {
 }
 
 const LAYOUT_KEY = 'zvs.layout';
+const PROXY_KEY = 'zvs.proxy';
+
+function proxyPrefs(): { useProxy: boolean; autoProxy: boolean } {
+  try {
+    const j = JSON.parse(localStorage.getItem(PROXY_KEY) ?? '{}') as Record<string, unknown>;
+    return { useProxy: j.use !== false, autoProxy: j.auto !== false };
+  } catch {
+    return { useProxy: true, autoProxy: true };
+  }
+}
+export function saveProxyPrefs(p: { useProxy?: boolean; autoProxy?: boolean }): void {
+  setV(p);
+  try {
+    localStorage.setItem(PROXY_KEY, JSON.stringify({ use: state.useProxy, auto: state.autoProxy }));
+  } catch {
+    // private mode: only this session
+  }
+}
+
+/** Fase 4C: what the preview plays for a media item (its proxy when there is one and they are on). */
+export function playUrl(s: VState, mediaId: string): string | undefined {
+  return (s.useProxy && s.proxies[mediaId]) || s.urls[mediaId];
+}
 
 let state: VState = {
   open: false,
@@ -82,6 +113,9 @@ let state: VState = {
   past: [],
   future: [],
   urls: {},
+  proxies: {},
+  proxyProg: {},
+  ...proxyPrefs(),
   thumbs: {},
   waves: {},
   importing: [],
@@ -279,6 +313,7 @@ export async function importPaths(paths: string[]): Promise<MediaItem[]> {
       commit({ ...state.project, media: [...state.project.media, item] }, tv('import'));
       setV((s) => ({ urls: { ...s.urls, [item.id]: url } }));
       void loadDerived(item);
+      void autoProxy(item);
       added.push(item);
     } catch (e) {
       toast(
@@ -376,6 +411,8 @@ async function loadProject(project: VideoProject, path: string | null): Promise<
     past: [],
     future: [],
     urls,
+    proxies: {},
+    proxyProg: {},
     thumbs: {},
     waves: {},
     selection: [],
@@ -384,6 +421,7 @@ async function loadProject(project: VideoProject, path: string | null): Promise<
     savedAt: path ? Date.now() : null,
   });
   for (const m of project.media) void loadDerived(m);
+  void findProxies();
 }
 
 export async function newProjectWith(opts: {

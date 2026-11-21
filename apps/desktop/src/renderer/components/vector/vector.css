@@ -1,0 +1,521 @@
+@layer features {
+/* Design editor (Fase 3B del plan de funciones) */
+.vd {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-sm);
+}
+.vd-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  flex-wrap: wrap;
+}
+.vd-bar .spacer {
+  flex: 1;
+}
+.vd-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.vd button {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: inherit;
+  padding: 3px 8px;
+  font-size: var(--text-sm);
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 28px;
+  line-height: 1.3;
+}
+.vd button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.vd button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-color);
+}
+.vd button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.vd button.danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--on-color);
+}
+.vd-zoom {
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+}
+.vd-menu-wrap {
+  position: relative;
+}
+.vd-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  min-width: 160px;
+}
+.vd-menu.right {
+  left: auto;
+  right: 0;
+}
+.vd-menu > button {
+  text-align: left;
+}
+.vd-pop {
+  gap: 6px;
+  min-width: 240px;
+}
+.vd-ai {
+  min-width: 320px;
+}
+.vd-ai textarea {
+  width: 100%;
+  resize: vertical;
+  background: var(--bg-3);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+}
+.vd-note {
+  padding: 4px 10px;
+  background: var(--bg-3);
+  color: var(--warn);
+  border-bottom: 1px solid var(--border);
+}
+.vd-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.vd-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  outline: none;
+  background: var(--bg-3);
+  touch-action: none;
+  cursor: default;
+}
+.vd-stage.tool-hand {
+  cursor: grab;
+}
+.vd-stage.tool-rect,
+.vd-stage.tool-ellipse,
+.vd-stage.tool-line,
+.vd-stage.tool-pen {
+  cursor: crosshair;
+}
+.vd-stage.tool-text {
+  cursor: text;
+}
+.vd-host {
+  position: absolute;
+  background-color: var(--white);
+  background-image:
+    linear-gradient(45deg, var(--gray-3) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--gray-3) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--gray-3) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--gray-3) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+.vd-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.vd-page {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.vd-hover {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+.vd-in-group {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.vd-sel {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.vd-sel-each {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.vd-h {
+  fill: var(--white);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+.vd-h-nw,
+.vd-h-se {
+  cursor: nwse-resize;
+}
+.vd-h-ne,
+.vd-h-sw {
+  cursor: nesw-resize;
+}
+.vd-h-n,
+.vd-h-s {
+  cursor: ns-resize;
+}
+.vd-h-e,
+.vd-h-w {
+  cursor: ew-resize;
+}
+.vd-rot {
+  fill: var(--white);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+  cursor: grab;
+}
+.vd-rot-line {
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.vd-dim {
+  fill: var(--on-color);
+  font-size: var(--text-xs);
+  paint-order: stroke;
+  stroke: var(--accent);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+}
+.vd-guide {
+  stroke: var(--danger);
+  stroke-width: 1;
+}
+.vd-marquee {
+  fill: var(--sel-soft);
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.vd-pen-next {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.vd-pen-handle {
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.vd-pen-hdot {
+  fill: var(--accent);
+}
+.vd-pen-pt {
+  fill: var(--white);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.vd-pen-pt.first {
+  fill: var(--accent);
+}
+.vd-text-edit {
+  position: absolute;
+  z-index: 5;
+  padding: 0 2px;
+  margin: 0;
+  border: 1px dashed var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+}
+.vd-error {
+  position: absolute;
+  inset: 24px;
+  padding: 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+}
+.vd-error pre {
+  white-space: pre-wrap;
+  color: var(--danger);
+  font-family: var(--font-mono);
+}
+.vd-layers,
+.vd-side {
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--bg-2);
+  font-size: var(--text-sm);
+}
+.vd-layers {
+  width: 210px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.vd-side {
+  width: 264px;
+  border-left: 1px solid var(--border);
+  padding: 4px 12px 16px;
+}
+.vd-side-title {
+  padding: 8px 10px 4px;
+  font-weight: 600;
+}
+.vd-layer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 4px;
+}
+.vd-layer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.vd-layer:hover {
+  background: var(--hover);
+}
+.vd-layer.on {
+  background: var(--sel);
+}
+.vd-layer.hidden .vd-layer-name {
+  opacity: 0.45;
+}
+.vd-layer-kind {
+  width: 16px;
+  text-align: center;
+  color: var(--fg-dim);
+}
+.vd-layer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vd-layer input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-3);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  font: inherit;
+  padding: 0 4px;
+}
+.vd-layer-count {
+  color: var(--fg-dim);
+  font-size: var(--text-xs);
+}
+.vd .vd-ico {
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  min-width: 18px;
+  opacity: 0;
+  font-size: var(--text-xs);
+}
+.vd-layer:hover .vd-ico,
+.vd .vd-ico.set {
+  opacity: 0.85;
+}
+.vd .vd-crumb {
+  margin: 0 6px 4px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vd-side section {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.vd-side section:last-child {
+  border-bottom: none;
+}
+.vd-side h4 {
+  margin: 6px 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vd-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0;
+}
+.vd-wrap {
+  flex-wrap: wrap;
+}
+.vd-grid4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+.vd-num {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-dim);
+  flex: 1;
+  min-width: 0;
+}
+.vd-num input,
+.vd-hex,
+.vd-field select {
+  width: 100%;
+  min-width: 0;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: var(--text-sm);
+}
+.vd-hex {
+  flex: 1;
+  font-family: var(--font-mono);
+}
+.vd input[type='color'] {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.vd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0;
+  color: var(--fg-dim);
+}
+.vd-slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 6px;
+  margin: 6px 0;
+  color: var(--fg-dim);
+}
+.vd-slider-val {
+  font-variant-numeric: tabular-nums;
+}
+.vd-slider input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent);
+}
+.vd-dim-label {
+  color: var(--fg-dim);
+  margin-right: 4px;
+}
+.vd-hint {
+  margin: 6px 0;
+  padding: 0 4px;
+  color: var(--fg-dim);
+  font-size: var(--text-xs);
+}
+.vd-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vd .vd-wide {
+  width: 100%;
+  margin-bottom: 4px;
+}
+/* Editing the points of a path */
+.vd-node-outline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.vd-node {
+  fill: var(--white);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+  cursor: move;
+}
+.vd-node.on {
+  fill: var(--accent);
+}
+.vd-node-h {
+  fill: var(--accent);
+  stroke: var(--white);
+  stroke-width: 1;
+  pointer-events: all;
+  cursor: pointer;
+}
+.vd-help {
+  margin: 6px 0 8px;
+  padding-left: 16px;
+  color: var(--fg-dim);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+}
+@layer features {
+.breadcrumbs .crumb-action {
+  margin-left: 10px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: inherit;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+.breadcrumbs .crumb-action:hover {
+  background: var(--hover);
+}
+}

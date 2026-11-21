@@ -46,6 +46,7 @@ import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
 import type { BrowserController } from './browser.js';
 import type { Workspace } from './workspace.js';
+import { COMPUTER_MODE_NOTE, type ComputerRunHooks } from './computerTools.js';
 import { isAdapterImplemented } from '@omni/providers';
 import type {
   ChatEventView,
@@ -81,9 +82,46 @@ const COMMIT_SYSTEM =
   '(max 72 characters, imperative mood) and, if useful, a blank line and a short bullet list of the main changes. ' +
   'Write it in the language the project already uses in its code comments or, if unclear, in Spanish. No markdown fences.';
 
+const IMPROVE_PROMPT_SYSTEM =
+  'You improve prompts before they are sent to an AI assistant. You never answer or carry out the request.';
+
+/** Like titlePrompt: the instructions travel in the user turn (CLI agents drop system prompts). */
+function improvePromptRequest(message: string): string {
+  return (
+    'Rewrite the message between <message> tags so an AI assistant understands it better: fix spelling, ' +
+    'state the goal clearly, keep every detail, file name, code and constraint the user gave, and add a short ' +
+    'note of the expected result when it helps. Do not invent requirements, do not answer it, do not carry it out. ' +
+    'Write it in the same language as the message, speaking as the user. Output ONLY the rewritten message, ' +
+    'with no preface, quotes or markdown fences.\n\n<message>\n' +
+    message +
+    '\n</message>'
+  );
+}
+
 const TITLE_SYSTEM =
-  'You name chat conversations. Given the first message of a chat, output only a short title for it ' +
-  '(2 to 6 words, no quotes, no final period), in the same language as the message.';
+  'You name chat conversations. You never answer or carry out the message: you only label its topic.';
+
+/**
+ * The naming request goes in the user turn itself: CLI agents (Claude Code, Codex…) drop
+ * system prompts, so with the instructions only there they would start doing the task and
+ * their first line ("Voy a revisar…") became the name.
+ */
+function titlePrompt(message: string): string {
+  return (
+    'Give a title of 3 to 5 words for the chat that starts with the message between the ' +
+    '<message> tags. The title says what the chat is ABOUT (its topic, like "Error de login en React" ' +
+    'or "Receta de pan casero"), not what you are going to do: never start with "Voy a", ' +
+    '"I will", "Let me" or similar, and do not answer, run or carry out the message. ' +
+    'Write it in the same language as the message, with no quotes and no final period. ' +
+    'Reply with the title only, on one line.\n\n<message>\n' +
+    message +
+    '\n</message>'
+  );
+}
+
+/** Drops answers that describe an action instead of a topic ("Voy a…", "Let me…"). */
+const ACTION_TITLE =
+  /^(voy a|vamos a|déjame|dejame|claro[,!]|perfecto[,!]|entendido|i'?ll|i will|let me|sure[,!]|okay[,!])/i;
 
 /** Project rules files, first match wins (paths relative to the workspace root). */
 export const RULES_FILES = ['.zinarix/rules.md', 'AGENTS.md', 'CLAUDE.md', '.cursorrules'];
@@ -98,6 +136,9 @@ export function describeError(e: unknown): { message: string; code: string } {
   if (e instanceof OmniError) {
     if (e.code === 'auth' && e.status === undefined && e.provider)
       return { code: e.code, message: t('err.no_key', { provider: e.provider }) };
+    // The core's hint is for the CLI (`omni use …`): in the app, point to the model picker.
+    if (e.code === 'config' && e.message.startsWith('no model selected'))
+      return { code: e.code, message: t('err.no_model') };
     const base = t(`err.${e.code}` as MessageKey, {
       provider: e.provider ?? '',
       detail: e.message,
@@ -145,6 +186,8 @@ export interface Scope {
   browser?: BrowserController;
   /** Fase 5: a background task (run_command stays in its worktree, limits apply). */
   task?: TaskScope;
+  /** "Controlar la compu": the window's bar and minimize while the AI acts (stop = abort). */
+  computerUi?: (stop: () => void) => ComputerRunHooks;
 }
 
 /**
@@ -671,6 +714,11 @@ export class AiService {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
     const rec = new TurnRecorder(requestId, req.mode);
+    // "Controlar la compu" (not in plan mode: it changes nothing until the plan is approved).
+    const pc =
+      req.computer && req.mode !== 'plan' && !scope.task
+        ? scope.computerUi?.(() => ctrl.abort())
+        : undefined;
     const at = Date.now();
     let convId: string | undefined;
     const send = (ev: ChatEventView) => {
@@ -682,6 +730,7 @@ export class AiService {
           { conversationId: convId, prompt: req.prompt, ...rec.progress(), at },
           ev.type === 'text' || ev.type === 'reasoning' || ev.type === 'tool_output',
         );
+      if (pc && ev.type === 'tool_approval') pc.needUser();
       emit(requestId, ev);
     };
     try {
@@ -710,11 +759,13 @@ export class AiService {
         mode: req.mode,
         scope,
         delegation: this.features().delegation,
-        rules: this.rulesBlock(
-          scope,
-          req.context.map((c) => c.source),
-          req.prompt,
-        ),
+        ...(pc ? { computer: pc } : {}),
+        rules:
+          this.rulesBlock(
+            scope,
+            req.context.map((c) => c.source),
+            req.prompt,
+          ) + (pc ? COMPUTER_MODE_NOTE : ''),
         ruleFeed: this.ruleFeed(
           scope,
           new RuleTracker(
@@ -747,6 +798,7 @@ export class AiService {
         answer: (toolCallId) =>
           new Promise<string[] | null>((resolve) => {
             if (ctrl.signal.aborted) return resolve(null);
+            pc?.needUser();
             const key = `${requestId}:${toolCallId}`;
             const onAbort = () => {
               this.answers.delete(key);
@@ -763,6 +815,7 @@ export class AiService {
       const d = describeError(e);
       send({ type: 'error', code: d.code, message: d.message });
     } finally {
+      pc?.end();
       this.running.delete(requestId);
       if (convId) saveTurn(rec, this.core, convId);
       this.journal.drop(requestId);
@@ -1071,6 +1124,30 @@ export class AiService {
     return r.text.replace(/^```[\w-]*\n?|```\s*$/g, '').trim();
   }
 
+  /**
+   * Rewrites what the user is about to send so the AI understands it better (clearer goal,
+   * context and expected result), in the user's language. Nothing is sent to the chat: the
+   * user reviews the new text first.
+   */
+  async improvePrompt(prompt: string, model?: string): Promise<string> {
+    if (!prompt.trim()) throw new Error('No hay nada que mejorar.');
+    const r = await this.core.complete(
+      {
+        model,
+        role: 'chat',
+        maxTokens: 1200,
+        messages: [
+          { role: 'system', content: IMPROVE_PROMPT_SYSTEM },
+          { role: 'user', content: improvePromptRequest(prompt.slice(0, 20000)) },
+        ],
+      },
+      new AbortController().signal,
+    );
+    const text = r.text.replace(/^```[\w-]*\n?|```\s*$/g, '').trim();
+    if (!text) throw new Error('La IA no devolvió texto.');
+    return text;
+  }
+
   /** Names a new conversation after what it is about, in a few words; quiet on failure. */
   private async autoTitle(id: string, prompt: string, model?: string): Promise<void> {
     if (!prompt.trim()) return;
@@ -1082,7 +1159,7 @@ export class AiService {
           maxTokens: 30,
           messages: [
             { role: 'system', content: TITLE_SYSTEM },
-            { role: 'user', content: prompt.slice(0, 2000) },
+            { role: 'user', content: titlePrompt(prompt.slice(0, 2000)) },
           ],
         },
         new AbortController().signal,
@@ -1091,9 +1168,13 @@ export class AiService {
         .split('\n')
         .map((l) => l.trim())
         .find(Boolean)
-        ?.replace(/^["'`*#\s]+|["'`*.\s]+$/g, '')
+        ?.replace(/^(title|título|titulo)\s*:\s*/i, '')
+        .replace(/^["'`*#\s]+|["'`*.\s]+$/g, '')
+        .split(/\s+/)
+        .slice(0, 6)
+        .join(' ')
         .slice(0, 60);
-      if (!title || !this.core.history.get(id)) return;
+      if (!title || ACTION_TITLE.test(title) || !this.core.history.get(id)) return;
       this.core.history.rename(id, title);
       this.onTitle?.(id, title);
     } catch {

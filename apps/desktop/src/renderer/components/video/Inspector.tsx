@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Clip, Ease, KeyProp, Transform } from '../../../shared/video';
+import type { Clip, Ease, KeyProp, Transform, VideoProject } from '../../../shared/video';
+import { rampGroup } from '../../../shared/videoRamp';
 import type {
   AnimKind,
   ClipAnim,
@@ -58,13 +59,19 @@ import {
 } from '../../../shared/video';
 import { api, toast } from '../../store';
 import { type VideoKey, fmtBytes, fmtDuration, kindLabel, tv } from './strings';
-import { commit, commitMerged, getV, seek, useV } from './videoStore';
+import { RampSection } from './RampSection';
+import { AutoZoomSection } from './AutoZoomSection';
+import { ProxySettings } from './ProxySettings';
+import { commit, commitMerged, getV, seek, setV, useV } from './videoStore';
 
 export function Inspector() {
   const project = useV((s) => s.project);
   const selection = useV((s) => s.selection);
-  const clip =
+  const one =
     selection.length === 1 ? project.clips.find((c) => c.id === selection[0]) : undefined;
+  // Fase 4B: the whole ramp selected (clicking a step selects them all) reads as its first step.
+  const ramp = !one && selection.length > 1 ? rampSelection(project, selection) : undefined;
+  const clip = one ?? ramp;
   const media = clip ? mediaOf(project, clip.mediaId) : undefined;
   const visual = !!clip && trackOf(project, clip.trackId)?.kind === 'video';
 
@@ -88,6 +95,15 @@ export function Inspector() {
           <TransitionSection clip={clip} />
           <EffectsSection clip={clip} />
           <FadeSection clip={clip} />
+        </div>
+      ) : ramp && media ? (
+        <div className="vs-props">
+          <Row label={tv('clipSource')}>
+            <span className="vs-ellipsis" title={media.path}>
+              {media.name}
+            </span>
+          </Row>
+          <RampSection key={ramp.ramp?.group} clip={ramp} />
         </div>
       ) : clip && media ? (
         <div className="vs-props">
@@ -130,6 +146,7 @@ export function Inspector() {
           )}
           {(media.hasVideo || media.kind === 'image') && <TransformSection clip={clip} />}
           {media.kind !== 'image' && <SpeedSection clip={clip} />}
+          {media.kind === 'video' && <AutoZoomSection clip={clip} media={media} />}
           {visual && (media.hasVideo || media.kind === 'image') && (
             <>
               <AnimSection clip={clip} />
@@ -140,7 +157,6 @@ export function Inspector() {
           {(media.hasVideo || media.hasAudio || media.kind === 'image') && (
             <FadeSection clip={clip} />
           )}
-          <p className="vs-dim vs-note">{tv('comingNext')}</p>
         </div>
       ) : selection.length > 1 ? (
         <p className="vs-dim vs-pad">{tv('inspectorMulti', { n: selection.length })}</p>
@@ -149,6 +165,14 @@ export function Inspector() {
       )}
     </div>
   );
+}
+
+/** The first step when the selection is exactly one speed ramp. */
+function rampSelection(p: VideoProject, ids: string[]): Clip | undefined {
+  const first = p.clips.find((c) => c.id === ids[0]);
+  if (!first?.ramp) return undefined;
+  const group = rampGroup(p, first.id);
+  return group.length === ids.length && group.every((c) => ids.includes(c.id)) ? group[0] : undefined;
 }
 
 function ProjectInfo() {
@@ -195,7 +219,10 @@ function ProjectInfo() {
           <button
             className="vs-mini"
             onClick={async () => {
+              // Proxies live in the cache too: stop the running ones first.
+              await api().video.proxyCancel(null);
               await api().video.clearCache();
+              setV({ proxies: {}, proxyProg: {} });
               setCache(0);
               toast(tv('cacheCleared'));
             }}
@@ -204,6 +231,7 @@ function ProjectInfo() {
           </button>
         </span>
       </Row>
+      <ProxySettings />
     </div>
   );
 }
@@ -471,6 +499,8 @@ function TransformSection({ clip }: { clip: Clip }) {
 
 function SpeedSection({ clip }: { clip: Clip }) {
   const sp = speedOf(clip);
+  // Fase 4B: on a ramp step the fixed speed would change one step only: show the ramp instead.
+  if (clip.ramp) return <RampSection clip={clip} />;
   return (
     <>
       <div className="vs-panel-sub">{tv('secSpeed')}</div>
@@ -499,6 +529,7 @@ function SpeedSection({ clip }: { clip: Clip }) {
         ))}
       </div>
       <p className="vs-dim vs-note">{tv('speedNote')}</p>
+      <RampSection clip={clip} />
     </>
   );
 }

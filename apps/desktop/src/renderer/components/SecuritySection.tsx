@@ -264,7 +264,7 @@ function ScanTab() {
           </button>
         ) : (
           <button className="primary" disabled={isPublic && !authorized} onClick={() => void run()}>
-            ▶ {t('scannerRun')}
+            <Icon name="play" size={13} /> {t('scannerRun')}
           </button>
         )}
       </div>
@@ -527,10 +527,18 @@ export function SecuritySection() {
                     disabled={running !== null}
                     onClick={() => void runAllLocal()}
                   >
-                    {running ? `${t('secRunning')} ${labelOf(running)}…` : `▶ ${t('secRunAll')}`}
+                    {running ? (
+                      `${t('secRunning')} ${labelOf(running)}…`
+                    ) : (
+                      <>
+                        <Icon name="play" size={13} /> {t('secRunAll')}
+                      </>
+                    )}
                   </button>
                   {anyRun && (
-                    <button onClick={() => void exportReport()}>⬇ {t('secExport')}</button>
+                    <button onClick={() => void exportReport()}>
+                      <Icon name="download" size={13} /> {t('secExport')}
+                    </button>
                   )}
                 </div>
               </div>
@@ -634,11 +642,14 @@ export function SecuritySection() {
                   }
                   onClick={() => void run(cat)}
                 >
-                  {running === cat
-                    ? `${t('secRunning')}…`
-                    : store[cat]
-                      ? `↻ ${t('secRerun')}`
-                      : `▶ ${t('securityRun')}`}
+                  {running === cat ? (
+                    `${t('secRunning')}…`
+                  ) : (
+                    <>
+                      <Icon name={store[cat] ? 'refresh' : 'play'} size={13} />{' '}
+                      {store[cat] ? t('secRerun') : t('securityRun')}
+                    </>
+                  )}
                 </button>
                 {store[cat]?.report?.findings.length ? (
                   <button onClick={() => explain(cat, store[cat]!.report!)}>
@@ -683,7 +694,13 @@ export function SecuritySection() {
                 disabled={running === 'site' || !siteUrl.trim()}
                 onClick={() => void run('site', { url: siteUrl.trim() })}
               >
-                {running === 'site' ? `${t('secRunning')}…` : `▶ ${t('securityRun')}`}
+                {running === 'site' ? (
+                  `${t('secRunning')}…`
+                ) : (
+                  <>
+                    <Icon name="play" size={13} /> {t('securityRun')}
+                  </>
+                )}
               </button>
               {store.site?.report?.findings.length ? (
                 <button onClick={() => explain('site', store.site!.report!)}>
@@ -717,7 +734,13 @@ export function SecuritySection() {
                 disabled={running === 'hash' || !hashPath.trim()}
                 onClick={() => void run('hash', { path: hashPath.trim() })}
               >
-                {running === 'hash' ? `${t('secRunning')}…` : `▶ ${t('secHashBtn')}`}
+                {running === 'hash' ? (
+                  `${t('secRunning')}…`
+                ) : (
+                  <>
+                    <Icon name="play" size={13} /> {t('secHashBtn')}
+                  </>
+                )}
               </button>
             </div>
             {store.hash?.report && (

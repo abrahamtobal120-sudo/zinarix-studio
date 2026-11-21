@@ -7,7 +7,16 @@ import { childEnv } from './env.js';
 import { which } from './debug/backend.js';
 import {
   executeRequest,
+  kernelMessage,
+  parseCompleteReply,
+  parseVariables,
+  PY_VARIABLES_CODE,
+  PY_VARIABLES_EXPR,
+  stripAnsi,
+  toCodePoints,
   type JsonObject,
+  type NbCompletions,
+  type NbVariable,
   type JupyterStatus,
   type KernelInfo,
   type KernelMessage,
@@ -208,6 +217,8 @@ interface Session {
   info: KernelInfo;
   /** execute_request msg_id -> cell id. */
   pending: Map<string, string>;
+  /** Other shell requests (complete, inspect, variables) waiting for their reply. */
+  replies: Map<string, (content: JsonObject) => void>;
 }
 
 export class NotebookKernels {
@@ -219,7 +230,63 @@ export class NotebookKernels {
   /** The running server, for the synchronous kill on exit. */
   private live: JupyterServer | null = null;
 
-  constructor(private readonly emit: (e: NotebookEvent) => void) {}
+  /** Interpreter picked by the user (null = the first that has Jupyter). */
+  private prefer: string | null = null;
+  /** Extra listeners of the events (the agent's notebook_run waits on them). */
+  private listeners = new Set<(e: NotebookEvent) => void>();
+  private readonly emit: (e: NotebookEvent) => void;
+
+  constructor(emit: (e: NotebookEvent) => void) {
+    this.emit = (e) => {
+      emit(e);
+      for (const l of this.listeners) l(e);
+    };
+  }
+
+  /** Listens to every event; returns the function that stops listening. */
+  on(listener: (e: NotebookEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /** Whether a notebook has a running kernel session. */
+  has(rel: string): boolean {
+    return this.sessions.has(rel);
+  }
+
+  /** The interpreter in use (or wanted), for the picker. */
+  get python(): string | null {
+    return this.prefer ?? this.runner?.cmd ?? null;
+  }
+
+  /**
+   * Interpreters found for this folder and whether each one has jupyter_server + ipykernel
+   * (Python of the project venv, conda, PATH…).
+   */
+  async interpreters(root: string | null): Promise<{ cmd: string; label: string; ok: boolean; version?: string }[]> {
+    const cands = pythonCandidates(root);
+    if (this.prefer && !cands.some((c) => c.cmd === this.prefer))
+      cands.unshift({ cmd: this.prefer, pre: [], label: this.prefer });
+    return Promise.all(
+      cands.map(async (r) => {
+        try {
+          const out = (await run(r.cmd, [...r.pre, '-c', PROBE], 15_000)).trim().split(/\r?\n/);
+          return { cmd: out[1]?.trim() || r.cmd, label: r.label, ok: true, version: out[0]?.trim() };
+        } catch {
+          return { cmd: r.cmd, label: r.label, ok: false };
+        }
+      }),
+    );
+  }
+
+  /** Uses another interpreter: stops the server and every kernel (they start again on demand). */
+  async usePython(cmd: string | null): Promise<void> {
+    if (cmd === this.prefer) return;
+    await this.dispose();
+    this.prefer = cmd;
+    this.status_ = null;
+    this.runner = null;
+  }
 
   /** Finds Python with jupyter_server + ipykernel (cached for a minute; force re-checks). */
   async status(root: string | null, force = false): Promise<JupyterStatus> {
@@ -227,7 +294,11 @@ export class NotebookKernels {
     if (!force && c && c.root === root && Date.now() - c.at < 60_000) return c.value;
     const tried: string[] = [];
     let value: JupyterStatus | null = null;
-    const cands = pythonCandidates(root);
+    // The interpreter the user picked is the only one tried (a fallback would hide its problem).
+    const all = pythonCandidates(root);
+    const cands = this.prefer
+      ? [all.find((c) => c.cmd === this.prefer) ?? { cmd: this.prefer, pre: [], label: this.prefer }]
+      : all;
     for (const r of cands) {
       tried.push(r.label);
       try {
@@ -333,6 +404,7 @@ export class NotebookKernels {
         ws,
         info: spec,
         pending: new Map(),
+        replies: new Map(),
       };
       ws.addEventListener('message', (ev) => this.onMessage(session, ev.data));
       ws.addEventListener('close', () => {
@@ -351,6 +423,8 @@ export class NotebookKernels {
   }
 
   private failPending(s: Session): void {
+    for (const done of s.replies.values()) done({ status: 'aborted' });
+    s.replies.clear();
     for (const cellId of s.pending.values())
       this.emit({ kind: 'done', path: s.path, cellId, status: 'aborted', executionCount: null });
     s.pending.clear();
@@ -375,6 +449,12 @@ export class NotebookKernels {
         this.failPending(s);
         this.emit({ kind: 'kernel', path: s.path, state: st });
       }
+      return;
+    }
+    if (m.channel === 'shell' && parent && s.replies.has(parent)) {
+      const done = s.replies.get(parent)!;
+      s.replies.delete(parent);
+      done(m.content as JsonObject);
       return;
     }
     const cellId = parent ? s.pending.get(parent) : undefined;
@@ -409,6 +489,78 @@ export class NotebookKernels {
     const msgId = randomUUID();
     s.pending.set(msgId, cellId);
     s.ws.send(JSON.stringify(executeRequest(code, { msgId, session: s.client })));
+  }
+
+  /**
+   * A shell request answered by one reply (complete, inspect, a silent execute). Null when the
+   * notebook has no kernel or it does not answer in time (busy with a long cell).
+   */
+  private async ask(rel: string, type: string, content: JsonObject, timeout: number): Promise<JsonObject | null> {
+    const p = this.sessions.get(rel);
+    if (!p) return null;
+    const s = await p.catch(() => null);
+    if (!s || s.ws.readyState !== WebSocket.OPEN) return null;
+    const msgId = randomUUID();
+    return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        s.replies.delete(msgId);
+        resolve(null);
+      }, timeout);
+      s.replies.set(msgId, (c) => {
+        clearTimeout(t);
+        resolve(c);
+      });
+      s.ws.send(JSON.stringify(kernelMessage(type, content, { msgId, session: s.client })));
+    });
+  }
+
+  /** Completions of the kernel at a cursor (UTF-16 offset) of a cell's code. */
+  async complete(rel: string, code: string, cursor: number): Promise<NbCompletions | null> {
+    // The first completion of a kernel loads jedi (several seconds); later ones take ms.
+    const r = await this.ask(rel, 'complete_request', { code, cursor_pos: toCodePoints(code, cursor) }, 12_000);
+    return r ? parseCompleteReply(code, r) : null;
+  }
+
+  /** What the kernel knows of the name at a cursor (signature and docstring), as plain text. */
+  async inspect(rel: string, code: string, cursor: number): Promise<string | null> {
+    const r = await this.ask(
+      rel,
+      'inspect_request',
+      { code, cursor_pos: toCodePoints(code, cursor), detail_level: 0 },
+      4000,
+    );
+    if (!r || r.status !== 'ok' || r.found !== true) return null;
+    const data = r.data as JsonObject | undefined;
+    const text = data && typeof data['text/plain'] === 'string' ? stripAnsi(data['text/plain']) : '';
+    return text.trim() ? text.trim().slice(0, 6000) : null;
+  }
+
+  /** Variables of a Python kernel (silent run: no history, no execution count). */
+  async variables(rel: string, timeout = 10_000): Promise<NbVariable[] | null> {
+    if ((await this.language(rel)) !== 'python') return null;
+    const r = await this.ask(
+      rel,
+      'execute_request',
+      {
+        code: PY_VARIABLES_CODE,
+        silent: true,
+        store_history: false,
+        user_expressions: { v: PY_VARIABLES_EXPR },
+        allow_stdin: false,
+        stop_on_error: false,
+      },
+      timeout,
+    );
+    if (!r || r.status !== 'ok') return null;
+    const ue = r.user_expressions as JsonObject | undefined;
+    return parseVariables(ue?.v);
+  }
+
+  /** Language of the notebook's running kernel (null = no kernel). */
+  async language(rel: string): Promise<string | null> {
+    const p = this.sessions.get(rel);
+    const s = p ? await p.catch(() => null) : null;
+    return s ? s.info.language.toLowerCase() : null;
   }
 
   async interrupt(rel: string): Promise<void> {

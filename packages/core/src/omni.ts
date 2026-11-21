@@ -453,6 +453,7 @@ export class OmniCore {
           ...(req.jsonSchema ? { jsonSchema: req.jsonSchema } : {}),
           cwd: req.cwd,
           ...(req.readOnly ? { readOnly: true } : {}),
+          ...(req.noTools ? { noTools: true } : {}),
         };
         for await (const chunk of adapter.chat(cfg, chatReq, signal)) {
           if (chunk.type === 'usage') {

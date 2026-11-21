@@ -1,0 +1,114 @@
+import type * as Monaco from 'monaco-editor';
+
+/**
+ * Fase 6 (plan de funciones): GDScript (Godot 4) for Monaco: highlighting, comments,
+ * brackets and indentation. Completion, hover, errors and go-to-definition come from Godot's
+ * own language server (see main/godot.ts and shared/lsp.ts).
+ */
+export function registerGdscript(monaco: typeof Monaco): void {
+  if (monaco.languages.getLanguages().some((l) => l.id === 'gdscript')) return;
+  monaco.languages.register({ id: 'gdscript', extensions: ['.gd'], aliases: ['GDScript', 'gdscript'] });
+  monaco.languages.setLanguageConfiguration('gdscript', {
+    comments: { lineComment: '#' },
+    brackets: [
+      ['{', '}'],
+      ['[', ']'],
+      ['(', ')'],
+    ],
+    autoClosingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"', notIn: ['string'] },
+      { open: "'", close: "'", notIn: ['string'] },
+    ],
+    surroundingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"' },
+      { open: "'", close: "'" },
+    ],
+    onEnterRules: [
+      // A block opens after ":" (func, if, for, while, match, class…).
+      { beforeText: /:\s*(#.*)?$/, action: { indentAction: monaco.languages.IndentAction.Indent } },
+    ],
+    indentationRules: {
+      increaseIndentPattern: /^\s*(func|static func|if|elif|else|for|while|match|class|enum|when)\b.*:\s*(#.*)?$/,
+      decreaseIndentPattern: /^\s*(elif|else)\b.*:\s*$/,
+    },
+    folding: { offSide: true },
+  });
+  monaco.languages.setMonarchTokensProvider('gdscript', {
+    defaultToken: '',
+    keywords: [
+      'if', 'elif', 'else', 'for', 'while', 'match', 'when', 'break', 'continue', 'pass', 'return', 'class',
+      'class_name', 'extends', 'is', 'in', 'as', 'self', 'signal', 'func', 'static', 'const', 'enum', 'var',
+      'breakpoint', 'preload', 'await', 'yield', 'assert', 'void', 'super', 'and', 'or', 'not', 'get', 'set',
+    ],
+    constants: ['true', 'false', 'null', 'PI', 'TAU', 'INF', 'NAN'],
+    types: [
+      'bool', 'int', 'float', 'String', 'StringName', 'NodePath', 'Vector2', 'Vector2i', 'Vector3', 'Vector3i',
+      'Vector4', 'Vector4i', 'Rect2', 'Rect2i', 'Transform2D', 'Transform3D', 'Plane', 'Quaternion', 'AABB',
+      'Basis', 'Projection', 'Color', 'RID', 'Object', 'Callable', 'Signal', 'Dictionary', 'Array',
+      'PackedByteArray', 'PackedInt32Array', 'PackedInt64Array', 'PackedFloat32Array', 'PackedFloat64Array',
+      'PackedStringArray', 'PackedVector2Array', 'PackedVector3Array', 'PackedColorArray', 'Variant',
+    ],
+    tokenizer: {
+      root: [
+        [/#.*$/, 'comment'],
+        [/@[a-zA-Z_]\w*/, 'annotation'],
+        [/\$("[^"]*"|[\w/]+)/, 'variable.predefined'],
+        [/%("[^"]*"|\w+)/, 'variable.predefined'],
+        [/[&^]?"""/, 'string', '@mstring_dq'],
+        [/[&^]?'''/, 'string', '@mstring_sq'],
+        [/r?[&^]?"/, 'string', '@string_dq'],
+        [/r?[&^]?'/, 'string', '@string_sq'],
+        [/0x[0-9a-fA-F_]+|0b[01_]+/, 'number'],
+        [/\d[\d_]*(\.[\d_]*)?([eE][+-]?\d+)?|\.\d[\d_]*([eE][+-]?\d+)?/, 'number'],
+        [/\bfunc\b/, { token: 'keyword', next: '@funcname' }],
+        [/[A-Z][A-Z0-9_]*\b/, 'constant'],
+        [
+          /[a-zA-Z_]\w*/,
+          {
+            cases: {
+              '@keywords': 'keyword',
+              '@constants': 'constant',
+              '@types': 'type',
+              '[A-Z]\\w*': 'type',
+              '@default': 'identifier',
+            },
+          },
+        ],
+        [/->|:=|==|!=|<=|>=|\*\*|<<|>>|&&|\|\||[-+*/%=<>!&|^~]/, 'operator'],
+        [/[{}()[\]]/, '@brackets'],
+        [/[,.:;]/, 'delimiter'],
+      ],
+      funcname: [
+        [/\s+/, ''],
+        [/[a-zA-Z_]\w*/, { token: 'entity.name.function', next: '@pop' }],
+        [/./, { token: '@rematch', next: '@pop' }],
+      ],
+      string_dq: [
+        [/[^\\"]+/, 'string'],
+        [/\\./, 'string.escape'],
+        [/"/, 'string', '@pop'],
+      ],
+      string_sq: [
+        [/[^\\']+/, 'string'],
+        [/\\./, 'string.escape'],
+        [/'/, 'string', '@pop'],
+      ],
+      mstring_dq: [
+        [/"""/, 'string', '@pop'],
+        [/[^"]+/, 'string'],
+        [/"/, 'string'],
+      ],
+      mstring_sq: [
+        [/'''/, 'string', '@pop'],
+        [/[^']+/, 'string'],
+        [/'/, 'string'],
+      ],
+    },
+  } as Monaco.languages.IMonarchLanguage);
+}

@@ -246,6 +246,12 @@ export interface ChatRequest {
   cwd?: string;
   /** Plan mode: CLI agents run read-only whatever their provider mode says. */
   readOnly?: boolean;
+  /**
+   * Answer only, for callers outside Zinarix (the Blender bridge): CLI agents run in a new
+   * empty folder (not the project, not the home folder), with their tools switched off
+   * where the CLI allows it. `cwd` is ignored.
+   */
+  noTools?: boolean;
 }
 
 export interface FimRequest {

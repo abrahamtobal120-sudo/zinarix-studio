@@ -9,9 +9,9 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
-import { readFile, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import { mkdtemp, readFile, rm, stat as statAsync, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   BrowserWindow,
@@ -20,10 +20,12 @@ import {
   Tray,
   app,
   dialog,
+  globalShortcut,
   ipcMain,
   nativeImage,
   protocol,
   safeStorage,
+  session,
   shell,
 } from 'electron';
 import type { BaseWindow, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
@@ -33,6 +35,7 @@ import type {
   BotKind,
   Channel,
   PhoneAction,
+  PhoneConfigView,
   PhoneModels,
   PhoneRepo,
   PhoneWindow,
@@ -41,7 +44,13 @@ import type {
   WorkspaceInfo,
 } from '../shared/api.js';
 import { UI_ZOOM_STEPS } from '../shared/api.js';
-import { DEFAULT_PREFS, EVENT_CHANNEL, GCLOUD_KINDS, THEME_IDS } from '../shared/api.js';
+import {
+  DEFAULT_PREFS,
+  EVENT_CHANNEL,
+  GCLOUD_KINDS,
+  PHONE_PREF_KEYS,
+  THEME_IDS,
+} from '../shared/api.js';
 import { AiService, describeError } from './ai.js';
 import type { Scope } from './ai.js';
 import {
@@ -51,6 +60,7 @@ import {
   githubStatus,
   publishRepo,
   repoName,
+  run as runGit,
   runUntrustedGit,
 } from './git.js';
 import { BrowserController, browserData } from './browser.js';
@@ -67,7 +77,8 @@ import { startUpdates } from './updates.js';
 import { editionOf } from '../shared/edition.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
 import { PhoneRemote } from './phone.js';
-import type { PairRequest, PhoneRepos } from './phone.js';
+import { githubBeacon } from './phoneBeacon.js';
+import type { PairRequest, PhoneRepos, PhoneTerm, PhoneTools } from './phone.js';
 import { ChatBots } from './bots.js';
 import { WhatsApp } from './whatsapp.js';
 import { Watcher } from './watch.js';
@@ -92,9 +103,34 @@ import { SETUP_SCRIPT, TaskManager } from './tasks.js';
 import { ReviewManager } from './review.js';
 import { PlaygroundService } from './playground.js';
 import { MediaService } from './media.js';
+import { ImageService } from './imageTools.js';
+import { rasterSvg } from './svgRaster.js';
+import { NotebookKernels } from './jupyter.js';
+import { DockerService } from './docker.js';
+import { PlatformioService } from './platformio.js';
+import { GodotService, LSP_TCP_BRIDGE } from './godot.js';
+import { CadService, builtinViaProcess } from './cad.js';
+import { BgRemoveService, bgViaProcess } from './bgRemove.js';
+import { BG_MODELS, type BgStatusView } from '../shared/bgRemove.js';
+import { BlenderModelService } from './blenderModel.js';
+import { SlicerService } from './slicer.js';
+import { PrinterClient, PrinterStore, normalizePrinterUrl, printerFileName } from './printers.js';
+import { TokenStore } from './token-store.js';
+import { PRINTER_KINDS, SLICEABLE, validateSlice, type SliceView, type SlicerView } from '../shared/slicer.js';
+import { gcodeGrams, gcodeTime } from '../shared/gcode.js';
+import { CAD_FORMATS, CAD_TEMPLATES, isMeshPath, parseScadParams, type CadEnginesView, type CadRenderView, type ScadLog } from '../shared/cad.js';
+import { WebGameServers } from './webGame.js';
+import { setGodotLocator } from './debug/manager.js';
+import { isGameTemplate } from '../shared/games.js';
+import { MobileService } from './mobile.js';
+import { projectCommand, type MobileInput } from '../shared/mobile.js';
+import type { PioEvent, PioResult } from '../shared/platformio.js';
+import { Computer } from './computer.js';
+import { BAR_LABELS, ComputerControlRun } from './computerMode.js';
 import { BuildService } from './build.js';
 import { rulesPrompt } from '../shared/rules.js';
 import { redact } from '@omni/security';
+import { cliRunsWithoutTools } from '@omni/providers';
 import type { ChatMessage } from '@omni/shared';
 import { DesignSession, EDITOR_SCRIPT_PATH } from './design/session.js';
 import { EditError } from './design/htmlSource.js';
@@ -114,6 +150,9 @@ import { ExtensionStore } from './extensions/store.js';
 import { HelperService, MODEL_NAME } from './helper.js';
 import { gitMention, webMention } from './mentions.js';
 import { VideoService, fromStored, readLut, toStored } from './video.js';
+import { CURSOR_MAX_BYTES, cursorFile } from '../shared/videoZoom.js';
+import { PROXY_HEIGHTS, ProxyMaker } from './videoProxy.js';
+import { Recorder, recordingName } from './recorder.js';
 import { Transcriber } from './transcribe.js';
 import { Scene3DService } from './scene3d.js';
 import { BlenderBridge, newBridgeToken, type BridgeDeps } from './blenderBridge.js';
@@ -160,7 +199,13 @@ protocol.registerSchemesAsPrivileged([
   // and fetch() of the page are cross-origin requests; without it Chromium refuses them.
   {
     scheme: 'zxp',
-    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
   },
 ]);
 
@@ -199,12 +244,54 @@ let ai: AiService;
 let watcher: Watcher;
 /** Which window each terminal belongs to. */
 const termOwner = new Map<number, Win>();
+/**
+ * The last output of every terminal (the phone shows it and follows it), its name and size.
+ * `start` is the offset of `text` in the whole output: the phone asks "after offset n".
+ */
+interface TermOut {
+  name: string;
+  text: string;
+  start: number;
+  alive: boolean;
+  cols: number;
+  rows: number;
+  waiters: Set<() => void>;
+}
+const termOut = new Map<number, TermOut>();
+/** Output kept per terminal for the phone. */
+const TERM_KEEP = 256 * 1024;
+/** Terminals the phone opened (not shown on the computer; closed when the remote stops). */
+const phoneTerms = new Set<number>();
+function termWake(o: TermOut): void {
+  for (const w of [...o.waiters]) w();
+}
+function termTrack(id: number, name: string, cols: number, rows: number): void {
+  termOut.set(id, { name, text: '', start: 0, alive: true, cols, rows, waiters: new Set() });
+}
 const terminals = new Terminals(
   (id, data) => {
+    const o = termOut.get(id);
+    if (o) {
+      o.text += data;
+      if (o.text.length > TERM_KEEP) {
+        const cut = o.text.length - TERM_KEEP;
+        o.text = o.text.slice(cut);
+        o.start += cut;
+      }
+      termWake(o);
+    }
     const w = termOwner.get(id);
     if (w) send(w, { type: 'term:data', id, data });
   },
   (id, code) => {
+    const o = termOut.get(id);
+    if (o) {
+      o.alive = false;
+      termWake(o);
+      // The phone still reads how it ended for a while.
+      setTimeout(() => termOut.delete(id), 10 * 60_000).unref();
+    }
+    phoneTerms.delete(id);
     const w = termOwner.get(id);
     termOwner.delete(id);
     w?.terminals.delete(id);
@@ -319,6 +406,227 @@ const phoneModels = {
     for (const w of wins.values()) send(w, { type: 'settings:changed' });
   },
 };
+/** The project of the window the phone controls (files and git work on it). */
+function phoneWs(): Workspace {
+  const w = phoneWin();
+  if (!w?.workspace) throw new Error('No hay ninguna carpeta abierta en la computadora.');
+  return w.workspace;
+}
+/** Largest file the phone downloads or previews in one go. */
+const PHONE_RAW_MAX = 15 * 1024 * 1024;
+function phoneTermView(id: number, phoneOwned: boolean): PhoneTerm | null {
+  const o = termOut.get(id);
+  if (!o) return null;
+  return { id, name: o.name, phone: phoneOwned, alive: o.alive, cols: o.cols, rows: o.rows };
+}
+const phoneTools: PhoneTools = {
+  files: {
+    list: async (path) => {
+      const ws = phoneWs();
+      const abs = ws.resolve(path);
+      const entries = await ws.readDir(path);
+      const sized = await mapLimit(entries, 16, async (e) => {
+        const st = await statAsync(join(abs, e.name)).catch(() => null);
+        return { ...e, size: st && !e.dir ? st.size : undefined, mtime: st?.mtimeMs };
+      });
+      return { root: ws.root, name: basename(ws.root), entries: sized };
+    },
+    read: async (path) => {
+      const ws = phoneWs();
+      const st = await statAsync(ws.resolve(path));
+      if (st.isDirectory()) throw new Error('Es una carpeta.');
+      // The phone edits text up to 2 MB (bigger ones are downloaded instead).
+      if (st.size > 2 * 1024 * 1024)
+        return { content: '', binary: false, tooLarge: true, size: st.size };
+      return { ...(await ws.readFile(path)), size: st.size };
+    },
+    raw: async (path) => {
+      const ws = phoneWs();
+      const st = await statAsync(ws.resolve(path));
+      if (st.isDirectory()) throw new Error('Es una carpeta.');
+      if (st.size > PHONE_RAW_MAX)
+        throw new Error('El archivo es muy grande para el celular (más de 15 MB).');
+      return readFile(ws.resolve(path));
+    },
+    write: async (path, content) => {
+      const ws = phoneWs();
+      await ws.writeFile(path, content);
+    },
+    create: async (path, dir) => {
+      const ws = phoneWs();
+      if (dir) await ws.createDir(path);
+      else await ws.createFile(path);
+    },
+    rename: async (from, to) => phoneWs().rename(from, to),
+    trash: async (path) => {
+      const ws = phoneWs();
+      const abs = ws.resolve(path);
+      if (abs === resolve(ws.root)) throw new Error('No se puede borrar la carpeta del proyecto.');
+      await shell.trashItem(abs);
+    },
+    find: async (query) => {
+      const q = query.toLowerCase();
+      const all = await phoneWs().listFiles();
+      return all.filter((p) => p.toLowerCase().includes(q)).slice(0, 200);
+    },
+  },
+  terminals: {
+    list: () => {
+      const w = phoneWin();
+      const out: PhoneTerm[] = [];
+      for (const id of w?.terminals ?? []) {
+        const v = phoneTermView(id, false);
+        if (v) out.push(v);
+      }
+      for (const id of phoneTerms) {
+        const v = phoneTermView(id, true);
+        if (v) out.push(v);
+      }
+      return out;
+    },
+    create: (cols, rows) => {
+      if (phoneTerms.size >= 8) throw new Error('Ya hay 8 terminales abiertas desde el celular.');
+      const cwd = phoneWin()?.workspace?.root ?? app.getPath('home');
+      const t = terminals.create(cwd, cols, rows);
+      if (!t) throw new Error('No se pudo abrir la terminal.');
+      termTrack(t.id, t.name, cols, rows);
+      phoneTerms.add(t.id);
+      return phoneTermView(t.id, true)!;
+    },
+    read: async (id, since, abort) => {
+      const o = termOut.get(id);
+      if (!o) throw new Error('Esa terminal ya no existe.');
+      const end = () => o.start + o.text.length;
+      if (since >= end() && o.alive && !abort.aborted) {
+        await new Promise<void>((ok) => {
+          const done = () => {
+            clearTimeout(timer);
+            o.waiters.delete(done);
+            abort.removeEventListener('abort', done);
+            ok();
+          };
+          const timer = setTimeout(done, 20_000);
+          o.waiters.add(done);
+          abort.addEventListener('abort', done);
+        });
+      }
+      const from = Math.max(since, o.start);
+      return {
+        from,
+        data: from < end() ? o.text.slice(from - o.start) : '',
+        next: end(),
+        alive: o.alive,
+        cols: o.cols,
+        rows: o.rows,
+      };
+    },
+    write: (id, data) => terminals.write(id, data),
+    resize: (id, cols, rows) => {
+      // Only the phone's own shells: the computer's keep the size of its panel.
+      if (!phoneTerms.has(id)) return;
+      terminals.resize(id, cols, rows);
+      const o = termOut.get(id);
+      if (o) {
+        o.cols = cols;
+        o.rows = rows;
+      }
+    },
+    kill: (id) => {
+      if (!phoneTerms.has(id)) throw new Error('Esa terminal es de la computadora: ciérrala allí.');
+      terminals.kill(id);
+      phoneTerms.delete(id);
+      termOut.delete(id);
+    },
+  },
+  git: {
+    status: async () => new Git(phoneWs()).status(),
+    log: async () => new Git(phoneWs()).log(40),
+    diff: async (path) => {
+      const ws = phoneWs();
+      const rel = ws.toRel(ws.resolve(path));
+      const out = await runGit(
+        'git',
+        ['diff', '--no-color', '--no-ext-diff', 'HEAD', '--', rel],
+        ws.root,
+      ).catch(() => '');
+      if (out.trim()) return out.slice(0, 400_000);
+      // New file (not in git yet): all of it is new.
+      const f = await ws.readFile(rel).catch(() => null);
+      if (!f || f.binary || f.tooLarge) return '';
+      return f.content
+        .slice(0, 400_000)
+        .split('\n')
+        .map((l) => `+${l}`)
+        .join('\n');
+    },
+    commit: async (message, paths) => {
+      const g = new Git(phoneWs());
+      await g.stage(paths ?? []);
+      await g.commit(message, false);
+    },
+    sync: async (op) => new Git(phoneWs()).sync(op),
+  },
+  config: {
+    get: async (): Promise<PhoneConfigView> => {
+      const cfg = ai.core.config;
+      const u = ai.usage();
+      const sum = (rows: { costUsd: number }[]) => rows.reduce((a, r) => a + r.costUsd, 0);
+      const row = (r: (typeof u.today)[number]) => ({
+        provider: r.provider,
+        name: r.name,
+        costUsd: r.costUsd,
+        requests: r.requests,
+      });
+      const p = prefs();
+      const budgets: PhoneConfigView['usage']['budgets'] = {};
+      for (const [k, b] of Object.entries(u.budgets))
+        budgets[k] = { daily: b.daily, monthly: b.monthly };
+      return {
+        version: app.getVersion(),
+        defaultModel: cfg.defaultModel ?? null,
+        roles: { chat: cfg.roles.chat, agent: cfg.roles.agent, inline: cfg.roles.inline },
+        localOnly: cfg.privacy.localOnly,
+        theme: loadState().theme ?? 'dark',
+        themes: THEME_IDS,
+        prefs: Object.fromEntries(
+          PHONE_PREF_KEYS.map((k) => [k, p[k]]),
+        ) as PhoneConfigView['prefs'],
+        zoomSteps: [...UI_ZOOM_STEPS],
+        usage: {
+          today: u.today.map(row),
+          month: u.month.map(row),
+          todayUsd: sum(u.today),
+          monthUsd: sum(u.month),
+          budgets,
+        },
+        providers: (await ai.providers())
+          .filter((x) => x.connected)
+          .map((x) => ({ id: x.id, name: x.name, local: x.local })),
+      };
+    },
+    set: async (patch) => {
+      if (patch.defaultModel) ai.setDefaultModel(patch.defaultModel);
+      if (patch.role) ai.setRole(patch.role.role, patch.role.ref);
+      if (patch.localOnly !== undefined) ai.setLocalOnly(patch.localOnly);
+      if (patch.theme) saveState({ theme: patch.theme });
+      if (patch.prefs) setPrefs(patch.prefs);
+      if (patch.budget) {
+        const { provider, daily, monthly } = patch.budget;
+        ai.setBudget(provider, daily || monthly ? { daily, monthly } : null);
+      }
+      // Every window picks the change up (models, theme, editor) like a change made on the PC.
+      for (const w of wins.values()) send(w, { type: 'settings:changed' });
+    },
+  },
+};
+/** Closes the shells the phone opened (the remote stopped or the terminal was turned off). */
+function closePhoneTerms(): void {
+  for (const id of [...phoneTerms]) {
+    terminals.kill(id);
+    termOut.delete(id);
+  }
+  phoneTerms.clear();
+}
 /** Windows the phone may have open at once (each one runs its own editor, chats, browser). */
 const MAX_PHONE_WINDOWS = 12;
 /** How long the approval dialog waits before it counts as "no" (Cloudflare cuts at ~100 s). */
@@ -344,7 +652,7 @@ async function approvePairing(req: PairRequest): Promise<boolean> {
     type: 'warning',
     title: 'Nuevo dispositivo',
     message: `¿Permitir que este dispositivo controle Zinarix mediante ${via}?`,
-    detail: `${req.who}\n\nEscribió el PIN correcto. Si no fuiste tú, pulsa Rechazar: el PIN cambiará. Quien se conecte podrá usar la IA y tus repositorios desde ahí.`,
+    detail: `${req.who}\n\nEscribió el PIN correcto. Si no fuiste tú, pulsa Rechazar: el PIN cambiará. Quien se conecte podrá usar la IA, tus repositorios, los archivos del proyecto y la terminal desde ahí (puedes limitarlo en Configuración → Celular).`,
     buttons: ['Permitir', 'Rechazar'],
     defaultId: 1,
     cancelId: 1,
@@ -390,7 +698,11 @@ const phone = new PhoneRemote(
     },
     open: (sealed) => safeStorage.decryptString(Buffer.from(sealed, 'base64')),
   },
+  phoneTools,
+  // The free tunnel's address changes; a gist keeps the link on the phone the same.
+  githubBeacon,
 );
+phone.onTerminalOff = closePhoneTerms;
 /** Telegram / Discord bots: the same remote control, from those apps (see bots.ts). */
 const bots = new ChatBots({
   dir: () => ai.core.paths.home,
@@ -423,6 +735,7 @@ function stopPhone(): void {
   clearPhoneTarget();
   bots.detach();
   phone.stop();
+  closePhoneTerms();
   for (const w of wins.values()) send(w, { type: 'whatsapp:status', status: whatsapp.status() });
 }
 
@@ -628,6 +941,18 @@ function prefs(): Prefs {
   return { ...DEFAULT_PREFS, ...p, keybindings: { ...p.keybindings } };
 }
 
+/** Saves a change of the preferences and applies what main owns (zoom, LSP, rules, tasks). */
+function setPrefs(patch: Partial<Prefs>): Prefs {
+  const next = { ...prefs(), ...patch };
+  saveState({ prefs: next });
+  if (patch.lsp !== undefined || patch.lspCommands)
+    for (const h of lspHosts.values()) void h.restart();
+  ai.useRules = next.projectRules;
+  if (patch.taskParallel !== undefined) tasks?.setMaxParallel(patch.taskParallel);
+  applyZoom();
+  return next;
+}
+
 /** Sizes every window's interface to the saved zoom (a percentage). */
 function applyZoom(): void {
   const f = prefs().uiZoom / 100;
@@ -788,6 +1113,18 @@ function debugOf(w: Win): DebugManager {
   }
   return d;
 }
+/** Fase 2A (plan de funciones): Jupyter kernels of each window (by webContents id). */
+const notebookKernels = new Map<number, NotebookKernels>();
+/** Kernels the agent started for a folder no window has open (by folder). */
+const agentKernels = new Map<string, NotebookKernels>();
+function notebooksOf(w: Win): NotebookKernels {
+  let k = notebookKernels.get(w.id);
+  if (!k) {
+    k = new NotebookKernels((event) => send(w, { type: 'notebook', event }));
+    notebookKernels.set(w.id, k);
+  }
+  return k;
+}
 /** Test runs of each window (by webContents id). */
 const testRuns = new Map<number, TestManager>();
 function testsOf(w: Win): TestManager {
@@ -829,6 +1166,7 @@ function lspOf(w: Win): LspHost {
         enabled: () => prefs().lsp !== false,
         commands: () => prefs().lspCommands ?? {},
         dataDir: app.getPath('userData'),
+        special: godotLspServer,
       },
     );
     lspHosts.set(w.id, h);
@@ -884,6 +1222,7 @@ function registerIpc(): void {
     w.workspace?.dispose();
     w.workspace = undefined;
     lspHosts.get(w.id)?.setRoot(undefined);
+    void notebookKernels.get(w.id)?.dispose();
     w.win.setTitle(APP_NAME);
     send(w, { type: 'workspace', workspace: null });
   });
@@ -917,6 +1256,11 @@ function registerIpc(): void {
     (w, p, offset, length) => ws(w).readBytes(p, offset, length),
   );
   handle('workspace:writeFile', z.tuple([rel, big]), (w, p, c) => ws(w).writeFile(p, c));
+  handle(
+    'workspace:writeBytes',
+    z.tuple([rel, z.instanceof(Uint8Array).refine((b) => b.byteLength <= 256 * 1024 * 1024)]),
+    (w, p, b) => ws(w).writeBytes(p, b),
+  );
   handle('workspace:createFile', z.tuple([rel]), (w, p) => ws(w).createFile(p));
   handle('workspace:createDir', z.tuple([rel]), (w, p) => ws(w).createDir(p));
   handle('workspace:rename', z.tuple([rel, rel]), (w, a, b) => ws(w).rename(a, b));
@@ -1327,19 +1671,20 @@ function registerIpc(): void {
     'video:export',
     z.tuple([projectArg, exportArg, absPath, textPngsArg]),
     (w, project, options, out, texts) => {
-    const target = resolve(out);
-    if (!videoOutputs.has(target)) throw new Error('Elige primero dónde guardar el video.');
-    if (!(options.end > options.start)) throw new Error('El rango a exportar está vacío.');
-    const pngs: Record<string, Buffer> = {};
-    for (const [id, url] of Object.entries(texts ?? {})) {
-      const buf = Buffer.from(url.slice(PNG_URL.length), 'base64');
-      // The PNG signature: anything else is dropped.
-      if (buf.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) pngs[id] = buf;
-    }
-    const job = videoService().enqueue(project, options, target, pngs);
-    videoJobOwner.set(job.id, w);
-    send(w, { type: 'video:job', job });
-    return job;
+      const target = resolve(out);
+      if (!videoOutputs.has(target)) throw new Error('Elige primero dónde guardar el video.');
+      if (!(options.end > options.start)) throw new Error('El rango a exportar está vacío.');
+      const pngs: Record<string, Buffer> = {};
+      for (const [id, url] of Object.entries(texts ?? {})) {
+        const buf = Buffer.from(url.slice(PNG_URL.length), 'base64');
+        // The PNG signature: anything else is dropped.
+        if (buf.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
+          pngs[id] = buf;
+      }
+      const job = videoService().enqueue(project, options, target, pngs);
+      videoJobOwner.set(job.id, w);
+      send(w, { type: 'video:job', job });
+      return job;
     },
   );
   handle('video:jobs', z.tuple([]), () => videoService().list());
@@ -1359,6 +1704,7 @@ function registerIpc(): void {
       z.object({
         line: z.number().int().min(1).max(10_000_000),
         condition: z.string().max(2000).optional(),
+        logMessage: z.string().max(2000).optional(),
       }),
     )
     .max(5000);
@@ -1464,6 +1810,11 @@ function registerIpc(): void {
     const staged = st.files.some((f) => !f.untracked && f.index !== ' ');
     return ai.commitMessage(await g.patch(staged));
   });
+  handle(
+    'ai:improvePrompt',
+    z.tuple([z.string().min(1).max(20000), z.string().max(300).optional()]),
+    (_w, prompt, model) => ai.improvePrompt(prompt, model),
+  );
   handle('ai:rulesFile', z.tuple([z.string().min(1).max(4096).optional()]), (w, folder) =>
     ai.rulesFile(scope(w, folder)),
   );
@@ -1945,13 +2296,7 @@ function registerIpc(): void {
     .partial();
   handle('app:prefs', z.tuple([]), () => prefs());
   handle('app:setPrefs', z.tuple([prefsPatch]), (w, patch) => {
-    const next = { ...prefs(), ...patch };
-    saveState({ prefs: next });
-    if (patch.lsp !== undefined || patch.lspCommands)
-      for (const h of lspHosts.values()) void h.restart();
-    ai.useRules = next.projectRules;
-    if (patch.taskParallel !== undefined) tasks?.setMaxParallel(patch.taskParallel);
-    applyZoom();
+    const next = setPrefs(patch);
     broadcastSettings(w);
     return next;
   });
@@ -1985,6 +2330,8 @@ function registerIpc(): void {
           .max(MAX_IMAGES)
           .optional(),
         reasoning: z.enum(['low', 'medium', 'high']).optional(),
+        computer: z.boolean().optional(),
+        uiLang: z.enum(['es', 'en']).optional(),
       }),
     ]),
     (w, requestId, { folder, noFolder, ...req }) => {
@@ -2016,6 +2363,17 @@ function registerIpc(): void {
         return;
       }
       if (task) where.task = task.scope;
+      if (req.computer)
+        where.computerUi = (stop) => {
+          const pc = ai.agent.computer;
+          return new ComputerControlRun(
+            w.win,
+            stop,
+            // The bar speaks the language of Zinarix (the window's), else the system's.
+            BAR_LABELS[(req.uiLang ?? (app.getLocale().startsWith('en') ? 'en' : 'es'))],
+            pc instanceof Computer ? { cursor: () => pc.rawCursor() } : {},
+          );
+        };
       w.requests.add(id);
       void ai
         .chat(id, req, (_r, event) => send(w, { type: 'chat', requestId, event }), where)
@@ -2292,7 +2650,11 @@ function registerIpc(): void {
     else browserData().forget(url);
   });
   handle('browser:bookmarks', z.tuple([]), () =>
-    withIcons(browserData().bookmarks().map((b) => ({ ...b, visits: 0, bookmark: true }))),
+    withIcons(
+      browserData()
+        .bookmarks()
+        .map((b) => ({ ...b, visits: 0, bookmark: true })),
+    ),
   );
   handle(
     'browser:toggleBookmark',
@@ -2335,6 +2697,7 @@ function registerIpc(): void {
       const cwd = w.workspace?.root ?? app.getPath('home');
       const t = terminals.create(cwd, cols, rows, admin ?? false, profile);
       if (t === null) return null;
+      termTrack(t.id, t.name, cols, rows);
       termOwner.set(t.id, w);
       w.terminals.add(t.id);
       return t;
@@ -2345,13 +2708,20 @@ function registerIpc(): void {
     if (w.terminals.has(i)) terminals.write(i, d);
   });
   handle('terminal:resize', z.tuple([id, dim, dim]), (w, i, c, r) => {
-    if (w.terminals.has(i)) terminals.resize(i, c, r);
+    if (!w.terminals.has(i)) return;
+    terminals.resize(i, c, r);
+    const o = termOut.get(i);
+    if (o) {
+      o.cols = c;
+      o.rows = r;
+    }
   });
   handle('terminal:kill', z.tuple([id]), (w, i) => {
     if (!w.terminals.has(i)) return;
     terminals.kill(i);
     w.terminals.delete(i);
     termOwner.delete(i);
+    termOut.delete(i);
   });
 
   handle('app:openLink', z.tuple([z.string().url().max(8192)]), (w, url) => openLink(w, url));
@@ -2365,8 +2735,10 @@ function registerIpc(): void {
   });
   // Fase 18: the window's own title bar.
   const cssColor = z.string().trim().max(32);
-  handle('app:chrome', z.tuple([z.object({ bg: cssColor, fg: cssColor, dark: z.boolean() })]), (w, colors) =>
-    applyChrome(w.win, colors, prefs().windowEffects !== false, prefs().uiZoom),
+  handle(
+    'app:chrome',
+    z.tuple([z.object({ bg: cssColor, fg: cssColor, dark: z.boolean() })]),
+    (w, colors) => applyChrome(w.win, colors, prefs().windowEffects !== false, prefs().uiZoom),
   );
   handle('app:menuBar', z.tuple([]), () =>
     (Menu.getApplicationMenu()?.items ?? []).filter((i) => i.visible).map((i) => i.label),
@@ -2426,6 +2798,7 @@ function registerIpc(): void {
     phoneOwner = undefined;
     bots.detach();
     const status = phone.stop(true);
+    closePhoneTerms();
     for (const o of wins.values()) send(o, { type: 'whatsapp:status', status: whatsapp.status() });
     return status;
   });
@@ -2474,6 +2847,21 @@ function registerIpc(): void {
           error: e instanceof Error ? e.message : String(e),
         };
       }
+    },
+  );
+  handle(
+    'phone:allow',
+    z.tuple([
+      z.object({
+        files: z.boolean(),
+        terminal: z.boolean(),
+        git: z.boolean(),
+        config: z.boolean().optional(),
+      }),
+    ]),
+    (w, allow) => {
+      const status = phone.setAllow(allow);
+      return phoneOwner === w ? status : { running: false, phones: 0, allow: status.allow };
     },
   );
   handle('phone:push', z.tuple([PhoneSnapshot]), (w, snapshot) => {
@@ -2780,20 +3168,842 @@ function registerReviewIpc(): void {
   );
 }
 
+/** Fase 2B (plan de funciones): Docker panel (containers, images, volumes, compose, logs). */
+let docker: DockerService | undefined;
+// ---------------- Fase 4: screen recording and proxies (Video Studio) ----------------
+
+let recorder: Recorder | undefined;
+let proxies: ProxyMaker | undefined;
+/** Recording ids by window (only the window that started one may write to it). */
+const recOwner = new Map<string, Win>();
+const REC_STOP_KEY = 'CommandOrControl+Alt+R';
+
+function registerVideoPhase4Ipc(): void {
+  const rec = (recorder = new Recorder(() => videoService().tools().ffmpeg));
+  rec.install(session.defaultSession);
+  const px = (proxies = new ProxyMaker(
+    () => videoService().cacheDir,
+    () => {
+      const bin = videoService().tools().ffmpeg;
+      if (!bin) throw new Error('FFmpeg no está disponible en este equipo.');
+      return bin;
+    },
+  ));
+  const recId = z.string().min(1).max(80);
+  const ownRec = (w: Win, id: string) => {
+    if (recOwner.get(id) !== w) throw new Error('Esa grabación no es de esta ventana.');
+  };
+  handle('video:recSources', z.tuple([]), () => rec.sources());
+  handle('video:recSelect', z.tuple([z.string().min(1).max(200), z.boolean()]), (_w, id, audio) =>
+    rec.select(id, audio),
+  );
+  handle('video:recStart', z.tuple([z.enum(['screen', 'camera'])]), (w, kind) => {
+    // The open folder's media/recordings (like media/generated), else Videos/Zinarix Studio.
+    const dir = w.workspace?.root
+      ? join(w.workspace.root, 'media', 'recordings')
+      : join(app.getPath('videos'), 'Zinarix Studio');
+    const started = rec.start(dir, recordingName(new Date(), kind === 'camera' ? '-camara' : ''));
+    recOwner.set(started.id, w);
+    if (kind === 'screen') rec.trackCursor(started.id);
+    return started;
+  });
+  handle('video:recPause', z.tuple([recId, z.boolean()]), (w, id, paused) => {
+    ownRec(w, id);
+    rec.pauseCursor(id, paused);
+  });
+  // Only "<media>.cursor.json" next to a file, small: nothing else can be read through it.
+  handle('video:cursorTrack', z.tuple([z.string().min(1).max(4096)]), async (_w, p) => {
+    const file = cursorFile(resolve(p));
+    try {
+      const st = await statAsync(file);
+      if (!st.isFile() || st.size > CURSOR_MAX_BYTES) return null;
+      return await readFile(file, 'utf8');
+    } catch {
+      return null;
+    }
+  });
+  handle(
+    'video:recChunk',
+    z.tuple([recId, z.instanceof(Uint8Array).refine((b) => b.byteLength <= 64 * 1024 * 1024)]),
+    (w, id, bytes) => {
+      ownRec(w, id);
+      return rec.write(id, bytes);
+    },
+  );
+  handle('video:recFinish', z.tuple([recId]), async (w, id) => {
+    ownRec(w, id);
+    recOwner.delete(id);
+    return rec.finish(id);
+  });
+  handle('video:recAbort', z.tuple([recId]), async (w, id) => {
+    ownRec(w, id);
+    recOwner.delete(id);
+    await rec.abort(id);
+  });
+  // While recording: a global shortcut stops it, and the window can get out of the way.
+  handle('video:recMode', z.tuple([z.boolean(), z.boolean()]), (w, on, minimize) => {
+    if (globalShortcut.isRegistered(REC_STOP_KEY)) globalShortcut.unregister(REC_STOP_KEY);
+    if (!on) {
+      if (w.win.isMinimized()) w.win.restore();
+      w.win.focus();
+      return { shortcut: null };
+    }
+    let ok = false;
+    try {
+      ok = globalShortcut.register(REC_STOP_KEY, () => send(w, { type: 'video:recStop' }));
+    } catch {
+      ok = false;
+    }
+    if (minimize) w.win.minimize();
+    return {
+      shortcut: ok
+        ? REC_STOP_KEY.replace('CommandOrControl', process.platform === 'darwin' ? 'Cmd' : 'Ctrl')
+        : null,
+    };
+  });
+  const height = z
+    .number()
+    .int()
+    .refine((h) => (PROXY_HEIGHTS as readonly number[]).includes(h));
+  const absFile = z.string().min(1).max(4096);
+  handle('video:proxyUrl', z.tuple([absFile, height]), (_w, p, h) => {
+    const f = px.existing(resolve(p), h);
+    return f ? videoService().urlFor(f) : null;
+  });
+  handle(
+    'video:proxy',
+    z.tuple([
+      absFile,
+      z.object({
+        duration: z.number().min(0).max(1e7),
+        width: z.number().min(0).max(100_000),
+        height: z.number().min(0).max(100_000),
+        hasAudio: z.boolean(),
+        target: height,
+      }),
+    ]),
+    async (w, p, o) => {
+      const path = resolve(p);
+      if (mediaKindOf(path) !== 'video' || !(existsSync(path) && statSync(path).isFile()))
+        throw new Error('Solo videos.');
+      let last = -1;
+      const file = await px.make({ path, ...o }, (progress) => {
+        const pct = Math.floor(progress * 100);
+        if (pct === last) return;
+        last = pct;
+        send(w, { type: 'video:proxy', path, progress });
+      });
+      return videoService().urlFor(file);
+    },
+  );
+  handle('video:proxyCancel', z.tuple([absFile.nullable()]), (_w, p) =>
+    px.cancel(p ? resolve(p) : undefined),
+  );
+  app.on('will-quit', () => {
+    globalShortcut.unregister(REC_STOP_KEY);
+    rec.dispose();
+    px.cancel();
+  });
+}
+
+/** Fase 6 (plan de funciones): Godot (one for the app) and the web game preview servers. */
+let godotService: GodotService | undefined;
+const webGames = new WebGameServers();
+function godot(): GodotService {
+  return (godotService ??= new GodotService(homedir(), join(app.getPath('userData'), 'godot.json')));
+}
+
+async function godotLspServer(
+  command: string,
+  root: string,
+): Promise<{ exe: string; args: string[]; env?: Record<string, string> } | { missing: string }> {
+  if (command !== '@godot') return { missing: '' };
+  const g = godot();
+  const st = await g.status();
+  if (st.state !== 'ready') return { missing: 'Instala Godot 4 (godotengine.org) y elígelo en Más → Juegos' };
+  const project = existsSync(join(root, 'project.godot')) ? '' : (await g.scan(root)).godot[0]?.dir;
+  if (project === undefined) return { missing: 'No hay un project.godot en la carpeta abierta' };
+  const port = await g.lspPort(project ? join(root, project) : root);
+  return { exe: process.execPath, args: ['-e', LSP_TCP_BRIDGE, String(port)], env: { ELECTRON_RUN_AS_NODE: '1' } };
+}
+
+/** Fase 1B (plan de funciones): background removal on this PC (resources/bgremove). */
+let bgService: BgRemoveService | undefined;
+function bgRemove(): BgRemoveService {
+  const dir = app.isPackaged ? join(process.resourcesPath, 'bgremove') : join(appRoot, 'dist', 'bgremove');
+  const worker = join(dir, 'bgWorker.mjs');
+  return (bgService ??= new BgRemoveService(
+    dir,
+    join(app.getPath('userData'), 'models'),
+    existsSync(worker) ? bgViaProcess(process.execPath, worker, { ELECTRON_RUN_AS_NODE: '1' }) : null,
+  ));
+}
+
+function registerBgIpc(): void {
+  const bg = bgRemove();
+  const view = (): BgStatusView => ({ available: bg.available, models: bg.status() });
+  const id = z.enum(['fast', 'precise']);
+  handle('bg:status', z.tuple([]), () => view());
+  handle('bg:download', z.tuple([id]), (w, m) => {
+    // Runs on; progress and the end go to the window that asked as events.
+    bg.download(m, (got, total) => send(w, { type: 'bg:progress', id: m, got, total })).then(
+      () => send(w, { type: 'bg:progress', id: m, got: BG_MODELS[m].bytes, total: BG_MODELS[m].bytes, done: true }),
+      (e: unknown) =>
+        send(w, {
+          type: 'bg:progress',
+          id: m,
+          got: 0,
+          total: BG_MODELS[m].bytes,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+    );
+  });
+  handle('bg:cancelDownload', z.tuple([id]), (_w, m) => bg.cancelDownload(m));
+  const tensor = z.custom<Float32Array>((v) => v instanceof Float32Array && v.length <= 3 * 1024 * 1024);
+  handle('bg:infer', z.tuple([id, tensor]), (_w, m, input) => bg.infer(m, input));
+}
+
+/** Fase 7 (plan de funciones): CAD with OpenSCAD (installed, or the built-in WebAssembly one). */
+let cadService: CadService | undefined;
+let blenderVersion: () => Promise<string | null> = async () => null;
+function cad(): CadService {
+  // A separate GPL program next to the app, like FFmpeg (build.mjs, package.json extraResources).
+  const worker = app.isPackaged
+    ? join(process.resourcesPath, 'openscad', 'cadWorker.mjs')
+    : join(appRoot, 'dist', 'openscad', 'cadWorker.mjs');
+  return (cadService ??= new CadService(
+    join(app.getPath('userData'), 'openscad.json'),
+    existsSync(worker) ? builtinViaProcess(process.execPath, worker, { ELECTRON_RUN_AS_NODE: '1' }) : null,
+  ));
+}
+
+function registerCadIpc(): void {
+  const c = cad();
+  ai.agent.cad = c;
+  const view = async (refresh = false): Promise<CadEnginesView> => {
+    const e = await c.engines(refresh);
+    return { native: e.native, builtin: e.builtin, blender: await blenderVersion().catch(() => null) };
+  };
+  const rootOf = (w: Win) => w.workspace?.root;
+  // Tabs use paths relative to the open folder.
+  const absOf = (w: Win, p: string) => (w.workspace ? resolve(w.workspace.root, p) : resolve(p));
+  const relMsgs = (w: Win, log: ScadLog | undefined) =>
+    (log?.messages ?? []).map((m) => {
+      const root = rootOf(w);
+      if (!m.file || !root || !isAbsolute(m.file)) return m;
+      const r = relative(root, m.file);
+      return r.startsWith('..') ? m : { ...m, file: r.split(sep).join('/') };
+    });
+  const renders = new Map<string, AbortController>();
+  const values = z.record(z.string().max(100), z.unknown());
+  const path = z.string().min(1).max(4096);
+  const code = z.string().max(2_000_000);
+  handle('cad:engines', z.tuple([z.boolean().optional()]), (_w, refresh) => view(refresh === true));
+  handle('cad:pickNative', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Elige el programa de OpenSCAD',
+      properties: ['openFile'],
+      ...(process.platform === 'win32' ? { filters: [{ name: 'OpenSCAD', extensions: ['exe', 'com'] }] } : {}),
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    let exe = r.filePaths[0];
+    if (exe.endsWith('.app')) exe = join(exe, 'Contents', 'MacOS', 'OpenSCAD');
+    return (await c.useNative(exe)) ? view() : null;
+  });
+  handle('cad:render', z.tuple([z.string().min(1).max(200), path, code, values]), async (w, key, file, src, vals): Promise<CadRenderView> => {
+    const k = `${w.id}:${key}`;
+    renders.get(k)?.abort();
+    const ac = new AbortController();
+    renders.set(k, ac);
+    const params = parseScadParams(src);
+    try {
+      const r = await c.render({ file: absOf(w, file), code: src, values: vals, root: rootOf(w), timeoutMs: 180_000 }, ac.signal);
+      return { ok: true, stl: new Uint8Array(r.data), engine: r.engine, ms: r.ms, messages: relMsgs(w, r.log), params };
+    } catch (e) {
+      const log = (e as { log?: ScadLog }).log;
+      return { ok: false, error: (e as Error).message, messages: relMsgs(w, log), params, ...(ac.signal.aborted ? { cancelled: true } : {}) };
+    } finally {
+      if (renders.get(k) === ac) renders.delete(k);
+    }
+  });
+  handle('cad:cancel', z.tuple([z.string().min(1).max(200)]), (w, key) => {
+    renders.get(`${w.id}:${key}`)?.abort();
+  });
+  handle('cad:export', z.tuple([path, code, values, z.enum(CAD_FORMATS as unknown as [string, ...string[]])]), async (w, file, src, vals, fmt) => {
+    const abs = absOf(w, file);
+    const r = await dialog.showSaveDialog(w.win, {
+      title: 'Exportar modelo 3D',
+      defaultPath: abs.replace(/\.scad$/i, `.${fmt}`),
+      filters: [{ name: fmt.toUpperCase(), extensions: [fmt] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    const out = await c.render({ file: abs, code: src, values: vals, root: rootOf(w), format: fmt as (typeof CAD_FORMATS)[number], timeoutMs: 10 * 60_000 });
+    await writeFile(r.filePath, out.data);
+    return { path: r.filePath, size: out.data.length };
+  });
+  handle('cad:create', z.tuple([z.string().min(1).max(40), z.string().min(1).max(400)]), async (w, template, rel) => {
+    const root = rootOf(w);
+    if (!root) throw new Error('Abre una carpeta primero.');
+    const t = CAD_TEMPLATES.find((x) => x.id === template);
+    if (!t) throw new Error('Plantilla desconocida.');
+    const name = rel.trim().replace(/\.scad$/i, '') + '.scad';
+    const abs = resolve(root, name);
+    const r = relative(root, abs);
+    if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error('El archivo tiene que quedar dentro de la carpeta abierta.');
+    if (existsSync(abs)) throw new Error('Ya existe un archivo con ese nombre.');
+    mkdirSync(dirname(abs), { recursive: true });
+    await writeFile(abs, t.code, 'utf8');
+    return relative(root, abs).split(sep).join('/');
+  });
+  // The window's CSP allows no fetch of zmedia: URLs, so the viewer gets the bytes here.
+  handle('cad:readMesh', z.tuple([path]), async (w, p) => {
+    const abs = absOf(w, p);
+    const gcode = /\.(gcode|gco)$/i.test(abs);
+    if ((!isMeshPath(abs) && !gcode) || !existsSync(abs) || !statSync(abs).isFile()) throw new Error('No es un modelo 3D.');
+    if (statSync(abs).size > (gcode ? 400 : 300) * 1024 * 1024) throw new Error(`El archivo pesa más de ${gcode ? 400 : 300} MB.`);
+    return new Uint8Array(await readFile(abs));
+  });
+  registerPrintIpc(c, absOf, rootOf);
+}
+
+/** Fase 7 (mejora): slicing to G-code (PrusaSlicer) and the network 3D printers. */
+let slicerService: SlicerService | undefined;
+let printerStore: PrinterStore | undefined;
+const slicerOf = () => (slicerService ??= new SlicerService(join(app.getPath('userData'), 'slicer.json')));
+const printerSecret = (id: string) => new TokenStore(join(app.getPath('userData'), `printer-${id.replace(/[^\w-]/g, '')}.bin`), `printer:${id}`);
+const printersOf = () => (printerStore ??= new PrinterStore(join(app.getPath('userData'), 'printers.json'), printerSecret));
+
+function registerPrintIpc(c: CadService, absOf: (w: Win, p: string) => string, rootOf: (w: Win) => string | undefined): void {
+  const sl = slicerOf();
+  const ps = printersOf();
+  ai.agent.slicer = sl;
+  ai.agent.printers = ps;
+  const view = async (refresh = false): Promise<SlicerView> => {
+    const i = await sl.info(refresh);
+    return { slicer: i.slicer, profile: i.profile, desktop: i.desktop.map(({ id, name }) => ({ id, name })) };
+  };
+  const relOf = (w: Win, abs: string) => {
+    const root = rootOf(w);
+    return root ? relative(root, abs).split(sep).join('/') : abs;
+  };
+  const inProject = (w: Win, p: string) => {
+    const root = rootOf(w);
+    if (!root) throw new Error('Abre una carpeta primero.');
+    const abs = absOf(w, p);
+    const r = relative(root, abs);
+    if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error('El archivo tiene que estar dentro de la carpeta abierta.');
+    return abs;
+  };
+  const slices = new Map<string, AbortController>();
+  const key = z.string().min(1).max(200);
+  const path = z.string().min(1).max(4096);
+  const id = z.string().min(1).max(100);
+  handle('print:slicer', z.tuple([z.boolean().optional()]), (_w, refresh) => view(refresh === true));
+  handle('print:pickSlicer', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Elige PrusaSlicer (prusa-slicer-console) o SuperSlicer',
+      properties: ['openFile'],
+      ...(process.platform === 'win32' ? { filters: [{ name: 'PrusaSlicer', extensions: ['exe'] }] } : {}),
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    let exe = r.filePaths[0];
+    if (exe.endsWith('.app')) exe = join(exe, 'Contents', 'MacOS', exe.includes('Super') ? 'SuperSlicer' : 'PrusaSlicer');
+    // The window one opens a window: use the console one next to it.
+    if (/prusa-slicer\.exe$/i.test(exe) && existsSync(exe.replace(/prusa-slicer\.exe$/i, 'prusa-slicer-console.exe')))
+      exe = exe.replace(/prusa-slicer\.exe$/i, 'prusa-slicer-console.exe');
+    return (await sl.use(exe)) ? view() : null;
+  });
+  handle('print:pickProfile', z.tuple([z.boolean()]), async (w, clear) => {
+    if (clear) {
+      await sl.setProfile(null);
+      return view();
+    }
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Perfil de PrusaSlicer (Archivo → Exportar → Exportar configuración)',
+      properties: ['openFile'],
+      filters: [{ name: 'PrusaSlicer config', extensions: ['ini'] }],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    await sl.setProfile(r.filePaths[0]);
+    return view();
+  });
+  handle(
+    'print:slice',
+    z.tuple([key, path, z.string().max(2_000_000).nullable(), z.record(z.string().max(100), z.unknown()), z.record(z.string().max(40), z.unknown())]),
+    async (w, k, file, code, vals, settings): Promise<SliceView> => {
+      const abs = inProject(w, file);
+      const st = validateSlice(settings);
+      const out = abs.replace(/\.[^./\\]+$/, '.gcode');
+      const kk = `${w.id}:${k}`;
+      slices.get(kk)?.abort();
+      const ac = new AbortController();
+      slices.set(kk, ac);
+      let model = abs;
+      let tmp: string | undefined;
+      try {
+        if (/\.scad$/i.test(abs)) {
+          const r = await c.render({ file: abs, ...(code !== null ? { code } : {}), values: vals, root: rootOf(w), format: 'stl', timeoutMs: 10 * 60_000 }, ac.signal);
+          tmp = await mkdtemp(join(tmpdir(), 'zinarix-slice-model-'));
+          model = join(tmp, basename(abs).replace(/\.scad$/i, '.stl'));
+          await writeFile(model, r.data);
+        } else if (!SLICEABLE.test(abs)) throw new Error('Ese archivo no se puede rebanar.');
+        const r = await sl.slice({ model, out, settings: st }, ac.signal);
+        return { path: relOf(w, out), ms: r.ms, slicer: r.slicer, warnings: r.warnings, timeS: gcodeTime(r.stats), grams: gcodeGrams(r.stats), layers: r.stats.layers };
+      } finally {
+        if (tmp) await rm(tmp, { recursive: true, force: true }).catch(() => {});
+        if (slices.get(kk) === ac) slices.delete(kk);
+      }
+    },
+  );
+  handle('print:cancel', z.tuple([key]), (w, k) => {
+    slices.get(`${w.id}:${k}`)?.abort();
+  });
+  handle('print:openIn', z.tuple([z.string().min(1).max(20), path]), (w, app, file) => {
+    sl.openIn(app, inProject(w, file));
+  });
+  handle('printers:list', z.tuple([]), () => ps.list());
+  const kind = z.enum(PRINTER_KINDS as unknown as [string, ...string[]]);
+  const cfg = z.object({
+    id: id.optional(),
+    name: z.string().max(60),
+    kind,
+    url: z.string().min(1).max(500),
+    key: z.string().max(400).optional(),
+  });
+  handle('printers:save', z.tuple([cfg]), (_w, p) => ps.save(p as Parameters<PrinterStore['save']>[0]));
+  handle('printers:remove', z.tuple([id]), (_w, pid) => ps.remove(pid));
+  // Tests what is typed in the form (the saved key when none is typed).
+  handle('printers:test', z.tuple([cfg]), async (_w, p) => {
+    const url = normalizePrinterUrl(p.url);
+    const k = p.key !== undefined && p.key.trim() ? p.key.trim() : p.id ? printerSecret(p.id).get() : null;
+    return new PrinterClient({ id: p.id ?? 'test', name: p.name || url, kind: p.kind as 'octoprint' | 'moonraker', url }, k).test();
+  });
+  handle('printers:status', z.tuple([id]), (_w, pid) => ps.client(pid).status());
+  handle('printers:send', z.tuple([id, path, z.boolean()]), async (w, pid, file, start) => {
+    const abs = inProject(w, file);
+    if (!/\.(gcode|gco|g|bgcode)$/i.test(abs)) throw new Error('Solo se envían archivos G-code.');
+    const client = ps.client(pid);
+    if (start) {
+      const st = await client.status();
+      if (!st.online) throw new Error(st.error ?? 'La impresora no responde.');
+      if (st.printing || st.paused) throw new Error(`La impresora está ocupada (${st.state}).`);
+    }
+    const name = printerFileName(abs);
+    await client.upload(name, await readFile(abs), start);
+    return name;
+  });
+  handle('printers:control', z.tuple([id, z.enum(['pause', 'resume', 'cancel'])]), (_w, pid, action) => ps.client(pid).control(action));
+}
+
+function registerGamesIpc(): void {
+  const g = godot();
+  ai.agent.games = g;
+  ai.agent.webGames = webGames;
+  setGodotLocator(async () => (await g.status()).exe ?? null);
+  const rootOf = (w: Win) => {
+    if (!w.workspace) throw new Error('No hay carpeta abierta');
+    return w.workspace.root;
+  };
+  const key = z.string().min(1).max(200);
+  const dir = z.string().max(500);
+  const scene = z.string().max(400).nullable();
+  handle('games:status', z.tuple([z.boolean().optional()]), (_w, force) => g.status(force === true));
+  handle('games:scan', z.tuple([]), (w) => (w.workspace ? g.scan(w.workspace.root) : { godot: [], others: [], web: [] }));
+  handle('games:pickExecutable', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Elige el ejecutable de Godot 4',
+      properties: ['openFile'],
+      ...(process.platform === 'win32' ? { filters: [{ name: 'Godot', extensions: ['exe'] }] } : {}),
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    let exe = r.filePaths[0];
+    // macOS: the .app bundle → its binary.
+    if (exe.endsWith('.app')) exe = join(exe, 'Contents', 'MacOS', 'Godot');
+    const st = await g.setExecutable(exe);
+    // Open .gd files get GDScript completion now (the server was "missing" before).
+    for (const h of lspHosts.values()) void h.restart();
+    return st;
+  });
+  handle('games:forgetExecutable', z.tuple([]), () => g.setExecutable(null));
+  handle('games:openEditor', z.tuple([dir, z.string().max(400).optional()]), (w, d, file) => g.openEditor(rootOf(w), d, file));
+  handle(
+    'games:run',
+    z.tuple([key, dir, z.object({ scene, debugCollisions: z.boolean().optional(), debugNavigation: z.boolean().optional() })]),
+    (w, k, d, opts) =>
+      g.startRun(
+        `${w.id}:${k}`,
+        rootOf(w),
+        d,
+        opts,
+        (chunk) => send(w, { type: 'games', event: { kind: 'run-data', key: k, chunk } }),
+        (code) => send(w, { type: 'games', event: { kind: 'run-end', key: k, code } }),
+      ),
+  );
+  handle('games:stop', z.tuple([key]), (w, k) => g.stopRun(`${w.id}:${k}`));
+  handle('games:check', z.tuple([dir]), (w, d) => g.check(rootOf(w), d));
+  handle('games:frame', z.tuple([dir, scene, z.number().min(0).max(30)]), async (w, d, sc, at) => {
+    const { frames, run } = await g.frames(rootOf(w), d, { scene: sc, at: [at] });
+    const f = frames[0];
+    return { image: f ? `data:image/png;base64,${f.png.toString('base64')}` : null, problems: run.problems, output: run.output.slice(-20_000) };
+  });
+  handle('games:export', z.tuple([dir, z.string().min(1).max(100), z.boolean()]), async (w, d, preset, debug) => {
+    const r = await g.exportGame(rootOf(w), d, preset, debug);
+    return { ok: r.ok, path: r.path, output: r.output.slice(-20_000), problems: r.problems };
+  });
+  handle('games:create', z.tuple([z.string().min(1).max(64), z.string().min(1).max(40), z.string().max(80)]), (w, folder, template, name) => {
+    if (!isGameTemplate(template)) throw new Error('Plantilla desconocida.');
+    return g.create(rootOf(w), folder, template, name);
+  });
+  handle('games:webUrl', z.tuple([z.string().max(500)]), (w, rel) => webGames.url(rootOf(w), rel));
+  handle('games:openOther', z.tuple([z.enum(['unity', 'unreal']), dir, z.string().max(200).optional()]), async (w, kind, d, file) => {
+    const root = rootOf(w);
+    const p = (await g.scan(root)).others.find((o) => o.kind === kind && o.dir === d);
+    if (!p) throw new Error('No encontré ese proyecto.');
+    if (kind === 'unity') return g.openUnity(root, p);
+    // Unreal: the .uproject opens with the engine version it is associated with.
+    const err = await shell.openPath(join(root, p.dir, p.file ?? file ?? ''));
+    if (err) throw new Error(err);
+    return 'Unreal';
+  });
+  app.on('will-quit', () => {
+    g.dispose();
+    webGames.stop();
+  });
+}
+
+/** Fase 5A (plan de funciones): PlatformIO (build, upload, serial monitor). */
+function registerPioIpc(): void {
+  const pio = new PlatformioService();
+  ai.agent.platformio = pio;
+  const results = new Map<string, PioResult>();
+  // A port opens once: every window sees the same monitor.
+  const all = (event: PioEvent) => {
+    for (const w of wins.values()) send(w, { type: 'pio', event });
+  };
+  pio.onSerial = (port, chunk) => all({ kind: 'serial-data', port, chunk });
+  pio.onSerialState = (port, open, error) =>
+    all({ kind: 'serial-state', port, open, ...(error ? { error } : {}) });
+  const rootOf = (w: Win) => {
+    if (!w.workspace) throw new Error('No hay carpeta abierta');
+    return w.workspace.root;
+  };
+  const key = z.string().min(1).max(200);
+  const port = z.string().min(1).max(200);
+  handle('pio:status', z.tuple([z.boolean().optional()]), (_w, force) => pio.status(force === true));
+  handle('pio:projects', z.tuple([]), (w) => (w.workspace ? pio.projects(w.workspace.root) : []));
+  handle('pio:devices', z.tuple([]), () => pio.devices());
+  handle('pio:boards', z.tuple([z.string().max(80)]), (_w, q) => pio.boards(q));
+  handle(
+    'pio:startJob',
+    z.tuple([
+      key,
+      z.object({
+        dir: z.string().max(500),
+        env: z.string().max(64).nullable(),
+        target: z.enum(['build', 'upload', 'clean', 'compiledb']),
+        port: z.string().max(200).nullable().optional(),
+      }),
+    ]),
+    (w, k, job) => {
+      const id = `${w.id}:${k}`;
+      results.delete(id);
+      return pio.startJob(
+        id,
+        rootOf(w),
+        job,
+        (chunk) => send(w, { type: 'pio', event: { kind: 'job-data', key: k, chunk } }),
+        (r) => {
+          results.set(id, r);
+          send(w, { type: 'pio', event: { kind: 'job-end', key: k, ok: r.ok } });
+        },
+      );
+    },
+  );
+  handle('pio:stopJob', z.tuple([key]), (w, k) => pio.stopJob(`${w.id}:${k}`));
+  handle('pio:lastResult', z.tuple([key]), (w, k) => results.get(`${w.id}:${k}`) ?? null);
+  handle(
+    'pio:createProject',
+    z.tuple([z.string().min(1).max(64), z.string().min(1).max(80), z.string().min(1).max(40)]),
+    (w, name, board, framework) => pio.createProject(rootOf(w), name, board, framework),
+  );
+  handle('pio:serialOpen', z.tuple([port, z.number().int().min(50).max(4_000_000)]), (_w, p, baud) =>
+    pio.openSerial(p, baud),
+  );
+  handle('pio:serialClose', z.tuple([port]), (_w, p) => pio.closeSerial(p));
+  handle('pio:serialWrite', z.tuple([port, z.string().max(64 * 1024)]), (_w, p, data) =>
+    pio.writeSerial(p, data),
+  );
+  handle('pio:serialState', z.tuple([]), () =>
+    pio.openPorts().map((o) => ({ ...o, text: pio.serialText(o.port) ?? '' })),
+  );
+  handle('pio:serialClear', z.tuple([port]), (_w, p) => pio.clearSerial(p));
+  handle('pio:searchLibraries', z.tuple([z.string().min(1).max(100), z.number().int().min(1).max(100)]), (_w, q, page) =>
+    pio.searchLibraries(q, page),
+  );
+  handle('pio:libraries', z.tuple([z.string().max(500), z.string().max(100).nullable()]), (w, dir, env) =>
+    pio.libraries(rootOf(w), dir, env),
+  );
+  handle(
+    'pio:changeLibrary',
+    z.tuple([z.string().max(500), z.string().max(100).nullable(), z.string().min(1).max(120), z.boolean()]),
+    (w, dir, env, spec, remove) => pio.changeLibrary(rootOf(w), dir, env, spec, remove).then(() => undefined),
+  );
+  app.on('will-quit', () => pio.dispose());
+}
+
+/** Fase 5B (plan de funciones): phones and emulators (adb, emulator, scrcpy, logcat). */
+function registerMobileIpc(): void {
+  const m = new MobileService();
+  ai.agent.mobile = m;
+  const serial = z.string().min(1).max(64);
+  const key = z.string().min(1).max(200);
+  handle('mobile:tools', z.tuple([z.boolean().optional()]), (_w, force) => m.tools(force === true));
+  handle('mobile:devices', z.tuple([]), () => m.devices());
+  handle('mobile:avds', z.tuple([]), () => m.avds());
+  handle('mobile:projects', z.tuple([]), (w) => (w.workspace ? m.projects(w.workspace.root) : []));
+  handle('mobile:startEmulator', z.tuple([z.string().min(1).max(100)]), (_w, avd) => m.startEmulator(avd));
+  handle('mobile:mirror', z.tuple([serial]), (_w, s) => m.mirror(s));
+  handle('mobile:screenshot', z.tuple([serial]), async (_w, s) =>
+    `data:image/png;base64,${(await m.screenshot(s)).toString('base64')}`,
+  );
+  handle('mobile:followLogcat', z.tuple([key, serial]), (w, k, s) =>
+    m.followLogcat(
+      `${w.id}:${k}`,
+      s,
+      (chunk) => send(w, { type: 'mobile', event: { kind: 'logcat', key: k, chunk } }),
+      () => send(w, { type: 'mobile', event: { kind: 'logcat-end', key: k } }),
+    ),
+  );
+  handle('mobile:stopLogcat', z.tuple([key]), (w, k) => m.stopLogcat(`${w.id}:${k}`));
+  handle(
+    'mobile:input',
+    z.tuple([
+      serial,
+      z.object({
+        kind: z.enum(['tap', 'long_press', 'swipe', 'text', 'key']),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        x2: z.number().optional(),
+        y2: z.number().optional(),
+        ms: z.number().optional(),
+        text: z.string().max(1000).optional(),
+        key: z.string().max(40).optional(),
+      }),
+    ]),
+    (_w, s, i) => m.input(s, i as MobileInput),
+  );
+  handle('mobile:packages', z.tuple([serial, z.boolean()]), (_w, s, third) => m.packages(s, third));
+  handle(
+    'mobile:app',
+    z.tuple([serial, z.string().min(1).max(200), z.enum(['launch', 'stop', 'clear', 'uninstall'])]),
+    (_w, s, pkg, action) => m.app(s, pkg, action).then(() => undefined),
+  );
+  handle('mobile:apks', z.tuple([]), (w) => (w.workspace ? m.apks(w.workspace.root) : []));
+  handle('mobile:install', z.tuple([serial, z.string().min(1).max(1000)]), async (w, s, rel) => {
+    if (!w.workspace) throw new Error('No hay carpeta abierta');
+    if (!(await m.apks(w.workspace.root)).includes(rel)) throw new Error('Ese .apk no está en la carpeta.');
+    await m.install(s, join(w.workspace.root, rel));
+  });
+  handle('mobile:connect', z.tuple([z.string().min(3).max(300), z.string().max(6).nullable()]), (_w, addr, code) =>
+    m.connect(addr, code ?? undefined).then((out) => out.trim()),
+  );
+  handle('mobile:disconnect', z.tuple([z.string().min(3).max(300)]), (_w, addr) => m.disconnect(addr));
+  handle(
+    'mobile:command',
+    z.tuple([z.string().max(500), z.enum(['run', 'build', 'ios']), serial.nullable()]),
+    async (w, dir, action, s) => {
+      if (!w.workspace) throw new Error('No hay carpeta abierta');
+      const p = (await m.projects(w.workspace.root)).find((x) => x.dir === dir);
+      if (!p) throw new Error('Ese proyecto no está en la carpeta.');
+      return projectCommand(p, action, { platform: process.platform, serial: s });
+    },
+  );
+  app.on('will-quit', () => m.dispose());
+}
+
+function registerDockerIpc(): void {
+  const d = (docker = new DockerService());
+  ai.agent.docker = d;
+  const name = z.string().min(1).max(256);
+  handle('docker:status', z.tuple([]), () => d.status());
+  handle('docker:startDesktop', z.tuple([]), () => d.startDesktop());
+  handle('docker:containers', z.tuple([]), () => d.containers());
+  handle('docker:images', z.tuple([]), () => d.images());
+  handle('docker:volumes', z.tuple([]), () => d.volumes());
+  handle('docker:networks', z.tuple([]), () => d.networks());
+  handle(
+    'docker:action',
+    z.tuple([
+      z.enum(['start', 'stop', 'restart', 'pause', 'unpause', 'rm', 'rmi', 'volume-rm']),
+      name,
+    ]),
+    (_w, action, target) => d.action(action, target),
+  );
+  const list = z.array(z.string().max(4096)).max(100);
+  handle(
+    'docker:run',
+    z.tuple([
+      z.object({
+        image: name,
+        name: z.string().max(128).optional(),
+        ports: list.optional(),
+        env: list.optional(),
+        volumes: list.optional(),
+        restart: z.enum(['no', 'always', 'unless-stopped', 'on-failure']).optional(),
+        rm: z.boolean().optional(),
+        command: list.optional(),
+      }),
+    ]),
+    (_w, spec) => d.runContainer(spec),
+  );
+  handle('docker:composeFiles', z.tuple([]), (w) =>
+    w.workspace ? d.composeFiles(w.workspace.root) : [],
+  );
+  handle(
+    'docker:compose',
+    z.tuple([z.string().min(1).max(4096), z.enum(['up', 'down', 'ps', 'restart', 'pull'])]),
+    (w, file, action) => {
+      if (!w.workspace) throw new Error('No hay carpeta abierta');
+      return d.compose(w.workspace.root, file, action);
+    },
+  );
+  const key = z.string().min(1).max(200);
+  handle('docker:followLogs', z.tuple([key, name]), (w, k, container) =>
+    d.followLogs(
+      `${w.id}:${k}`,
+      container,
+      (chunk) => send(w, { type: 'docker', event: { kind: 'logs', key: k, chunk } }),
+      () => send(w, { type: 'docker', event: { kind: 'logs-end', key: k } }),
+    ),
+  );
+  handle('docker:stopLogs', z.tuple([key]), (w, k) => d.stopLogs(`${w.id}:${k}`));
+  handle('docker:stats', z.tuple([]), () => d.stats());
+  handle('docker:inspect', z.tuple([name]), (_w, target) => d.inspect(target));
+  handle('docker:diskUsage', z.tuple([]), () => d.diskUsage());
+  handle(
+    'docker:prune',
+    z.tuple([z.enum(['containers', 'images', 'build', 'volumes'])]),
+    (_w, kind) => d.prune(kind),
+  );
+  handle('docker:dockerfiles', z.tuple([]), (w) =>
+    w.workspace ? d.dockerfiles(w.workspace.root) : [],
+  );
+  handle(
+    'docker:startJob',
+    z.tuple([
+      key,
+      z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('pull'), image: name }),
+        z.object({ kind: z.literal('build'), dockerfile: z.string().min(1).max(4096), tag: name }),
+      ]),
+    ]),
+    (w, k, job) =>
+      d.startJob(
+        `${w.id}:${k}`,
+        w.workspace?.root ?? null,
+        job,
+        (chunk) => send(w, { type: 'docker', event: { kind: 'logs', key: k, chunk } }),
+        (ok) => send(w, { type: 'docker', event: { kind: 'job-end', key: k, ok } }),
+      ),
+  );
+  app.on('will-quit', () => d.dispose());
+}
+
+/** Fase 2A (plan de funciones): Jupyter notebooks (cells run on a local Jupyter Server). */
+function registerNotebookIpc(): void {
+  /** A notebook of the open folder: relative, forward slashes, never leaving it. */
+  const nbPath = z
+    .string()
+    .min(1)
+    .max(4096)
+    .refine(
+      (p) => /\.ipynb$/i.test(p) && !isAbsolute(p) && !p.split(/[\\/]/).includes('..'),
+      'bad notebook path',
+    );
+  const kernelId = z.string().max(200).nullable();
+  const rootOf = (w: Win) => {
+    if (!w.workspace) throw new Error('No hay carpeta abierta');
+    return w.workspace.root;
+  };
+  handle('notebook:status', z.tuple([z.boolean().optional()]), async (w, force) => ({
+    status: await notebooksOf(w).status(w.workspace?.root ?? null, force === true),
+    python: notebooksOf(w).python,
+  }));
+  handle('notebook:interpreters', z.tuple([]), (w) =>
+    notebooksOf(w).interpreters(w.workspace?.root ?? null),
+  );
+  handle('notebook:usePython', z.tuple([z.string().min(1).max(4096).nullable()]), (w, cmd) =>
+    notebooksOf(w).usePython(cmd),
+  );
+  handle('notebook:kernelspecs', z.tuple([]), (w) => notebooksOf(w).kernelspecs(rootOf(w)));
+  handle('notebook:start', z.tuple([nbPath, kernelId]), (w, rel, kernel) =>
+    notebooksOf(w).start(rootOf(w), rel, kernel),
+  );
+  handle(
+    'notebook:execute',
+    z.tuple([nbPath, z.string().min(1).max(200), z.string().max(2_000_000)]),
+    (w, rel, cellId, code) => notebooksOf(w).execute(rel, cellId, code),
+  );
+  handle('notebook:interrupt', z.tuple([nbPath]), (w, rel) => notebooksOf(w).interrupt(rel));
+  handle('notebook:restart', z.tuple([nbPath]), (w, rel) => notebooksOf(w).restart(rel));
+  handle('notebook:shutdown', z.tuple([nbPath]), (w, rel) => notebooksOf(w).shutdown(rel));
+  const cellCode = z.string().max(200_000);
+  const cursor = z.number().int().min(0).max(200_000);
+  handle('notebook:complete', z.tuple([nbPath, cellCode, cursor]), (w, rel, code, at) =>
+    notebooksOf(w).complete(rel, code, at),
+  );
+  handle('notebook:inspect', z.tuple([nbPath, cellCode, cursor]), (w, rel, code, at) =>
+    notebooksOf(w).inspect(rel, code, at),
+  );
+  handle('notebook:variables', z.tuple([nbPath]), (w, rel) => notebooksOf(w).variables(rel));
+  // The agent's notebook_run uses the kernel of the window that has the folder open.
+  ai.agent.notebooks = (root) => {
+    const w = [...wins.values()].find((x) => x.workspace?.root === root);
+    if (w) return notebooksOf(w);
+    let k = agentKernels.get(root);
+    if (!k) {
+      k = new NotebookKernels(() => undefined);
+      agentKernels.set(root, k);
+    }
+    return k;
+  };
+  app.on('will-quit', () => {
+    for (const k of [...notebookKernels.values(), ...agentKernels.values()]) k.killNow();
+  });
+}
+
 /** Fase 9: Playground (one model or several side by side) and Build. */
 /** Fase 10: image / video / speech generation (Generate panel and generate_* agent tools). */
 function registerMediaIpc(): void {
   const media = new MediaService(ai.core, app.getPath('userData'));
   ai.agent.media = media;
+  // Fase 1A (plan de funciones): image_info / image_edit decode and encode with FFmpeg.
+  ai.agent.images = new ImageService(() => videoService().tools().ffmpeg);
+  // Fase 1B: image_remove_bg runs the background model on this PC.
+  ai.agent.images.bg = bgRemove();
+  // Fase 3 (plan de funciones): svg_render / svg_export draw SVG files in a hidden window.
+  ai.agent.raster = rasterSvg;
+  // Computer use (computer_* tools): the screen, mouse and keyboard of the whole computer.
+  const computer = new Computer();
+  ai.agent.computer = computer;
+  app.on('will-quit', () => computer.dispose());
   const genReq = z.object({
     kind: z.enum(['image', 'video', 'speech', 'music']),
-    provider: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).max(64),
+    provider: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]*$/)
+      .max(64),
     model: z.string().min(1).max(200),
     prompt: z.string().max(20_000),
     style: z.string().max(500).optional(),
     aspect: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4']).optional(),
     durationSec: z.number().int().min(1).max(120).optional(),
-    seed: z.number().int().min(0).max(2 ** 31).optional(),
+    seed: z
+      .number()
+      .int()
+      .min(0)
+      .max(2 ** 31)
+      .optional(),
     count: z.number().int().min(1).max(4).optional(),
     quality: z.enum(['low', 'medium', 'high']).optional(),
     voice: z.string().max(64).optional(),
@@ -2820,7 +4030,12 @@ function registerGen3dIpc(): void {
     model: z.enum(GEN3D_MODELS.map((m) => m.id) as [string, ...string[]]),
     prompt: z.string().max(1000).optional(),
     image: z.string().max(4096).refine(isGen3dImage).optional(),
-    seed: z.number().int().min(0).max(2 ** 31).optional(),
+    seed: z
+      .number()
+      .int()
+      .min(0)
+      .max(2 ** 31)
+      .optional(),
   });
   handle('gen3d:info', z.tuple([]), async (w) => ({
     connected: await gen.connected(),
@@ -2957,14 +4172,30 @@ function registerScene3dIpc(): void {
       let messages: ChatMessage[] = req.messages;
       // CLI agents (Claude Code, Codex…) drop system prompts: fold them into the user turn.
       const ref = ai.core.resolveModel(req.model, 'chat');
-      if (ai.core.provider(ref.provider).adapter === 'cli-agent') {
+      const entry = ai.core.provider(ref.provider);
+      if (entry.adapter === 'cli-agent') {
+        // Whoever holds the token is not the user at the keyboard: the CLI runs with no
+        // tools in an empty folder (noTools). A web page only gets CLIs that then truly
+        // cannot read files (Codex's read-only sandbox, for one, still reads the whole disk).
+        if (req.fromWeb && !cliRunsWithoutTools(entry.cli?.profile))
+          throw new Error(
+            `${entry.name} can read files on this computer, so it cannot answer web pages through the bridge. Pick another model (an API one, Ollama, Claude Code or Gemini CLI).`,
+          );
         const sys = messages.filter((m) => m.role === 'system').map((m) => m.content);
         messages = messages.filter((m) => m.role !== 'system');
         if (sys.length) messages = withProtocol(messages, sys.join('\n\n'), 'user');
       }
       try {
         const r = await ai.core.complete(
-          { model: req.model, role: 'chat', maxTokens: req.maxTokens ?? 4096, messages },
+          {
+            model: req.model,
+            role: 'chat',
+            maxTokens: req.maxTokens ?? 4096,
+            messages,
+            noTools: true,
+            // A fallback could land on a CLI the check above did not see.
+            ...(req.fromWeb ? { noFallback: true } : {}),
+          },
           signal,
         );
         return { text: r.text, model: r.provider ? `${r.provider}/${r.model}` : r.model };
@@ -3026,7 +4257,7 @@ function registerScene3dIpc(): void {
   if (bridgeCfg.permanent)
     void openPermanent()
       .then(() => updateTray())
-      .catch((e) => console.warn('[3d-pro] permanent bridge:', e));
+      .catch((e) => console.error('[3d-pro] permanent bridge:', e));
   app.on('will-quit', () => {
     bridgeJobs.stop();
     bridgeStore.unpublish();
@@ -3055,12 +4286,26 @@ function registerScene3dIpc(): void {
       return bridgeState();
     },
   );
+  // A token pasted into a web app (or read from the file) stops working: reopen with a new one.
+  handle('scene3d:rotateBridgeToken', z.tuple([]), async () => {
+    const was = bridgeCfg.permanent && !!bridge.info;
+    bridgeStore.unpublish();
+    await bridge.close();
+    bridgeCfg = { ...bridgeCfg, token: newBridgeToken() };
+    bridgeStore.save(bridgeCfg);
+    bridge = makeBridge();
+    if (was) await openPermanent();
+    return bridgeState();
+  });
   const svc = new Scene3DService(
     app.getPath('userData'),
     () => videoService().tools().ffmpeg,
     () => (bridgeCfg.permanent ? openPermanent() : bridge.start()),
   );
   ai.agent.scene3d = svc;
+  // Fase 7: structured Blender edits (blender_model / blender_inspect) use the same Blender.
+  ai.agent.blenderModel = new BlenderModelService(() => svc.findBlender());
+  blenderVersion = async () => (await svc.findBlender())?.version ?? null;
   const id = z.string().uuid();
   // The agent's viewer renders run in a window: the focused one, else the first.
   type EditorAnswer = { ok: boolean; content: string; summary: string };
@@ -3101,7 +4346,11 @@ function registerScene3dIpc(): void {
         setTimeout(
           () => {
             if (editing.delete(requestId))
-              resolve({ ok: false, content: 'The 3D editor did not answer.', summary: 'sin respuesta' });
+              resolve({
+                ok: false,
+                content: 'The 3D editor did not answer.',
+                summary: 'sin respuesta',
+              });
           },
           name === 'scene3d_render' ? 30 * 60_000 : 30_000,
         );
@@ -3251,7 +4500,9 @@ function registerScene3dIpc(): void {
           filters: Z3D,
         });
         if (r.canceled || !r.filePath) return null;
-        target = resolve(r.filePath.toLowerCase().endsWith('.z3d') ? r.filePath : `${r.filePath}.z3d`);
+        target = resolve(
+          r.filePath.toLowerCase().endsWith('.z3d') ? r.filePath : `${r.filePath}.z3d`,
+        );
       }
       await writeFile(target, JSON.stringify(sanitizeScene(scene), null, 2), 'utf8');
       scenePaths.add(target);
@@ -3276,7 +4527,10 @@ function registerScene3dIpc(): void {
 
 function registerPlaygroundIpc(): void {
   const playground = new PlaygroundService(ai.core, app.getPath('userData'));
-  const build = new BuildService(app.getPath('userData'), () => new Vercel(app.getPath('userData')));
+  const build = new BuildService(
+    app.getPath('userData'),
+    () => new Vercel(app.getPath('userData')),
+  );
   const model = z.string().min(1).max(300);
   const jsonObject = z.record(z.string(), z.unknown());
   const params = z.object({
@@ -3304,7 +4558,10 @@ function registerPlaygroundIpc(): void {
       .array(
         z.object({
           name: z.string().min(1).max(255),
-          mediaType: z.string().regex(/^[a-z]+\/[a-z0-9.+-]+$/i).max(100),
+          mediaType: z
+            .string()
+            .regex(/^[a-z]+\/[a-z0-9.+-]+$/i)
+            .max(100),
           // 20 MB of file is ~27 MB of base64.
           data: z.string().max(28 * 1024 * 1024),
         }),
@@ -3319,9 +4576,7 @@ function registerPlaygroundIpc(): void {
       .run(id, req, (event) => send(w, { type: 'playground', requestId, event }))
       .finally(() => w.requests.delete(id));
   });
-  handle('playground:abort', z.tuple([str]), (w, requestId) =>
-    playground.abort(rid(w, requestId)),
-  );
+  handle('playground:abort', z.tuple([str]), (w, requestId) => playground.abort(rid(w, requestId)));
   handle('playground:code', z.tuple([z.enum(['ts', 'python', 'curl']), runReq]), (_w, lang, req) =>
     playground.code(lang, req),
   );
@@ -3360,13 +4615,18 @@ function registerPlaygroundIpc(): void {
   );
   handle('build:info', z.tuple([]), (w) => (w.workspace ? build.info(w.workspace.root) : null));
   handle('build:recent', z.tuple([]), () => build.recent());
-  const team = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).nullable();
+  const team = z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,100}$/)
+    .nullable();
   // The renderer confirms (production or preview) before calling this.
   handle('build:deploy', z.tuple([team, z.boolean()]), (w, teamId, production) =>
     build.deploy(ws(w).root, teamId, production),
   );
-  handle('build:deployState', z.tuple([z.string().regex(/^dpl_[A-Za-z0-9]{1,64}$/), team]), (_w, id, teamId) =>
-    build.deployState(id, teamId),
+  handle(
+    'build:deployState',
+    z.tuple([z.string().regex(/^dpl_[A-Za-z0-9]{1,64}$/), team]),
+    (_w, id, teamId) => build.deployState(id, teamId),
   );
 }
 
@@ -3861,6 +5121,10 @@ async function createWindow(
     debugSessions.delete(w.id);
     testRuns.get(w.id)?.cancel();
     testRuns.delete(w.id);
+    void notebookKernels.get(w.id)?.dispose();
+    notebookKernels.delete(w.id);
+    docker?.stopAllLogs(`${w.id}:`);
+    godotService?.stopRunsOf(`${w.id}:`);
     w.browser.destroy();
     whatsapp.release(win);
     for (const r of w.requests) ai?.abort(r);
@@ -4031,6 +5295,14 @@ app.whenReady().then(async () => {
   registerTasksIpc();
   registerPlaygroundIpc();
   registerMediaIpc();
+  registerNotebookIpc();
+  registerDockerIpc();
+  registerPioIpc();
+  registerGamesIpc();
+  registerCadIpc();
+  registerBgIpc();
+  registerMobileIpc();
+  registerVideoPhase4Ipc();
   registerScene3dIpc();
   registerVideoAgentIpc();
   registerGen3dIpc();

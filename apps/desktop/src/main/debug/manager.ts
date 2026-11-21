@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { isAbsolute, join, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { existsSync } from 'node:fs';
 import type {
   Breakpoint,
   DebugConfig,
@@ -15,7 +16,7 @@ import { findPython, which, type BackendEvents, type DebugBackend } from './back
 
 export { findPython } from './backend.js';
 import { CdpBackend } from './cdpBackend.js';
-import { autoConfig, kindOf, parseLaunchJson, resolveConfig } from './config.js';
+import { autoConfig, kindOf, parseLaunchJson, resolveConfig, substitute } from './config.js';
 import { DapBackend } from './dapBackend.js';
 import { testCommand, type TestRunRequest } from '../testing.js';
 import { tmpdir } from 'node:os';
@@ -44,6 +45,30 @@ function hasDebugpy(py: { cmd: string; pre: string[] }): boolean {
 }
 
 export class DebugError extends Error {}
+
+/** Fase 6: finds the Godot 4 executable (set by main from the Games service). */
+let godotLocator: (() => Promise<string | null>) | null = null;
+export function setGodotLocator(fn: () => Promise<string | null>): void {
+  godotLocator = fn;
+}
+
+interface GodotPrep {
+  exe: string;
+  project: string;
+  port: number;
+}
+
+/** Nearest folder with project.godot from a file up to the root (or the root's own). */
+function godotProjectOf(root: string, file: string | undefined): string | null {
+  let d = file ? dirname(file) : root;
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(join(d, 'project.godot'))) return d;
+    const up = dirname(d);
+    if (up === d || !up.startsWith(root)) break;
+    d = up;
+  }
+  return existsSync(join(root, 'project.godot')) ? root : null;
+}
 
 /**
  * The debug session of one window: picks the backend for a configuration, keeps the
@@ -107,10 +132,20 @@ export class DebugManager {
     const cfg0 = config ?? (file ? autoConfig(file) : null);
     if (!cfg0)
       throw new DebugError(
-        'No sé cómo depurar este archivo. Abre un archivo .js/.ts, .py o .go, o crea .zinarix/launch.json.',
+        'No sé cómo depurar este archivo. Abre un archivo .js/.ts, .py, .go o .gd (Godot), o crea .zinarix/launch.json.',
       );
     const cfg = resolveConfig(cfg0, root, file);
-    await this.launch(cfg.name, (ev) => this.create(cfg, ev), breakpoints);
+    let godot: GodotPrep | undefined;
+    if (kindOf(cfg.type) === 'godot') {
+      const exe = await godotLocator?.().catch(() => null);
+      if (!exe)
+        throw new DebugError('No encontré Godot 4. Descárgalo de godotengine.org y elígelo en Más → Juegos.');
+      const project = godotProjectOf(root, cfg.program);
+      if (!project) throw new DebugError('No encontré project.godot en la carpeta abierta.');
+      godot = { exe, project, port: await freePort() };
+      if (cfg.scene) cfg.scene = substitute(cfg.scene, root, file);
+    }
+    await this.launch(cfg.name, (ev) => this.create(cfg, ev, godot), breakpoints);
   }
 
   /**
@@ -289,13 +324,13 @@ export class DebugManager {
     this.emit({ kind: 'stopped', reason, threadId, frames, description });
   }
 
-  private create(cfg: DebugConfig, ev: BackendEvents): DebugBackend {
+  private create(cfg: DebugConfig, ev: BackendEvents, godot?: GodotPrep): DebugBackend {
     const kind = kindOf(cfg.type);
     const env = childEnv({ ...process.env, ...cfg.env });
     const cwd = cfg.cwd ?? this.root;
     const host = cfg.host ?? '127.0.0.1';
     const attach = cfg.request === 'attach';
-    if (!attach && !cfg.program && kind !== 'go')
+    if (!attach && !cfg.program && kind !== 'go' && kind !== 'godot')
       throw new DebugError('La configuración no dice qué programa ejecutar ("program").');
     switch (kind) {
       case 'node': {
@@ -413,6 +448,31 @@ export class DebugManager {
         if (codelldb) return new LazyCodelldb(codelldb, cwd, env, { ...launch, env: cfg.env }, ev);
         throw new DebugError(
           'No encontré un depurador LLDB (lldb-dap, lldb-vscode o codelldb) en el PATH. Instala LLVM.',
+        );
+      }
+      case 'godot': {
+        if (!godot) throw new DebugError('No encontré Godot 4.');
+        // Godot's debug adapter lives in its editor: a headless one serves it on a free port and
+        // runs the game when it gets "launch". Scene: "main", or the .tscn as res://.
+        let scene = cfg.scene || 'main';
+        if (/\.tscn$/i.test(scene)) {
+          const rel = relative(godot.project, isAbsolute(scene) ? scene : join(this.root, scene));
+          scene = rel.startsWith('..') ? 'main' : `res://${rel.split(sep).join('/')}`;
+        }
+        return new DapBackend(
+          {
+            kind: 'fixedServer',
+            command: godot.exe,
+            args: ['--editor', '--headless', '--path', godot.project, '--dap-port', String(godot.port)],
+            cwd: godot.project,
+            env,
+            port: godot.port,
+            quiet: true,
+          },
+          'godot',
+          'launch',
+          { project: godot.project.split(sep).join('/'), scene, ...(cfg.args?.length ? { additional_options: cfg.args.join(' ') } : {}) },
+          ev,
         );
       }
       default:

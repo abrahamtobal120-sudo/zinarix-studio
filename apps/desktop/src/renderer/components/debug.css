@@ -196,6 +196,11 @@
   border-radius: 1px;
   transform: rotate(45deg) scale(0.85);
 }
+.dbg-bp-dot.log {
+  border-radius: 1px;
+  width: 10px;
+  height: 6px;
+}
 .dbg-bp-dot.unbound {
   background: transparent;
   border: 1.5px solid var(--fg-dim);

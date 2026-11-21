@@ -107,6 +107,31 @@ export interface Clip {
   eq?: Eq4;
   /** Fase 12E: a compound clip draws this sub-timeline instead of a media file (mediaId ''). */
   compound?: Compound;
+  /** Fase 4B: this clip is one step of a speed ramp (videoRamp.ts); the steps share `group`. */
+  ramp?: RampTag;
+}
+
+/** Fase 4B: which ramp a step belongs to and what the clip was before the ramp. */
+export interface RampTag {
+  group: string;
+  /** Preset id, or 'custom'. */
+  preset: string;
+  /** The clip's speed before the ramp (restored when the ramp is removed). */
+  base?: number;
+}
+
+/** A ramp tag as loaded from a file. */
+export function validRampTag(x: unknown): boolean {
+  if (x === undefined) return true;
+  if (!x || typeof x !== 'object') return false;
+  const r = x as RampTag;
+  return (
+    typeof r.group === 'string' &&
+    r.group.length <= 64 &&
+    typeof r.preset === 'string' &&
+    r.preset.length <= 64 &&
+    (r.base === undefined || (Number.isFinite(r.base) && r.base > 0 && r.base <= 16))
+  );
 }
 
 /** Fase 12E: a sub-timeline inside a clip (its media live in the project's media list). */
@@ -1167,6 +1192,7 @@ const finiteIn = (v: unknown, lo: number, hi: number) =>
 function validClipExtras(c: Clip, depth: number): boolean {
   if (!finiteIn(c.pan, -1, 1) || !finiteIn(c.gradeMix, 0, 1) || !validGrade(c.colorB)) return false;
   if (c.eq !== undefined && !validEqShape(c.eq)) return false;
+  if (!validRampTag(c.ramp)) return false;
   if (c.compound === undefined) return true;
   const k = c.compound;
   if (depth + 1 > COMPOUND_MAX_DEPTH || !k || typeof k !== 'object') return false;

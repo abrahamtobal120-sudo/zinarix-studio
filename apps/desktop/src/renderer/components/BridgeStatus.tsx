@@ -122,6 +122,19 @@ export function BridgeStatus() {
               >
                 <Icon name="key" size={14} /> {t3('bridgeCopyToken')}
               </button>
+              <button
+                type="button"
+                className="bridge-opt"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () => api().scene3d.rotateBridgeToken(),
+                    () => t3('bridgeTokenRotated'),
+                  )
+                }
+              >
+                <Icon name="refresh" size={14} /> {t3('bridgeRotateToken')}
+              </button>
               <label className="bridge-hint" htmlFor="bridge-sites">
                 {t3('bridgeSites')}
               </label>

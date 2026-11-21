@@ -37,7 +37,19 @@ export interface ColorGrade {
   lut?: string;
   /** 0…1 strength of the LUT (missing = 1). */
   lutMix?: number;
+  /** Fase 4 (mejora): RGB curves, applied after the wheels: master first, then each channel. */
+  curves?: Curves;
 }
+
+/** A curve point: input and output, both 0…1. */
+export type CurvePoint = [number, number];
+export const CURVE_KEYS = ['m', 'r', 'g', 'b'] as const;
+export type CurveKey = (typeof CURVE_KEYS)[number];
+/** Points per curve, including both ends (x = 0 and x = 1). */
+export type Curves = Partial<Record<CurveKey, CurvePoint[]>>;
+export const CURVE_MAX_POINTS = 12;
+/** Closest two points may be (in x). */
+const CURVE_MIN_GAP = 0.02;
 
 export const WHEELS = ['lift', 'gamma', 'gain'] as const;
 export type WheelName = (typeof WHEELS)[number];
@@ -61,6 +73,9 @@ export interface ChannelCurve {
   gain: number;
   lift: number;
   exp: number;
+  /** RGB curves after that: the master one, then the channel's own (missing = straight). */
+  master?: CurveSeg[];
+  own?: CurveSeg[];
 }
 
 /** Grade with every value in range and the neutral ones dropped (undefined = no grade). */
@@ -90,11 +105,158 @@ export function cleanGrade(g: ColorGrade | undefined): ColorGrade | undefined {
       delete out.lutMix;
     }
   }
+  if (g.curves && typeof g.curves === 'object') {
+    const cv: Curves = {};
+    for (const k of CURVE_KEYS) {
+      const pts = cleanCurve(g.curves[k]);
+      if (pts) cv[k] = pts;
+    }
+    if (Object.keys(cv).length) out.curves = cv;
+  }
   return Object.keys(out).length ? out : undefined;
 }
 
 const hasCurve = (g: ColorGrade | undefined): boolean =>
-  !!g && !!(g.lift || g.gamma || g.gain || g.temperature || g.tint);
+  !!g && !!(g.lift || g.gamma || g.gain || g.temperature || g.tint || g.curves);
+
+// ---------------- RGB curves ----------------
+
+const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+
+/**
+ * A curve with its points sorted, inside 0…1, at least CURVE_MIN_GAP apart and with both ends
+ * (a missing end keeps the value of the nearest point). undefined when it is the identity.
+ */
+export function cleanCurve(pts: unknown): CurvePoint[] | undefined {
+  if (!Array.isArray(pts)) return undefined;
+  const raw: CurvePoint[] = [];
+  for (const p of pts.slice(0, 64)) {
+    if (!Array.isArray(p) || p.length < 2) continue;
+    const x = Number(p[0]);
+    const y = Number(p[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    raw.push([r4(clamp(x, 0, 1)), r4(clamp(y, 0, 1))]);
+  }
+  if (!raw.length) return undefined;
+  raw.sort((a, b) => a[0] - b[0]);
+  const out: CurvePoint[] = [];
+  for (const p of raw) {
+    const last = out[out.length - 1];
+    if (last && p[0] - last[0] < CURVE_MIN_GAP) {
+      // Too close: the start (x = 0) stays, otherwise the later point replaces the earlier.
+      if (last[0] !== 0) out[out.length - 1] = p;
+      continue;
+    }
+    out.push(p);
+  }
+  if (out[0]![0] > 0) out.unshift([0, out[0]![1]]);
+  if (out[out.length - 1]![0] < 1) out.push([1, out[out.length - 1]![1]]);
+  // Keep the ends and the first inner points up to the limit.
+  while (out.length > CURVE_MAX_POINTS) out.splice(out.length - 2, 1);
+  if (out.every(([x, y]) => Math.abs(x - y) < 1e-4)) return undefined;
+  return out;
+}
+
+/** One cubic piece of a curve: y = a + b·t + c·t² + d·t³ with t = (x − x0) / h. */
+export interface CurveSeg {
+  x0: number;
+  /** End of the piece (x0 + h). */
+  x1: number;
+  h: number;
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+}
+
+/**
+ * The pieces of a monotone cubic spline (Fritsch–Carlson) through the points: smooth like the
+ * curves of DaVinci or Photoshop, and it never overshoots between two points.
+ */
+export function curveSegments(pts: CurvePoint[]): CurveSeg[] {
+  const n = pts.length;
+  if (n < 2) return [];
+  const dx: number[] = [];
+  const sl: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx.push(pts[i + 1]![0] - pts[i]![0]);
+    sl.push((pts[i + 1]![1] - pts[i]![1]) / dx[i]!);
+  }
+  const m: number[] = new Array(n).fill(0);
+  m[0] = sl[0]!;
+  m[n - 1] = sl[n - 2]!;
+  for (let i = 1; i < n - 1; i++) m[i] = sl[i - 1]! * sl[i]! <= 0 ? 0 : (sl[i - 1]! + sl[i]!) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (sl[i] === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
+    const a = m[i]! / sl[i]!;
+    const b = m[i + 1]! / sl[i]!;
+    const s = a * a + b * b;
+    if (s > 9) {
+      const tau = 3 / Math.sqrt(s);
+      m[i] = tau * a * sl[i]!;
+      m[i + 1] = tau * b * sl[i]!;
+    }
+  }
+  const segs: CurveSeg[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i]!;
+    const y0 = pts[i]![1];
+    const y1 = pts[i + 1]![1];
+    const m0 = m[i]! * h;
+    const m1 = m[i + 1]! * h;
+    // Rounded like the export writes them, so both compute with the very same numbers.
+    const q = (x: number) => Number(n6(x));
+    const x0 = pts[i]![0];
+    segs.push({
+      x0: q(x0),
+      x1: q(x0 + h),
+      h: q(h),
+      a: q(y0),
+      b: q(m0),
+      c: q(3 * (y1 - y0) - 2 * m0 - m1),
+      d: q(2 * (y0 - y1) + m0 + m1),
+    });
+  }
+  return segs;
+}
+
+/** The curve at x (0…1 in and out); the same formula as its FFmpeg expression. */
+export function splineAt(segs: CurveSeg[], x: number): number {
+  if (!segs.length) return x;
+  let s = segs[segs.length - 1]!;
+  for (const g of segs)
+    if (x < g.x1) {
+      s = g;
+      break;
+    }
+  const t = (x - s.x0) / s.h;
+  return clamp(s.a + t * (s.b + t * (s.c + t * s.d)), 0, 1);
+}
+
+/** FFmpeg expression of a curve whose input is `v` (an expression, used several times). */
+function splineExpr(segs: CurveSeg[], v: string): string {
+  const piece = (s: CurveSeg) => {
+    const t = `((${v}-${n6(s.x0)})/${n6(s.h)})`;
+    return `clip(${n6(s.a)}+${t}*(${n6(s.b)}+${t}*(${n6(s.c)}+${t}*${n6(s.d)})),0,1)`;
+  };
+  let e = piece(segs[segs.length - 1]!);
+  for (let i = segs.length - 2; i >= 0; i--)
+    e = `if(lt(${v},${n6(segs[i]!.x1)}),${piece(segs[i]!)},${e})`;
+  return e;
+}
+
+/** Ready-made curves (the master curve; the channels stay as they are). */
+export const CURVE_PRESETS: { id: string; pts: CurvePoint[] }[] = [
+  { id: 'sSoft', pts: [[0, 0], [0.25, 0.21], [0.75, 0.79], [1, 1]] },
+  { id: 'sStrong', pts: [[0, 0], [0.25, 0.16], [0.75, 0.85], [1, 1]] },
+  { id: 'fade', pts: [[0, 0.1], [0.3, 0.32], [1, 0.95]] },
+  { id: 'brighten', pts: [[0, 0], [0.45, 0.58], [1, 1]] },
+  { id: 'darken', pts: [[0, 0], [0.55, 0.43], [1, 1]] },
+];
 
 /** Whether the grade changes anything apart from the LUT. */
 export const gradeHasCurves = (g: ColorGrade | undefined): boolean => hasCurve(cleanGrade(g));
@@ -105,12 +267,16 @@ export function channelCurves(g: ColorGrade | undefined): [ChannelCurve, Channel
   const t = e.temperature ?? 0;
   const ti = e.tint ?? 0;
   const wb = [1 + TEMP_K * t, 1 - TINT_K * ti, 1 - TEMP_K * t];
+  const master = e.curves?.m ? curveSegments(e.curves.m) : undefined;
   const ch = (['r', 'g', 'b'] as const).map((k, i): ChannelCurve => {
     const w = (wheel: Wheel | undefined) => (wheel?.m ?? 0) + (wheel?.[k] ?? 0);
+    const own = e.curves?.[k];
     return {
       gain: Math.max(0, (1 + GAIN_K * w(e.gain)) * wb[i]!),
       lift: LIFT_K * w(e.lift),
       exp: Math.pow(2, -GAMMA_K * w(e.gamma)),
+      ...(master ? { master } : {}),
+      ...(own ? { own: curveSegments(own) } : {}),
     };
   });
   return ch as [ChannelCurve, ChannelCurve, ChannelCurve];
@@ -121,7 +287,10 @@ export function curveAt(c: ChannelCurve, x: number): number {
   let v = x * c.gain;
   v = v + c.lift * (1 - v);
   v = clamp(v, 0, 1);
-  return Math.pow(v, c.exp);
+  v = Math.pow(v, c.exp);
+  if (c.master) v = splineAt(c.master, v);
+  if (c.own) v = splineAt(c.own, v);
+  return v;
 }
 
 /** 256-entry 8-bit tables (r, g, b), rounded like the export's expression. */
@@ -139,7 +308,13 @@ const n6 = (x: number) => (Math.round(x * 1e6) / 1e6).toString();
 function curveExpr(c: ChannelCurve): string {
   const v = `(val/255)*${n6(c.gain)}`;
   const lifted = `clip(${v}+${n6(c.lift)}*(1-${v}),0,1)`;
-  return `floor(255*pow(${lifted},${n6(c.exp)})+0.5)`;
+  if (!c.master && !c.own) return `floor(255*pow(${lifted},${n6(c.exp)})+0.5)`;
+  // With curves the value goes through variable 0 (st / ld), one step after the other.
+  const steps = [`st(0,pow(${lifted},${n6(c.exp)}))`];
+  if (c.master) steps.push(`st(0,${splineExpr(c.master, 'ld(0)')})`);
+  if (c.own) steps.push(`st(0,${splineExpr(c.own, 'ld(0)')})`);
+  steps.push('floor(255*ld(0)+0.5)');
+  return steps.join(';');
 }
 
 /** Which LUT file a grade needs: the same .cube at another strength is another file. */
@@ -353,6 +528,24 @@ export function validGrade(x: unknown): boolean {
     if (wh === undefined) continue;
     if (!wh || typeof wh !== 'object' || Array.isArray(wh)) return false;
     if (!WHEEL_KEYS.every((k) => okNum((wh as Record<string, unknown>)[k]))) return false;
+  }
+  if (g.curves !== undefined) {
+    const cv = g.curves as Record<string, unknown>;
+    if (!cv || typeof cv !== 'object' || Array.isArray(cv)) return false;
+    for (const k of CURVE_KEYS) {
+      const pts = cv[k];
+      if (pts === undefined) continue;
+      if (!Array.isArray(pts) || pts.length > 64) return false;
+      if (
+        !pts.every(
+          (p) =>
+            Array.isArray(p) &&
+            p.length === 2 &&
+            p.every((v) => typeof v === 'number' && Number.isFinite(v)),
+        )
+      )
+        return false;
+    }
   }
   return (
     okNum(g.temperature) &&

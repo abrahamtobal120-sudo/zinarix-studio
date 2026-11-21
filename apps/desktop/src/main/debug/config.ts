@@ -12,6 +12,7 @@ export function kindOf(type: string): DebugKind | null {
   if (['node', 'pwa-node', 'node2', 'javascript', 'typescript'].includes(t)) return 'node';
   if (['python', 'debugpy', 'py'].includes(t)) return 'python';
   if (['go', 'delve', 'dlv'].includes(t)) return 'go';
+  if (t === 'godot' || t === 'gdscript') return 'godot';
   if (['lldb', 'codelldb', 'lldb-dap', 'lldb-vscode', 'cppdbg', 'cppvsdbg', 'rust'].includes(t))
     return 'lldb';
   return null;
@@ -25,6 +26,9 @@ export function autoConfig(file: string): DebugConfig | null {
     return { name, type: 'node', request: 'launch', program: '${file}' };
   if (ext === '.py') return { name, type: 'python', request: 'launch', program: '${file}' };
   if (ext === '.go') return { name, type: 'go', request: 'launch', program: '${fileDirname}' };
+  // Godot: the game (or this scene) runs from a headless editor that serves the debug adapter.
+  if (ext === '.gd') return { name: 'Godot', type: 'godot', request: 'launch', program: '${file}', scene: 'main' };
+  if (ext === '.tscn') return { name: `Godot: ${name}`, type: 'godot', request: 'launch', program: '${file}', scene: '${file}' };
   return null;
 }
 

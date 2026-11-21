@@ -230,7 +230,9 @@ function PhoneSection() {
                   remote.url,
                   remote.fixed
                     ? `${t('phoneFixedOn', { host: status.fixedHost ?? '' })}. ${t('phoneRemoteWarn')}`
-                    : `${t('phoneRandomNote')} ${t('phoneRemoteWarn')}`,
+                    : remote.permanent
+                      ? `${t('phonePermanentNote')} ${t('phoneRemoteWarn')}`
+                      : `${remote.relayError ?? t('phoneRandomNote')} ${t('phoneRemoteWarn')}`,
                 )
               ) : (
                 <div className="phone-remote-off">
@@ -263,6 +265,8 @@ function PhoneSection() {
       )}
 
       {status.running && <PhoneDevices status={status} />}
+
+      {status.running && <PhoneAllowCard status={status} />}
 
       {status.running && <BotsSection pin={status.pin} />}
     </>
@@ -316,6 +320,46 @@ function PhoneDevices({ status }: { status: PhoneStatus }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** What the paired phones may use besides the chats: files, terminal, git. */
+function PhoneAllowCard({ status }: { status: PhoneStatus }) {
+  const allow = status.allow ?? { files: true, terminal: true, git: true };
+  const set = async (patch: Partial<typeof allow>) => {
+    setState({ phone: await api().phone.allow({ ...allow, ...patch }) });
+  };
+  return (
+    <div className="phone-card phone-devices">
+      <div className="phone-devices-head">
+        <b>{t('phoneAllowTitle')}</b>
+      </div>
+      <p className="dim small">{t('phoneAllowHint')}</p>
+      <Toggle
+        label={t('phoneAllowFiles')}
+        hint={t('phoneAllowFilesHint')}
+        checked={allow.files}
+        onChange={(files) => void set({ files })}
+      />
+      <Toggle
+        label={t('phoneAllowTerminal')}
+        hint={t('phoneAllowTerminalHint')}
+        checked={allow.terminal}
+        onChange={(terminal) => void set({ terminal })}
+      />
+      <Toggle
+        label={t('phoneAllowGit')}
+        hint={t('phoneAllowGitHint')}
+        checked={allow.git}
+        onChange={(git) => void set({ git })}
+      />
+      <Toggle
+        label={t('phoneAllowConfig')}
+        hint={t('phoneAllowConfigHint')}
+        checked={allow.config !== false}
+        onChange={(config) => void set({ config })}
+      />
     </div>
   );
 }

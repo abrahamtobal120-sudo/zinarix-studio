@@ -427,6 +427,10 @@ export function runPhoneAction(a: PhoneAction): void {
     case 'clearQueue':
       if (chatTab(id)) updateChat(id, { queued: [] });
       break;
+    case 'openFile':
+      // From the phone's file browser: the file shows up in the editor of the computer.
+      void openFile(a.path).catch((err: unknown) => toast(errText(err)));
+      break;
   }
   pushToPhone();
 }
@@ -946,6 +950,8 @@ const AUTH_ERROR =
   /\b40[13]\b|api[\s_-]?key|\bkeys?\b|clave|llave|unauthori[sz]ed|authenticat|autentica|credential|credencial|forbidden|permission denied/i;
 /** Errors of a model that cannot call tools (agent mode then needs another model). */
 const TOOLS_ERROR = /tool|function|herramienta/i;
+/** No model chosen yet (err.no_model): offer the picker and the providers. */
+const NO_MODEL_ERROR = /no hay un modelo elegido|no model selected/i;
 
 /** Tools whose file changes are checkpointed (rewind / review, Fase 2). */
 const EDIT_TOOLS = new Set(['edit_file', 'write_file', 'write_system_file', 'set_env_var']);
@@ -1060,7 +1066,12 @@ const TurnView = memo(function TurnView({
           {turn.error && (
             <div className="turn-error" role="alert">
               <Icon name="warning" size={14} /> {turn.error}
-              {AUTH_ERROR.test(turn.error) && (
+              {NO_MODEL_ERROR.test(turn.error) && (
+                <button onClick={() => setState({ modal: { kind: 'models' } })}>
+                  {t('pickModel')}
+                </button>
+              )}
+              {(AUTH_ERROR.test(turn.error) || NO_MODEL_ERROR.test(turn.error)) && (
                 <button onClick={() => setState({ modal: { kind: 'providers' } })}>
                   {t('providers')}
                 </button>
@@ -1142,6 +1153,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const turnsNow = useRef(turns);
   turnsNow.current = turns;
   const [input, setInput] = useState('');
+  /** "Mejorar prompt": working, and the text the user had before (to go back to it). */
+  const [improving, setImproving] = useState(false);
+  const [beforeImprove, setBeforeImprove] = useState<string | null>(null);
   const [images, setImages] = useState<PendingImage[]>([]);
   const imagesNow = useRef<PendingImage[]>([]);
   imagesNow.current = images;
@@ -1177,6 +1191,22 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (announce) toast(t('modeToast', { mode: modeLabel(m), hint: modeHint(m) }));
   };
   const setAgentMode = (on: boolean) => setChatMode(on ? (agentMode ? chatMode : 'agent') : 'ask');
+  /** "Controlar la compu" (only with the agent; asks once per chat before turning on). */
+  const computerOn = Boolean(meta?.computer) && agentMode;
+  const toggleComputer = async () => {
+    if (computerOn) {
+      updateChat(id, { computer: false });
+      toast(t('computerOffToast'));
+      return;
+    }
+    const ok = await confirmDialog(t('computerConfirm'), {
+      danger: true,
+      okLabel: t('computerConfirmOk'),
+    });
+    if (!ok) return;
+    updateChat(id, { computer: true, ...(chatMode === 'plan' ? { mode: 'agent' as const } : {}) });
+    toast(t('computerOnToast'));
+  };
   /** The plan being edited before it runs (Fase 3). */
   const [planEdit, setPlanEdit] = useState<Turn | null>(null);
   /** Model of this chat; undefined = the app default for the mode. */
@@ -1654,7 +1684,10 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         ...(useAgent && agentRun === 'plan' ? { mode: 'plan' as const } : {}),
       },
     ]);
-    if (!fromQueue) setInput('');
+    if (!fromQueue) {
+      setInput('');
+      setBeforeImprove(null);
+    }
     setRunning((r) => [...r, requestId]);
     // Kept until the answer ends, so a shutdown in between is continued on the next start (a
     // resumed task keeps its original message, not the "go on" prompt).
@@ -1766,6 +1799,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
           break;
         case 'file_changed':
           void reloadFromDisk(e.path);
+          if (e.open) void openFile(e.path).catch(() => undefined);
           setChanged((c) => (c.includes(e.path) ? c : [...c, e.path]));
           break;
         case 'cost':
@@ -1789,6 +1823,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       await api().ai.chat(requestId, {
         agent: useAgent,
         ...(useAgent ? { mode: agentRun } : {}),
+        ...(useAgent && meta?.computer ? { computer: true, uiLang: lang } : {}),
         // This chat's own model, or (undefined) the one main resolves for the role.
         model: chatModel,
         history,
@@ -2227,6 +2262,27 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
     if (await runSlash(input)) return;
     // Still working: the message runs alongside (the answers stream at the same time).
     void send(input);
+  };
+
+  /** Rewrites what is in the box with the chat's model; the user reviews it before sending. */
+  const improvePrompt = async () => {
+    const original = input;
+    if (!original.trim() || improving) return;
+    setImproving(true);
+    try {
+      const model = chatModel ?? (agentMode ? settings.roles.agent : undefined);
+      const better = await api().ai.improvePrompt(original, model ?? undefined);
+      // The user kept typing meanwhile: their text wins.
+      if (textarea.current && textarea.current.value !== original) return;
+      setBeforeImprove(original);
+      setInput(better);
+      toast(t('chatImproveDone'));
+      setTimeout(() => textarea.current?.focus(), 30);
+    } catch (err) {
+      toast(errText(err));
+    } finally {
+      setImproving(false);
+    }
   };
 
   /** Puts what is in the box in the queue: it goes out by itself when the answers end. */
@@ -3105,7 +3161,22 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               <option value="medium">{t('reasoningMedium')}</option>
               <option value="high">{t('reasoningHigh')}</option>
             </select>
+            <Icon name="chevronDown" size={12} className="reasoning-caret" />
           </label>
+          {agentMode && (
+            <button
+              type="button"
+              className={`pill computer-pill ${computerOn ? 'on' : ''}`}
+              title={t('computerPillTitle')}
+              aria-pressed={computerOn}
+              onClick={() => void toggleComputer()}
+            >
+              <Icon name="monitor" size={14} />
+              <span className="pill-label">
+                {computerOn ? t('computerPillOn') : t('computerPill')}
+              </span>
+            </button>
+          )}
           <label className={`check pill ${includeFile ? 'on' : ''}`} title={t('includeFile')}>
             <input
               type="checkbox"
@@ -3190,6 +3261,32 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             <span className="model-chip-label">{shownModel ?? t('noModel')}</span>
             <Icon name="chevronDown" size={12} />
           </button>
+          {beforeImprove !== null && (
+            <button
+              className="rules-chip"
+              title={t('chatImproveUndo')}
+              aria-label={t('chatImproveUndo')}
+              onClick={() => {
+                setInput(beforeImprove);
+                setBeforeImprove(null);
+                textarea.current?.focus();
+              }}
+            >
+              <Icon name="undo" size={15} />
+            </button>
+          )}
+          {input.trim() && (
+            <button
+              className={`rules-chip improve-btn ${improving ? 'on' : ''}`}
+              title={improving ? t('chatImproving') : t('chatImprove')}
+              aria-label={t('chatImprove')}
+              aria-busy={improving}
+              disabled={improving}
+              onClick={() => void improvePrompt()}
+            >
+              {improving ? <span className="chat-tab-spin" /> : <Icon name="sparkle" size={15} />}
+            </button>
+          )}
           {(!busy || input.trim()) && (
             // One send button; "send now", "queue" and "in parallel" are in its menu.
             <SendButton

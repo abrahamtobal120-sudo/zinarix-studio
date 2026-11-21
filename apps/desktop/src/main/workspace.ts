@@ -98,6 +98,11 @@ export class Workspace {
     await writeFile(this.resolve(rel), content, 'utf8');
   }
 
+  /** Binary write (the image editor saving a picture). */
+  async writeBytes(rel: string, bytes: Uint8Array): Promise<void> {
+    await writeFile(this.resolve(rel), bytes);
+  }
+
   async createFile(rel: string): Promise<void> {
     const abs = this.resolve(rel);
     const fh = await open(abs, 'wx');

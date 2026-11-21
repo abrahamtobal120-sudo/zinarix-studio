@@ -39,6 +39,13 @@ const BADGES: [RegExp, string, string][] = [
   [/\.pdf$/i, 'PDF', '#e5252a'],
   [/\.(zip|tar|gz|tgz|7z|rar)$/i, 'ZIP', '#8a6d3b'],
   [/^(license|licence)(\.\w+)?$/i, '©', '#c5a332'],
+  // Games, CAD and 3D printing.
+  [/\.gd$/i, 'GD', '#478cbf'],
+  [/^project\.godot$/i, 'G', '#478cbf'],
+  [/\.(gdshader|shader|glsl|wgsl|hlsl)$/i, 'SH', '#7e57c2'],
+  [/\.scad$/i, 'CAD', '#e8b43a'],
+  [/\.(gcode|gco|bgcode)$/i, 'G', '#e07a3c'],
+  [/\.blend\d?$/i, 'BL', '#ea7600'],
 ];
 
 const SVG = (children: ReactNode) => (
@@ -72,6 +79,15 @@ export function fileIcon(path: string): ReactNode {
     return glyph('M4 7.5h8v6H4zM5.5 7.5V5a2.5 2.5 0 0 1 5 0v2.5', '#8a8f9a');
   if (/\.(png|jpe?g|gif|webp|ico|bmp|avif)$/i.test(name))
     return glyph('M2.5 3h11v10h-11zM2.5 11l3.5-3.5 3 3 2-2 2.5 2.5M10.5 5.8h.01', '#a074c4');
+  if (/\.(tscn|tres|scn|res)$/i.test(name))
+    // A small node tree, in Godot blue.
+    return glyph('M4.5 2.5h3v3h-3zM4.5 10.5h3v3h-3zM10 6.5h3v3h-3zM6 5.5v5M6 8h4', '#478cbf');
+  if (/\.(stl|3mf|obj|glb|gltf|fbx|ply|off|step|stp|usdz?)$/i.test(name))
+    return glyph('M8 1.8l5.5 3.1v6.2L8 14.2l-5.5-3.1V4.9zM2.5 4.9L8 8l5.5-3.1M8 8v6.2', '#3fa7a0');
+  if (/\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(name))
+    return glyph('M2 3.5h12v9H2zM6.5 6v4l3.5-2z', '#d9576b');
+  if (/\.(mp3|wav|ogg|flac|m4a|aac|opus)$/i.test(name))
+    return glyph('M6 12V3.5l7-1.5v8.5M6 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM13 10.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z', '#5aa0e0');
   for (const [re, text, color] of BADGES) {
     if (!re.test(name)) continue;
     const size = text === '{}' ? 8 : text.length >= 3 ? 5.2 : text.length === 2 ? 6.6 : 8.5;

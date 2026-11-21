@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { deflateSync } from 'node:zlib';
 
 const out = resolve(process.argv[2] ?? join(tmpdir(), 'zs-audit'));
 const themes = process.argv.slice(3).length ? process.argv.slice(3) : ['dark', 'light'];
@@ -26,10 +27,96 @@ const files = {
   'src/app.tsx': 'export const App = () => <div>Hola</div>;\n',
   'src/util.test.ts':
     "import { sum } from './index';\ntest('sum', () => expect(sum(1, 2)).toBe(3));\n",
+  // Files for the newer viewers: Godot scene, OpenSCAD, mesh and G-code.
+  'project.godot': '[application]\nconfig/name="Demo"\nrun/main_scene="res://main.tscn"\n',
+  'main.tscn':
+    '[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://main.gd" id="1"]\n\n' +
+    '[node name="Main" type="Node2D"]\nscript = ExtResource("1")\n\n' +
+    '[node name="Player" type="CharacterBody2D" parent="."]\nposition = Vector2(120, 80)\n\n' +
+    '[node name="Sky" type="ColorRect" parent="."]\ncolor = Color(0.2, 0.4, 0.9, 1)\n',
+  'main.gd': 'extends Node2D\n\nfunc _ready() -> void:\n\tprint($Player.position)\n',
+  'caja.scad':
+    'ancho = 40; // [10:1:120]\nalto = 20; // [5:1:60]\nhueca = true;\n\n' +
+    'difference() {\n  cube([ancho, ancho, alto]);\n  if (hueca) translate([2, 2, 2]) cube([ancho - 4, ancho - 4, alto]);\n}\n',
+  'pieza.stl': (() => {
+    const v = [
+      [0, 0, 0], [20, 0, 0], [20, 20, 0], [0, 20, 0],
+      [0, 0, 20], [20, 0, 20], [20, 20, 20], [0, 20, 20],
+    ];
+    const f = [
+      [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4],
+      [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7],
+    ];
+    const t = f.map(
+      (x) =>
+        ' facet normal 0 0 0\n  outer loop\n' +
+        x.map((i) => `   vertex ${v[i].join(' ')}\n`).join('') +
+        '  endloop\n endfacet\n',
+    );
+    return `solid cubo\n${t.join('')}endsolid cubo\n`;
+  })(),
+  'pieza.gcode': (() => {
+    const l = [';FLAVOR:Marlin', 'M104 S210', 'M140 S60', 'G28', 'G92 E0'];
+    let e = 0;
+    for (let z = 1; z <= 20; z++) {
+      l.push(`;LAYER_CHANGE`, `;Z:${(z * 0.2).toFixed(1)}`, `G1 Z${(z * 0.2).toFixed(1)} F600`, ';TYPE:Perimeter');
+      for (const [x, y] of [[100, 100], [120, 100], [120, 120], [100, 120], [100, 100]])
+        l.push(`G1 X${x} Y${y} E${(e += 0.8).toFixed(3)} F1800`);
+    }
+    return l.join('\n') + '\n';
+  })(),
 };
 for (const [p, c] of Object.entries(files)) {
   mkdirSync(join(proj, p, '..'), { recursive: true });
   writeFileSync(join(proj, p), c);
+}
+// A small real PNG (a gradient with a circle) for the image viewer/editor.
+{
+  const w = 160;
+  const h = 120;
+  const raw = Buffer.alloc((w * 3 + 1) * h);
+  for (let y = 0; y < h; y++) {
+    raw[y * (w * 3 + 1)] = 0;
+    for (let x = 0; x < w; x++) {
+      const o = y * (w * 3 + 1) + 1 + x * 3;
+      const inC = (x - 80) ** 2 + (y - 60) ** 2 < 900;
+      raw[o] = inC ? 230 : 40 + x;
+      raw[o + 1] = inC ? 120 : 60 + y;
+      raw[o + 2] = inC ? 40 : 160;
+    }
+  }
+  const crcT = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (b) => {
+    let c = 0xffffffff;
+    for (const x of b) c = crcT[(c ^ x) & 255] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type), data]);
+    const c = Buffer.alloc(4);
+    c.writeUInt32BE(crc(td));
+    return Buffer.concat([len, td, c]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  writeFileSync(
+    join(proj, 'foto.png'),
+    Buffer.concat([
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      chunk('IHDR', ihdr),
+      chunk('IDAT', deflateSync(raw)),
+      chunk('IEND', Buffer.alloc(0)),
+    ]),
+  );
 }
 const git = (...a) => execFileSync('git', a, { cwd: proj, stdio: 'ignore' });
 git('init', '-q');
@@ -273,7 +360,7 @@ for (const theme of themes) {
   await visit(p('start'), async () => {});
   // view.explorer toggles the side bar: only send it when the Explorer is not already showing.
   await visit(p('explorer'), async () => {
-    if (!(await win.locator('.explorer:not(.git-panel)').count())) await cmd('view.explorer');
+    if (!(await win.locator('.explorer .tree-row').count())) await cmd('view.explorer');
   });
   const row = (name) =>
     win
@@ -326,6 +413,21 @@ for (const theme of themes) {
   await visit(p('compare'), () => cmd('view.playgroundCompare'), 1200);
   await visit(p('build'), () => cmd('view.build'), 1200);
   await visit(p('browser'), () => cmd('view.browser'), 1500);
+  // Side panels added with the phases plan.
+  for (const panel of ['graphics', 'docker', 'hardware', 'mobile', 'games', 'cad'])
+    await visit(p(`panel-${panel}`), () => cmd(`${panel}.open`), 1500);
+  if (!(await win.locator('.explorer .tree-row').count())) await cmd('view.explorer');
+  await win.waitForTimeout(600);
+  // Newer file viewers: Godot scene, OpenSCAD with its 3D view, mesh, G-code and image.
+  for (const [name, wait] of [
+    ['main.tscn', 1500],
+    ['main.gd', 1500],
+    ['caja.scad', 5000],
+    ['pieza.stl', 2500],
+    ['pieza.gcode', 2500],
+    ['foto.png', 1500],
+  ])
+    await visit(p(`file-${name.replace('.', '-')}`), () => row(name).click({ timeout: 5000 }), wait);
   await visit(p('security'), () => cmd('security.center'), 1200);
   await esc();
   await visit(p('scanner'), () => cmd('security.scanner'), 1200);

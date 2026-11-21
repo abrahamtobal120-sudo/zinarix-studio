@@ -465,7 +465,6 @@
 .bot-card input {
   flex: 1;
 }
-}
 .phone-devices {
   padding: 14px 18px;
   display: flex;
@@ -512,4 +511,5 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
 }

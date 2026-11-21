@@ -1,5 +1,5 @@
 import { Icon } from './Icon';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { tabKeyDown } from '../a11y';
 import { t } from '../i18n';
 import { monaco } from '../monaco';
@@ -31,6 +31,17 @@ import { WhatsAppPane } from './WhatsApp';
 import { SecuritySection } from './SecuritySection';
 import { Welcome } from './Chrome';
 import { FileViewerPane } from './FileViewers';
+import { NotebookView } from './notebook/NotebookView';
+import { VectorEditor } from './vector/VectorEditor';
+import { PaintView } from './paint/PaintView';
+import { SceneView } from './games/SceneView';
+import { tgm } from './games/gamesStrings';
+import { tg } from './graphics/graphicsStrings';
+import { isGcodePath, isScenePath, isSvgPath, setTabViewer } from '../store';
+import { CadPreview } from './cad/CadPreview';
+import { ModelView } from './cad/ModelView';
+import { GcodeView } from './cad/GcodeView';
+import { tc } from './cad/cadStrings';
 
 function prefOptions(p: Prefs): monaco.editor.IEditorOptions {
   return {
@@ -117,6 +128,9 @@ export function EditorArea() {
   const hasPlaygroundTab = tabs.some((x) => x.path === PLAYGROUND_TAB);
   const special = isBrowser || isSecurity || isWhatsApp || isPlayground;
   const showEditor = Boolean(activeTab && !activeTab.notice && !activeTab.viewer && !special);
+  // Fase 7: a .scad shows its 3D view beside the code (hidden per file until shown again).
+  const [cadHidden, setCadHidden] = useState<ReadonlySet<string>>(new Set());
+  const isCad = showEditor && !!active && /\.scad$/i.test(active);
   return (
     <div className="editor-area" id="editor-tabpanel" role="tabpanel">
       {tabs.length > 0 && (
@@ -192,14 +206,67 @@ export function EditorArea() {
         </div>
       )}
       {activeTab && !special && (
-        <div className="breadcrumbs">{activeTab.path.split('/').join(' › ')}</div>
+        <div className="breadcrumbs">
+          {activeTab.path.split('/').join(' › ')}
+          {/* Fase 3B: an SVG open as text can go back to the design editor. */}
+          {!activeTab.viewer && !activeTab.notice && isSvgPath(activeTab.path) && (
+            <button className="crumb-action" title={tg('designHint')} onClick={() => setTabViewer(activeTab.path, 'design')}>
+              🎨 {tg('design')}
+            </button>
+          )}
+          {/* Fase 6: a Godot scene open as text can go back to its node tree. */}
+          {!activeTab.viewer && !activeTab.notice && isScenePath(activeTab.path) && (
+            <button className="crumb-action" title={tgm('sceneHint')} onClick={() => setTabViewer(activeTab.path, 'scene')}>
+              🌳 {tgm('sceneTitle')}
+            </button>
+          )}
+          {/* Fase 7: a G-code open as text can go back to its layers. */}
+          {!activeTab.viewer && !activeTab.notice && isGcodePath(activeTab.path) && (
+            <button className="crumb-action" onClick={() => setTabViewer(activeTab.path, 'gcode')}>
+              🧱 {tc('sliceOpen')}
+            </button>
+          )}
+        </div>
       )}
-      <div className="editor-host" ref={host} style={{ display: showEditor ? 'block' : 'none' }} />
+      <div className="editor-split" style={{ display: showEditor ? 'flex' : 'none' }}>
+        <div className="editor-host" ref={host} />
+        {isCad && active && !cadHidden.has(active) && (
+          <CadPreview key={active} path={active} onHide={() => setCadHidden((s) => new Set(s).add(active))} />
+        )}
+        {isCad && active && cadHidden.has(active) && (
+          <button
+            className="btn ghost cad-show"
+            onClick={() =>
+              setCadHidden((s) => {
+                const n = new Set(s);
+                n.delete(active);
+                return n;
+              })
+            }
+          >
+            {tc('show')}
+          </button>
+        )}
+      </div>
       <div className="dbg-float">
         <DebugToolbar />
       </div>
       {activeTab?.notice && <div className="notice-pane">{activeTab.notice}</div>}
-      {activeTab?.viewer && <FileViewerPane key={activeTab.path} tab={activeTab} />}
+      {activeTab?.viewer === 'notebook' ? (
+        <NotebookView key={activeTab.path} path={activeTab.path} />
+      ) : activeTab?.viewer === 'design' ? (
+        <VectorEditor key={activeTab.path} path={activeTab.path} />
+      ) : activeTab?.viewer === 'paint' ? (
+        <PaintView key={activeTab.path} path={activeTab.path} />
+      ) : activeTab?.viewer === 'scene' ? (
+        <SceneView key={activeTab.path} path={activeTab.path} />
+      ) : activeTab?.viewer === 'model' ? (
+        <ModelView key={activeTab.path} path={activeTab.path} />
+      ) : activeTab?.viewer === 'gcode' ? (
+        <GcodeView key={activeTab.path} path={activeTab.path} />
+      ) : (
+        activeTab?.viewer && <FileViewerPane key={activeTab.path} tab={activeTab} />
+      )}
       {hasBrowserTab && <BrowserPane visible={isBrowser} />}
       {hasWhatsAppTab && <WhatsAppPane visible={isWhatsApp} />}
       {/* Kept mounted while open so runs keep streaming when you switch tabs. */}

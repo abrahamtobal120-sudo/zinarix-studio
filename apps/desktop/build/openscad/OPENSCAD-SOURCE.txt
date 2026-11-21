@@ -1,0 +1,26 @@
+OpenSCAD (WebAssembly): source code of the build in this folder
+===============================================================
+
+OpenSCAD is distributed under the GNU General Public License, version 2 or later
+(COPYING.GPLv2.txt, next to this file). The corresponding source code:
+
+- OpenSCAD 2025.01.19: https://github.com/openscad/openscad
+- WebAssembly build scripts and runtime (openscad-wasm-prebuilt 1.2.0):
+  https://github.com/lorenzowritescode/openscad-wasm
+- The npm package itself, with the compiled files:
+  https://www.npmjs.com/package/openscad-wasm-prebuilt/v/1.2.0
+- Zinarix's launcher (cadWorker.mjs is built from it with esbuild):
+  src/main/cadWorker.ts in the Zinarix Studio source code.
+
+Written offer
+-------------
+For at least three years after we distribute this version of Zinarix
+Studio, anyone can ask for the complete corresponding source code of
+this build, at no charge beyond the cost of delivery, by opening an
+issue titled "OpenSCAD source request" at
+https://github.com/abrahamtobal120-sudo/zinarix-studio/issues
+
+----------------------------------------------------------------------
+Español: arriba están los enlaces al código fuente exacto del OpenSCAD
+incluido. También puedes pedir el código abriendo un issue
+"OpenSCAD source request" en el repositorio de Zinarix Studio.

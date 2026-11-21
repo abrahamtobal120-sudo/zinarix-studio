@@ -34,6 +34,7 @@ import {
 import { shuttle, stepFrame, togglePlay } from './Viewer';
 import { Viewer } from './Viewer';
 import './video.css';
+import { RecordBar } from './RecordDialog';
 import {
   closeStudio,
   commit,
@@ -121,6 +122,7 @@ export function VideoStudioHost() {
     <>
       {mounted && <VideoStudio shown={shown} visible={open && !minimized} />}
       <MiniPill />
+      <RecordBar />
       <Studio3DHost />
     </>
   );

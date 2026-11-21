@@ -3,6 +3,10 @@
  * approvals, stop). Self-contained (no files, no outside requests); text is never parsed as
  * HTML.
  */
+import { RELAY_PAGE } from './phoneBeacon.js';
+import { CONFIG_CSS, CONFIG_ICONS, CONFIG_JS, CONFIG_TEXT } from './phoneConfig.js';
+import { TOOLS_CSS, TOOLS_ICONS, TOOLS_JS, TOOLS_TEXT } from './phoneTools.js';
+
 const TEXT = {
   es: {
     connecting: 'Conectando…',
@@ -273,7 +277,11 @@ const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export function phonePage(nonce: string, lang: PhoneLang = 'es'): string {
-  const T = TEXT[lang] ?? TEXT.es;
+  const T = {
+    ...(TEXT[lang] ?? TEXT.es),
+    ...(TOOLS_TEXT[lang] ?? TOOLS_TEXT.es),
+    ...(CONFIG_TEXT[lang] ?? CONFIG_TEXT.es),
+  };
   const h = (k: keyof typeof T) => esc(T[k]);
   // Strings for the page script (constants: "<" escaped so nothing can close the tag).
   const json = JSON.stringify(T).replace(/</g, '\\u003c');
@@ -515,12 +523,15 @@ h4{margin:10px 0 4px;color:var(--strong);font-size:1.02em}
 #pin{width:100%;font-size:28px;letter-spacing:12px;text-indent:12px;text-align:center;font-weight:600;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px;outline:0;margin-top:8px}
 #pin:focus{border-color:var(--focus);box-shadow:var(--ring)}
 #go{width:100%;padding:12px;font-size:15px}
+${TOOLS_CSS}
+${CONFIG_CSS}
 </style>
 </head>
 <body>
 <header id="head" class="hide">
   <button class="icon" id="menu" aria-label="${h('chats')}"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   <button id="title"><b id="tname">Zinarix</b><small><span class="dot" id="dot"></span><span id="state">${h('connecting')}</span></small></button>
+  <button class="icon" id="termb" aria-label="${h('terminal')}"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg></button>
   <button class="icon" id="gear" aria-label="${h('settings')}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
   <button class="icon" id="new" aria-label="${h('newChat')}"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
 </header>
@@ -531,6 +542,12 @@ h4{margin:10px 0 4px;color:var(--strong);font-size:1.02em}
   <div class="dhead"><span class="logo">Z</span><b>Zinarix Studio</b></div>
   <button class="newbtn primary" id="new2"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>${h('newChat')}</button>
   <button class="newbtn" id="open2"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>${h('openFolder')}</button>
+  <div class="dtools">
+    <button id="files2"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/></svg>${h('files')}</button>
+    <button id="term2"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>${h('terminal')}</button>
+    <button id="git2"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 3-11 5.5"/></svg>${h('gitTitle')}</button>
+  </div>
+  <button class="newbtn" id="config2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>${h('appConfig')}</button>
   <button class="newbtn" id="models2"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2 8 12.7 4 8.8l5.5-.8Z"/></svg>${h('models')}</button>
   <div class="dtitle">${h('chats')}</div>
   <input id="csearch" class="csearch" type="search" placeholder="${h('searchChats')}" aria-label="${h('searchChats')}">
@@ -575,9 +592,27 @@ h4{margin:10px 0 4px;color:var(--strong);font-size:1.02em}
 const L = ${json};
 const $ = (id) => document.getElementById(id);
 let token = localStorage.getItem('zx.token') || '';
+/*
+ * Came through the permanent link (the Zinarix website reads the computer's current address
+ * from a gist): #g=<gist>&k=<key>&t=<token>. That page keeps the token, because each new
+ * address of the free tunnel is a new site for the phone, with its storage empty.
+ */
+const RELAY = ${JSON.stringify(RELAY_PAGE)};
+const HASH = new URLSearchParams(location.hash.slice(1));
+const KEY = /^[0-9a-f]{32,}$/.test(HASH.get('k') || '') ? HASH.get('k') : '';
+const RELAY_G = /^[0-9a-f]{20,40}$/.test(HASH.get('g') || '') ? HASH.get('g') : localStorage.getItem('zx.relay') || '';
+if (RELAY_G) localStorage.setItem('zx.relay', RELAY_G);
+if (!token && /^[0-9a-f]{64}$/.test(HASH.get('t') || '')) { token = HASH.get('t'); localStorage.setItem('zx.token', token); }
+// The token leaves the address bar (and the history) right away.
+if (HASH.has('t') || HASH.has('g')) history.replaceState(null, '', location.pathname + (KEY ? '#k=' + KEY : ''));
+function toRelay(extra) {
+  location.replace(RELAY + '#g=' + RELAY_G + (KEY ? '&k=' + KEY : '') + (extra || ''));
+}
 let snap = null, es = null, stick = true, online = false;
 const PANELS = ['head', 'tabs', 'log', 'foot'];
 const ICONS = {
+${TOOLS_ICONS}
+${CONFIG_ICONS}
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   running: '<path d="M21 12a9 9 0 1 1-6.2-8.6"/>',
@@ -653,7 +688,7 @@ async function post(path, data) {
 }
 const act = (a) => post('/api/action', a);
 
-let offTimer = 0;
+let offTimer = 0, relayTimer = 0;
 function setOnline(on) {
   online = on;
   $('dot').classList.toggle('on', on);
@@ -661,6 +696,9 @@ function setOnline(on) {
   // A short hiccup does not flash the banner; a real cut (Zinarix closed, Wi-Fi) does.
   if (on || !token) $('offline').classList.add('hide');
   else offTimer = setTimeout(() => { if (!online && token) $('offline').classList.remove('hide'); }, 2500);
+  // A long cut with the permanent link: the computer may be at a new address; ask the website.
+  clearTimeout(relayTimer);
+  if (!on && token && RELAY_G) relayTimer = setTimeout(() => { if (!online) toRelay(); }, 15000);
   status();
 }
 function status() {
@@ -677,6 +715,7 @@ function unpair() {
   es = null;
   for (const id of PANELS) $(id).classList.add('hide');
   closeSheet();
+  fdirty = false;
   closeM();
   $('pair').classList.remove('hide');
   drawer(false);
@@ -687,6 +726,7 @@ function paired() {
   $('pair').classList.add('hide');
   for (const id of PANELS) $(id).classList.remove('hide');
   connect();
+  loadCaps();
   // Model names for the header and the messages (the picker fetches them again when opened).
   fetch('/api/models', { headers: { Authorization: 'Bearer ' + token } })
     .then((r) => (r.ok ? r.json() : null))
@@ -851,9 +891,18 @@ function openM(title) {
   $('mtitle').textContent = title;
   $('mbody').textContent = '';
   $('msheet').classList.remove('hide');
+  $('msheet').classList.remove('term');
+  tgen++;
   return $('mbody');
 }
-function closeM() { $('msheet').classList.add('hide'); mview = null; }
+function closeM() {
+  if (mview === 'file' && fdirty && !confirm(L.unsaved)) return;
+  fdirty = false;
+  $('msheet').classList.add('hide');
+  $('msheet').classList.remove('term');
+  tgen++;
+  mview = null;
+}
 let mview = null;
 
 function curMode() { return (snap && snap.mode) || (snap && snap.agent === false ? 'ask' : 'agent'); }
@@ -1264,6 +1313,11 @@ async function openSettings() {
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => { if (d) { name.value = d.name || ''; since.textContent = L.pairedSince + ': ' + new Date(d.at).toLocaleString(); } })
     .catch(() => undefined);
+  if (caps.config !== false) {
+    const cb = el('button', '', L.appConfig);
+    cb.onclick = () => openConfig();
+    box.append(cb);
+  }
   box.append(el('p', 'hint', L.stays));
   if (installEv) {
     const ib = el('button', 'primary', L.install);
@@ -1366,11 +1420,13 @@ $('go').onclick = async () => {
   $('go').disabled = true;
   $('pwait').classList.remove('hide');
   try {
-    const key = new URLSearchParams(location.hash.slice(1)).get('k') || undefined;
+    const key = KEY || undefined;
     const r = await post('/api/pair', { pin: $('pin').value, key });
     if (!r.ok) { $('perr').textContent = (await r.json().catch(() => ({}))).error || L.badPin; return; }
     token = (await r.json()).token;
     localStorage.setItem('zx.token', token);
+    // The website keeps the token for the next addresses (it comes right back here).
+    if (RELAY_G) return void toRelay('&save=' + token);
     paired();
   } catch { $('perr').textContent = L.noComputer; }
   finally { $('go').disabled = false; $('pwait').classList.add('hide'); }
@@ -1401,6 +1457,13 @@ $('tobottom').onclick = () => { const l = $('log'); l.scrollTop = l.scrollHeight
 $('log').addEventListener('scroll', toBottom, { passive: true });
 $('csearch').oninput = () => { if (snap) renderList(); };
 if (Speech) { $('mic').classList.remove('hide'); $('mic').onclick = dictate; }
+$('files2').onclick = () => openFiles();
+$('term2').onclick = $('termb').onclick = () => openTerm();
+$('git2').onclick = openGit;
+$('config2').onclick = () => openConfig();
+$('menu').addEventListener('click', loadCaps);
+${TOOLS_JS}
+${CONFIG_JS}
 if (token) paired();
 </script>
 </body>

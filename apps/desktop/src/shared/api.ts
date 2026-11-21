@@ -1,3 +1,6 @@
+import type { CadEnginesView, CadFormat, CadRenderView } from './cad.js';
+import type { BgModelId, BgStatusView } from './bgRemove.js';
+import type { PrinterAction, PrinterConfig, PrinterKind, PrinterStatus, SliceSettings, SliceView, SlicerView } from './slicer.js';
 import type { DesignApplyResult, DesignOp, DesignSessionView } from './design.js';
 /**
  * The only surface the sandboxed renderer can call. Implemented in preload over a
@@ -8,6 +11,40 @@ import type { ChatMessage, ModelInfo } from '@omni/shared';
 import type { LicenseStatus } from './plans.js';
 import type { ChromeState } from './windowChrome.js';
 import type { TestDiscovery, TestEvent, TestRunRequest, TestRunSummary } from './testing.js';
+import type { JupyterStatus, KernelInfo, NbCompletions, NbVariable, NotebookEvent } from './notebook.js';
+import type {
+  DockerAction,
+  DockerContainer,
+  DockerDetails,
+  DockerDiskRow,
+  DockerEvent,
+  DockerJob,
+  DockerPrune,
+  DockerStats,
+  DockerImage,
+  DockerNetwork,
+  DockerRunSpec,
+  DockerStatus,
+  DockerVolume,
+} from './docker.js';
+import type {
+  PioBoard,
+  PioDevice,
+  PioEvent,
+  PioInstalledLibs,
+  PioJob,
+  PioLibrary,
+  PioProject,
+  PioResult,
+  PioStatus,
+} from './platformio.js';
+import type { GamesScan, GameTemplate, GodotProblem, GodotStatus } from './games.js';
+
+/** Fase 6: what the Games panel hears while a game runs. */
+export type GamesEvent =
+  | { kind: 'run-data'; key: string; chunk: string }
+  | { kind: 'run-end'; key: string; code: number | null };
+import type { MobileAction, MobileDevice, MobileEvent, MobileInput, MobileProject, MobileTools } from './mobile.js';
 import type {
   Breakpoint,
   DebugConfig,
@@ -22,6 +59,16 @@ import type { SuggestionStatsRow } from './nextEdit.js';
 import type { ExportOptions, MediaItem, Transcript, VideoProject } from './video.js';
 import type { VideoAgentResult } from './videoAgent.js';
 import type { TransitionDef } from './videoTransitions.js';
+
+/** Fase 4A: a screen or window that can be recorded. */
+export interface CaptureSourceView {
+  id: string;
+  name: string;
+  kind: 'screen' | 'window';
+  /** PNG data URL (small). */
+  thumb: string;
+  icon?: string;
+}
 
 /** Fase 13: a speech-to-text engine as the video editor lists it. */
 export type SttEngineId = 'local' | 'openai' | 'groq';
@@ -1036,6 +1083,11 @@ export interface ChatRequestView {
   images?: { mediaType: string; data: string }[];
   /** How hard the model should think (and show its reasoning); omitted = provider default. */
   reasoning?: 'low' | 'medium' | 'high';
+  /** With agent: "Controlar la compu" is on (screen, mouse and keyboard without asking each
+   * step; the window is minimized while the AI acts and a bar with Stop stays on screen). */
+  computer?: boolean;
+  /** Language of the Zinarix window (the "Controlar la compu" bar uses it). */
+  uiLang?: 'es' | 'en';
 }
 
 export interface EditRequestView {
@@ -1080,7 +1132,8 @@ export type ChatEventView =
     }
   | { type: 'tool_output'; id: string; chunk: string }
   | { type: 'tool_result'; id: string; ok: boolean; summary: string }
-  | { type: 'file_changed'; path: string };
+  /** open: also show it in the editor (a design the agent just created). */
+  | { type: 'file_changed'; path: string; open?: boolean };
 
 export type AppEvent =
   | { type: 'chat'; requestId: string; event: ChatEventView }
@@ -1120,6 +1173,10 @@ export type AppEvent =
     }
   /** Fase 13B: the agent stopped waiting for this request (canceled turn). */
   | { type: 'video:agentAbort'; requestId: string }
+  /** Fase 4: the global "stop recording" shortcut was pressed. */
+  | { type: 'video:recStop' }
+  /** Fase 4C: progress (0–1) of the proxy being made for this file. */
+  | { type: 'video:proxy'; path: string; progress: number }
   /** The paired phone asked for something (see PhoneAction). */
   | { type: 'phone'; action: PhoneAction }
   /** The phone remote changed (started, stopped, a phone paired, new PIN). */
@@ -1136,6 +1193,17 @@ export type AppEvent =
   | { type: 'debug'; event: DebugEvent }
   /** A test run of this window started, printed something or finished. */
   | { type: 'tests'; event: TestEvent }
+  /** Fase 2A (plan de funciones): a notebook kernel changed state or a cell sent output. */
+  | { type: 'notebook'; event: NotebookEvent }
+  /** Fase 2B (plan de funciones): a followed container log sent lines or ended. */
+  | { type: 'docker'; event: DockerEvent }
+  /** Fase 5A (plan de funciones): PlatformIO build output, serial monitor data and state. */
+  | { type: 'pio'; event: PioEvent }
+  /** Fase 1B: download of a background-removal model (done / error at the end). */
+  | { type: 'bg:progress'; id: BgModelId; got: number; total: number; done?: boolean; error?: string }
+  | { type: 'games'; event: GamesEvent }
+  /** Fase 5B (plan de funciones): a followed device log sent lines or ended. */
+  | { type: 'mobile'; event: MobileEvent }
   /** Extensions were installed, removed, enabled or disabled (in any window). */
   | { type: 'extensions:changed' }
   /** Errors/warnings a language server found in a file (LSP Diagnostic[], zx-ws:/ URIs). */
@@ -1315,6 +1383,8 @@ export interface PhoneStatus {
   autostart?: boolean;
   /** Address of the user's own Cloudflare tunnel, when set (the link never changes). */
   fixedHost?: string;
+  /** What the paired phones may use besides the chats (both on unless turned off). */
+  allow?: PhoneAllow;
   /** Access from anywhere (a Cloudflare tunnel), when it was turned on. */
   remote?: {
     /** Link to open on the phone from any network (carries the pairing key after #). */
@@ -1324,8 +1394,78 @@ export interface PhoneStatus {
     error?: string;
     /** It goes through the user's own tunnel (fixed address). */
     fixed?: boolean;
+    /** `url` never changes: own domain, or the permanent link of the Zinarix website. */
+    permanent?: boolean;
+    /** Why the free link has no permanent version (GitHub CLI missing or signed out). */
+    relayError?: string;
   };
   error?: string;
+}
+
+/** Extras of the phone remote the user can turn off on the computer. */
+export interface PhoneAllow {
+  /** Browse, read, edit, create and delete files of the open project. */
+  files: boolean;
+  /** See and type into the terminals, and open new ones. */
+  terminal: boolean;
+  /** Git changes, diffs, commit, pull and push of the open project. */
+  git: boolean;
+  /** Change Zinarix's settings (models per task, theme, editor, budgets). Missing = on. */
+  config?: boolean;
+}
+
+/** Zinarix's settings as the phone's "Configuración" screen shows and changes them. */
+export interface PhoneConfigView {
+  version: string;
+  defaultModel: string | null;
+  roles: { chat?: string; agent?: string; inline?: string };
+  localOnly: boolean;
+  theme: ThemeId;
+  themes: readonly ThemeId[];
+  prefs: Pick<Prefs, PhonePrefKey>;
+  zoomSteps: number[];
+  /** Spent per provider (USD), today and this month, with the budgets. */
+  usage: {
+    today: { provider: string; name: string; costUsd: number; requests: number }[];
+    month: { provider: string; name: string; costUsd: number; requests: number }[];
+    todayUsd: number;
+    monthUsd: number;
+    budgets: Record<string, { daily?: number; monthly?: number }>;
+  };
+  /** Connected providers (no keys, only names and whether they are local). */
+  providers: { id: string; name: string; local: boolean }[];
+}
+
+/** Preferences the phone may change (no keybindings, fonts or commands). */
+export const PHONE_PREF_KEYS = [
+  'uiZoom',
+  'fontSize',
+  'tabSize',
+  'wordWrap',
+  'minimap',
+  'lineNumbers',
+  'formatOnSave',
+  'autoSave',
+  'inlineCompletions',
+  'nextEdit',
+  'autoImport',
+  'projectRules',
+  'lsp',
+  'helperBubble',
+  'windowEffects',
+  'taskParallel',
+] as const;
+export type PhonePrefKey = (typeof PHONE_PREF_KEYS)[number];
+
+/** A change the phone asks for (one field at a time is enough). */
+export interface PhoneConfigPatch {
+  defaultModel?: string;
+  role?: { role: 'chat' | 'agent' | 'inline'; ref: string | null };
+  localOnly?: boolean;
+  theme?: ThemeId;
+  prefs?: Partial<Pick<Prefs, PhonePrefKey>>;
+  /** No daily and no monthly = remove the budget. */
+  budget?: { provider: string; daily?: number; monthly?: number };
 }
 
 /** A phone paired with the remote (kept across restarts). */
@@ -1455,7 +1595,9 @@ export type PhoneAction =
   /** Drop the messages waiting for the current answer. */
   | { kind: 'clearQueue' }
   /** Control another window (another open folder) from now on. Handled by main. */
-  | { kind: 'window'; id: number };
+  | { kind: 'window'; id: number }
+  /** Open a project file in the editor of the computer (path relative to the project). */
+  | { kind: 'openFile'; path: string };
 
 /** An MCP server of the global config or of the open project (Settings → MCP). */
 export interface McpServerView {
@@ -1531,6 +1673,8 @@ export interface OmniApi {
     readFile(path: string): Promise<FileContent>;
     readBytes(path: string, offset: number, length: number): Promise<FileBytes>;
     writeFile(path: string, content: string): Promise<void>;
+    /** Writes binary content (the image editor saving a picture). */
+    writeBytes(path: string, bytes: Uint8Array): Promise<void>;
     createFile(path: string): Promise<void>;
     createDir(path: string): Promise<void>;
     rename(from: string, to: string): Promise<void>;
@@ -1593,6 +1737,8 @@ export interface OmniApi {
     mention(kind: 'git' | 'web', arg: string | null): Promise<string>;
     /** Commit message for the staged changes (or all changes when nothing is staged). */
     commitMessage(): Promise<string>;
+    /** Rewrites a prompt so the AI understands it better (the user reviews it before sending). */
+    improvePrompt(prompt: string, model?: string): Promise<string>;
     /** Project rules file in use (.zinarix/rules.md, AGENTS.md…) or null. */
     rulesFile(folder?: string): Promise<string | null>;
     /** Project rules that would enter a message with this context ("file:path" sources). */
@@ -1967,6 +2113,177 @@ export interface OmniApi {
     /** Debugs a test (or a describe / file) of the Test Explorer with its runner. */
     startTest(req: TestRunRequest, breakpoints: Record<string, Breakpoint[]>): Promise<void>;
   };
+  /** Fase 2A (plan de funciones): Jupyter notebooks of the open folder (paths relative to it). */
+  notebook: {
+    /** Whether cells can run (Python with jupyter_server + ipykernel) and with which Python. */
+    status(force?: boolean): Promise<{ status: JupyterStatus; python: string | null }>;
+    /** Interpreters found (project venv, conda, PATH) and whether each one has Jupyter. */
+    interpreters(): Promise<{ cmd: string; label: string; ok: boolean; version?: string }[]>;
+    /** Runs notebooks with this interpreter (null = automatic); stops the running kernels. */
+    usePython(cmd: string | null): Promise<void>;
+    kernelspecs(): Promise<{ default: string; specs: KernelInfo[] }>;
+    start(path: string, kernel: string | null): Promise<KernelInfo>;
+    /** Queues a cell; outputs and the end arrive as `notebook` events. */
+    execute(path: string, cellId: string, code: string): Promise<void>;
+    interrupt(path: string): Promise<void>;
+    restart(path: string): Promise<void>;
+    shutdown(path: string): Promise<void>;
+    /** Kernel completions at a cursor (UTF-16 offset) of a cell; null without a kernel. */
+    complete(path: string, code: string, cursor: number): Promise<NbCompletions | null>;
+    /** Signature and docstring of the name at a cursor (plain text); null when unknown. */
+    inspect(path: string, code: string, cursor: number): Promise<string | null>;
+    /** Variables of the notebook's Python kernel; null without a kernel (or not Python). */
+    variables(path: string): Promise<NbVariable[] | null>;
+  };
+  /** Fase 2B (plan de funciones): Docker through its CLI. */
+  docker: {
+    status(): Promise<DockerStatus>;
+    startDesktop(): Promise<void>;
+    containers(): Promise<DockerContainer[]>;
+    images(): Promise<DockerImage[]>;
+    volumes(): Promise<DockerVolume[]>;
+    networks(): Promise<DockerNetwork[]>;
+    action(action: DockerAction, target: string): Promise<string>;
+    run(spec: DockerRunSpec): Promise<string>;
+    /** Compose files of the open folder (relative paths). */
+    composeFiles(): Promise<string[]>;
+    compose(file: string, action: 'up' | 'down' | 'ps' | 'restart' | 'pull'): Promise<string>;
+    /** Follows a container's log: lines arrive as `docker` events with this key. */
+    followLogs(key: string, container: string): Promise<void>;
+    stopLogs(key: string): Promise<void>;
+    /** CPU / memory / network of the running containers (takes ~2 s). */
+    stats(): Promise<DockerStats[]>;
+    inspect(container: string): Promise<DockerDetails>;
+    diskUsage(): Promise<DockerDiskRow[]>;
+    /** Removes stopped containers, dangling images, the build cache or unused volumes. */
+    prune(kind: DockerPrune): Promise<string>;
+    /** Dockerfiles of the open folder (relative paths). */
+    dockerfiles(): Promise<string[]>;
+    /** Pull / build streamed as `docker` logs events with this key, then a job-end event. */
+    startJob(key: string, job: DockerJob): Promise<void>;
+  };
+  /** Fase 5A (plan de funciones): Arduino / ESP32 / STM32 boards through PlatformIO Core. */
+  pio: {
+    status(force?: boolean): Promise<PioStatus>;
+    projects(): Promise<PioProject[]>;
+    devices(): Promise<PioDevice[]>;
+    boards(query: string): Promise<PioBoard[]>;
+    /** Build / upload / clean streamed as pio job-data events with this key, then job-end. */
+    startJob(key: string, job: PioJob): Promise<void>;
+    stopJob(key: string): Promise<void>;
+    /** Result of the last job of this key (problems, memory), once it ended. */
+    lastResult(key: string): Promise<PioResult | null>;
+    createProject(name: string, board: string, framework: string): Promise<string>;
+    serialOpen(port: string, baud: number): Promise<void>;
+    serialClose(port: string): Promise<void>;
+    serialWrite(port: string, data: string): Promise<void>;
+    /** The open monitors with what they received so far. */
+    serialState(): Promise<{ port: string; baud: number; text: string }[]>;
+    serialClear(port: string): Promise<void>;
+    /** The PlatformIO registry (needs internet). */
+    searchLibraries(query: string, page: number): Promise<{ libraries: PioLibrary[]; total: number; pages: number }>;
+    libraries(dir: string, env: string | null): Promise<PioInstalledLibs>;
+    /** pio pkg install / uninstall -l (saves lib_deps in platformio.ini). */
+    changeLibrary(dir: string, env: string | null, spec: string, remove: boolean): Promise<void>;
+  };
+  /** Fase 6 (plan de funciones): Godot, Unity / Unreal and web games. */
+  games: {
+    status(force?: boolean): Promise<GodotStatus>;
+    scan(): Promise<GamesScan>;
+    /** Asks the user for the Godot executable (null = cancelled). */
+    pickExecutable(): Promise<GodotStatus | null>;
+    forgetExecutable(): Promise<GodotStatus>;
+    openEditor(dir: string, file?: string): Promise<void>;
+    /** Runs the game in its window; output as games run-data events with this key, then run-end. */
+    run(key: string, dir: string, opts: { scene: string | null; debugCollisions?: boolean; debugNavigation?: boolean }): Promise<void>;
+    stop(key: string): Promise<boolean>;
+    check(dir: string): Promise<{ checked: number; problems: (GodotProblem & { count: number })[] }>;
+    /** A frame of the game at a second of play (movie writer), as a data: URL. */
+    frame(dir: string, scene: string | null, at: number): Promise<{ image: string | null; problems: (GodotProblem & { count: number })[]; output: string }>;
+    export(dir: string, preset: string, debug: boolean): Promise<{ ok: boolean; path: string; output: string; problems: (GodotProblem & { count: number })[] }>;
+    /** New project from a template in a new folder; returns the files (relative). */
+    create(folder: string, template: GameTemplate, name: string): Promise<string[]>;
+    /** http://127.0.0.1 address of a web game file of the open folder. */
+    webUrl(rel: string): Promise<string>;
+    openOther(kind: 'unity' | 'unreal', dir: string, file?: string): Promise<string>;
+  };
+  /** Fase 1B (plan de funciones): remove the background of a picture on this PC. */
+  bg: {
+    status(): Promise<BgStatusView>;
+    /** Starts downloading a model (progress arrives as bg:progress events). */
+    download(id: BgModelId): Promise<void>;
+    cancelDownload(id: BgModelId): Promise<void>;
+    /** Runs a model on its prepared input (shared/bgRemove modelInput); returns its side × side output. */
+    infer(id: BgModelId, input: Float32Array): Promise<Float32Array>;
+  };
+  /** Fase 7 (plan de funciones): CAD with OpenSCAD (code -> 3D model) and 3D printing. */
+  cad: {
+    engines(refresh?: boolean): Promise<CadEnginesView>;
+    /** Asks the user for the OpenSCAD program (null = cancelled or not OpenSCAD). */
+    pickNative(): Promise<CadEnginesView | null>;
+    /** Renders the editor's text of a .scad to a binary STL; a new render with the same key cancels the last one. */
+    render(key: string, path: string, code: string, values: Record<string, unknown>): Promise<CadRenderView>;
+    cancel(key: string): Promise<void>;
+    /** Save dialog, then writes the model in that format (null = cancelled). */
+    export(path: string, code: string, values: Record<string, unknown>, format: CadFormat): Promise<{ path: string; size: number } | null>;
+    /** New .scad of the open folder from a template; returns its path (relative, like tabs). */
+    create(template: string, name: string): Promise<string>;
+    /** Bytes of a mesh file of the open folder, for the model viewer (at most 300 MB). */
+    readMesh(path: string): Promise<Uint8Array>;
+  };
+  /** Fase 7 (mejora): slicing to G-code with PrusaSlicer, and the network 3D printers. */
+  print: {
+    slicer(refresh?: boolean): Promise<SlicerView>;
+    /** Asks for the PrusaSlicer / SuperSlicer program (null = cancelled or not a slicer). */
+    pickSlicer(): Promise<SlicerView | null>;
+    /** Asks for the user's PrusaSlicer profile (.ini); clear = stop using it. null = cancelled. */
+    pickProfile(clear: boolean): Promise<SlicerView | null>;
+    /** Slices a model of the open folder (a .scad with the editor's code and values) to a .gcode next to it. */
+    slice(key: string, path: string, code: string | null, values: Record<string, unknown>, settings: Partial<SliceSettings>): Promise<SliceView>;
+    cancel(key: string): Promise<void>;
+    /** Opens a model in a desktop slicer (OrcaSlicer, Bambu Studio, Cura, PrusaSlicer). */
+    openIn(app: string, path: string): Promise<void>;
+  };
+  printers: {
+    list(): Promise<(PrinterConfig & { hasKey: boolean })[]>;
+    /** Adds or edits; key undefined keeps the saved one, '' removes it. */
+    save(p: { id?: string; name: string; kind: PrinterKind; url: string; key?: string }): Promise<PrinterConfig>;
+    remove(id: string): Promise<void>;
+    /** Checks the address and key; returns the version the printer reports. */
+    test(p: { id?: string; name: string; kind: PrinterKind; url: string; key?: string }): Promise<string>;
+    status(id: string): Promise<PrinterStatus>;
+    /** Uploads a .gcode of the open folder; start prints it. Returns the name on the printer. */
+    send(id: string, path: string, start: boolean): Promise<string>;
+    control(id: string, action: PrinterAction): Promise<void>;
+  };
+  /** Fase 5B (plan de funciones): Android phones / emulators and phone app projects. */
+  mobile: {
+    tools(force?: boolean): Promise<MobileTools>;
+    devices(): Promise<MobileDevice[]>;
+    avds(): Promise<string[]>;
+    projects(): Promise<MobileProject[]>;
+    startEmulator(avd: string): Promise<void>;
+    /** The phone's screen in a scrcpy window. */
+    mirror(serial: string): Promise<void>;
+    /** PNG screenshot as a data: URL. */
+    screenshot(serial: string): Promise<string>;
+    /** Follows logcat: lines arrive as mobile logcat events with this key. */
+    followLogcat(key: string, serial: string): Promise<void>;
+    stopLogcat(key: string): Promise<void>;
+    /** Terminal command that runs / builds a project of the open folder. */
+    command(dir: string, action: MobileAction, serial: string | null): Promise<string>;
+    /** A tap, long press, swipe, text or key (adb shell input). */
+    input(serial: string, input: MobileInput): Promise<void>;
+    /** Installed apps (third=true: only the ones the user installed). */
+    packages(serial: string, third: boolean): Promise<string[]>;
+    app(serial: string, pkg: string, action: 'launch' | 'stop' | 'clear' | 'uninstall'): Promise<void>;
+    /** .apk files of the open folder (relative paths, newest builds included). */
+    apks(): Promise<string[]>;
+    install(serial: string, apk: string): Promise<void>;
+    /** adb connect (pairCode null) or adb pair (6-digit code); returns adb's answer. */
+    connect(address: string, pairCode: string | null): Promise<string>;
+    disconnect(address: string): Promise<void>;
+  };
   /** Test Explorer: Vitest, Jest and Pytest. One run at a time per window. */
   tests: {
     discover(): Promise<TestDiscovery>;
@@ -2040,6 +2357,8 @@ export interface OmniApi {
     forget(id: string | null): Promise<PhoneStatus>;
     /** The user's own Cloudflare tunnel for a link that never changes (null = random one). */
     fixed(tunnel: { host: string; token: string } | null): Promise<PhoneStatus>;
+    /** What the phones may use besides the chats (files, terminal, git). */
+    allow(allow: PhoneAllow): Promise<PhoneStatus>;
     /** What the phone should show now (sent while the remote runs). */
     push(snapshot: PhoneSnapshot): Promise<void>;
   };
@@ -2148,6 +2467,31 @@ export interface OmniApi {
     agentDone(requestId: string, r: VideoAgentResult): Promise<void>;
     /** Transitions shared in the Zinarix Studio repository (community/transitions). */
     communityTransitions(force: boolean): Promise<TransitionDef[]>;
+    /** Fase 4A: screens and windows that can be recorded. */
+    recSources(): Promise<CaptureSourceView[]>;
+    /** The source the next getDisplayMedia() gets (audio: the computer's sound, Windows). */
+    recSelect(id: string, audio: boolean): Promise<void>;
+    /** Starts a recording file (open folder's media/recordings, else Videos). */
+    recStart(kind: 'screen' | 'camera'): Promise<{ id: string; path: string }>;
+    recChunk(id: string, bytes: Uint8Array): Promise<void>;
+    /** Closes and remuxes the file; returns its path. */
+    recFinish(id: string): Promise<string>;
+    recAbort(id: string): Promise<void>;
+    /** Recording on/off: the global stop shortcut (null when it could not be taken) and minimizing. */
+    recMode(on: boolean, minimize: boolean): Promise<{ shortcut: string | null }>;
+    /** Fase 4 (mejora): the cursor clock of a screen recording stops / goes on with it. */
+    recPause(id: string, paused: boolean): Promise<void>;
+    /** The cursor path saved next to a recording (`<file>.cursor.json`), or null. */
+    cursorTrack(mediaPath: string): Promise<string | null>;
+    /** Fase 4C: URL of a file's proxy when it already exists. */
+    proxyUrl(path: string, height: number): Promise<string | null>;
+    /** Makes (or reuses) a proxy; progress comes as 'video:proxy' events. Returns its URL. */
+    proxy(
+      path: string,
+      opts: { duration: number; width: number; height: number; hasAudio: boolean; target: number },
+    ): Promise<string>;
+    /** Stops the proxy of a file (null: every one). */
+    proxyCancel(path: string | null): Promise<void>;
   };
   /** Ayuda de Zinarix: the help assistant (a small local model that knows the app). */
   helper: {
@@ -2209,6 +2553,8 @@ export interface OmniApi {
     setBridge(on: boolean): Promise<BridgeState>;
     /** Web origins allowed to use the bridge from a browser (invalid ones are dropped). */
     setBridgeOrigins(origins: string[]): Promise<BridgeState>;
+    /** New bridge token: whoever had the old one (a web app, a Blender) loses access. */
+    rotateBridgeToken(): Promise<BridgeState>;
     /** Starts encoding viewer frames; then frame() each RGBA frame and end(). */
     begin(o: {
       width: number;
@@ -2336,6 +2682,7 @@ export const CHANNELS = [
   'workspace:readFile',
   'workspace:readBytes',
   'workspace:writeFile',
+  'workspace:writeBytes',
   'workspace:createFile',
   'workspace:createDir',
   'workspace:rename',
@@ -2375,6 +2722,7 @@ export const CHANNELS = [
   'ai:applyReview',
   'ai:complete',
   'ai:commitMessage',
+  'ai:improvePrompt',
   'ai:rulesFile',
   'ai:activeRules',
   'ai:agentKit',
@@ -2548,6 +2896,7 @@ export const CHANNELS = [
   'phone:resume',
   'phone:forget',
   'phone:fixed',
+  'phone:allow',
   'phone:push',
   'bots:status',
   'bots:connect',
@@ -2578,6 +2927,106 @@ export const CHANNELS = [
   'debug:evaluate',
   'debug:setBreakpoints',
   'debug:startTest',
+  'docker:status',
+  'docker:startDesktop',
+  'docker:containers',
+  'docker:images',
+  'docker:volumes',
+  'docker:networks',
+  'docker:action',
+  'docker:run',
+  'docker:composeFiles',
+  'docker:compose',
+  'docker:followLogs',
+  'docker:stopLogs',
+  'docker:stats',
+  'docker:inspect',
+  'docker:diskUsage',
+  'docker:prune',
+  'docker:dockerfiles',
+  'docker:startJob',
+  'games:status',
+  'games:scan',
+  'games:pickExecutable',
+  'games:forgetExecutable',
+  'games:openEditor',
+  'games:run',
+  'games:stop',
+  'games:check',
+  'games:frame',
+  'games:export',
+  'games:create',
+  'games:webUrl',
+  'cad:engines',
+  'cad:pickNative',
+  'cad:render',
+  'bg:status',
+  'bg:download',
+  'bg:cancelDownload',
+  'bg:infer',
+  'cad:cancel',
+  'cad:export',
+  'cad:create',
+  'cad:readMesh',
+  'print:slicer',
+  'print:pickSlicer',
+  'print:pickProfile',
+  'print:slice',
+  'print:cancel',
+  'print:openIn',
+  'printers:list',
+  'printers:save',
+  'printers:remove',
+  'printers:test',
+  'printers:status',
+  'printers:send',
+  'printers:control',
+  'games:openOther',
+  'pio:status',
+  'pio:projects',
+  'pio:devices',
+  'pio:boards',
+  'pio:startJob',
+  'pio:stopJob',
+  'pio:lastResult',
+  'pio:createProject',
+  'pio:serialOpen',
+  'pio:serialClose',
+  'pio:serialWrite',
+  'pio:serialState',
+  'pio:serialClear',
+  'pio:searchLibraries',
+  'pio:libraries',
+  'pio:changeLibrary',
+  'mobile:tools',
+  'mobile:devices',
+  'mobile:avds',
+  'mobile:projects',
+  'mobile:startEmulator',
+  'mobile:mirror',
+  'mobile:screenshot',
+  'mobile:followLogcat',
+  'mobile:stopLogcat',
+  'mobile:command',
+  'mobile:input',
+  'mobile:packages',
+  'mobile:app',
+  'mobile:apks',
+  'mobile:install',
+  'mobile:connect',
+  'mobile:disconnect',
+  'notebook:status',
+  'notebook:interpreters',
+  'notebook:usePython',
+  'notebook:kernelspecs',
+  'notebook:start',
+  'notebook:execute',
+  'notebook:interrupt',
+  'notebook:restart',
+  'notebook:shutdown',
+  'notebook:complete',
+  'notebook:inspect',
+  'notebook:variables',
   'tests:discover',
   'tests:run',
   'tests:cancel',
@@ -2657,6 +3106,18 @@ export const CHANNELS = [
   'video:saveCaptions',
   'video:agentDone',
   'video:communityTransitions',
+  'video:recSources',
+  'video:recSelect',
+  'video:recStart',
+  'video:recChunk',
+  'video:recFinish',
+  'video:recAbort',
+  'video:recMode',
+  'video:recPause',
+  'video:cursorTrack',
+  'video:proxyUrl',
+  'video:proxy',
+  'video:proxyCancel',
   'helper:status',
   'helper:ask',
   'helper:pull',
@@ -2701,6 +3162,7 @@ export const CHANNELS = [
   'scene3d:bridge',
   'scene3d:setBridge',
   'scene3d:setBridgeOrigins',
+  'scene3d:rotateBridgeToken',
   'scene3d:begin',
   'scene3d:frame',
   'scene3d:end',

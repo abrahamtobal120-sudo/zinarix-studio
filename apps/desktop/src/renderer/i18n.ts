@@ -145,6 +145,15 @@ const es = {
   reasoningTitle:
     'Cuánto piensa el modelo antes de responder. Con un nivel elegido, los modelos que lo permiten muestran su razonamiento.',
   reasoningAuto: 'Razonar: auto',
+  computerPill: 'Compu',
+  computerPillOn: 'Controla la compu',
+  computerPillTitle:
+    'Controlar la compu: la IA ve tu pantalla y usa el mouse y el teclado en cualquier programa, sin pedir permiso en cada paso. Mientras trabaja, Zinarix se minimiza y arriba aparece una barra con «Detener». Necesita un modelo que vea imágenes.',
+  computerConfirm:
+    'Con «Controlar la compu», la IA ve tu pantalla y usa tu mouse y teclado en cualquier programa sin pedirte permiso en cada paso (los atajos delicados sí se preguntan).\n\nMientras trabaja, Zinarix se minimiza y arriba aparece una barra con «Detener». También puedes pararla moviendo el mouse a la esquina de arriba a la izquierda.\n\nNo la dejes sola con correos, bancos o datos privados abiertos. Se apaga sola al cerrar Zinarix.',
+  computerConfirmOk: 'Darle el control',
+  computerOnToast: 'Control de la compu encendido en este chat',
+  computerOffToast: 'Control de la compu apagado: vuelve a pedir permiso',
   reasoningLow: 'Razonar: bajo',
   reasoningMedium: 'Razonar: medio',
   reasoningHigh: 'Razonar: alto',
@@ -277,6 +286,18 @@ const es = {
   phoneLanSame:
     'Este enlace no cambia: tus celulares siguen conectados aunque cierres y abras Zinarix.',
   phoneDevices: 'Celulares conectados',
+  phoneAllowTitle: 'Lo que el celular puede usar',
+  phoneAllowHint:
+    'Además de los chats. Solo los celulares que emparejaste con el PIN y aceptaste aquí.',
+  phoneAllowFiles: 'Archivos del proyecto',
+  phoneAllowFilesHint: 'Ver, editar, crear, renombrar y mandar a la papelera.',
+  phoneAllowTerminal: 'Terminal',
+  phoneAllowTerminalHint:
+    'Ver y escribir en tus terminales y abrir otras. Lo que escribas se ejecuta en esta computadora.',
+  phoneAllowGit: 'Git',
+  phoneAllowGitHint: 'Cambios, diferencias, commit, pull y push del proyecto.',
+  phoneAllowConfig: 'Configuración de Zinarix',
+  phoneAllowConfigHint: 'Modelos por tarea, solo local, tema, editor y presupuestos (no las claves de API).',
   phoneNoDevices: 'Todavía no hay celulares conectados.',
   phoneForget: 'Desconectar',
   phoneForgetAll: 'Desconectar todos',
@@ -297,6 +318,8 @@ const es = {
   phoneFixedRemove: 'Quitar enlace fijo',
   phoneRandomNote:
     'Tus celulares siguen emparejados, pero este enlace gratuito puede cambiar al reiniciar. Configura un enlace fijo abajo para que nunca cambie.',
+  phonePermanentNote:
+    'Este enlace es permanente: guárdalo en el celular y funcionará siempre, aunque reinicies Zinarix o la computadora. Se apoya en un gist privado de tu GitHub (no lo borres).',
   phoneRemoteStarting: 'Conectando…',
   phoneHint:
     'Controla Zinarix desde tu celular: ve los chats, escribe mensajes, aprueba o rechaza lo que pide el agente y detén respuestas. En la misma red Wi-Fi, o desde cualquier lugar si activas el acceso a distancia.',
@@ -1332,6 +1355,10 @@ const es = {
   chatQueueRetryCancel: 'Cancelar el reintento',
   chatQueueEdit: 'Sacar de la cola y editar',
   chatQueueRemove: 'Quitar de la cola',
+  chatImprove: 'Mejorar prompt: la IA reescribe tu mensaje más claro antes de enviarlo (tú lo revisas y decides)',
+  chatImproving: 'Mejorando tu mensaje…',
+  chatImproveUndo: 'Volver a mi texto original',
+  chatImproveDone: 'Mensaje mejorado: revísalo y envíalo, o vuelve a tu texto',
   chatSendOptions: 'Más formas de enviar',
   chatImageName: 'imagen',
   chatTokens: 'tok',
@@ -2364,6 +2391,15 @@ const en: Record<Key, string> = {
   reasoningTitle:
     'How much the model thinks before answering. With a level chosen, models that support it show their reasoning.',
   reasoningAuto: 'Reasoning: auto',
+  computerPill: 'Computer',
+  computerPillOn: 'Controls the computer',
+  computerPillTitle:
+    'Control the computer: the AI sees your screen and uses the mouse and keyboard in any program, without asking at every step. While it works, Zinarix is minimized and a bar with "Stop" shows at the top. Needs a model that can see images.',
+  computerConfirm:
+    'With "Control the computer", the AI sees your screen and uses your mouse and keyboard in any program without asking at every step (delicate shortcuts are still asked).\n\nWhile it works, Zinarix is minimized and a bar with "Stop" shows at the top. You can also stop it by moving the mouse to the top-left corner.\n\nDo not leave it alone with mail, banking or private data open. It turns off when Zinarix closes.',
+  computerConfirmOk: 'Give it control',
+  computerOnToast: 'Computer control is on in this chat',
+  computerOffToast: 'Computer control is off: it asks again',
   reasoningLow: 'Reasoning: low',
   reasoningMedium: 'Reasoning: medium',
   reasoningHigh: 'Reasoning: high',
@@ -2494,6 +2530,17 @@ const en: Record<Key, string> = {
   phoneRemoteOff: 'Turn off access from anywhere',
   phoneLanSame: "This link doesn't change: your phones stay connected even if you close and reopen Zinarix.",
   phoneDevices: 'Connected phones',
+  phoneAllowTitle: 'What the phone can use',
+  phoneAllowHint: 'Besides the chats. Only phones you paired with the PIN and accepted here.',
+  phoneAllowFiles: 'Project files',
+  phoneAllowFilesHint: 'View, edit, create, rename and move to the recycle bin.',
+  phoneAllowTerminal: 'Terminal',
+  phoneAllowTerminalHint:
+    'See and type into your terminals and open new ones. What you type runs on this computer.',
+  phoneAllowGit: 'Git',
+  phoneAllowGitHint: 'Changes, diffs, commit, pull and push of the project.',
+  phoneAllowConfig: 'Zinarix settings',
+  phoneAllowConfigHint: 'Models per task, local only, theme, editor and budgets (not the API keys).',
   phoneNoDevices: 'No phones connected yet.',
   phoneForget: 'Disconnect',
   phoneForgetAll: 'Disconnect all',
@@ -2514,6 +2561,8 @@ const en: Record<Key, string> = {
   phoneFixedRemove: 'Remove fixed link',
   phoneRandomNote:
     'Your phones stay paired, but this free link may change on restart. Set a fixed link below so it never changes.',
+  phonePermanentNote:
+    'This link is permanent: save it on your phone and it always works, even after restarting Zinarix or the computer. It relies on a secret gist in your GitHub (do not delete it).',
   phoneRemoteStarting: 'Connecting…',
   phoneHint:
     'Control Zinarix from your phone: see the chats, write messages, approve or deny what the agent asks and stop answers. On the same Wi-Fi network, or from anywhere if you turn on remote access.',
@@ -3543,6 +3592,10 @@ const en: Record<Key, string> = {
   chatQueueRetryCancel: 'Cancel the retry',
   chatQueueEdit: 'Take out of the queue and edit',
   chatQueueRemove: 'Remove from the queue',
+  chatImprove: 'Improve prompt: the AI rewrites your message more clearly before it is sent (you review it and decide)',
+  chatImproving: 'Improving your message…',
+  chatImproveUndo: 'Back to my original text',
+  chatImproveDone: 'Message improved: review it and send it, or go back to your text',
   chatSendOptions: 'More ways to send',
   chatImageName: 'image',
   chatTokens: 'tok',

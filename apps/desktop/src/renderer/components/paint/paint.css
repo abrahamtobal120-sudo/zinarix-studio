@@ -1,0 +1,328 @@
+@layer features {
+/* Paint canvas (Fase 3A del plan de funciones) */
+.pv {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-sm);
+}
+.pv-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  flex-wrap: wrap;
+}
+.pv-bar .spacer {
+  flex: 1;
+}
+.pv-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--border);
+}
+.pv-dim {
+  margin-left: 8px;
+  color: var(--fg-dim);
+}
+.pv button {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: inherit;
+  padding: 3px 8px;
+  font-size: var(--text-sm);
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 28px;
+}
+.pv button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.pv button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-color);
+}
+.pv button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pv button.danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--on-color);
+}
+.pv-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.pv-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-3);
+  outline: none;
+  touch-action: none;
+  cursor: crosshair;
+}
+.pv-stage.tool-brush,
+.pv-stage.tool-eraser {
+  cursor: none;
+}
+.pv-stage.tool-hand {
+  cursor: grab;
+}
+.pv-stage.tool-picker {
+  cursor: copy;
+}
+.pv-canvas {
+  position: absolute;
+  background-color: var(--white);
+  background-image:
+    linear-gradient(45deg, var(--gray-3) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--gray-3) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--gray-3) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--gray-3) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+.pv-cursor {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 1px solid var(--white);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.pv-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--fg-dim);
+}
+.pv-side {
+  width: 260px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg-2);
+  padding: 4px 12px 16px;
+}
+.pv-side section {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pv-side section:last-child {
+  border-bottom: none;
+}
+.pv-side h4 {
+  margin: 4px 0 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.pv-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0;
+}
+.pv-wrap {
+  flex-wrap: wrap;
+}
+.pv input[type='color'] {
+  width: 44px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.pv-swatches {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  margin-top: 6px;
+}
+.pv .pv-swatches button {
+  min-width: 0;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+}
+.pv .pv-swatches button.on {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.pv-slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 6px;
+  margin: 6px 0;
+  color: var(--fg-dim);
+}
+.pv-val {
+  font-variant-numeric: tabular-nums;
+}
+.pv-slider input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent);
+}
+.pv-label {
+  margin-top: 6px;
+  color: var(--fg-dim);
+}
+.pv-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+.pv-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+  color: var(--fg-dim);
+}
+.pv-field select {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: var(--text-sm);
+}
+.pv-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.pv-layer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.pv-layer:hover {
+  background: var(--hover);
+}
+.pv-layer.on {
+  background: var(--sel);
+  border-color: var(--accent);
+}
+.pv .pv-eye {
+  background: transparent;
+  border: none;
+  min-width: 20px;
+  padding: 0;
+}
+.pv-thumb {
+  flex-shrink: 0;
+  background: var(--white);
+  border: 1px solid var(--border);
+}
+.pv-layer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-layer input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-3);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  font: inherit;
+}
+.pv-tag {
+  font-size: var(--text-2xs);
+  color: var(--fg-dim);
+}
+/* Selection, lasso and transform (mejora de la Fase 3A) */
+.pv-stage.tool-move {
+  cursor: move;
+}
+.pv-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.pv-ants-bg,
+.pv-ants {
+  fill: none;
+  stroke-width: 1;
+}
+.pv-ants-bg {
+  stroke: var(--white);
+}
+.pv-ants {
+  stroke: var(--black);
+  stroke-dasharray: 4 4;
+  animation: pv-ants 0.6s linear infinite;
+}
+@keyframes pv-ants {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+.pv-fbox {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.pv-fh {
+  fill: var(--white);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+.pv-fh-nw,
+.pv-fh-se {
+  cursor: nwse-resize;
+}
+.pv-fh-ne,
+.pv-fh-sw {
+  cursor: nesw-resize;
+}
+.pv-hint {
+  margin: 2px 0 6px;
+  color: var(--fg-dim);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.pv-brushes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.pv .pv-brushes button {
+  padding: 3px 4px;
+  font-size: var(--text-xs);
+}
+}

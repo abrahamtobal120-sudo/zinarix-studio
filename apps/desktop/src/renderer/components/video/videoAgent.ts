@@ -37,7 +37,9 @@ import { normalizeTransitionDef, shareUrl } from '../../../shared/videoTransitio
 import { api, toast } from '../../store';
 import { allTransitions, saveTransition } from './transitionLibrary';
 import { textPngs } from './textDraw';
-import { commit, getV, importPaths, openStudio } from './videoStore';
+import { unzoomClip, zoomClip } from './autoZoom';
+import { commit, getV, importPaths, openStudio, saveProxyPrefs } from './videoStore';
+import { heavy, makeProxies, proxyStatus } from './proxies';
 
 type Args = Record<string, unknown>;
 const str = (a: Args, k: string) => (typeof a[k] === 'string' ? (a[k] as string).trim() : '');
@@ -66,6 +68,18 @@ const ACTION: Record<string, (a: Args, p: VideoProject) => string> = {
   video_add_title: (a) => `agregar el título "${str(a, 'text').slice(0, 80)}"`,
   video_captions: (a) => `poner subtítulos (estilo ${str(a, 'style') || 'classic'})`,
   video_set_format: (a) => `cambiar el formato a ${str(a, 'aspect')}`,
+  video_speed_ramp: (a) =>
+    a.remove === true
+      ? `quitar la rampa de velocidad del clip ${str(a, 'clip')}`
+      : `poner una rampa de velocidad (${str(a, 'preset') || 'personalizada'}) en el clip ${str(a, 'clip')}`,
+  video_auto_zoom: (a) =>
+    a.remove === true
+      ? `quitar el zoom del clip ${str(a, 'clip')}`
+      : `poner zoom automático hacia el cursor en el clip ${str(a, 'clip')}`,
+  video_color: (a) =>
+    a.reset === true
+      ? 'quitar la corrección de color'
+      : `corregir el color${Array.isArray(a.clips) && a.clips.length ? ` de ${a.clips.length} clip(s)` : ' de los clips'}${str(a, 'preset') ? ` (estilo ${str(a, 'preset')})` : ''}${str(a, 'curve') ? ` (curva ${str(a, 'curve')})` : ''}`,
   video_add_transition: (a) => {
     if (a.remove === true) return 'quitar transiciones';
     const c = a.custom as { name?: unknown } | undefined;
@@ -191,6 +205,32 @@ async function run(
       const e = addTransition(p, a, allTransitions());
       if (!('error' in e) && !dry && e.isNew && e.def) saveTransition(e.def);
       return finishEdit(name, a, p, e, dry);
+    }
+    case 'video_proxies':
+      return proxiesTool(a, dry);
+    case 'video_auto_zoom': {
+      const id = str(a, 'clip');
+      const c = p.clips.find((x) => x.id === id);
+      if (!c) return fail(`No clip "${id}". Call video_state to see the clip ids.`);
+      if (a.remove === true)
+        return finishEdit(name, a, p, { project: unzoomClip(p, id), label: 'IA: quitar zoom', content: `Zoom keys removed from ${id}.` }, dry);
+      const scale = typeof a.scale === 'number' ? a.scale : undefined;
+      const z = await zoomClip(p, id, scale ? { scale } : {});
+      if ('error' in z)
+        return fail(
+          z.error === 'noClip'
+            ? `Clip ${id} is not a video.`
+            : z.error === 'noTrack'
+              ? `Clip ${id} has no cursor path: auto zoom only works on full-screen recordings made with Zinarix's ⏺ Record.`
+              : 'The cursor never rests in that clip, so there is nothing to zoom into.',
+        );
+      return finishEdit(
+        name,
+        a,
+        p,
+        { project: z.project, label: 'IA: zoom automático', content: `Auto zoom on ${id}: ${z.rests} zoom-ins (scale ${scale ?? 1.8}×), written as scale / x / y keyframes.` },
+        dry,
+      );
     }
     case 'video_transcribe':
       return transcribe(a, dry, id, signal);
@@ -355,5 +395,74 @@ async function shareTransition(a: Args, dry: boolean): Promise<VideoAgentResult>
     ok: true,
     content: `Opened GitHub with community/transitions/${n.id}.json filled in. The user signs in and presses "Commit changes" / "Propose changes" to open the pull request; once merged, every Zinarix Studio user gets it in the Transitions panel.`,
     summary: 'GitHub abierto',
+  };
+}
+
+/** Fase 4C: make proxies, list them, or switch the preview between proxies and originals. */
+async function proxiesTool(a: Args, dry: boolean): Promise<VideoAgentResult> {
+  const action = str(a, 'action');
+  const st = proxyStatus();
+  const names = (ids: string[]) =>
+    ids.map((i) => st.candidates.find((m) => m.id === i)?.name ?? i).join(', ') || '(none)';
+  if (action === 'status' || (dry && action !== 'make' && action !== 'on' && action !== 'off')) {
+    const v = getV();
+    return {
+      ok: true,
+      content: `Proxies ${v.useProxy ? 'ON' : 'OFF'} in the preview (export always uses the originals). ${st.ready.length} of ${st.total} videos bigger than 540p have one: ${names(st.ready)}. Being made: ${names(st.making)}. Without: ${names(st.candidates.filter((m) => !st.ready.includes(m.id)).map((m) => m.id))}.`,
+      summary: `${st.ready.length}/${st.total} con proxy`,
+    };
+  }
+  if (action === 'on' || action === 'off') {
+    if (dry)
+      return {
+        ok: true,
+        content:
+          action === 'on'
+            ? 'usar proxies en la vista previa'
+            : 'usar los originales en la vista previa',
+        summary: 'no cambia el proyecto',
+      };
+    saveProxyPrefs({ useProxy: action === 'on' });
+    return {
+      ok: true,
+      content: `Preview now uses ${action === 'on' ? 'proxies' : 'the originals'}.`,
+      summary: action,
+    };
+  }
+  if (action !== 'make') return fail('action must be make, status, on or off.');
+  const refs = Array.isArray(a.media)
+    ? (a.media as unknown[]).filter((x): x is string => typeof x === 'string')
+    : [];
+  const p = getV().project;
+  const pick = refs.length
+    ? st.candidates.filter((m) =>
+        refs.some(
+          (r) => r === m.id || r === m.name || m.name.toLowerCase().includes(r.toLowerCase()),
+        ),
+      )
+    : st.candidates.filter((m) => heavy(m) && p.clips.some((c) => c.mediaId === m.id));
+  const todo = pick.filter((m) => !st.ready.includes(m.id));
+  if (!todo.length)
+    return {
+      ok: true,
+      content: pick.length
+        ? 'Those videos already have proxies.'
+        : 'No video needs a proxy (none above 1080p on the timeline). Give "media" ids to make them for smaller ones.',
+      summary: 'nada que hacer',
+    };
+  if (dry)
+    return {
+      ok: true,
+      content: `crear proxies (copias ligeras de 540p) de ${todo.length} video(s): ${todo
+        .map((m) => m.name)
+        .join(', ')
+        .slice(0, 200)}`,
+      summary: 'usa CPU un rato; no cambia el proyecto',
+    };
+  const r = await makeProxies(todo.map((m) => m.id));
+  return {
+    ok: r.failed === 0,
+    content: `Made ${r.made} proxy file(s)${r.failed ? `, ${r.failed} failed` : ''}. The preview ${getV().useProxy ? 'uses them now' : 'still uses the originals (proxies are off: action "on")'}.`,
+    summary: `${r.made} proxy(s)`,
   };
 }

@@ -1,0 +1,47 @@
+Background removal in Zinarix Studio
+====================================
+
+This folder holds the program Zinarix uses to remove the background of pictures on this
+computer, without the internet: bgWorker.mjs (a small launcher from Zinarix bundled with
+ONNX Runtime Web), ONNX Runtime's WebAssembly files and, when the build includes it, the
+fast model u2netp.onnx. The precise model is downloaded only when the user asks for it,
+into the user's data folder (models/isnet-general-use.onnx), and checked with SHA-256.
+
+ONNX Runtime Web 1.31.1 (ort-wasm-simd-threaded.*, and inside bgWorker.mjs)
+-------------------------------------------------------------------------
+MIT License
+
+Copyright (c) Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Models
+------
+- u2netp.onnx (fast): U²-Net, small version. Xuebin Qin, Zichen Zhang, Chenyang Huang,
+  Masood Dehghan, Osmar R. Zaiane and Martin Jagersand, "U²-Net: Going Deeper with Nested
+  U-Structure for Salient Object Detection", Pattern Recognition 2020.
+  https://github.com/xuebinqin/U-2-Net — Apache License 2.0.
+- isnet-general-use.onnx (precise, downloaded on request): IS-Net from "Highly Accurate
+  Dichotomous Image Segmentation" (DIS), Xuebin Qin, Hang Dai, Xiaobin Hu, Deng-Ping Fan,
+  Ling Shao and Luc Van Gool, ECCV 2022. https://github.com/xuebinqin/DIS — Apache
+  License 2.0.
+
+Both files are the ONNX exports published by the rembg project
+(https://github.com/danielgatis/rembg, MIT), unchanged. The Apache License 2.0 text is at
+https://www.apache.org/licenses/LICENSE-2.0.

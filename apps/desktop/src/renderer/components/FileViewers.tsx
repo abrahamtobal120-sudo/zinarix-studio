@@ -3,6 +3,11 @@ import type { ReactElement, WheelEvent } from 'react';
 import { t } from '../i18n';
 import { languageFor, monaco } from '../monaco';
 import { MAX_EDITABLE, api, openLargeInEditor, type Tab } from '../store';
+import { EDITABLE_EXT } from '../../shared/imageEdit';
+import { ImageEditor } from './image/ImageEditor';
+import { ti } from './image/imageStrings';
+import { PaintView } from './paint/PaintView';
+import { tg } from './graphics/graphicsStrings';
 
 /** Human size: 1.2 MB, 340 KB… */
 export function formatBytes(n: number): string {
@@ -82,6 +87,12 @@ function ImageViewer({ path, size }: { path: string; size: number }) {
   const [progress, setProgress] = useState(0);
   const [zoom, setZoom] = useState<number | 'fit'>('fit');
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  // Fase 1A: the editor works on the same bytes; "rev" reads the file again after replacing it.
+  const [editing, setEditing] = useState(false);
+  // Fase 3A: paint over the picture (layers), saved as a .zdraw next to it.
+  const [painting, setPainting] = useState(false);
+  const [rev, setRev] = useState(0);
+  const editable = EDITABLE_EXT.has(path.split('.').pop()?.toLowerCase() ?? '');
 
   useEffect(() => {
     let alive = true;
@@ -98,13 +109,16 @@ function ImageViewer({ path, size }: { path: string; size: number }) {
       try {
         const parts: Uint8Array<ArrayBuffer>[] = [];
         let offset = 0;
-        while (offset < size) {
-          const { bytes } = await api().workspace.readBytes(path, offset, CHUNK);
+        // The size of the file now (the tab's may be stale after the editor replaced it).
+        let total = size;
+        while (offset < total || offset === 0) {
+          const { bytes, size: now } = await api().workspace.readBytes(path, offset, CHUNK);
           if (!alive) return;
+          total = Math.min(now, MAX_IMAGE);
           if (bytes.length === 0) break;
           parts.push(bytes);
           offset += bytes.length;
-          setProgress(size ? offset / size : 1);
+          setProgress(total ? offset / total : 1);
         }
         const ext = path.split('.').pop()?.toLowerCase() ?? '';
         made = URL.createObjectURL(new Blob(parts, { type: MIME[ext] ?? 'image/*' }));
@@ -117,7 +131,7 @@ function ImageViewer({ path, size }: { path: string; size: number }) {
       alive = false;
       if (made) URL.revokeObjectURL(made);
     };
-  }, [path, size]);
+  }, [path, size, rev]);
 
   const onWheel = (e: WheelEvent) => {
     if (!e.ctrlKey || !natural) return;
@@ -127,9 +141,30 @@ function ImageViewer({ path, size }: { path: string; size: number }) {
   };
 
   if (error) return <div className="notice-pane">{error}</div>;
+  if (painting && url) return <PaintView path={path} source={{ url }} onClose={() => setPainting(false)} />;
+  if (editing && url)
+    return (
+      <ImageEditor
+        path={path}
+        url={url}
+        onClose={() => setEditing(false)}
+        onReplaced={() => {
+          setEditing(false);
+          setRev((r) => r + 1);
+        }}
+      />
+    );
   return (
     <div className="image-viewer">
       <div className="image-tools">
+        {editable && (
+          <button className="on" disabled={!url} title={ti('editHint')} onClick={() => setEditing(true)}>
+            ✎ {ti('edit')}
+          </button>
+        )}
+        <button disabled={!url} title={tg('paintFromHint')} onClick={() => setPainting(true)}>
+          🖌 {tg('paintFrom')}
+        </button>
         <button className={zoom === 'fit' ? 'on' : ''} onClick={() => setZoom('fit')}>
           {t('zoomFit')}
         </button>

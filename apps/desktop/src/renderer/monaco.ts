@@ -4,6 +4,7 @@ import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker';
 import JsonWorker from 'monaco-editor/language/json/json.worker?worker';
 import CssWorker from 'monaco-editor/language/css/css.worker?worker';
 import HtmlWorker from 'monaco-editor/language/html/html.worker?worker';
+import { registerGdscript } from './gdscript';
 
 self.MonacoEnvironment = {
   getWorker(_id: string, label: string) {
@@ -17,11 +18,16 @@ self.MonacoEnvironment = {
 
 export { monaco };
 
+// Fase 6: GDScript (Godot) before the extension table is built.
+registerGdscript(monaco);
+
 const EXT_LANG: Record<string, string> = {};
 for (const lang of monaco.languages.getLanguages()) {
   for (const ext of lang.extensions ?? []) EXT_LANG[ext.toLowerCase()] ??= lang.id;
   for (const name of lang.filenames ?? []) EXT_LANG[name.toLowerCase()] ??= lang.id;
 }
+// Godot's text resources (project.godot, scenes, resources, import settings) are INI-like.
+for (const ext of ['.tscn', '.tres', '.godot', '.import', '.gdshaderinc']) EXT_LANG[ext] ??= 'ini';
 
 export function languageFor(path: string): string {
   const name = path.split('/').pop()!.toLowerCase();

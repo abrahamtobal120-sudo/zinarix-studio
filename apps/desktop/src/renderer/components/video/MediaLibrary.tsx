@@ -6,6 +6,11 @@ import { GeneratePanel } from './GeneratePanel';
 import { tg } from './generateStrings';
 import { fmtBytes, fmtDuration, tv } from './strings';
 import { addToTimeline, importPaths, relinkMedia, removeMedia, useV } from './videoStore';
+import { t4 } from './fase4Strings';
+import { cancelProxy, makeProxy, needsProxy } from './proxies';
+import { RecordDialog } from './RecordDialog';
+import { useRec } from './screenRecord';
+import './fase4.css';
 
 export const MEDIA_DRAG = 'application/x-zinarix-video-media';
 
@@ -31,6 +36,8 @@ export function MediaLibrary() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [over, setOver] = useState(false);
   const [gen, setGen] = useState(false);
+  const [rec, setRec] = useState(false);
+  const recPhase = useRec((r) => r.phase);
 
   const shown = media.filter(
     (m) =>
@@ -77,6 +84,14 @@ export function MediaLibrary() {
         >
           <Icon name="sparkle" size={14} /> {tg('open')}
         </button>
+        <button
+          className="vs-import"
+          title={t4('recOpenHint')}
+          disabled={recPhase !== 'idle'}
+          onClick={() => setRec(true)}
+        >
+          <span className="vs-rec-dot" /> {t4('recOpen')}
+        </button>
         <div className="vs-seg" role="group" aria-label={tv('list')}>
           <button
             className={view === 'grid' ? 'on' : ''}
@@ -97,6 +112,7 @@ export function MediaLibrary() {
         </div>
       </div>
       {gen && <GeneratePanel onClose={() => setGen(false)} />}
+      {rec && <RecordDialog onClose={() => setRec(false)} />}
       <input
         className="vs-search"
         placeholder={tv('searchMedia')}
@@ -136,6 +152,9 @@ export function MediaLibrary() {
 
 function MediaCard({ m, thumb, used }: { m: MediaItem; thumb?: string; used: number }) {
   const [hoverX, setHoverX] = useState<number | null>(null);
+  const proxy = useV((s) => !!s.proxies[m.id]);
+  const prog = useV((s) => s.proxyProg[m.id]);
+  const proxyable = needsProxy(m);
   // Hovering scrubs through the thumbnail strip (24 frames).
   const frame = hoverX == null ? 4 : Math.min(23, Math.floor(hoverX * 24));
   const strip = m.kind === 'video' && thumb;
@@ -181,6 +200,22 @@ function MediaCard({ m, thumb, used }: { m: MediaItem; thumb?: string; used: num
         {!thumb && <Icon name={KIND_ICON[m.kind]} size={22} />}
         {m.kind !== 'image' && <span className="vs-badge">{fmtDuration(m.duration)}</span>}
         {used > 0 && <span className="vs-used" title={`${used}`} />}
+        {proxy && (
+          <span className="vs-proxy-tag" title={t4('proxyHint')}>
+            {t4('proxyBadge')}
+          </span>
+        )}
+        {prog !== undefined && (
+          <span
+            className="vs-proxy-prog"
+            role="progressbar"
+            aria-valuenow={Math.round(prog * 100)}
+            aria-label={t4('proxyMaking', { pct: Math.round(prog * 100) })}
+            title={t4('proxyMaking', { pct: Math.round(prog * 100) })}
+          >
+            <span style={{ width: `${Math.round(prog * 100)}%` }} />
+          </span>
+        )}
       </div>
       <div className="vs-card-body">
         <div className="vs-card-name">{m.name}</div>
@@ -206,6 +241,18 @@ function MediaCard({ m, thumb, used }: { m: MediaItem; thumb?: string; used: num
             onClick={() => addToTimeline(m)}
           >
             <Icon name="plus" size={14} />
+          </button>
+        )}
+        {proxyable && !proxy && (
+          <button
+            className="vs-icon-btn"
+            title={
+              prog !== undefined ? t4('proxyCancel') : `${t4('proxyMake')} · ${t4('proxyHint')}`
+            }
+            aria-label={prog !== undefined ? t4('proxyCancel') : t4('proxyMake')}
+            onClick={() => (prog !== undefined ? cancelProxy(m) : void makeProxy(m))}
+          >
+            <Icon name={prog !== undefined ? 'stop' : 'bolt'} size={14} />
           </button>
         )}
         <button

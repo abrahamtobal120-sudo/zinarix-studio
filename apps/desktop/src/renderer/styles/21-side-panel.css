@@ -449,4 +449,32 @@ body.dragging-y webview {
   white-space: nowrap;
   flex-shrink: 0;
 }
+/* Action buttons of the tool panels and views (Hardware, Celular, Juegos, CAD, Docker…).
+   One size whatever the container's font: .btn is the normal action, .btn.ghost the
+   secondary one (outlined), and the panels' *-small classes the compact one. */
+button.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 26px;
+  padding: 3px 10px;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+button.btn.ghost {
+  background: transparent;
+  border-color: var(--border);
+}
+button.btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: color-mix(in srgb, var(--border) 60%, var(--fg) 40%);
+}
+button.btn:is(.hw-small, .gm-small, .cad-small) {
+  min-height: 22px;
+  padding: 1px var(--space-2);
+  font-size: var(--text-xs);
+}
+
 }

@@ -38,6 +38,8 @@ import {
 import { toast } from '../../store';
 import { CustomTransitions, LookSample } from './CustomTransitions';
 import { DuckControl } from './EasyPanel';
+import { MASTER, MeterBar, useMeterLoop } from './MixerMeters';
+import { t4 } from './fase4Strings';
 import { FONT_FAMILY } from './textDraw';
 import { type VideoKey, kindLabel, tv } from './strings';
 import { commit, commitMerged, getV, setV, useV } from './videoStore';
@@ -311,11 +313,19 @@ export const transitionLabel = (k: TransitionName, def?: TransitionDef): string 
 export function MixerPanel() {
   const project = useV((s) => s.project);
   const anySolo = project.tracks.some((t) => t.solo);
+  useMeterLoop();
   return (
     <div className="vs-fx-panel">
       <div className="vs-panel-title">{tv('mixer')}</div>
       <p className="vs-dim vs-note">{tv('mixHint')}</p>
       <div className="vs-mixer">
+        <div className="vs-strip vs-strip-master">
+          <div className="vs-strip-head">
+            <strong>{t4('meterMaster')}</strong>
+          </div>
+          <MeterBar id={MASTER} label={t4('meterMaster')} />
+          <p className="vs-dim vs-note">{t4('meterHint')}</p>
+        </div>
         {project.tracks.map((t) => (
           <MixerStrip key={t.id} track={t} dimmed={anySolo && !t.solo} />
         ))}
@@ -359,6 +369,7 @@ function MixerStrip({ track, dimmed }: { track: Track; dimmed: boolean }) {
           </button>
         </span>
       </div>
+      <MeterBar id={track.id} label={`${t4('meterLevel')} · ${track.name}`} />
       <label className="vs-strip-row">
         <span className="vs-prop-label">{tv('mixVolume')}</span>
         <input

@@ -1,6 +1,6 @@
 /** Types shared by the debugger and the extensions (main ↔ renderer). */
 
-export type DebugKind = 'node' | 'python' | 'go' | 'lldb';
+export type DebugKind = 'node' | 'python' | 'go' | 'lldb' | 'godot';
 
 /** A launch configuration (a subset of VS Code's launch.json). */
 export interface DebugConfig {
@@ -16,13 +16,42 @@ export interface DebugConfig {
   port?: number;
   host?: string;
   stopOnEntry?: boolean;
+  /** Godot: scene to run ("main", "current", res://… or a .tscn path). */
+  scene?: string;
 }
 
 export interface Breakpoint {
   /** 1-based line. */
   line: number;
   condition?: string;
+  /** Logpoint: prints this message ({expr} parts are evaluated) instead of stopping. */
+  logMessage?: string;
 }
+
+/**
+ * A logpoint for debuggers without them (Chrome DevTools Protocol): a breakpoint condition that
+ * prints and never stops. "x = {x}, total {a + b}" → console.log(`x = ${x}, total ${a + b}`).
+ */
+export function logpointCondition(message: string, condition?: string): string {
+  let tpl = '';
+  let i = 0;
+  while (i < message.length) {
+    const open = message.indexOf('{', i);
+    const close = open < 0 ? -1 : message.indexOf('}', open + 1);
+    if (open < 0 || close < 0) {
+      tpl += literal(message.slice(i));
+      break;
+    }
+    tpl += literal(message.slice(i, open));
+    const expr = message.slice(open + 1, close).trim();
+    tpl += expr ? `\${(() => { try { return (${expr}); } catch (e) { return '<' + e + '>'; } })()}` : '{}';
+    i = close + 1;
+  }
+  const log = `(console.log(\`${tpl}\`), false)`;
+  return condition?.trim() ? `(${condition.trim()}) && ${log}` : log;
+}
+
+const literal = (s: string) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 
 export interface DebugFrame {
   id: number;

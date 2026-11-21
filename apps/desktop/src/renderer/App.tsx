@@ -15,6 +15,12 @@ import { WatchPanel } from './components/WatchPanel';
 import { RunPanel } from './components/RunPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { TestExplorer } from './components/TestExplorer';
+import { DockerPanel } from './components/docker/DockerPanel';
+import { HardwarePanel } from './components/hardware/HardwarePanel';
+import { GamesPanel } from './components/games/GamesPanel';
+import { CadPanel } from './components/cad/CadPanel';
+import { MobilePanel } from './components/mobile/MobilePanel';
+import { GraphicsPanel } from './components/graphics/GraphicsPanel';
 import { SupabasePanel } from './components/SupabasePanel';
 import { VercelPanel } from './components/VercelPanel';
 import { GCloudPanel } from './components/GCloudPanel';
@@ -552,6 +558,18 @@ export function App() {
                 <DebugPanel />
               ) : sidebar === 'testing' ? (
                 <TestExplorer />
+              ) : sidebar === 'docker' ? (
+                <DockerPanel />
+              ) : sidebar === 'hardware' ? (
+                <HardwarePanel />
+              ) : sidebar === 'mobile' ? (
+                <MobilePanel />
+              ) : sidebar === 'games' ? (
+                <GamesPanel />
+              ) : sidebar === 'cad' ? (
+                <CadPanel />
+              ) : sidebar === 'graphics' ? (
+                <GraphicsPanel />
               ) : sidebar === 'vercel' ? (
                 <VercelPanel />
               ) : sidebar === 'supabase' ? (

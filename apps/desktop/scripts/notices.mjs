@@ -298,6 +298,28 @@ export function bundledExtras() {
       text: 'Separate programs, not linked into Zinarix. License, notice and the source code of each build: resources/ffmpeg/FFMPEG-NOTICE.txt, FFMPEG-SOURCE.txt and COPYING.GPLv3.txt next to the app.',
     },
     {
+      name: 'OpenSCAD (WebAssembly)',
+      kind: 'program',
+      license: 'GPL-2.0-or-later',
+      homepage: 'https://openscad.org',
+      text: 'A separate program, not linked into Zinarix: the built-in CAD engine (Fase 7), run as its own process when OpenSCAD is not installed. License, notice and source code: resources/openscad/OPENSCAD-NOTICE.txt, OPENSCAD-SOURCE.txt and COPYING.GPLv2.txt next to the app.',
+    },
+    {
+      name: 'Phaser 4 (web game template)',
+      kind: 'library',
+      license: 'MIT',
+      homepage: 'https://phaser.io',
+      // Copied into dist/vendor by build.mjs and into the user's project by the "web-phaser" template.
+      text: read(join(root, 'node_modules/phaser/LICENSE.md')),
+    },
+    {
+      name: 'ONNX Runtime Web + U²-Net / IS-Net models (background removal)',
+      kind: 'program',
+      license: 'MIT (ONNX Runtime) + Apache-2.0 (models)',
+      homepage: 'https://onnxruntime.ai',
+      text: 'A separate program, not linked into Zinarix: removes the background of pictures on this computer (Fase 1B), run as its own process. Licenses and model credits: resources/bgremove/MODELS-NOTICE.txt next to the app.',
+    },
+    {
       name: 'Electron / Chromium',
       kind: 'program',
       license: 'MIT (Electron) + Chromium licenses',

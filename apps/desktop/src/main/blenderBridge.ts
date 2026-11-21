@@ -40,6 +40,11 @@ export interface BridgeChatRequest {
   model?: string;
   messages: BridgeMessage[];
   maxTokens?: number;
+  /**
+   * Sent by a web page (it had an Origin), not by Blender or a local script: CLI models that
+   * could still read the user's files are refused for it (see main.ts).
+   */
+  fromWeb?: boolean;
 }
 
 export interface BridgeDeps {
@@ -156,6 +161,8 @@ export function parseChatBody(body: unknown): BridgeChatRequest {
 export class BlenderBridge {
   private server: Server | null = null;
   private starting: Promise<BridgeInfo> | null = null;
+  /** Bumped by close(): a start still listening when it changes shuts its server. */
+  private gen = 0;
   private readonly token: string;
   private readonly tokenHash: Buffer;
   private readonly maxBody: number;
@@ -185,6 +192,7 @@ export class BlenderBridge {
 
   /** Starts the server on first use; later calls return the same URL and token. */
   start(): Promise<BridgeInfo> {
+    const gen = this.gen;
     this.starting ??= new Promise<BridgeInfo>((resolve, reject) => {
       const server = createServer((req, res) => void this.handle(req, res));
       // Time to receive a request; the answer itself may take up to timeoutMs.
@@ -199,6 +207,12 @@ export class BlenderBridge {
         });
         server.listen(port, '127.0.0.1', () => {
           server.removeAllListeners('error');
+          // close() was called while it was opening: no server may stay up behind its back.
+          if (gen !== this.gen) {
+            server.close();
+            reject(new Error('The bridge was closed while it was starting.'));
+            return;
+          }
           server.on('error', () => undefined); // Late socket errors must not crash main.
           this.server = server;
           resolve(this.info!);
@@ -210,6 +224,7 @@ export class BlenderBridge {
   }
 
   close(): Promise<void> {
+    this.gen++;
     const s = this.server;
     this.server = null;
     this.starting = null;
@@ -288,6 +303,7 @@ export class BlenderBridge {
       throw new HttpError(400, 'Body is not valid JSON.');
     }
     const parsed = parseChatBody(body);
+    if (req.headers.origin !== undefined) parsed.fromWeb = true;
     // Unknown names (e.g. the add-on's own default "gpt-4o") fall back to the Zinarix default.
     if (parsed.model) {
       const known = await this.deps.models().catch(() => [] as BridgeModel[]);

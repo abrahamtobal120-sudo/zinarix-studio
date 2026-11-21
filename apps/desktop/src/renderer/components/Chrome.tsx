@@ -3,10 +3,18 @@ import { commands, runCommand } from '../commands';
 import { pressable } from '../a11y';
 import { SpaceSwitcher } from '../layout/SpaceSwitcher';
 import { t } from '../i18n';
+import { formatUsd } from '../format';
 import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
 import { BridgeStatus } from './BridgeStatus';
+import { LspStatusItem } from './LspStatusItem';
 import { tv } from './video/strings';
+import { tk } from './docker/dockerStrings';
+import { th } from './hardware/hardwareStrings';
+import { tm } from './mobile/mobileStrings';
+import { tgm } from './games/gamesStrings';
+import { tc as tcad } from './cad/cadStrings';
+import { tg } from './graphics/graphicsStrings';
 import { td } from '../i18nDebug';
 import { tp } from '../i18nPlayground';
 import { useProblemCounts } from './Problems';
@@ -105,6 +113,12 @@ function useBarItems() {
     supabase: view('supabase', 'Supabase', 'supabase'),
     gcloud: view('gcloud', 'Google Cloud', 'cloud'),
     mail: view('mail', t('mlTitle'), 'mail'),
+    docker: view('docker', tk('title'), 'package'),
+    hardware: view('hardware', th('title'), 'cpu'),
+    mobile: view('mobile', tm('title'), 'smartphone'),
+    games: view('games', tgm('title'), 'gamepad'),
+    cad: view('cad', tcad('title'), 'compass'),
+    graphics: view('graphics', tg('title'), 'image'),
     browser: tool('browser', t('browser'), 'globe', 'toggle', browserActive, () =>
       browserActive ? leaveTab() : openBrowserTab(),
     ),
@@ -221,6 +235,12 @@ export function ActivityBar() {
     items.supabase,
     items.gcloud,
     items.mail,
+    items.docker,
+    items.hardware,
+    items.mobile,
+    items.games,
+    items.cad,
+    items.graphics,
     items.whatsapp,
     items.browser,
     items.security,
@@ -296,6 +316,12 @@ export function AppsPanel() {
         {row(items.whatsapp, t('appsWhatsapp'))}
         {row(items.browser, t('appsBrowser'))}
         <div className="apps-section">{t('appsTools')}</div>
+        {row(items.graphics, tg('desc'))}
+        {row(items.docker, tk('desc'))}
+        {row(items.hardware, th('desc'))}
+        {row(items.mobile, tm('desc'))}
+        {row(items.games, tgm('desc'))}
+        {row(items.cad, tcad('desc'))}
         {row(items.playground, tp('pgTab'))}
         {row(items.usage, t('appsUsage'))}
         {row(items.palette, t('appsPalette'))}
@@ -306,9 +332,6 @@ export function AppsPanel() {
   );
 }
 
-function usd(n: number): string {
-  return n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
-}
 
 function ProblemStatus() {
   const { errors, warnings } = useProblemCounts();
@@ -368,6 +391,7 @@ export function StatusBar() {
       )}
       <ProblemStatus />
       <DebugStatus />
+      <LspStatusItem />
       {dirty > 0 && (
         <span className="status-item" {...pressable(() => void runCommand('file.saveAll'))}>
           ● {dirty}
@@ -406,7 +430,7 @@ export function StatusBar() {
         title={t('usageTitle')}
         {...pressable(() => setState({ modal: { kind: 'usage' } }))}
       >
-        <Icon name="chart" size={13} /> {usd(settings.todayUsd)} {t('today')}
+        <Icon name="chart" size={13} /> {formatUsd(settings.todayUsd)} {t('today')}
       </span>
       <PlanBadge />
     </footer>

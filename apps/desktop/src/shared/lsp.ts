@@ -14,6 +14,31 @@ export interface LspCandidate {
   install: string;
 }
 
+/** Package managers whose commands can run as they are in a terminal. */
+const RUNNABLE = /^(npm|pnpm|pip|pip3|pipx|gem|go|rustup|dotnet|composer|cs|ghcup|winget|brew|apt|sudo apt|scoop|choco)\s+\S/;
+
+/**
+ * The command that installs a server on this platform, taken from its install hint
+ * ("npm i -g pyright", "winget install LLVM.LLVM · apt install clangd"); null when the hint is
+ * only a description or a web page (then the user follows it by hand).
+ */
+export function installCommand(install: string, platform: 'win32' | 'darwin' | 'linux'): string | null {
+  const inner = /\(([^)]*)\)/.exec(install)?.[1];
+  const parts = (inner ?? install)
+    .split(/\s+·\s+/)
+    .map((x) => x.trim())
+    .filter((x) => RUNNABLE.test(x));
+  const fits = (x: string) =>
+    /^winget|^scoop|^choco/.test(x)
+      ? platform === 'win32'
+      : /^brew/.test(x)
+        ? platform === 'darwin'
+        : /^(sudo )?apt/.test(x)
+          ? platform === 'linux'
+          : true;
+  return parts.find(fits) ?? null;
+}
+
 export interface LspLanguage {
   /** Monaco language id(s) handled by this entry. */
   ids: string[];
@@ -22,6 +47,19 @@ export interface LspLanguage {
 }
 
 export const LSP_LANGUAGES: LspLanguage[] = [
+  {
+    // Godot 4's own server (Zinarix starts a headless editor for it; see main/godot.ts).
+    ids: ['gdscript'],
+    label: 'GDScript',
+    candidates: [
+      {
+        command: '@godot',
+        args: [],
+        name: 'Godot',
+        install: 'Instala Godot 4 (godotengine.org) y elígelo en Más → Juegos',
+      },
+    ],
+  },
   {
     ids: ['python'],
     label: 'Python',

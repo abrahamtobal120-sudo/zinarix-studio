@@ -306,7 +306,7 @@
 }
 .chat-input-bar > .check:not(.agent-toggle) {
   min-width: 0;
-  max-width: 120px;
+  max-width: 190px;
 }
 .chat-input-bar .pill.agent-toggle {
   flex-shrink: 0;

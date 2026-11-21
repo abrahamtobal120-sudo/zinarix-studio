@@ -27,7 +27,7 @@ import { gradedLayer, gradePending, onLutLoaded } from './colorGrade';
 import { textCanvas, textStops } from './textDraw';
 import { layerPlacement } from '../../../shared/videoPreview';
 import { usesTypewriter } from '../../../shared/videoTypewriter';
-import { getV, setV } from './videoStore';
+import { getV, playUrl, setV } from './videoStore';
 
 type El = HTMLVideoElement | HTMLAudioElement;
 
@@ -43,7 +43,7 @@ const PRELOAD = 2;
 const MAX_ELEMENTS = 24;
 
 export class Player {
-  private els = new Map<string, { el: El; mediaId: string; used: number }>();
+  private els = new Map<string, { el: El; mediaId: string; url: string; used: number }>();
   private images = new Map<string, HTMLImageElement>();
   private raf = 0;
   private clockStart = 0;
@@ -105,8 +105,14 @@ export class Player {
       el.preload = 'auto';
       if (el instanceof HTMLVideoElement) el.playsInline = true;
       el.src = url;
-      e = { el, mediaId: c.mediaId, used: performance.now() };
+      e = { el, mediaId: c.mediaId, url, used: performance.now() };
       this.els.set(c.id, e);
+    } else if (e.url !== url) {
+      // Fase 4C: the proxy got ready (or proxies were switched off): same picture, other file.
+      const at = e.el.currentTime;
+      e.el.src = url;
+      e.el.currentTime = at;
+      e.url = url;
     }
     e.used = performance.now();
     return e.el;
@@ -146,7 +152,7 @@ export class Player {
     const live = new Set<string>();
     for (const c of p.clips) {
       const m = mediaOf(p, c.mediaId);
-      const url = s.urls[c.mediaId];
+      const url = playUrl(s, c.mediaId);
       if (c.text || !m || !url || m.missing || m.kind === 'image') continue;
       // Pictures run on before / after the clip during transitions; the sound does not.
       const lead = m.kind === 'video' ? leadOf(p, c) : 0;

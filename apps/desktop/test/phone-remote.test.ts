@@ -15,7 +15,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-function make(dir: string): Remote {
+function make(dir: string, tools?: ConstructorParameters<typeof PhoneRemote>[7]): Remote {
   const r = new PhoneRemote(
     () => undefined,
     () => undefined,
@@ -24,12 +24,22 @@ function make(dir: string): Remote {
     () => join(dir, 'guard.json'),
     undefined,
     { file: () => join(dir, 'phone-remote.json'), seal: (s) => `S:${s}`, open: (s) => s.slice(2) },
+    tools,
   );
   remotes.push(r);
   return r;
 }
 
 const ip = lanAddress();
+
+/** fetch, once more if the keep-alive socket of the closed server was reused. */
+async function get(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    return fetch(url, init);
+  }
+}
 
 describe.skipIf(!ip)('phone remote survives a restart', () => {
   it('keeps the paired phone, the link and the on switch', async () => {
@@ -39,7 +49,7 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     const st = await a.start();
     expect(st.running).toBe(true);
     const base = st.url!;
-    const pair = await fetch(`${base}/api/pair`, {
+    const pair = await get(`${base}/api/pair`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/130' },
       body: JSON.stringify({ pin: st.pin }),
@@ -47,7 +57,7 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     expect(pair.status).toBe(200);
     const { token } = (await pair.json()) as { token: string };
     const auth = { Authorization: `Bearer ${token}` };
-    expect((await fetch(`${base}/api/me`, { headers: auth })).status).toBe(200);
+    expect((await get(`${base}/api/me`, { headers: auth })).status).toBe(200);
     // The token itself is never written to disk, only its hash.
     expect(readFileSync(join(dir, 'phone-remote.json'), 'utf8')).not.toContain(token);
     const key = JSON.parse(readFileSync(join(dir, 'phone-remote.json'), 'utf8')).key as string;
@@ -63,25 +73,25 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     const base2 = st2.url!;
     expect(st2.phones).toBe(1);
     expect(st2.devices![0]!.name).toBe('Pixel 8 · Chrome');
-    const me = await fetch(`${base2}/api/me`, { headers: auth });
+    const me = await get(`${base2}/api/me`, { headers: auth });
     expect(me.status).toBe(200);
     expect(JSON.parse(readFileSync(join(dir, 'phone-remote.json'), 'utf8')).key).toBe(key);
 
     // Renaming, then unpairing from the phone.
     expect(
-      (await fetch(`${base2}/api/rename`, {
+      (await get(`${base2}/api/rename`, {
         method: 'POST',
         headers: { ...auth, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Mi celular' }),
       })).status,
     ).toBe(200);
     expect(b.devices()[0]!.name).toBe('Mi celular');
-    await fetch(`${base2}/api/unpair`, {
+    await get(`${base2}/api/unpair`, {
       method: 'POST',
       headers: { ...auth, 'Content-Type': 'application/json' },
       body: '{}',
     });
-    expect((await fetch(`${base2}/api/me`, { headers: auth })).status).toBe(401);
+    expect((await get(`${base2}/api/me`, { headers: auth })).status).toBe(401);
 
     // Turned off by the user: it stays off next time.
     b.stop(true);
@@ -93,7 +103,7 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     dirs.push(dir);
     const a = make(dir);
     const st = await a.start();
-    const m = await fetch(`${st.url}/manifest.webmanifest`);
+    const m = await get(`${st.url}/manifest.webmanifest`);
     expect(m.status).toBe(200);
     expect(((await m.json()) as { start_url: string }).start_url).toBe('/');
     await expect(a.setFixed({ host: 'not a host', token: 'x'.repeat(60) })).rejects.toThrow();
@@ -106,6 +116,75 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     const saved = JSON.parse(readFileSync(join(dir, 'phone-remote.json'), 'utf8'));
     expect(saved.fixed.token.startsWith('S:eyJh')).toBe(true);
     expect((await a.setFixed(null)).fixedHost).toBeUndefined();
+  });
+});
+
+describe.skipIf(!ip)('phone remote: Zinarix settings', () => {
+  it('reads and changes the settings, rejects the rest and obeys the switch', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zx-phone-'));
+    dirs.push(dir);
+    const patches: unknown[] = [];
+    const view = { version: '1.0.0', theme: 'dark', prefs: { fontSize: 14 } };
+    const a = make(dir, {
+      config: {
+        get: async () => view as never,
+        set: async (p) => {
+          patches.push(p);
+          if (p.defaultModel === 'x/unknown') throw new Error('Modelo desconocido');
+        },
+      },
+    });
+    const st = await a.start();
+    const base = st.url!;
+    const pair = await get(`${base}/api/pair`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: st.pin }),
+    });
+    const { token } = (await pair.json()) as { token: string };
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const set = (body: unknown) =>
+      get(`${base}/api/config`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
+
+    expect((await get(`${base}/api/caps`, { headers: auth }).then((r) => r.json())).config).toBe(true);
+    const g = await get(`${base}/api/config`, { headers: auth });
+    expect(g.status).toBe(200);
+    expect(((await g.json()) as { version: string }).version).toBe('1.0.0');
+    expect((await get(`${base}/api/config`)).status).toBe(401);
+
+    expect((await set({ theme: 'nord', prefs: { fontSize: 16, uiZoom: 125 } })).status).toBe(200);
+    expect((await set({ role: { role: 'agent', ref: null } })).status).toBe(200);
+    expect((await set({ budget: { provider: 'openai', monthly: 20 } })).status).toBe(200);
+    expect(patches).toHaveLength(3);
+    // Keys, shortcuts, commands and odd values stay on the computer.
+    expect((await set({ prefs: { keybindings: {} } })).status).toBe(400);
+    expect((await set({ prefs: { lspCommands: { py: 'calc.exe' } } })).status).toBe(400);
+    expect((await set({ prefs: { uiZoom: 133 } })).status).toBe(400);
+    expect((await set({ theme: 'hacker' })).status).toBe(400);
+    expect((await set({ apiKey: 'sk-1' })).status).toBe(400);
+    expect(patches).toHaveLength(3);
+    const bad = await set({ defaultModel: 'x/unknown' });
+    expect(bad.status).toBe(409);
+    expect(((await bad.json()) as { error: string }).error).toBe('Modelo desconocido');
+
+    // Turned off on the computer.
+    a.setAllow({ files: true, terminal: true, git: true, config: false });
+    expect((await get(`${base}/api/config`, { headers: auth })).status).toBe(403);
+    expect((await set({ theme: 'dark' })).status).toBe(403);
+    // The other switches keep it off.
+    a.setAllow({ files: false, terminal: true, git: true });
+    expect(a.allowed().config).toBe(false);
+  });
+
+  it('builds a page whose script parses and has the settings screen', async () => {
+    const { phonePage } = await import('../src/main/phonePage.js');
+    for (const lang of ['es', 'en'] as const) {
+      const html = phonePage('n0nce', lang);
+      const js = html.slice(html.indexOf('<script nonce="n0nce">') + 22, html.lastIndexOf('</script>'));
+      expect(() => new Function(js)).not.toThrow();
+      expect(js).toContain('async function openConfig()');
+      expect(html).toContain('id="config2"');
+    }
   });
 });
 

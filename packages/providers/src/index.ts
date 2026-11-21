@@ -29,6 +29,7 @@ export {
   cliPrompt,
   cliMode,
   cliDeniedHint,
+  cliRunsWithoutTools,
   findExecutable,
   bundledNode,
   CliStreamParser,

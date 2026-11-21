@@ -15,7 +15,7 @@ import type { TestRunRequest } from '../shared/testing';
 import { td } from './i18nDebug';
 import { fileUriOf, modelPath } from './lsp';
 import { monaco } from './monaco';
-import { api, getState, openFile, saveAll, setState, toast } from './store';
+import { api, getState, openFile, saveAll, setState, toast, askText } from './store';
 
 export interface ConsoleLine {
   id: number;
@@ -110,8 +110,14 @@ const bpDecorations = new Map<monaco.editor.ITextModel, { ids: string[]; bps: Br
 function bpOptions(path: string, bp: Breakpoint): monaco.editor.IModelDecorationOptions {
   const bound = view.state === 'idle' || (view.verified[path]?.includes(bp.line) ?? true);
   return {
-    glyphMarginClassName: `dbg-bp ${bp.condition ? 'cond' : ''} ${bound ? '' : 'unbound'}`,
-    glyphMarginHoverMessage: { value: bp.condition ? `${td('dbgCondition')}: \`${bp.condition}\`` : td('dbgToggleBp') },
+    glyphMarginClassName: `dbg-bp ${bp.logMessage ? 'log' : bp.condition ? 'cond' : ''} ${bound ? '' : 'unbound'}`,
+    glyphMarginHoverMessage: {
+      value: bp.logMessage
+        ? `${td('dbgLogpoint')}: \`${bp.logMessage}\``
+        : bp.condition
+          ? `${td('dbgCondition')}: \`${bp.condition}\``
+          : td('dbgToggleBp'),
+    },
     stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
   };
 }
@@ -154,9 +160,30 @@ export function setCondition(path: string, line: number, condition: string): voi
   setFileBreakpoints(
     path,
     bps.some((b) => b.line === line)
-      ? bps.map((b) => (b.line === line ? { line, condition: condition || undefined } : b))
+      ? bps.map((b) => (b.line === line ? { ...b, condition: condition || undefined } : b))
       : [...bps, { line, condition: condition || undefined }],
   );
+}
+
+/** Makes the breakpoint of a line a logpoint (message with {expressions}); empty = a plain breakpoint. */
+export function setLogMessage(path: string, line: number, message: string): void {
+  const bps = view.breakpoints[path] ?? [];
+  const logMessage = message.trim() || undefined;
+  setFileBreakpoints(
+    path,
+    bps.some((b) => b.line === line)
+      ? bps.map((b) => (b.line === line ? { ...b, logMessage } : b))
+      : [...bps, { line, logMessage }],
+  );
+}
+
+/** Right click on the gutter: asks for a logpoint message for that line. */
+export async function askLogpoint(path: string, line: number): Promise<void> {
+  const cur = view.breakpoints[path]?.find((b) => b.line === line)?.logMessage ?? '';
+  const msg = await askText(td('dbgLogpointAsk'), cur);
+  if (msg === null) return;
+  if (!msg.trim() && !cur) return;
+  setLogMessage(path, line, msg);
 }
 
 export function removeAllBreakpoints(): void {
@@ -381,7 +408,15 @@ export function attachDebugToEditor(ed: monaco.editor.IStandaloneCodeEditor): mo
         t !== monaco.editor.MouseTargetType.GUTTER_LINE_DECORATIONS
       )
         return;
-      if (e.event.rightButton) return;
+      if (e.event.rightButton) {
+        // Right click: a logpoint on that line (prints a message without stopping).
+        const m = ed.getModel();
+        const p = m && modelPath(m);
+        const l = e.target.position?.lineNumber;
+        e.event.preventDefault();
+        if (p && l) void askLogpoint(p, l);
+        return;
+      }
       // The right lane holds the Test Explorer's ▶ / ✓ / ✗: a click there runs the test.
       const model = ed.getModel();
       const path = model && modelPath(model);

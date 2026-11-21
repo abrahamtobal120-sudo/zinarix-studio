@@ -1,0 +1,426 @@
+@layer features {
+/* Docker panel (Fase 2B del plan de funciones) */
+.docker-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.dk-version {
+  margin-left: var(--space-2);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  font-size: var(--text-2xs);
+  color: var(--fg-dim);
+}
+.dk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0 var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+.dk-tab {
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.dk-tab:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.dk-tab.on {
+  color: var(--accent-text);
+  background: var(--sel-soft);
+}
+.dk-count {
+  margin-left: var(--space-1);
+  font-size: var(--text-2xs);
+  opacity: 0.8;
+}
+.dk-busy {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--warn);
+}
+.dk-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-1) 0;
+}
+.dk-empty {
+  padding: var(--space-4) var(--space-3);
+  color: var(--fg-dim);
+  font-size: var(--text-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.dk-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.dk-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+.dk-row:hover {
+  background: var(--hover);
+}
+.dk-main {
+  flex: 1;
+  min-width: 0;
+}
+.dk-name {
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.dk-sub {
+  font-size: var(--text-2xs);
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dk-dot {
+  flex: 0 0 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: var(--radius-full);
+  background: var(--fg-dim);
+}
+.dk-dot.dk-running {
+  background: var(--ok);
+}
+.dk-dot.dk-paused,
+.dk-dot.dk-restarting {
+  background: var(--warn);
+}
+.dk-dot.dk-dead {
+  background: var(--danger);
+}
+.dk-actions {
+  display: none;
+  gap: 1px;
+}
+.dk-row:hover .dk-actions,
+.dk-row:focus-within .dk-actions {
+  display: flex;
+}
+.dk-btn:disabled {
+  opacity: 0.35;
+}
+.dk-ports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: 2px;
+}
+.dk-port {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--accent-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: 0 var(--space-1);
+  cursor: pointer;
+}
+.dk-port:hover {
+  background: var(--sel-soft);
+}
+.dk-compose {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.dk-compose-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.dk-output,
+.dk-logs {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg);
+  background: var(--code-bg);
+}
+.dk-output {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.dk-logs {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.dk-logs-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dk-follow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--fg-dim);
+}
+
+/* ---- mejoras: search, stats, forms, details, disk, jobs ---- */
+.dk-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-1) var(--space-2) 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg-dim);
+  background: var(--bg);
+}
+.dk-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  padding: 3px 0;
+  color: var(--fg);
+}
+.dk-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--fg);
+  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+}
+.dk-link:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+.dk-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-2xs);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dk-meter {
+  flex: 0 0 36px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--hover);
+  overflow: hidden;
+}
+.dk-meter > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--ok);
+}
+.dk-form-row {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+}
+.dk-form-row input {
+  flex: 1;
+  min-width: 0;
+}
+.dk-build {
+  margin: 0 var(--space-3) var(--space-1);
+  font-size: var(--text-xs);
+}
+.dk-build summary {
+  cursor: pointer;
+  color: var(--fg-dim);
+  padding: var(--space-1) 0;
+}
+.dk-build-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+}
+.dk-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+}
+.dk-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--fg-dim);
+}
+.dk-form label.dk-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dk-form textarea {
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+.dk-form-btns {
+  display: flex;
+  gap: var(--space-2);
+}
+.dk-warn {
+  color: var(--warn);
+  font-size: var(--text-xs);
+}
+.dk-details {
+  padding: var(--space-1) var(--space-3) var(--space-3);
+  font-size: var(--text-xs);
+}
+.dk-details h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.dk-kv {
+  display: flex;
+  gap: var(--space-2);
+  padding: 2px 0;
+  min-width: 0;
+}
+.dk-k {
+  flex: 0 0 34%;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dk-v {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dk-v code,
+.dk-k code {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+.dk-env .dk-k {
+  font-family: var(--font-mono);
+}
+.dk-dim {
+  color: var(--fg-dim);
+}
+.dk-v .dk-dot {
+  display: inline-block;
+  width: 8px;
+  margin: 0 2px 0 0;
+  vertical-align: middle;
+}
+.dk-mini-btn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--accent-text);
+  font-size: var(--text-2xs);
+  text-transform: none;
+  padding: 0 var(--space-1);
+  cursor: pointer;
+}
+.dk-health.dk-h-healthy {
+  color: var(--ok);
+}
+.dk-health.dk-h-unhealthy {
+  color: var(--danger);
+}
+.dk-health.dk-h-starting {
+  color: var(--warn);
+}
+.dk-disk {
+  padding: 0 var(--space-3) var(--space-3);
+}
+.dk-section-title {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.dk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.dk-table th,
+.dk-table td {
+  text-align: left;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.dk-table th {
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+.dk-prune {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+.dk-body:has(> .dk-logs) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.dk-job-state {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--warn);
+}
+.dk-job-state.ok {
+  color: var(--ok);
+}
+.dk-job-state.bad {
+  color: var(--danger);
+}
+.dk-stop {
+  padding: 1px var(--space-2);
+}
+}

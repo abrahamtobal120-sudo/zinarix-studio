@@ -119,6 +119,8 @@ class LspClient {
     private readonly root: string,
     private readonly sink: LspEventSink,
     private readonly languageId: string,
+    /** Extra environment (a TCP bridge runs Electron as Node). */
+    private readonly extraEnv: Record<string, string> = {},
   ) {
     this.ready = this.start();
   }
@@ -131,7 +133,9 @@ class LspClient {
     const proc = spawn(shell ? q(this.exe) : this.exe, shell ? this.args.map(q) : this.args, {
       cwd: this.root,
       // The shim calls `node` by bare name: cmd.exe must not pick one from the project.
-      env: shell ? { ...childEnv(process.env), ...NO_CWD_EXE_SEARCH } : childEnv(process.env),
+      env: shell
+        ? { ...childEnv(process.env), ...NO_CWD_EXE_SEARCH, ...this.extraEnv }
+        : { ...childEnv(process.env), ...this.extraEnv },
       shell,
       windowsHide: true,
     });
@@ -312,6 +316,12 @@ export interface LspHostOptions {
   commands: () => Record<string, string>;
   /** Folder for servers that need a data dir (jdtls). */
   dataDir?: string;
+  /**
+   * Servers Zinarix starts itself (candidates whose command starts with "@", e.g. "@godot":
+   * Godot's GDScript server runs inside a headless editor and speaks TCP). Returns the
+   * process to spawn, or a message when it can't (shown as "missing").
+   */
+  special?: (command: string, root: string) => Promise<{ exe: string; args: string[]; env?: Record<string, string> } | { missing: string }>;
 }
 
 /**
@@ -338,6 +348,7 @@ export class LspHost {
   /** Server for a Monaco language: user override first, then the built-in candidates. */
   private resolve(language: string):
     | { exe: string; args: string[]; name: string; label: string }
+    | { special: string; name: string; label: string; install: string }
     | { missing: string; label: string }
     | null {
     const custom = this.opts.commands()[language]?.trim();
@@ -351,6 +362,10 @@ export class LspHost {
     }
     if (!entry) return null;
     for (const c of entry.candidates) {
+      if (c.command.startsWith('@')) {
+        if (this.opts.special) return { special: c.command, name: c.name, label, install: c.install };
+        continue;
+      }
       const exe = findExecutable(c.command);
       if (exe) return { exe, args: this.args(c), name: c.name, label };
     }
@@ -405,7 +420,17 @@ export class LspHost {
     const root = this.root;
     this.setStatus(s, { state: 'starting', label: r.label, server: r.name, detail: undefined });
     s.starting = (async () => {
-      const client = new LspClient(r.exe, r.args, root, this.sink, lspLanguageId(language));
+      let spec: { exe: string; args: string[]; env?: Record<string, string> };
+      if ('special' in r) {
+        const got = await this.opts.special!(r.special, root).catch((e: Error) => ({ missing: e.message }));
+        if ('missing' in got) {
+          this.setStatus(s, { state: 'missing', detail: got.missing || r.install, server: undefined });
+          return undefined;
+        }
+        spec = got;
+      } else spec = r;
+      if (this.root !== root) return undefined;
+      const client = new LspClient(spec.exe, spec.args, root, this.sink, lspLanguageId(language), spec.env);
       client.onExit = (code, stderr) => this.crashed(language, client, code, stderr);
       try {
         await client.ready;

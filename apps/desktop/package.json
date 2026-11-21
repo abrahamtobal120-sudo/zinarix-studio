@@ -1,7 +1,7 @@
 {
   "name": "@omni/desktop",
   "productName": "Zinarix Studio",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Zinarix Studio — editor de código con cualquier modelo de IA",
   "license": "GPL-3.0-or-later",
@@ -56,6 +56,9 @@
     "mailparser": "^3.14.1",
     "monaco-editor": "0.57.0",
     "nodemailer": "^10.3.1",
+    "onnxruntime-web": "1.31.1",
+    "openscad-wasm-prebuilt": "1.2.0",
+    "phaser": "4.2.1",
     "playwright": "^1.63.0",
     "radix-ui": "^1.8.1",
     "react": "^19.3.0",
@@ -74,6 +77,8 @@
     },
     "files": [
       "dist/**",
+      "!dist/openscad/**",
+      "!dist/bgremove/**",
       "package.json"
     ],
     "asarUnpack": [
@@ -109,6 +114,14 @@
         }
       },
       "extraResources": [
+        {
+          "from": "dist/openscad",
+          "to": "openscad"
+        },
+        {
+          "from": "dist/bgremove",
+          "to": "bgremove"
+        },
         {
           "from": "blender/scripts",
           "to": "blender-scripts",
@@ -183,6 +196,14 @@
       "identity": null,
       "extraResources": [
         {
+          "from": "dist/openscad",
+          "to": "openscad"
+        },
+        {
+          "from": "dist/bgremove",
+          "to": "bgremove"
+        },
+        {
           "from": "blender/scripts",
           "to": "blender-scripts",
           "filter": [
@@ -232,6 +253,14 @@
       "icon": "build/icon.png",
       "artifactName": "Zinarix-Studio-${version}-${arch}-setup.${ext}",
       "extraResources": [
+        {
+          "from": "dist/openscad",
+          "to": "openscad"
+        },
+        {
+          "from": "dist/bgremove",
+          "to": "bgremove"
+        },
         {
           "from": "blender/scripts",
           "to": "blender-scripts",

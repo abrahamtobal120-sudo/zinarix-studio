@@ -24,6 +24,8 @@ export type AdapterSpec =
       cwd: string;
       env: Record<string, string>;
       port: number;
+      /** Don't show the server's own console (Godot's editor log) in the debug console. */
+      quiet?: boolean;
     }
   /** An adapter already listening (attach to `dlv --headless`, etc.). */
   | { kind: 'tcp'; host: string; port: number };
@@ -68,8 +70,13 @@ export class DapBackend implements DebugBackend {
       return conn;
     }
     if (a.kind === 'fixedServer') {
-      proc.stdout!.on('data', (d: Buffer) => this.ev.output('stdout', d.toString('utf8')));
-      proc.stderr!.on('data', (d: Buffer) => this.ev.output('stderr', d.toString('utf8')));
+      if (a.quiet) {
+        proc.stdout!.resume();
+        proc.stderr!.resume();
+      } else {
+        proc.stdout!.on('data', (d: Buffer) => this.ev.output('stdout', d.toString('utf8')));
+        proc.stderr!.on('data', (d: Buffer) => this.ev.output('stderr', d.toString('utf8')));
+      }
       const until = Date.now() + INIT_TIMEOUT;
       for (;;) {
         try {
@@ -223,20 +230,28 @@ export class DapBackend implements DebugBackend {
   }
 
   async setBreakpoints(absPath: string, bps: Breakpoint[]): Promise<number[]> {
+    const sent = bps.filter((b) => !b.logMessage || this.caps.supportsLogPoints);
     const r = await this.req<{ breakpoints: { verified: boolean; line?: number }[] }>(
       'setBreakpoints',
       {
-        source: { path: absPath },
-        breakpoints: bps.map((b) => ({
+        // Godot's adapter needs the name (and checksums) of the source too.
+        source: {
+          path: absPath,
+          name: absPath.split(/[\\/]/).pop(),
+          ...(this.adapterId === 'godot' ? { checksums: [] } : {}),
+        },
+        // A logpoint the adapter cannot do is left out (it would stop instead of printing).
+        breakpoints: sent.map((b) => ({
           line: b.line,
           ...(b.condition && this.caps.supportsConditionalBreakpoints
             ? { condition: b.condition }
             : {}),
+          ...(b.logMessage ? { logMessage: b.logMessage } : {}),
         })),
-        lines: bps.map((b) => b.line),
+        lines: sent.map((b) => b.line),
       },
     );
-    return (r?.breakpoints ?? []).map((x, i) => x.line ?? bps[i]?.line ?? 0).filter(Boolean);
+    return (r?.breakpoints ?? []).map((x, i) => x.line ?? sent[i]?.line ?? 0).filter(Boolean);
   }
 
   async resume(threadId: number): Promise<void> {

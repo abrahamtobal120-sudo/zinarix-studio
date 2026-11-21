@@ -10,6 +10,7 @@ import type { ColorGrade, Wheel, WheelKey, WheelName } from '../../../shared/vid
 import { GRADE_PRESETS, WHEELS, WHEEL_KEYS, cleanGrade } from '../../../shared/videoColor';
 import { api, toast } from '../../store';
 import { loadLut, lutState, onLutLoaded, reloadLut } from './colorGrade';
+import { CurvesBlock } from './CurvesBlock';
 import { type ProKey, tp } from './proStrings';
 import { commit, commitMerged, getV, useV } from './videoStore';
 import './color.css';
@@ -174,7 +175,7 @@ export function ColorPanel() {
               key={pr.id}
               onClick={() => {
                 // A style replaces the wheels and the balance; the LUT stays.
-                edit((g) => ({ ...pr.grade, lut: g.lut, lutMix: g.lutMix }), pr.id, false);
+                edit((g) => ({ ...pr.grade, lut: g.lut, lutMix: g.lutMix, curves: g.curves }), pr.id, false);
                 toast(tp('applied', { n: targets.length }));
               }}
             >
@@ -203,6 +204,12 @@ export function ColorPanel() {
           onChange={(v) => edit((g) => ({ ...g, tint: v }), 'tint')}
         />
       </div>
+      <CurvesBlock
+        grade={grade}
+        onChange={(k, pts, merged) =>
+          edit((g) => ({ ...g, curves: { ...g.curves, [k]: pts } }), `curve.${k}`, merged)
+        }
+      />
       <LutBlock grade={grade} />
       <div className="vs-color-foot">
         <button disabled={!grade} onClick={() => edit(() => ({}), 'reset', false)}>

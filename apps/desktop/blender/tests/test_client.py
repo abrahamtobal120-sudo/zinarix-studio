@@ -411,7 +411,7 @@ class TestPermanentBridgeFile(unittest.TestCase):
         })
 
     def test_reads_url_and_token(self):
-        with self._file({"url": "http://127.0.0.1:47815/v1", "token": TOKEN, "pid": 1}):
+        with self._file({"url": "http://127.0.0.1:47815/v1", "token": TOKEN, "pid": os.getpid()}):
             self.assertEqual(client.bridge_endpoint(), ("http://127.0.0.1:47815/v1", TOKEN))
             self.assertTrue(client.bridge_available())
             self.assertEqual(client.resolve_base_url("ZINARIX"), "http://127.0.0.1:47815/v1")
@@ -436,6 +436,15 @@ class TestPermanentBridgeFile(unittest.TestCase):
                 self.assertEqual(client.bridge_endpoint(), ("", ""))
                 self.assertFalse(client.bridge_available())
                 self.assertEqual(client.resolve_api_key("ZINARIX"), "")
+
+    def test_ignores_file_of_a_closed_zinarix(self):
+        # A crash leaves the file behind: whatever answers on that port now is not Zinarix.
+        for pid in (None, "123", 0, -4, 2 ** 22 + 12345):
+            data = {"url": "http://127.0.0.1:47815/v1", "token": TOKEN}
+            if pid is not None:
+                data["pid"] = pid
+            with self._file(data):
+                self.assertEqual(client.bridge_endpoint(), ("", ""))
 
     def test_missing_file(self):
         with mock.patch.dict(os.environ, {
