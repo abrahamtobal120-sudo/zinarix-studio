@@ -7,6 +7,8 @@ allowBuilds:
   electron-winstaller: false
   esbuild: true
   ffmpeg-static: true
+  # onnxruntime-web -> onnx-proto: its postinstall only prints a version warning.
+  protobufjs: false
 # Install native prebuilds for both CPU architectures so one macOS runner can package
 # Apple Silicon and Intel builds (node-pty, keyring).
 supportedArchitectures:
