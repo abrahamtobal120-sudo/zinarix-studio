@@ -30,7 +30,7 @@ interface Pull {
 }
 
 const POS_KEY = 'zs.helperPos';
-const SIZE = 44;
+const SIZE = 38;
 const GAP = 14;
 const OLLAMA_DOWNLOAD = 'https://ollama.com/download';
 
@@ -347,7 +347,7 @@ export function HelperBubble() {
           }
         }}
       >
-        <Icon name={open ? 'close' : 'aiChat'} size={22} />
+        <Icon name={open ? 'close' : 'aiChat'} size={18} />
         {!open && (
           <span className="hlp-tip" aria-hidden="true">
             {t('hlpBubbleTip')}

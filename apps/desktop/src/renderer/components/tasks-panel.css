@@ -111,7 +111,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   color: var(--fg-dim);
 }
 .tasks-list {
@@ -293,7 +293,7 @@
   padding: 8px;
   max-height: 320px;
   overflow: auto;
-  font-family: var(--mono, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   white-space: pre-wrap;
   word-break: break-word;

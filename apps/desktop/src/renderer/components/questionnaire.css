@@ -1,0 +1,33 @@
+/* First-run questionnaire (Questionnaire.tsx); builds on the onboarding styles. */
+.quiz-uses {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+.quiz-use {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+.quiz-use:hover { border-color: var(--brand); }
+.quiz-use .icon { color: var(--brand); flex: none; }
+.quiz-use.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-3));
+  color: var(--fg-strong);
+}
+.quiz-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.quiz-card.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-3));
+}

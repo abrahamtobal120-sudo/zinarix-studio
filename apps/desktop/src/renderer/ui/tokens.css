@@ -20,6 +20,8 @@
 /* Base themes. Neutral grays with one accent color; custom themes override these from themes.ts. */
 :root,
 :root[data-theme='dark'] {
+  /* Native controls (checkboxes, select lists, date pickers) follow the theme, not the system. */
+  color-scheme: dark;
   --bg: #1b1b1f;
   --bg-2: #17171a;
   --bg-3: #222226;
@@ -59,6 +61,7 @@
   --wa-fg: #0b1a10;
 }
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg: #ffffff;
   --bg-2: #f7f7f8;
   --bg-3: #f1f1f3;

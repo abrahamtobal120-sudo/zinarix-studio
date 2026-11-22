@@ -96,7 +96,7 @@ export function MobilePanel() {
   return (
     <div className="explorer hw-panel mb-panel">
       <div className="sidebar-title">
-        <span className="panel-title">{tm('title').toUpperCase()}</span>
+        <span className="panel-title">{tm('title')}</span>
         <span className="sidebar-actions">
           <button title={tm('refresh')} aria-label={tm('refresh')} onClick={() => void load(true)}>
             <Icon name="refresh" size={15} />

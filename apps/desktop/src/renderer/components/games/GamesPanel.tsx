@@ -118,7 +118,7 @@ export function GamesPanel() {
     <div className="explorer gm-panel">
       <div className="sidebar-title">
         <span className="panel-title">
-          {tgm('title').toUpperCase()}
+          {tgm('title')}
           {status?.state === 'ready' && (
             <button className="gm-version" title={status.exe} onClick={() => void pick()}>
               {tgm('godotReady', { v: status.version ?? '' })}

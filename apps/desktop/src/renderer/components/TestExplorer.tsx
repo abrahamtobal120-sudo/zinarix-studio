@@ -463,7 +463,7 @@ export function TestExplorer() {
   return (
     <div className="te-panel">
       <div className="sidebar-title">
-        <span>{t('teTitle').toUpperCase()}</span>
+        <span>{t('teTitle')}</span>
         <span className="sidebar-actions">
           {running ? (
             <button title={t('teCancel')} aria-label={t('teCancel')} onClick={cancelTests}>

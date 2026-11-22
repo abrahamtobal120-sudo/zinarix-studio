@@ -9,7 +9,7 @@ import type { AutoTaskInput, AutomationsStatus, BotInput } from './automations.j
  * API keys flow renderer -> main exactly once (when the user types them) and never back.
  */
 import type { ChatMessage, ModelInfo } from '@omni/shared';
-import type { LicenseStatus } from './plans.js';
+import type { IssueRequest, IssuerStatus, LicenseStatus } from './plans.js';
 import type { ChromeState } from './windowChrome.js';
 import type { TestDiscovery, TestEvent, TestRunRequest, TestRunSummary } from './testing.js';
 import type { JupyterStatus, KernelInfo, NbCompletions, NbVariable, NotebookEvent } from './notebook.js';
@@ -2434,6 +2434,10 @@ export interface OmniApi {
     /** A signed license key (ZX1.…). Throws with a readable reason. */
     activate(key: string): Promise<LicenseStatus>;
     remove(): Promise<LicenseStatus>;
+    /** Owner only: the key desk (makes signed keys with the private key of this PC). */
+    issuer(): Promise<IssuerStatus>;
+    issue(req: IssueRequest): Promise<IssuerStatus>;
+    markIssued(id: string, given: boolean, note: string): Promise<IssuerStatus>;
   };
   lsp: {
     open(path: string, language: string, text: string): Promise<LspStatus | null>;
@@ -2951,6 +2955,9 @@ export const CHANNELS = [
   'license:status',
   'license:activate',
   'license:remove',
+  'license:issuer',
+  'license:issue',
+  'license:markIssued',
   'phone:status',
   'phone:start',
   'phone:stop',

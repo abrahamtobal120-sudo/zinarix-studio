@@ -48,7 +48,7 @@
 .pg .mono,
 .pg pre,
 .pg code {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
 
@@ -184,7 +184,7 @@
   font: inherit;
 }
 .pg textarea.mono {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
 .pg [aria-invalid='true'] {
@@ -437,7 +437,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
   padding: 10px;
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   white-space: pre;
 }

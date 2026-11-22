@@ -144,8 +144,6 @@
 .dz-head {
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--fg-dim);
   padding: 9px 12px 5px;
 }

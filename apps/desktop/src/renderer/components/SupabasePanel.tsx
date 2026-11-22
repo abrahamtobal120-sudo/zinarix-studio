@@ -572,7 +572,7 @@ function SupabaseBody({ reset }: { reset: () => void }) {
 
   const title = (
     <div className="sidebar-title">
-      <span className="panel-title">SUPABASE</span>
+      <span className="panel-title">Supabase</span>
       <span className="sidebar-actions">
         {ref && (
           <button

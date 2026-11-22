@@ -232,7 +232,7 @@
 }
 .cr-where {
   align-self: flex-start;
-  font-family: var(--mono, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
 .cr-detail,

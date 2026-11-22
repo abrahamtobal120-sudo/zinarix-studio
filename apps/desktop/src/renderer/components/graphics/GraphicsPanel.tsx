@@ -144,7 +144,7 @@ export function GraphicsPanel() {
   return (
     <div className="gp">
       <div className="sidebar-title">
-        <span className="panel-title">{tg('title').toUpperCase()}</span>
+        <span className="panel-title">{tg('title')}</span>
       </div>
       <div className="gp-body">
         <p className="gp-hint">{tg('desc')}</p>

@@ -126,3 +126,37 @@ export const DEFAULT_PLANS: PlansConfig = {
   free: FREE_FEATURES,
   buyUrl: BUY_URL,
 };
+
+/** One key made on the owner's PC (main/licenseIssuer.ts), kept in ~/.omni-signing/issued.json. */
+export interface IssuedKey {
+  id: string;
+  /** The signed key to hand out (ZX1.…). */
+  key: string;
+  plan: Exclude<PaidPlan, 'free'>;
+  email: string;
+  name?: string;
+  iat: number;
+  exp: number | null;
+  /** One of the free Pro + AI gift keys. */
+  gift: boolean;
+  /** Already handed to someone. */
+  given: boolean;
+  note?: string;
+}
+
+export interface IssuerStatus {
+  /** This PC has the private key that matches the app: it can make keys. */
+  available: boolean;
+  keyPath: string;
+  reason?: string;
+  keys: IssuedKey[];
+}
+
+export interface IssueRequest {
+  plan: Exclude<PaidPlan, 'free'>;
+  email?: string;
+  name?: string;
+  /** 0 or absent: never expires. */
+  days?: number;
+  count?: number;
+}

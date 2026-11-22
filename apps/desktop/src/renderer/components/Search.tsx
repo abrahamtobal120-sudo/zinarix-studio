@@ -367,7 +367,7 @@ export function SearchView({
     <div className={`search-view${embedded ? ' embedded' : ''}${embedded && !active ? ' idle' : ''}`}>
       {!embedded && (
         <div className="sidebar-title">
-          <span>{t('search').toUpperCase()}</span>
+          <span>{t('search')}</span>
           {actions}
         </div>
       )}

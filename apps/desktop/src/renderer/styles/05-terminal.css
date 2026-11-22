@@ -156,8 +156,6 @@
   padding: 4px 8px 3px;
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
   color: var(--fg-dim);
 }
 .term-menu-hint {

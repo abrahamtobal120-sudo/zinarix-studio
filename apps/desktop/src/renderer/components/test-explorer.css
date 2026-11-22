@@ -54,7 +54,6 @@
 .te-fw {
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
   color: var(--fg-strong);
 }
 
@@ -240,7 +239,7 @@
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--mono, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--fg);
 }
@@ -273,7 +272,7 @@
 }
 
 .te-variant .te-name {
-  font-family: var(--mono, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
 

@@ -228,7 +228,7 @@
   color: var(--fg);
 }
 .dbg-tb-keys {
-  font-family: var(--mono, 'JetBrains Mono', Consolas, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs, 10px);
   padding: 0 4px;
   border-radius: var(--radius-xs);
@@ -304,7 +304,7 @@
   margin: 2px 12px 6px;
 }
 .dbg-tree {
-  font-family: var(--mono, 'JetBrains Mono', Consolas, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
 .dbg-var,
@@ -563,7 +563,7 @@
   min-height: 0;
   overflow: auto;
   padding: 4px 14px;
-  font-family: var(--mono, 'JetBrains Mono', Consolas, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   white-space: pre-wrap;
   word-break: break-word;
@@ -591,7 +591,7 @@
 .dbg-console-in input {
   flex: 1;
   height: 24px;
-  font-family: var(--mono, 'JetBrains Mono', Consolas, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   background: transparent;
   border: none;

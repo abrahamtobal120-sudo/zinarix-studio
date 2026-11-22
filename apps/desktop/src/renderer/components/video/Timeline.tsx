@@ -4,7 +4,9 @@ import {
   addMarker,
   addTrack,
   clipDur,
+  canDetachAudio,
   clipEnd,
+  detachAudio,
   keyTimes,
   speedOf,
   mediaOf,
@@ -76,6 +78,28 @@ export function deleteSelection(ripple: boolean): void {
   if (next === s.project) return toast(tv('locked'));
   commit(next, ripple ? tv('rippleDelete') : tv('delete'));
   setV({ selection: [] });
+}
+
+/** "Separar audio": the selected video clips (or the one under the playhead) lose their sound to an audio track. */
+export function detachSelectedAudio(): void {
+  const s = getV();
+  const p = s.project;
+  let ids = s.selection.filter((id) =>
+    canDetachAudio(
+      p,
+      p.clips.find((c) => c.id === id),
+    ),
+  );
+  if (!ids.length && !s.selection.length)
+    ids = p.clips
+      .filter((c) => c.start <= s.playhead && clipEnd(c) > s.playhead && canDetachAudio(p, c))
+      .map((c) => c.id);
+  if (!ids.length) return toast(tv('detachAudioNone'));
+  const r = detachAudio(p, ids);
+  if (!r.created.length) return toast(tv('detachAudioNone'));
+  commit(r.project, tv('detachAudio').replace(/\s*\(.*\)$/, ''));
+  setV({ selection: [...ids, ...r.created] });
+  toast(tv('detachAudioDone'));
 }
 
 export function addMarkerAtPlayhead(): void {
@@ -523,6 +547,7 @@ function Toolbar() {
       {btn('scissors', tv('split'), splitAtPlayhead)}
       {btn('trash', tv('delete'), () => deleteSelection(false), { disabled: !hasSel })}
       {btn('columns', tv('rippleDelete'), () => deleteSelection(true), { disabled: !hasSel })}
+      {btn('link', tv('detachAudio'), detachSelectedAudio)}
       <span className="vs-sep" />
       {btn(
         'magnet',
@@ -807,7 +832,9 @@ function ClipView({
         {name ?? '?'}
         {clip.effects && <span className="vs-clip-speed">fx</span>}
         {clip.ramp ? (
-          <span className="vs-clip-speed" title={`${speedOf(clip)}×`}>⤳</span>
+          <span className="vs-clip-speed" title={`${speedOf(clip)}×`}>
+            ⤳
+          </span>
         ) : (
           speedOf(clip) !== 1 && <span className="vs-clip-speed">{`${speedOf(clip)}×`}</span>
         )}
@@ -1014,6 +1041,14 @@ function MiniMap({
 
 function ClipMenu({ x, y, onClose }: { x: number; y: number; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const canDetach = useV((s) =>
+    s.selection.some((id) =>
+      canDetachAudio(
+        s.project,
+        s.project.clips.find((c) => c.id === id),
+      ),
+    ),
+  );
   const [pos, setPos] = useState({ x, y });
   // Right-clicking near the bottom or the right edge: open upwards / leftwards.
   useLayoutEffect(() => {
@@ -1059,6 +1094,7 @@ function ClipMenu({ x, y, onClose }: { x: number; y: number; onClose: () => void
       {item(tv('split'), splitAtPlayhead)}
       {item(tv('delete'), () => deleteSelection(false))}
       {item(tv('rippleDelete'), () => deleteSelection(true))}
+      {canDetach && item(tv('detachAudio'), detachSelectedAudio)}
     </div>
   );
 }

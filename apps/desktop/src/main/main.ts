@@ -73,6 +73,7 @@ import { CLOUD_SCOPE, GCloud } from './gcloud.js';
 import { GOOGLE_ALL_SCOPE } from './googleMail.js';
 import { licenseStatus, normalizeKey, parseLicense } from './license.js';
 import type { StoredLicense } from './license.js';
+import { LicenseIssuer } from './licenseIssuer.js';
 import { startUpdates } from './updates.js';
 import { editionOf } from '../shared/edition.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
@@ -3074,6 +3075,39 @@ function registerIpc(): void {
     broadcastSettings(w);
     return license();
   });
+  // The owner's key desk: only with the owner's key active AND the private key on this PC.
+  const issuer = new LicenseIssuer();
+  const ownerOnly = () => {
+    if (license().plan !== 'owner') throw new Error('Solo el dueño de Zinarix Studio puede hacer claves.');
+  };
+  handle('license:issuer', z.tuple([]), () => {
+    ownerOnly();
+    return issuer.ensureGifts();
+  });
+  handle(
+    'license:issue',
+    z.tuple([
+      z.object({
+        plan: z.enum(['pro', 'ai', 'proai']),
+        email: z.string().max(200).optional(),
+        name: z.string().max(120).optional(),
+        days: z.number().int().min(0).max(36500).optional(),
+        count: z.number().int().min(1).max(100).optional(),
+      }),
+    ]),
+    (_w, req) => {
+      ownerOnly();
+      return issuer.issue(req);
+    },
+  );
+  handle(
+    'license:markIssued',
+    z.tuple([z.string().min(1).max(200), z.boolean(), z.string().max(200)]),
+    (_w, id, given, note) => {
+      ownerOnly();
+      return issuer.mark(id, given, note);
+    },
+  );
 }
 
 // ---------------- Panel de Edición (visual editor) ----------------

@@ -16,6 +16,7 @@ import {
   useStore,
 } from '../store';
 import { pressable } from '../a11y';
+import { getProfile } from '../profile';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { ModalShell } from './ModalShell';
@@ -347,6 +348,11 @@ const USED_BEFORE = ['zs.chats', 'zs.lastConversation'].some((k) => stored(k) !=
  * someone who already used Zinarix and just got a new version. Never both, never twice.
  */
 export function introOnStart(version: string, hasModels: boolean): void {
+  // Before anything else, once: the questionnaire that sets the app up for this person.
+  if (!getProfile()) {
+    quizThen = () => introOnStart(version, hasModels);
+    return setState({ modal: { kind: 'quiz' } });
+  }
   const seen = stored(SEEN_VERSION_KEY);
   store(SEEN_VERSION_KEY, version);
   if (!stored(ONBOARDED_KEY)) {
@@ -356,6 +362,16 @@ export function introOnStart(version: string, hasModels: boolean): void {
     if (!USED_BEFORE) return;
   }
   if (seen !== version && hasModels) setState({ modal: { kind: 'whatsNew' } });
+}
+
+/** What comes after the questionnaire (the guided setup or what's new); none when repeated. */
+let quizThen: (() => void) | null = null;
+
+export function afterQuiz(): void {
+  close();
+  const next = quizThen;
+  quizThen = null;
+  next?.();
 }
 
 // Step to come back to after a detour to Providers.

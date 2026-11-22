@@ -4,6 +4,36 @@ import type { OmniCore } from '@omni/core';
 import { MEDIA_MODELS, estimateMediaCost, findMediaModel, getMediaProvider } from '@omni/providers';
 import type { MediaModel } from '@omni/providers';
 import { genFileName, genRequestIssue } from '../shared/mediaGen.js';
+import {
+  LOCAL_VOICE_MODEL,
+  LOCAL_VOICE_PROVIDER,
+  localVoices,
+  speakLocally,
+} from './localVoice.js';
+
+const isLocalVoice = (provider: string, id: string) =>
+  provider === LOCAL_VOICE_PROVIDER && id === LOCAL_VOICE_MODEL;
+
+/** The free voice of this computer, as a speech model of the Generate panel. */
+async function localVoiceView(): Promise<GenModelView> {
+  const v = await localVoices().catch(() => ({ available: false, voices: [] as string[] }));
+  return {
+    provider: LOCAL_VOICE_PROVIDER,
+    providerName: 'Este equipo',
+    id: LOCAL_VOICE_MODEL,
+    label: 'Voz del sistema (gratis, sin internet)',
+    kind: 'speech',
+    connected: v.available,
+    priced: true,
+    local: true,
+    ...(v.voices.length ? { voices: v.voices } : {}),
+    note: v.available
+      ? 'Usa las voces instaladas en tu computadora: no cuesta nada y el texto no sale de tu equipo. Para voces más naturales conecta OpenAI, Gemini o ElevenLabs.'
+      : 'No se encontró un lector de voz en este equipo (en Linux instala espeak-ng).',
+    source: 'local',
+    verifiedAt: '2026-11-21',
+  };
+}
 import type {
   GenEstimate,
   GenEvent,
@@ -54,10 +84,12 @@ export class MediaService {
 
   async models(): Promise<GenModelView[]> {
     const connected = new Set((await this.core.connectedProviders()).map((p) => p.id));
-    return MEDIA_MODELS.map((m) => this.view(m, connected));
+    // The free voice first: it is what the panel picks unless the user chooses a paid one.
+    return [await localVoiceView(), ...MEDIA_MODELS.map((m) => this.view(m, connected))];
   }
 
   async model(provider: string, id: string): Promise<GenModelView | undefined> {
+    if (isLocalVoice(provider, id)) return localVoiceView();
     const m = findMediaModel(provider, id);
     if (!m) return undefined;
     const connected = new Set((await this.core.connectedProviders()).map((p) => p.id));
@@ -65,6 +97,8 @@ export class MediaService {
   }
 
   estimate(req: GenRequest): GenEstimate {
+    if (isLocalVoice(req.provider, req.model))
+      return { usd: 0, approximate: false, detail: 'gratis, en este equipo' };
     return estimateMediaCost(findMediaModel(req.provider, req.model), req);
   }
 
@@ -93,10 +127,18 @@ export class MediaService {
     this.running.set(id, ac);
     const started = Date.now();
     try {
-      const cfg = await this.core.providerConfig(req.provider);
-      const r = await getMediaProvider(req.provider).generate(cfg, req, ac.signal, (p) =>
-        emit({ type: 'progress', ...p }),
-      );
+      const r = isLocalVoice(req.provider, req.model)
+        ? await (async () => {
+            emit({ type: 'progress', stage: 'waiting' });
+            const data = await speakLocally(req.prompt, req.voice, ac.signal);
+            return { files: [{ data, ext: 'wav' }], warnings: [] as string[] };
+          })()
+        : await getMediaProvider(req.provider).generate(
+            await this.core.providerConfig(req.provider),
+            req,
+            ac.signal,
+            (p) => emit({ type: 'progress', ...p }),
+          );
       const dir = this.outDir(workspaceRoot);
       await mkdir(dir, { recursive: true });
       const at = new Date();

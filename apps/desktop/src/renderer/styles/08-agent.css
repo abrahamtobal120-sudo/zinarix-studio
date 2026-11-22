@@ -21,43 +21,56 @@
   flex: 0 0 auto;
   color: var(--fg);
 }
+.chat-hints {
+  width: 100%;
+  max-width: 560px;
+}
 .chat-hints p {
-  max-width: 300px;
-  margin: 10px auto;
+  max-width: 380px;
+  margin: 0 auto 10px;
+  line-height: 1.5;
 }
 .chat-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 320px;
-  margin: 18px auto 14px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-width: 340px;
+  margin: 22px auto 18px;
   text-align: left;
 }
-.chat-suggestions-title {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--fg-dim);
-  padding-left: 2px;
+@container (min-width: 520px) {
+  .chat-suggestions {
+    grid-template-columns: 1fr 1fr;
+    max-width: 560px;
+  }
 }
 .chat-suggestion {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
   text-align: left;
-  padding: 8px 11px;
-  background: var(--bg-3);
+  padding: 10px 12px;
+  line-height: 1.35;
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   color: var(--fg);
 }
 .chat-suggestion .icon {
   flex-shrink: 0;
-  color: var(--brand);
 }
 .chat-suggestion:hover {
-  background: var(--sel-soft);
-  border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
+  background: var(--hover);
+  border-color: color-mix(in srgb, var(--fg-dim) 40%, var(--border));
+}
+.chat-suggestion .tone-badge {
+  width: 22px;
+  height: 22px;
+  color: var(--fg-dim);
+  background: var(--bg-4);
+}
+.chat-suggestion:hover .tone-badge {
+  color: var(--accent-text);
 }
 .tool-card {
   border: 1px solid var(--border);
@@ -87,14 +100,14 @@
   white-space: nowrap;
 }
 .tool-name {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   color: var(--fg-dim);
 }
 .tool-arg {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .tool-status {
   display: inline-flex;
@@ -401,8 +414,6 @@
   background: var(--bg-2);
   font-size: var(--text-xs);
   color: var(--fg-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 .mp-row .num {
   text-align: right;
@@ -429,7 +440,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .mp-badge {
   font-size: var(--text-xs);

@@ -495,6 +495,9 @@ const api: OmniApi = {
     status: call('license:status') as OmniApi['license']['status'],
     activate: call('license:activate') as OmniApi['license']['activate'],
     remove: call('license:remove') as OmniApi['license']['remove'],
+    issuer: call('license:issuer') as OmniApi['license']['issuer'],
+    issue: call('license:issue') as OmniApi['license']['issue'],
+    markIssued: call('license:markIssued') as OmniApi['license']['markIssued'],
   },
   lsp: {
     open: call('lsp:open') as OmniApi['lsp']['open'],

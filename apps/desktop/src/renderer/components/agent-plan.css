@@ -213,7 +213,7 @@
   width: 100%;
   min-height: 46vh;
   resize: vertical;
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   margin: 8px 0;
 }

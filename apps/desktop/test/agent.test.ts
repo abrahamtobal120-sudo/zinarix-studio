@@ -201,6 +201,7 @@ describe('agent safety', () => {
       'video_trim',
       'video_move',
       'video_delete',
+      'video_detach_audio',
       'video_add_title',
       'video_captions',
       'video_set_format',

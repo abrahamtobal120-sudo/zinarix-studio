@@ -408,7 +408,7 @@ function VercelBody({ reset }: { reset: () => void }) {
 
   const title = (
     <div className="sidebar-title">
-      <span className="panel-title">VERCEL</span>
+      <span className="panel-title">Vercel</span>
       <span className="sidebar-actions">
         {pick && (
           <button

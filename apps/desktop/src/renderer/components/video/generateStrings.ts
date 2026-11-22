@@ -13,6 +13,9 @@ const es = {
   notConnected: '(sin conectar)',
   noModels: 'No hay modelos para esto.',
   connectHint: 'Conecta {providers} en Ajustes → Proveedores para generar.',
+  connectBtn: 'Conectar un proveedor',
+  freeVoiceHint:
+    'Sin claves de API ya puedes crear voz en off gratis: pestaña Voz → «Voz del sistema».',
   prompt: 'Descripción',
   promptPh: 'Un faro en la costa al atardecer, con olas grandes',
   textToRead: 'Texto que se va a leer',
@@ -57,6 +60,9 @@ const en: typeof es = {
   notConnected: '(not connected)',
   noModels: 'No models for this.',
   connectHint: 'Connect {providers} in Settings → Providers to generate.',
+  connectBtn: 'Connect a provider',
+  freeVoiceHint:
+    'Without API keys you can already make a free voice-over: Voice tab → “System voice”.',
   prompt: 'Description',
   promptPh: 'A lighthouse on the coast at sunset, with big waves',
   textToRead: 'Text to read aloud',

@@ -81,7 +81,7 @@ export function AutomationsPanel() {
   return (
     <div className="run-panel auto-panel">
       <div className="sidebar-title">
-        <span>{ta('title').toUpperCase()}</span>
+        <span>{ta('title')}</span>
       </div>
       <div className="auto-tabs" role="tablist">
         {(['tasks', 'bots', 'widget'] as const).map((k) => (

@@ -23,6 +23,7 @@ import { useDebug } from '../debug';
 import { toggleStudio, useV } from './video/videoStore';
 import { toggle3d, use3 } from './three/store3d';
 import { t3 } from './three/strings3d';
+import { usePinned } from '../profile';
 import {
   BROWSER_TAB,
   PLAYGROUND_TAB,
@@ -185,15 +186,21 @@ function useBarItems() {
 }
 
 /**
- * Left bar, in three groups: code (files, search, git, run, debug, tests) · AI and tools (chat,
- * watcher, design, video, terminal) · integrations ("Más", plus whichever integration is open
- * right now, so it can be closed from the bar) · and settings at the bottom. Vercel, Supabase,
+ * Left bar, kept short: code (files, git, run, debug) · chat and terminal · "Más" (plus whatever
+ * from it is open right now, so it can be closed from the bar) · and settings at the bottom.
+ * Tests, the watcher, automations, design, video, 3D, Vercel, Supabase,
  * Google Cloud, mail, WhatsApp, the browser, security, usage, providers, the playground and
  * the palette live in "Más". Only the side panel being shown gets the accent (icon + marker,
  * no background); toggles (chat, terminal...) only get a brighter icon.
  */
 export function ActivityBar() {
   const { items, sidebar, browserActive, whatsappActive } = useBarItems();
+  // Panels the first-run questionnaire picked for this person: always in the bar.
+  const pinnedKeys = usePinned();
+  const pinned = pinnedKeys.flatMap((k) => {
+    const it = (items as Record<string, BarItem | undefined>)[k];
+    return it ? [it] : [];
+  });
   const [tip, setTip] = useState<{ text: string; keys?: string; y: number } | null>(null);
   // The browser and WhatsApp are native views drawn above the page: over them the custom
   // tooltip would be hidden, so the system one is used instead.
@@ -239,6 +246,10 @@ export function ActivityBar() {
   const sep = (key: string) => <div key={key} className="activity-sep" aria-hidden="true" />;
   // Integrations open right now get a button next to "Más" while they are open.
   const openNow = [
+    items.testing,
+    items.design,
+    items.video,
+    items.studio3d,
     items.vercel,
     items.supabase,
     items.gcloud,
@@ -253,24 +264,26 @@ export function ActivityBar() {
     items.browser,
     items.security,
     items.playground,
-  ].filter((it) => it.on);
+  ].filter((it) => it.on && !pinnedKeys.includes(it.key));
+  // The watcher and automations sit in "Más" too, but come back to the bar while they are
+  // open or have something to show (new reports, tasks running).
+  const withNews = [items.watch, items.automations].filter(
+    (it) => (it.on || it.badge) && !pinnedKeys.includes(it.key),
+  );
   return (
     <nav className="activity-bar" aria-label={t('appsBar')}>
       {button(items.explorer)}
       {button(items.git)}
       {button(items.run)}
       {button(items.debug)}
-      {button(items.testing)}
       {sep('s1')}
       {button(items.chat)}
-      {button(items.watch)}
-      {button(items.automations)}
-      {button(items.design)}
-      {button(items.video)}
-      {button(items.studio3d)}
       {button(items.terminal)}
+      {pinned.length > 0 && sep('s15')}
+      {pinned.map(button)}
       {sep('s2')}
       {button(items.more)}
+      {withNews.map(button)}
       {openNow.map(button)}
       <div className="spacer" />
       {sidebar && sidebar !== 'design' && button(items.maximize)}
@@ -289,7 +302,7 @@ export function ActivityBar() {
 // Badges here follow the bar: red only for alerts (unread messages), grey otherwise.
 export function AppsPanel() {
   const { items } = useBarItems();
-  const row = (it: BarItem, desc: string) => (
+  const row = (it: BarItem, desc: string, name = it.title) => (
     <button
       key={it.key}
       className={`apps-item${it.on ? ' on' : ''}`}
@@ -300,7 +313,7 @@ export function AppsPanel() {
         <Icon name={it.icon} size={18} />
       </span>
       <span className="apps-text">
-        <span className="apps-name">{it.title}</span>
+        <span className="apps-name">{name}</span>
         <span className="apps-desc">{desc}</span>
       </span>
       {it.badge ? (
@@ -313,7 +326,7 @@ export function AppsPanel() {
   return (
     <div className="explorer apps-panel">
       <div className="sidebar-title">
-        <span className="panel-title">{t('appsTitle').toUpperCase()}</span>
+        <span className="panel-title">{t('appsTitle')}</span>
       </div>
       <div className="apps-body">
         <div className="apps-section">{t('appsIntegrations')}</div>
@@ -321,16 +334,22 @@ export function AppsPanel() {
         {row(items.supabase, t('appsSupabase'))}
         {row(items.gcloud, t('appsGcloud'))}
         {row(items.mail, t('appsMail'))}
-        {row(items.automations, ta('desc'))}
+        {row(items.automations, ta('desc'), ta('title'))}
         {row(items.whatsapp, t('appsWhatsapp'))}
         {row(items.browser, t('appsBrowser'))}
-        <div className="apps-section">{t('appsTools')}</div>
+        <div className="apps-section">{t('appsCreate')}</div>
+        {row(items.design, t('appsDesign'))}
+        {row(items.video, t('appsVideo'), 'Video Studio')}
+        {row(items.studio3d, t('apps3d'))}
         {row(items.graphics, tg('desc'))}
+        {row(items.cad, tcad('desc'))}
+        {row(items.games, tgm('desc'))}
+        <div className="apps-section">{t('appsTools')}</div>
+        {row(items.testing, t('appsTesting'), t('appsTestingName'))}
+        {row(items.watch, t('appsWatch'), t('appsWatchName'))}
         {row(items.docker, tk('desc'))}
         {row(items.hardware, th('desc'))}
         {row(items.mobile, tm('desc'))}
-        {row(items.games, tgm('desc'))}
-        {row(items.cad, tcad('desc'))}
         {row(items.playground, tp('pgTab'))}
         {row(items.usage, t('appsUsage'))}
         {row(items.palette, t('appsPalette'))}

@@ -4,12 +4,14 @@
  * undo step, with the same pure functions as the buttons (shared/videoAgent.ts, videoAi.ts).
  */
 import type { SttEngineView } from '../../../shared/api';
-import type { ExportOptions, VideoProject } from '../../../shared/video';
+import type { ExportOptions, Transform, VideoProject } from '../../../shared/video';
 import {
   EXPORT_PRESETS,
   defaultExport,
   insertMedia,
   isText,
+  overlayMedia,
+  setTransform,
   projectDuration,
   trackKindFor,
 } from '../../../shared/video';
@@ -65,6 +67,10 @@ const ACTION: Record<string, (a: Args, p: VideoProject) => string> = {
   video_trim: (a) => `recortar el clip ${str(a, 'clip')}`,
   video_move: (a) => `mover el clip ${str(a, 'clip')}`,
   video_delete: (a) => `borrar ${Array.isArray(a.clips) ? a.clips.length : 1} clip(s)`,
+  video_detach_audio: (a) =>
+    Array.isArray(a.clips)
+      ? `separar el audio de ${a.clips.length} clip(s)`
+      : 'separar el audio del video',
   video_add_title: (a) => `agregar el título "${str(a, 'text').slice(0, 80)}"`,
   video_captions: (a) => `poner subtítulos (estilo ${str(a, 'style') || 'classic'})`,
   video_set_format: (a) => `cambiar el formato a ${str(a, 'aspect')}`,
@@ -213,7 +219,17 @@ async function run(
       const c = p.clips.find((x) => x.id === id);
       if (!c) return fail(`No clip "${id}". Call video_state to see the clip ids.`);
       if (a.remove === true)
-        return finishEdit(name, a, p, { project: unzoomClip(p, id), label: 'IA: quitar zoom', content: `Zoom keys removed from ${id}.` }, dry);
+        return finishEdit(
+          name,
+          a,
+          p,
+          {
+            project: unzoomClip(p, id),
+            label: 'IA: quitar zoom',
+            content: `Zoom keys removed from ${id}.`,
+          },
+          dry,
+        );
       const scale = typeof a.scale === 'number' ? a.scale : undefined;
       const z = await zoomClip(p, id, scale ? { scale } : {});
       if ('error' in z)
@@ -228,7 +244,11 @@ async function run(
         name,
         a,
         p,
-        { project: z.project, label: 'IA: zoom automático', content: `Auto zoom on ${id}: ${z.rests} zoom-ins (scale ${scale ?? 1.8}×), written as scale / x / y keyframes.` },
+        {
+          project: z.project,
+          label: 'IA: zoom automático',
+          content: `Auto zoom on ${id}: ${z.rests} zoom-ins (scale ${scale ?? 1.8}×), written as scale / x / y keyframes.`,
+        },
         dry,
       );
     }
@@ -255,12 +275,30 @@ async function addMedia(a: Args, dry: boolean): Promise<VideoAgentResult> {
   const p = getV().project;
   const t = str(a, 'track');
   const track = p.tracks.find((x) => (x.id === t || x.name === t) && x.kind === trackKindFor(m));
-  const r = insertMedia(p, m, { trackId: track?.id, start: num(a, 'start') });
+  let r =
+    a.overlay === true
+      ? overlayMedia(p, m, num(a, 'start') ?? getV().playhead)
+      : insertMedia(p, m, { trackId: track?.id, start: num(a, 'start') });
   if (!r.clip) return fail(`"${m.name}" could not be placed.`);
-  commit(r.project, 'IA: agregar medio');
+  if (a.overlay === true && r.clip.transform) {
+    const patch: Partial<Transform> = {};
+    for (const k of ['x', 'y', 'scale'] as const) {
+      const v = num(a, k);
+      if (v !== undefined)
+        patch[k] = k === 'scale' ? Math.min(5, Math.max(0.02, v)) : Math.min(1, Math.max(-1, v));
+    }
+    if (Object.keys(patch).length) {
+      const id = r.clip.id;
+      const project = setTransform(r.project, id, patch);
+      r = { project, clip: project.clips.find((c) => c.id === id)! };
+    }
+  }
+  commit(r.project, a.overlay === true ? 'IA: poner encima' : 'IA: agregar medio');
+  const placed = r.clip!;
+  const tr = placed.transform;
   return {
     ok: true,
-    content: `Added ${m.id} "${m.name}" (${m.kind}, ${m.duration.toFixed(2)} s) as clip ${r.clip.id} at ${r.clip.start.toFixed(2)} s on ${r.project.tracks.find((x) => x.id === r.clip!.trackId)?.name}.`,
+    content: `Added ${m.id} "${m.name}" (${m.kind}, ${m.duration.toFixed(2)} s) as clip ${placed.id} at ${placed.start.toFixed(2)} s on ${r.project.tracks.find((x) => x.id === placed.trackId)?.name}${tr ? `, on top of the video (scale ${tr.scale}, x ${tr.x}, y ${tr.y})` : ''}.`,
     summary: `${m.name} en la línea de tiempo`,
   };
 }

@@ -4,6 +4,7 @@ import { toast } from '../../store';
 import { Icon } from '../Icon';
 import { Player } from './player';
 import { tv } from './strings';
+import { ViewerGizmo } from './ViewerGizmo';
 import { getV, seek, setV, useV } from './videoStore';
 
 export const player = new Player();
@@ -95,6 +96,7 @@ export function Viewer() {
           style={{ width: fit.w, height: fit.h }}
           aria-label={tv('title')}
         />
+        {hasClips && <ViewerGizmo w={fit.w} h={fit.h} />}
         {!hasClips && (
           <div className="vs-viewer-empty">
             <Icon name="film" size={22} />

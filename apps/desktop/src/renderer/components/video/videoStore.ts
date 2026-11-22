@@ -11,6 +11,7 @@ import {
   insertMedia,
   mediaKindOf,
   newProject,
+  overlayMedia,
   projectDuration,
   toFrame,
 } from '../../../shared/video';
@@ -356,6 +357,15 @@ export function addToTimeline(m: MediaItem, at?: { trackId?: string; start?: num
   if (!clip) return;
   commit(project, tv('addToTimeline'));
   setV({ selection: [clip.id] });
+}
+
+/** "Poner encima": on top of what plays at the playhead, smaller, ready to drag in the viewer. */
+export function overlayToTimeline(m: MediaItem): void {
+  const { project, clip } = overlayMedia(state.project, m, state.playhead);
+  if (!clip) return;
+  commit(project, tv('overlay').replace(/\s*\(.*\)$/, ''));
+  setV({ selection: [clip.id] });
+  if (clip.transform) toast(tv('overlayDone'));
 }
 
 export async function removeMedia(m: MediaItem): Promise<void> {

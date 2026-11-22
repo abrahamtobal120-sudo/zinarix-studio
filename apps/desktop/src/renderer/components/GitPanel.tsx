@@ -151,7 +151,7 @@ export function GitPanel() {
     return (
       <div className="explorer">
         <div className="sidebar-title">
-          <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
+          <span className="panel-title">{t('gitTitle')}</span>
         </div>
         <div className="sidebar-empty">
           <p>{t('noFolder')}</p>
@@ -169,7 +169,7 @@ export function GitPanel() {
     return (
       <div className="explorer">
         <div className="sidebar-title">
-          <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
+          <span className="panel-title">{t('gitTitle')}</span>
         </div>
         <div className="sidebar-empty">
           <p>{t('gitNoRepo')}</p>
@@ -289,7 +289,7 @@ export function GitPanel() {
         <CodeReview onClose={() => setReviewOpen(false)} branch={st?.branch ?? undefined} />
       )}
       <div className="sidebar-title">
-        <span className="panel-title">{t('gitTitle').toUpperCase()}</span>
+        <span className="panel-title">{t('gitTitle')}</span>
         <span className="sidebar-actions">
           <button
             title={t('gitRefresh')}

@@ -26,6 +26,7 @@ import { BrowserSection } from './BrowserSettings';
 import { SuggestionSettings } from './SuggestionSettings';
 import { ModalShell } from './ModalShell';
 import { tl } from '../layout/i18nLayout';
+import { OwnerKeysSection } from './OwnerKeys';
 
 const close = () => setState({ modal: null });
 
@@ -63,7 +64,9 @@ type Section =
   | 'cloud'
   | 'browser'
   | 'phone'
-  | 'keys';
+  | 'keys'
+  /** Only for the app's owner: make and hand out license keys. */
+  | 'owner';
 
 function Toggle({
   label,
@@ -619,6 +622,7 @@ function ThemeCard({ id, active }: { id: ThemeId; active: boolean }) {
 export function SettingsPanel() {
   const prefs = useStore((s) => s.prefs);
   const settings = useStore((s) => s.settings);
+  const isOwner = useStore((s) => s.license.plan === 'owner');
   const [section, setSection] = useState<Section>(() => {
     const m = getState().modal;
     return m?.kind === 'settings' && m.section ? (m.section as Section) : 'appearance';
@@ -655,6 +659,7 @@ export function SettingsPanel() {
         {nav('browser', t('setBrowser'), 'globe')}
         {nav('phone', t('phoneTitle'), 'smartphone')}
         {nav('keys', t('shortcuts'), 'keyboard')}
+        {isOwner && nav('owner', lang === 'en' ? 'Keys (owner)' : 'Claves (dueño)', 'key')}
       </nav>
       <div className="settings-body">
         <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
@@ -662,6 +667,17 @@ export function SettingsPanel() {
         </button>
         {section === 'appearance' && (
           <>
+            <div className="settings-quiz">
+              <span className="dim small">
+                {lang === 'en'
+                  ? 'Answer the getting started questions again to adapt the panels and the help to you.'
+                  : 'Responde otra vez las preguntas de inicio para adaptar los paneles y la ayuda a ti.'}
+              </span>
+              <button className="small" onClick={() => setState({ modal: { kind: 'quiz' } })}>
+                <Icon name="sparkle" size={13} />{' '}
+                {lang === 'en' ? 'Repeat questionnaire' : 'Repetir cuestionario'}
+              </button>
+            </div>
             <h3>{t('setTheme')}</h3>
             <div className="theme-grid">
               {THEME_IDS.map((id) => (
@@ -833,6 +849,8 @@ export function SettingsPanel() {
         {section === 'browser' && <BrowserSection />}
 
         {section === 'phone' && <PhoneSection />}
+
+        {section === 'owner' && isOwner && <OwnerKeysSection />}
 
         {section === 'keys' && (
           <>

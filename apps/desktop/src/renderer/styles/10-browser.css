@@ -262,9 +262,12 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-lg);
-  color: var(--on-color);
-  background: var(--accent);
+  border-radius: var(--radius-md);
+  color: var(--fg-dim);
+  background: var(--bg-4);
+}
+.browser-tile:hover .browser-tile-icon {
+  color: var(--accent-text);
 }
 .browser-tile-label {
   color: var(--fg-strong);
@@ -291,8 +294,6 @@
 }
 .browser-ask-title {
   font-size: var(--text-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--fg-dim);
 }
 .browser-chip {
@@ -300,15 +301,14 @@
   padding: 9px 14px;
   border-radius: var(--radius-lg);
   background: transparent;
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
   color: var(--fg);
   font-size: var(--text-base);
 }
 .browser-chip:hover {
-  border-style: solid;
-  border-color: var(--brand);
+  border-color: color-mix(in srgb, var(--fg-dim) 40%, var(--border));
   color: var(--fg-strong);
-  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  background: var(--hover);
 }
 .browser-cookies-card {
   display: flex;
@@ -320,7 +320,7 @@
   padding: 12px 14px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  background: var(--bg-2);
   font-size: var(--text-base);
   color: var(--fg);
 }
@@ -354,7 +354,7 @@
 }
 .tool-url {
   color: var(--focus);
-  font-family: var(--mono, monospace);
+  font-family: var(--font-mono);
 }
 /* Multi-line secret (service-account JSON): blurred until focused. */
 .secret-area {
@@ -570,7 +570,7 @@
   background: var(--bg);
   color: var(--fg-strong);
   font-size: var(--text-md);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .scan-target input:focus {
   outline: none;
@@ -602,7 +602,7 @@
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg-strong);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   min-width: 180px;
 }
@@ -673,7 +673,7 @@
   margin-bottom: 16px;
 }
 .scan-host-name {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   color: var(--fg-strong);
   margin-bottom: 6px;
 }
@@ -689,13 +689,11 @@
   font-weight: 500;
   border-bottom: 1px solid var(--border);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .scan-table td {
   padding: 5px 10px;
   border-bottom: 1px solid var(--border);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .scan-table tr.risky td {
   background: color-mix(in srgb, var(--warn) 10%, transparent);

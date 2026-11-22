@@ -84,9 +84,9 @@
   justify-content: space-between;
   height: 35px;
   padding: 0 8px 0 14px;
-  font-size: var(--text-xs);
-  letter-spacing: 0.4px;
-  color: var(--fg-dim);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg);
   flex-shrink: 0;
 }
 .panel-title {
@@ -144,8 +144,6 @@
   margin: 14px 0 4px;
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
   color: var(--fg-dim);
 }
 .run-row {
@@ -270,8 +268,8 @@
   text-align: left;
 }
 .context-menu button:hover {
-  background: var(--accent);
-  color: var(--accent-fg);
+  background: var(--hover);
+  color: var(--fg);
 }
 .context-menu hr {
   border: 0;
@@ -345,6 +343,7 @@
 }
 .sx-tabs button {
   flex: 1;
+  white-space: nowrap;
   padding: 4px 0;
   border-radius: var(--radius-md);
   background: transparent;
@@ -495,7 +494,7 @@
   background: var(--bg);
   color: var(--fg-strong);
   padding: 0 8px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
 .sx-filters input:focus {
@@ -636,7 +635,7 @@
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
-  font-family: ui-monospace, 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: 18px;
   border-left: 2px solid transparent;

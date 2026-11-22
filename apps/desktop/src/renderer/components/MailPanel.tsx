@@ -396,7 +396,7 @@ function MailBody({ reset }: { reset: () => void }) {
 
   const title = (
     <div className="sidebar-title">
-      <span className="panel-title">{t('mlTitle').toUpperCase()}</span>
+      <span className="panel-title">{t('mlTitle')}</span>
       <span className="sidebar-actions">
         {st?.connected && !draft && (
           <>

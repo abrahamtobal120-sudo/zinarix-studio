@@ -105,8 +105,6 @@
 .sv-score-inner span {
   font-size: var(--text-xs);
   color: var(--fg-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 .sv-dash-sum {
   flex: 1;
@@ -248,7 +246,7 @@
   letter-spacing: 0.04em;
 }
 .sv-where {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--fg-dim);
 }
@@ -287,7 +285,7 @@
   border: 1px solid var(--border);
   background: var(--bg-2);
   color: var(--fg-strong);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .sv-scan-row input:focus {
   outline: none;

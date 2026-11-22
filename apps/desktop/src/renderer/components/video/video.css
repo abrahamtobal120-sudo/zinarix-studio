@@ -91,7 +91,7 @@ body.vs-open .toast {
   padding: 0 6px;
   background: transparent;
   font-weight: 600;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .vs-mini {
   padding: 2px 7px;
@@ -422,8 +422,6 @@ body.vs-open .toast {
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
   background: var(--bg-3);
   color: var(--fg-dim);
 }
@@ -763,7 +761,7 @@ body.vs-open .toast {
   color: var(--on-color);
 }
 .vs-timecode {
-  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--fg-dim);
 }
@@ -773,7 +771,7 @@ body.vs-open .toast {
 }
 .vs-rate {
   margin-left: 6px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   color: var(--warn);
 }
 
@@ -786,9 +784,7 @@ body.vs-open .toast {
   padding: 10px 12px 6px;
   font-weight: 600;
   color: var(--fg-strong);
-  text-transform: uppercase;
   font-size: var(--text-xs);
-  letter-spacing: 0.6px;
 }
 .vs-panel-sub {
   padding: 12px 12px 4px;
@@ -1339,7 +1335,7 @@ body.vs-open .toast {
   text-align: right;
 }
 .vs-keys kbd {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   background: var(--bg-4);
   border-radius: var(--radius-xs);
   padding: 1px 6px;
@@ -1623,5 +1619,53 @@ body.vs-open .toast {
   transform: rotate(45deg);
   pointer-events: none;
   z-index: 2;
+}
+
+/* Move / resize pictures in the viewer (ViewerGizmo.tsx). */
+.vs-gizmo-layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  touch-action: none;
+}
+.vs-gizmo {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
+  cursor: move;
+}
+.vs-gizmo-h {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  background: var(--accent);
+  border: 1.5px solid var(--on-color);
+  border-radius: var(--radius-xs);
+}
+.vs-gizmo-h.nw {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+.vs-gizmo-h.ne {
+  right: 0;
+  top: 0;
+  margin-right: -5px;
+  cursor: nesw-resize;
+}
+.vs-gizmo-h.sw {
+  left: 0;
+  bottom: 0;
+  margin-bottom: -5px;
+  cursor: nesw-resize;
+}
+.vs-gizmo-h.se {
+  right: 0;
+  bottom: 0;
+  margin: 0 -5px -5px 0;
+  cursor: nwse-resize;
 }
 }

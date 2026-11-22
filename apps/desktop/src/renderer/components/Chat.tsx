@@ -1523,8 +1523,23 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   useLayoutEffect(() => {
     const el = textarea.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+    const fit = (): void => {
+      el.style.height = 'auto';
+      // Measured while the chat is hidden (panel closed, another tab) scrollHeight is 0: keep
+      // the natural 3 rows instead of collapsing the box until the next keystroke.
+      const h = el.scrollHeight;
+      if (h > 0) el.style.height = `${Math.min(h, 260)}px`;
+    };
+    fit();
+    // The chat moves between the center and the side panel: fit again when its width changes.
+    let w = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === w) return;
+      w = el.clientWidth;
+      fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [input]);
 
   useEffect(() => {
@@ -2721,9 +2736,11 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               </div>
             ) : (
               <div className="dim chat-hints">
-                <p>{agentMode ? t('agentHint') : t('chatHint')}</p>
+                <h2 className="chat-hello">{t('chatHello')}</h2>
+                <p className="chat-mode-hint" title={agentMode ? t('agentHint') : undefined}>
+                  {agentMode ? t('agentHintShort') : t('chatHint')}
+                </p>
                 <div className="chat-suggestions">
-                  <div className="chat-suggestions-title">{t('chatTry')}</div>
                   {(['chatSuggest1', 'chatSuggest2', 'chatSuggest3', 'chatSuggest4'] as const)
                     .filter((k) => agentMode || k !== 'chatSuggest4')
                     .map((k) => (
@@ -2745,12 +2762,20 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                       </button>
                     ))}
                 </div>
-                <p>{t('chatTips')}</p>
-                <p>
-                  {shortcutOf('ai.askSelection')} · {t('includeFile')}
-                  <br />
-                  {shortcutOf('ai.edit')} · {t('aiEdit')}
-                </p>
+                <div className="chat-keys" title={t('chatTips')}>
+                  <span>
+                    <kbd>/</kbd> {t('chatKeyCommands')}
+                  </span>
+                  <span>
+                    <kbd>@</kbd> {t('chatKeyMention')}
+                  </span>
+                  <span>
+                    <kbd>{shortcutOf('ai.askSelection')}</kbd> {t('includeFile')}
+                  </span>
+                  <span>
+                    <kbd>{shortcutOf('ai.edit')}</kbd> {t('aiEdit')}
+                  </span>
+                </div>
               </div>
             )}
           </div>

@@ -135,8 +135,6 @@ button.big {
 }
 .plan-table th {
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   color: var(--fg-dim);
 }
 .plan-table .pro {
@@ -182,7 +180,7 @@ button.big {
 }
 .plan-activate-row input {
   flex: 1;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .plan-error {
   display: flex;
@@ -475,7 +473,7 @@ button.big {
 .code-lang,
 .tool-cmd,
 .tool-output {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 .chat-scroll {
   padding: 12px 16px 16px;

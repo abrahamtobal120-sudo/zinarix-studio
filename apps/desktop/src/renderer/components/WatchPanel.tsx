@@ -79,7 +79,7 @@ export function WatchPanel() {
   return (
     <div className="run-panel">
       <div className="sidebar-title">
-        <span>{t('wtTitle').toUpperCase()}</span>
+        <span>{t('wtTitle')}</span>
       </div>
       <div className="run-body">
         <div className={`watch-status watch-${state}`}>

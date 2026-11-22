@@ -27,6 +27,7 @@ import {
   deleteSelection,
   setInOut,
   splitAtPlayhead,
+  detachSelectedAudio,
   Timeline,
   zoomBy,
   zoomToFit,
@@ -675,6 +676,7 @@ const SHORTCUTS: [VideoKey, string][] = [
   ['kSplit', 'S · Ctrl+B'],
   ['kInOut', 'I / O'],
   ['kRipple', 'Shift+Supr / Del'],
+  ['kDetach', 'Ctrl+Shift+D'],
   ['kSnap', 'N'],
   ['kMarker', 'M'],
   ['kUndo', 'Ctrl+Z / Ctrl+Shift+Z'],
@@ -827,6 +829,7 @@ function useStudioKeys(active: boolean): void {
         if (k === 'a') return run(() => setV({ selection: s.project.clips.map((c) => c.id) }));
         if (k === 'c') return run(() => copySelection());
         if (k === 'v' && !e.shiftKey) return run(() => paste(s.playhead));
+        if (k === 'd' && e.shiftKey) return run(detachSelectedAudio);
         if (k === 'd') return run(() => duplicateSelection());
         return;
       }

@@ -481,7 +481,7 @@ export function DebugPanel() {
   return (
     <div className="run-panel dbg-panel">
       <div className="sidebar-title">
-        <span>{td('dbgTitle').toUpperCase()}</span>
+        <span>{td('dbgTitle')}</span>
         <span className="sidebar-actions">
           <button
             title={td('dbgCreateLaunch')}

@@ -880,7 +880,7 @@ export function RunPanel() {
     return (
       <div className="run-panel">
         <div className="sidebar-title">
-          <span>{t('runTitle').toUpperCase()}</span>
+          <span>{t('runTitle')}</span>
         </div>
         <div className="rp-empty">
           <div className="rp-empty-icon">
@@ -931,7 +931,7 @@ export function RunPanel() {
   return (
     <div className="run-panel rp">
       <div className="sidebar-title">
-        <span>{t('runTitle').toUpperCase()}</span>
+        <span>{t('runTitle')}</span>
         <span className="sidebar-actions">
           <button title={t('runRescan')} aria-label={t('runRescan')} onClick={() => void detect()}>
             <Icon name="refresh" size={14} />

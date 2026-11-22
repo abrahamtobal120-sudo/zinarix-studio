@@ -665,7 +665,7 @@ export function GCloudPanel() {
 
   const title = (
     <div className="sidebar-title">
-      <span className="panel-title">GOOGLE CLOUD</span>
+      <span className="panel-title">Google Cloud</span>
       <span className="sidebar-actions">
         {st?.connected && (
           <button title={t('gitRefresh')} aria-label={t('gitRefresh')} onClick={loadProjects}>

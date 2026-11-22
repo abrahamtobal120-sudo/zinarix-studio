@@ -358,7 +358,7 @@ export function Explorer() {
       }}
     >
       <div className="sidebar-title">
-        <span>{workspace.name.toUpperCase()}</span>
+        <span>{workspace.name}</span>
         <span className="sidebar-actions">
           <button
             className={searching ? 'on' : ''}

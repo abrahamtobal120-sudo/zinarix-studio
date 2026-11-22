@@ -23,7 +23,7 @@ function PanelViews() {
       className={`panel-view ${view === id ? 'active' : ''}`}
       onClick={() => setState({ panelView: id })}
     >
-      {label.toUpperCase()}
+      {label}
       {badge ? <span className="panel-view-badge">{badge > 99 ? '99+' : badge}</span> : null}
     </button>
   );

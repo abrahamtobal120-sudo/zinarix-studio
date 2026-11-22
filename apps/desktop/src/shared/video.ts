@@ -307,8 +307,7 @@ export function effectsAt(c: Clip, t: number): Effects | undefined {
 export const volumeAt = (c: Clip, t: number): number => propAt(c, 'volume', t);
 export const panAt = (c: Clip, t: number): number => propAt(c, 'pan', t);
 /** How much of grade B shows at t (0 when the clip has no B). */
-export const gradeMixAt = (c: Clip, t: number): number =>
-  c.colorB ? propAt(c, 'gradeMix', t) : 0;
+export const gradeMixAt = (c: Clip, t: number): number => (c.colorB ? propAt(c, 'gradeMix', t) : 0);
 
 /** The clip's transform at timeline time t, with its animated properties evaluated. */
 export function transformAt(c: Clip, t: number): Transform {
@@ -949,7 +948,14 @@ export function moveKey(
     t: src,
     v: v === undefined || !Number.isFinite(v) ? old.v : Math.min(hi, Math.max(lo, v)),
   };
-  return replaceClip(p, withKeys(c, prop, [...rest, moved].sort((a, b) => a.t - b.t)));
+  return replaceClip(
+    p,
+    withKeys(
+      c,
+      prop,
+      [...rest, moved].sort((a, b) => a.t - b.t),
+    ),
+  );
 }
 
 /** Copies a property's keys (times relative to the first key, in source seconds). */
@@ -1582,4 +1588,118 @@ export function estimateSize(o: ExportOptions): number {
   const bitsPerPixel = 0.07 * Math.pow(2, (23 - o.crf) / 6);
   const videoBps = o.width * o.height * o.fps * bitsPerPixel;
   return Math.round(((videoBps + o.audioKbps * 1000) * secs) / 8);
+}
+
+// ---------------- detach audio / overlays ----------------
+
+/** A video clip whose own sound can go to an audio track (detachAudio). */
+export function canDetachAudio(p: VideoProject, c: Clip | undefined): c is Clip {
+  if (!c || isText(c) || c.compound || c.volume <= 0) return false;
+  const tr = trackOf(p, c.trackId);
+  const m = mediaOf(p, c.mediaId);
+  return !!tr && tr.kind === 'video' && !tr.locked && !!m && m.kind === 'video' && m.hasAudio;
+}
+
+/**
+ * "Separar audio": the sound of each video clip goes to its own clip on an audio track (same
+ * time, source stretch, speed, volume and fades) and the video clip goes silent, so the two can
+ * be cut, moved and mixed apart. Clips without sound, titles and locked tracks are skipped.
+ */
+export function detachAudio(
+  p: VideoProject,
+  ids: Iterable<string>,
+): { project: VideoProject; created: string[] } {
+  let project = p;
+  const created: string[] = [];
+  for (const id of ids) {
+    const c = project.clips.find((x) => x.id === id);
+    if (!canDetachAudio(project, c)) continue;
+    const end = clipEnd(c);
+    let track = project.tracks.find(
+      (t) => t.kind === 'audio' && !t.locked && fits(project, t.id, c.start, end),
+    );
+    if (!track) {
+      project = addTrack(project, 'audio');
+      track = project.tracks[project.tracks.length - 1]!;
+    }
+    const a: Clip = {
+      id: uid('c'),
+      mediaId: c.mediaId,
+      trackId: track.id,
+      start: c.start,
+      in: c.in,
+      out: c.out,
+      volume: c.volume,
+      ...(c.speed !== undefined && c.speed !== 1 ? { speed: c.speed } : {}),
+      ...(c.fadeIn ? { fadeIn: c.fadeIn } : {}),
+      ...(c.fadeOut ? { fadeOut: c.fadeOut } : {}),
+      ...(c.pan !== undefined ? { pan: c.pan } : {}),
+      ...(c.eq ? { eq: c.eq } : {}),
+    };
+    project = {
+      ...project,
+      clips: [
+        ...project.clips.map((x) =>
+          x.id === id ? { ...x, volume: 0, pan: undefined, eq: undefined } : x,
+        ),
+        a,
+      ],
+    };
+    created.push(a.id);
+  }
+  return { project, created };
+}
+
+/** Size of a picture put on top of the video (share of "fitted to the frame"). */
+export const OVERLAY_SCALE = 0.45;
+
+/**
+ * "Poner encima": a picture or video goes on top of whatever plays at `at`, on a video track
+ * above every clip visible there (a new one on top when none is free), smaller and centred so
+ * it can be dragged into place in the viewer. Audio files and an empty timeline fall back to a
+ * normal insert.
+ */
+export function overlayMedia(
+  p: VideoProject,
+  media: MediaItem,
+  at: number,
+): { project: VideoProject; clip: Clip | null } {
+  if (media.missing) return { project: p, clip: null };
+  const start = Math.max(0, at);
+  const order = compositeOrder(p); // bottom (V1) → top
+  const busy = order.map((t) =>
+    p.clips.some((c) => c.trackId === t.id && c.start <= start + 1e-6 && clipEnd(c) > start + 1e-6),
+  );
+  const highest = busy.lastIndexOf(true);
+  if (media.kind === 'audio' || highest < 0) return insertMedia(p, media, { start });
+  // Pictures last as long as the clip they cover (5 s at most); videos their whole length.
+  const under = p.clips
+    .filter(
+      (c) => c.trackId === order[highest]!.id && c.start <= start + 1e-6 && clipEnd(c) > start,
+    )
+    .map((c) => clipEnd(c) - start)[0];
+  const dur =
+    media.kind === 'image'
+      ? Math.max(MIN_CLIP * 15, Math.min(IMAGE_DEFAULT, under ?? IMAGE_DEFAULT))
+      : media.duration;
+  if (!(dur > 0)) return { project: p, clip: null };
+  let project = p;
+  let track = order
+    .slice(highest + 1)
+    .find((t) => !t.locked && fits(project, t.id, start, start + dur));
+  if (!track) {
+    project = addTrack(project, 'video');
+    track = project.tracks[0]!;
+  }
+  const clip: Clip = {
+    id: uid('c'),
+    mediaId: media.id,
+    trackId: track.id,
+    start,
+    in: 0,
+    out: dur,
+    volume: 1,
+    transform: { ...IDENTITY, scale: OVERLAY_SCALE },
+  };
+  return { project: { ...project, clips: [...project.clips, clip] }, clip };
 }

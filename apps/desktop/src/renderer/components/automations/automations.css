@@ -274,7 +274,6 @@
   overflow-wrap: anywhere;
   user-select: all;
 }
-}
 
 /* The panel cannot work yet (the app has to restart) or could not load. */
 .auto-notice {
@@ -289,4 +288,5 @@
 .auto-notice p {
   margin: 0;
   line-height: 1.45;
+}
 }

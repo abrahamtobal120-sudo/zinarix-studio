@@ -59,7 +59,7 @@ export function CadPanel() {
   return (
     <div className="explorer cad-panel">
       <div className="sidebar-title">
-        <span className="panel-title">{tc('title').toUpperCase()}</span>
+        <span className="panel-title">{tc('title')}</span>
         <span className="sidebar-actions">
           <button title={tc('recheck')} aria-label={tc('recheck')} onClick={() => (void load(true), void loadFiles())}>
             <Icon name="refresh" size={15} />

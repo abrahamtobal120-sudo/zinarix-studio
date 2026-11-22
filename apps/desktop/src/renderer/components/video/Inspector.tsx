@@ -29,6 +29,7 @@ import {
   EASES,
   SPEED_MAX,
   SPEED_MIN,
+  canDetachAudio,
   clearKeys,
   clipDur,
   clipEnd,
@@ -58,6 +59,8 @@ import {
   updateClip,
 } from '../../../shared/video';
 import { api, toast } from '../../store';
+import { detachSelectedAudio } from './Timeline';
+import { Icon } from '../Icon';
 import { type VideoKey, fmtBytes, fmtDuration, kindLabel, tv } from './strings';
 import { RampSection } from './RampSection';
 import { AutoZoomSection } from './AutoZoomSection';
@@ -67,8 +70,7 @@ import { commit, commitMerged, getV, seek, setV, useV } from './videoStore';
 export function Inspector() {
   const project = useV((s) => s.project);
   const selection = useV((s) => s.selection);
-  const one =
-    selection.length === 1 ? project.clips.find((c) => c.id === selection[0]) : undefined;
+  const one = selection.length === 1 ? project.clips.find((c) => c.id === selection[0]) : undefined;
   // Fase 4B: the whole ramp selected (clicking a step selects them all) reads as its first step.
   const ramp = !one && selection.length > 1 ? rampSelection(project, selection) : undefined;
   const clip = one ?? ramp;
@@ -144,9 +146,16 @@ export function Inspector() {
               />
             </div>
           )}
-          {(media.hasVideo || media.kind === 'image') && <TransformSection clip={clip} />}
+          {canDetachAudio(project, clip) && (
+            <div className="vs-prop-block">
+              <button onClick={detachSelectedAudio} title={tv('detachAudio')}>
+                <Icon name="link" size={13} /> {tv('kDetach')}
+              </button>
+            </div>
+          )}
+          {visual && (media.hasVideo || media.kind === 'image') && <TransformSection clip={clip} />}
           {media.kind !== 'image' && <SpeedSection clip={clip} />}
-          {media.kind === 'video' && <AutoZoomSection clip={clip} media={media} />}
+          {visual && media.kind === 'video' && <AutoZoomSection clip={clip} media={media} />}
           {visual && (media.hasVideo || media.kind === 'image') && (
             <>
               <AnimSection clip={clip} />
@@ -172,7 +181,9 @@ function rampSelection(p: VideoProject, ids: string[]): Clip | undefined {
   const first = p.clips.find((c) => c.id === ids[0]);
   if (!first?.ramp) return undefined;
   const group = rampGroup(p, first.id);
-  return group.length === ids.length && group.every((c) => ids.includes(c.id)) ? group[0] : undefined;
+  return group.length === ids.length && group.every((c) => ids.includes(c.id))
+    ? group[0]
+    : undefined;
 }
 
 function ProjectInfo() {

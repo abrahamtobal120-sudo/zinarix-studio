@@ -296,8 +296,6 @@
     padding: 4px 12px;
     font-size: var(--text-xs);
     color: var(--fg-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
   }
   .vs-sticker-grid {
     display: grid;

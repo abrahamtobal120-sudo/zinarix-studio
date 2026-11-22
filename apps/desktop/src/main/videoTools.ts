@@ -28,12 +28,19 @@ const RANGES = {
 const CLIP = { type: 'string', description: 'Clip id from video_state' };
 const WHEEL = {
   type: 'object',
-  properties: Object.fromEntries(['m', 'r', 'g', 'b'].map((k) => [k, { type: 'number', minimum: -1, maximum: 1 }])),
+  properties: Object.fromEntries(
+    ['m', 'r', 'g', 'b'].map((k) => [k, { type: 'number', minimum: -1, maximum: 1 }]),
+  ),
 };
 const CURVE_PTS = {
   type: 'array',
   maxItems: 12,
-  items: { type: 'array', items: { type: 'number', minimum: 0, maximum: 1 }, minItems: 2, maxItems: 2 },
+  items: {
+    type: 'array',
+    items: { type: 'number', minimum: 0, maximum: 1 },
+    minItems: 2,
+    maxItems: 2,
+  },
 };
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: 'object',
@@ -57,12 +64,16 @@ export const VIDEO_TOOLS: ToolDefinition[] = [
   {
     name: 'video_add_media',
     description:
-      'Import a video, audio or image file (absolute path) into Video Studio and put it on the timeline (at "start" seconds, default the end of the first free track). Use it for files from generate_image / generate_video / generate_speech too.',
+      'Import a video, audio or image file (absolute path) into Video Studio and put it on the timeline (at "start" seconds, default the end of the first free track). Use it for files from generate_image / generate_video / generate_speech too. overlay=true puts a picture or video ON TOP of the video at "start" (default the playhead): on a track above, smaller (scale 0.45 by default) and centred; x / y move its centre (share of the frame, -0.5…0.5, + is right / down), scale sets its size (1 = fitted to the frame). Use it for logos, stickers, picture-in-picture.',
     parameters: obj(
       {
         path: { type: 'string' },
         start: { type: 'number', minimum: 0 },
         track: { type: 'string', description: 'Track id or name (optional)' },
+        overlay: { type: 'boolean' },
+        x: { type: 'number', minimum: -1, maximum: 1 },
+        y: { type: 'number', minimum: -1, maximum: 1 },
+        scale: { type: 'number', minimum: 0.02, maximum: 5 },
       },
       ['path'],
     ),
@@ -127,6 +138,12 @@ export const VIDEO_TOOLS: ToolDefinition[] = [
       { clips: { type: 'array', items: { type: 'string' } }, ripple: { type: 'boolean' } },
       ['clips'],
     ),
+  },
+  {
+    name: 'video_detach_audio',
+    description:
+      'Detach ("separar") the audio of video clips: their sound goes to new clips on an audio track, at the same time, and the video clips go silent, so the sound can be moved, cut, muted or replaced on its own. Default: every video clip with sound.',
+    parameters: obj({ clips: { type: 'array', items: { type: 'string' } } }, []),
   },
   {
     name: 'video_add_title',
@@ -200,8 +217,16 @@ export const VIDEO_TOOLS: ToolDefinition[] = [
     description:
       'Colour correction of video / image clips (default: every one on the timeline). Values change only what you give; the rest of the clip’s correction stays. reset=true removes the correction. preset: a ready style (neutral, warm, cool, tealOrange, matte, punchy, bleach) that replaces the wheels and balance. lift (shadows), gamma (midtones), gain (highlights): {m: master, r, g, b}, each -1…1, small values (±0.05…0.2) look natural. temperature (-1 cool … 1 warm) and tint (-1 green … 1 magenta). curve: a master RGB curve preset (sSoft, sStrong = S contrast; fade = faded blacks; brighten, darken = midtones). curves: points per curve {m, r, g, b}: [[in, out], …] with 0…1 values (e.g. {"b": [[0,0.05],[0.5,0.55],[1,1]]} lifts the blue); [] removes that curve.',
     parameters: obj({
-      clips: { type: 'array', items: { type: 'string' }, maxItems: 200, description: 'Clip ids (optional)' },
-      preset: { type: 'string', enum: ['neutral', 'warm', 'cool', 'tealOrange', 'matte', 'punchy', 'bleach'] },
+      clips: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 200,
+        description: 'Clip ids (optional)',
+      },
+      preset: {
+        type: 'string',
+        enum: ['neutral', 'warm', 'cool', 'tealOrange', 'matte', 'punchy', 'bleach'],
+      },
       lift: WHEEL,
       gamma: WHEEL,
       gain: WHEEL,

@@ -139,6 +139,8 @@ export type Modal =
   | { kind: 'license' }
   /** A Pro feature was used on the free plan. */
   | { kind: 'upgrade'; feature: ProFeature }
+  /** Before the first use: the questionnaire that sets the app up for the person. */
+  | { kind: 'quiz' }
   /** First launch: a short guided setup. */
   | { kind: 'welcome' }
   /** First launch of a new version: what changed. */

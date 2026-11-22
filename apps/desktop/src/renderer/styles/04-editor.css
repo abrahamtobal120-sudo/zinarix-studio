@@ -193,7 +193,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
-  font-family: var(--mono, Consolas, 'Courier New', monospace);
+  font-family: var(--font-mono);
   font-size: var(--text-base);
 }
 .hex-rows {

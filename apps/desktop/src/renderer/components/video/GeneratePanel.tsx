@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatEstimate } from '../../../shared/mediaGen';
+import { formatEstimate, genErrorKind, genErrorText } from '../../../shared/mediaGen';
 import type {
   GenAspect,
   GenEstimate,
@@ -8,10 +8,10 @@ import type {
   GenQuality,
   GenRequest,
 } from '../../../shared/mediaGen';
-import { api } from '../../store';
+import { api, setState } from '../../store';
 import { Icon } from '../Icon';
 import { genLang, tg } from './generateStrings';
-import { addToTimeline, importPaths } from './videoStore';
+import { addToTimeline, importPaths, minimizeStudio } from './videoStore';
 import './generate.css';
 
 /**
@@ -138,7 +138,9 @@ export function GeneratePanel({ onClose }: { onClose: () => void }) {
         /^Error invoking remote method '[^']+': (Error: )?/,
         '',
       );
-      setMessage({ ok: false, text: tg('failed', { err }) });
+      setMessage({ ok: false, text: tg('failed', { err: genErrorText(err, genLang) }) });
+      // No balance or quota: say that the free voice of this computer works without it.
+      if (genErrorKind(err) === 'quota') setWarnings([tg('freeVoiceHint')]);
     } finally {
       setRequestId(null);
       setStage(null);
@@ -193,7 +195,19 @@ export function GeneratePanel({ onClose }: { onClose: () => void }) {
           </label>
           {model?.note && <p className="vs-gen-note">{model.note}</p>}
           {!model?.connected && missing.length > 0 && (
-            <p className="vs-gen-warn">{tg('connectHint', { providers: missing.join(', ') })}</p>
+            <div className="vs-gen-warn">
+              <p>{tg('connectHint', { providers: missing.join(', ') })}</p>
+              <button
+                onClick={() => {
+                  // The app's modals sit below the studio: step out of it first.
+                  minimizeStudio();
+                  setState({ modal: { kind: 'providers' } });
+                }}
+              >
+                {tg('connectBtn')}
+              </button>
+              {kind !== 'speech' && <p className="vs-gen-note">{tg('freeVoiceHint')}</p>}
+            </div>
           )}
 
           <label className="vs-gen-field">

@@ -30,10 +30,20 @@ import {
   trimClip,
   uid,
   addTextClip,
+  canDetachAudio,
+  detachAudio,
   setGrade,
 } from './video.js';
 import type { ColorGrade, CurveKey, Wheel } from './videoColor.js';
-import { CURVE_KEYS, CURVE_PRESETS, GRADE_PRESETS, WHEELS, WHEEL_KEYS, cleanCurve, cleanGrade } from './videoColor.js';
+import {
+  CURVE_KEYS,
+  CURVE_PRESETS,
+  GRADE_PRESETS,
+  WHEELS,
+  WHEEL_KEYS,
+  cleanCurve,
+  cleanGrade,
+} from './videoColor.js';
 import type { Range } from './videoAi.js';
 import {
   CAPTION_STYLES,
@@ -84,6 +94,7 @@ export const VIDEO_EDIT_TOOLS = [
   'video_trim',
   'video_move',
   'video_delete',
+  'video_detach_audio',
   'video_add_title',
   'video_captions',
   'video_set_format',
@@ -480,6 +491,38 @@ export function del(p: VideoProject, a: Args): VideoEdit {
   };
 }
 
+/** "Separar audio": the sound of video clips goes to its own clips on an audio track. */
+export function detach(p: VideoProject, a: Args): VideoEdit {
+  const asked = Array.isArray(a.clips)
+    ? a.clips.map(String)
+    : str(a, 'clip')
+      ? [str(a, 'clip')]
+      : [];
+  const ids = (asked.length ? asked : p.clips.map((c) => c.id)).filter((id) =>
+    canDetachAudio(
+      p,
+      p.clips.find((c) => c.id === id),
+    ),
+  );
+  if (!ids.length)
+    return {
+      error: asked.length
+        ? 'Those clips have no sound to detach (only video clips with audio, on unlocked video tracks, whose volume is above 0).'
+        : 'No video clip with sound to detach.',
+    };
+  const r = detachAudio(p, ids);
+  const tracks = [
+    ...new Set(r.created.map((id) => r.project.clips.find((c) => c.id === id)!.trackId)),
+  ]
+    .map((t) => r.project.tracks.find((x) => x.id === t)?.name)
+    .join(', ');
+  return {
+    project: r.project,
+    label: 'IA: separar audio',
+    content: `Detached the audio of ${ids.length} clip(s) (${ids.join(', ')}) into new audio clip(s) ${r.created.join(', ')} on ${tracks}. The video clips are now silent; move, cut or change the volume of the audio clips on their own.`,
+  };
+}
+
 const POSITIONS: Record<string, number> = { top: -0.35, center: 0, bottom: 0.35 };
 
 export function addTitle(p: VideoProject, a: Args, playhead: number): VideoEdit {
@@ -589,20 +632,34 @@ export function colorGrade(p: VideoProject, a: Args): VideoEdit {
   const ids = Array.isArray(a.clips) ? (a.clips as unknown[]).map(String) : [];
   const targets = ids.length ? p.clips.filter((c) => ids.includes(c.id)) : p.clips.filter(visual);
   const missing = ids.filter((id) => !p.clips.some((c) => c.id === id));
-  if (missing.length) return { error: `No clip ${missing.join(', ')}. Call video_state to see the clip ids.` };
+  if (missing.length)
+    return { error: `No clip ${missing.join(', ')}. Call video_state to see the clip ids.` };
   const bad = targets.filter((c) => !visual(c));
-  if (bad.length) return { error: `Clips ${bad.map((c) => c.id).join(', ')} are not pictures (audio or titles).` };
+  if (bad.length)
+    return {
+      error: `Clips ${bad.map((c) => c.id).join(', ')} are not pictures (audio or titles).`,
+    };
   if (!targets.length) return { error: 'There are no video or image clips on the timeline.' };
   const preset = str(a, 'preset');
   if (preset && !GRADE_PRESETS.some((g) => g.id === preset))
-    return { error: `Unknown preset "${preset}". Use: ${GRADE_PRESETS.map((g) => g.id).join(', ')}.` };
+    return {
+      error: `Unknown preset "${preset}". Use: ${GRADE_PRESETS.map((g) => g.id).join(', ')}.`,
+    };
   const curve = str(a, 'curve');
   if (curve && !CURVE_PRESETS.some((c) => c.id === curve))
-    return { error: `Unknown curve "${curve}". Use: ${CURVE_PRESETS.map((c) => c.id).join(', ')}.` };
+    return {
+      error: `Unknown curve "${curve}". Use: ${CURVE_PRESETS.map((c) => c.id).join(', ')}.`,
+    };
   const build = (old: ColorGrade | undefined): ColorGrade | undefined => {
     if (a.reset === true) return undefined;
     let g: ColorGrade = { ...(old ?? {}) };
-    if (preset) g = { ...GRADE_PRESETS.find((x) => x.id === preset)!.grade, lut: g.lut, lutMix: g.lutMix, curves: g.curves };
+    if (preset)
+      g = {
+        ...GRADE_PRESETS.find((x) => x.id === preset)!.grade,
+        lut: g.lut,
+        lutMix: g.lutMix,
+        curves: g.curves,
+      };
     for (const w of WHEELS) {
       const src = a[w];
       if (!src || typeof src !== 'object') continue;
@@ -622,7 +679,11 @@ export function colorGrade(p: VideoProject, a: Args): VideoEdit {
         const pts = (a.curves as Record<string, unknown>)[k];
         if (pts === null || (Array.isArray(pts) && !pts.length)) delete curves[k as CurveKey];
         else if (Array.isArray(pts)) {
-          const c = cleanCurve(pts.map((x) => (Array.isArray(x) ? x : [(x as { x?: unknown })?.x, (x as { y?: unknown })?.y])));
+          const c = cleanCurve(
+            pts.map((x) =>
+              Array.isArray(x) ? x : [(x as { x?: unknown })?.x, (x as { y?: unknown })?.y],
+            ),
+          );
           if (c) curves[k as CurveKey] = c;
           else delete curves[k as CurveKey];
         }
@@ -665,6 +726,8 @@ export function pureEdit(
       return move(p, a);
     case 'video_delete':
       return del(p, a);
+    case 'video_detach_audio':
+      return detach(p, a);
     case 'video_add_title':
       return addTitle(p, a, playhead);
     case 'video_captions':

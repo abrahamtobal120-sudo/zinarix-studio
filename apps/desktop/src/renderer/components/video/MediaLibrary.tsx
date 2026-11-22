@@ -5,7 +5,14 @@ import { Icon, type IconName } from '../Icon';
 import { GeneratePanel } from './GeneratePanel';
 import { tg } from './generateStrings';
 import { fmtBytes, fmtDuration, tv } from './strings';
-import { addToTimeline, importPaths, relinkMedia, removeMedia, useV } from './videoStore';
+import {
+  addToTimeline,
+  importPaths,
+  overlayToTimeline,
+  relinkMedia,
+  removeMedia,
+  useV,
+} from './videoStore';
 import { t4 } from './fase4Strings';
 import { cancelProxy, makeProxy, needsProxy } from './proxies';
 import { RecordDialog } from './RecordDialog';
@@ -241,6 +248,16 @@ function MediaCard({ m, thumb, used }: { m: MediaItem; thumb?: string; used: num
             onClick={() => addToTimeline(m)}
           >
             <Icon name="plus" size={14} />
+          </button>
+        )}
+        {!m.missing && (m.kind === 'image' || m.hasVideo) && (
+          <button
+            className="vs-icon-btn"
+            title={tv('overlay')}
+            aria-label={tv('overlay')}
+            onClick={() => overlayToTimeline(m)}
+          >
+            <Icon name="layers" size={14} />
           </button>
         )}
         {proxyable && !proxy && (

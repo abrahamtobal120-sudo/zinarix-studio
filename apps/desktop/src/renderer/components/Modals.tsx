@@ -32,7 +32,8 @@ import { QuickPick } from './QuickPick';
 import { Palette as UnifiedPalette } from './Palette';
 import { describeTask, detectRunTasks, runTask, type RunTask } from './RunPanel';
 import { ProviderLogo } from './ProviderLogo';
-import { LicensePanel, Onboarding, UpgradeModal, WhatsNew } from './Plan';
+import { LicensePanel, Onboarding, UpgradeModal, WhatsNew, afterQuiz } from './Plan';
+import { Questionnaire } from './Questionnaire';
 import { Licenses } from './Licenses';
 
 const close = () => setState({ modal: null });
@@ -96,6 +97,7 @@ export function Modals() {
       {modal?.kind === 'publish' && <PublishRepo />}
       {modal?.kind === 'license' && <LicensePanel />}
       {modal?.kind === 'upgrade' && <UpgradeModal feature={modal.feature} />}
+      {modal?.kind === 'quiz' && <Questionnaire onDone={afterQuiz} />}
       {modal?.kind === 'welcome' && <Onboarding />}
       {modal?.kind === 'whatsNew' && <WhatsNew />}
       {modal?.kind === 'licenses' && <Licenses />}

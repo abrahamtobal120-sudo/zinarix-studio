@@ -242,8 +242,6 @@
   padding: 6px 8px 6px 14px;
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
   color: var(--fg);
   border-bottom: 1px solid var(--border);
 }
@@ -358,8 +356,6 @@
   padding: 12px 8px 6px;
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
   color: var(--fg-dim);
 }
 .apps-item {
