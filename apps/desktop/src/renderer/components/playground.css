@@ -63,7 +63,7 @@
 .pg-modes {
   display: inline-flex;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 .pg-modes button {
@@ -124,7 +124,7 @@
 .pg-tag {
   font-size: var(--text-xs);
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--sel-soft);
   color: var(--fg-strong);
 }
@@ -176,7 +176,7 @@
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 5px 7px;
 }
 .pg textarea {
@@ -193,7 +193,7 @@
 .pg-params,
 .pg-vars {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 6px 10px 10px;
   margin: 0;
   display: flex;
@@ -290,7 +290,7 @@
   gap: 4px;
   padding: 2px 4px 2px 8px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-3);
   font-size: var(--text-sm);
 }
@@ -314,7 +314,7 @@
 }
 .pg-card {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-2);
   display: flex;
   flex-direction: column;
@@ -341,7 +341,7 @@
   gap: 3px;
   font-size: var(--text-xs);
   padding: 1px 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
 }
 .pg-badge.good {
@@ -389,7 +389,7 @@
 .pg-tools pre {
   background: var(--code-bg);
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .pg-stats {
   display: flex;
@@ -406,7 +406,7 @@
   width: min(460px, 92vw);
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   padding: 14px 16px;
   display: flex;
@@ -426,7 +426,7 @@
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 5px 7px;
 }
 .pg-code {
@@ -435,7 +435,7 @@
   overflow: auto;
   background: var(--code-bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 10px;
   font-family: var(--mono);
   font-size: var(--text-sm);
@@ -458,7 +458,7 @@
 }
 .pg-build section {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-2);
   padding: 12px 14px;
   display: flex;

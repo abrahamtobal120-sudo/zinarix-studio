@@ -29,7 +29,7 @@
 .chat-input .chat-input-bar > .pill,
 .chat-input .chat-input-bar > .model-chip {
   height: 26px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   color: var(--fg-dim);
@@ -106,7 +106,7 @@
   right: auto;
   width: min(340px, calc(100% - 16px));
   padding: 5px;
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
   animation: add-menu-in 0.12s ease-out;
 }
 .chat-input .add-menu-item {
@@ -129,6 +129,34 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Options that used to be loose buttons in the bar (reasoning, computer, file, tasks, kit,
+   rules) are rows here; the bar only shows a chip for what is switched on. */
+.chat-input .add-menu-row {
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.chat-input .add-menu-row:hover {
+  background: var(--bg-4);
+}
+.chat-input .add-menu-row select {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.chat-input .add-menu-item .add-menu-check {
+  margin-left: auto;
+  color: var(--accent-text);
+}
+.chat-input .add-menu-item .add-menu-hint:last-child {
+  flex-shrink: 0;
 }
 .chat-input .add-menu .term-menu-head {
   margin-top: 4px;

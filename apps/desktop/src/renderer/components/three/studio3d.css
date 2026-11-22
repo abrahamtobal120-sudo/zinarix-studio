@@ -92,7 +92,7 @@
   }
   .s3-canvas {
     display: block;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     box-shadow: 0 0 0 1px var(--border);
     outline: none;
   }
@@ -121,7 +121,7 @@
     display: flex;
     gap: 2px;
     padding: 3px;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--bg-2);
     border: 1px solid var(--border);
   }
@@ -131,7 +131,7 @@
     gap: 5px;
     padding: 4px 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--bg);
     color: var(--fg);
     cursor: pointer;
@@ -178,7 +178,7 @@
     width: 28px;
     height: 28px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     background: none;
     color: var(--fg);
     cursor: pointer;
@@ -215,15 +215,15 @@
     flex-direction: column;
     padding: 4px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--bg);
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--bg) 40%, transparent);
+    box-shadow: var(--elevation-3);
   }
   .s3-pop button {
     text-align: left;
     padding: 6px 10px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     background: none;
     color: var(--fg);
     cursor: pointer;
@@ -274,7 +274,7 @@
     width: 100%;
     padding: 4px 6px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     background: none;
     color: var(--fg);
     cursor: pointer;
@@ -316,7 +316,7 @@
     min-width: 0;
     padding: 3px 6px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     background: var(--bg);
     color: var(--fg);
     font: inherit;
@@ -348,7 +348,7 @@
     width: 24px;
     height: 24px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     background: none;
     color: var(--fg-dim);
     cursor: pointer;
@@ -410,7 +410,7 @@
   .s3-curve select {
     padding: 3px 6px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     background: var(--bg);
     color: var(--fg);
     font: inherit;
@@ -454,9 +454,9 @@
     width: min(440px, calc(100% - 32px));
     padding: 16px;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     background: var(--bg-2);
-    box-shadow: 0 12px 40px color-mix(in srgb, var(--bg) 50%, transparent);
+    box-shadow: var(--elevation-4);
   }
   .s3-card .s3-field {
     grid-template-columns: 140px minmax(0, 1fr);
@@ -466,7 +466,7 @@
     min-width: 0;
     padding: 4px 6px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     background: var(--bg);
     color: var(--fg);
     font: inherit;
@@ -494,13 +494,13 @@
     gap: 10px;
     padding: 8px 12px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--bg-2);
   }
   .s3-bar {
     width: 200px;
     height: 6px;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     background: var(--bg-4);
     overflow: hidden;
   }
@@ -519,7 +519,7 @@
     gap: 8px;
     padding: 6px 10px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--bg-2);
     color: var(--fg);
   }
@@ -542,7 +542,7 @@
   }
 }
 
-/* Zinarix identity: logo in the top bar, brand-gradient name and buttons, a faint mark in
+/* Zinarix identity: logo in the top bar, name and accent buttons, a faint mark in
    the viewport (editor only, never in renders) and a short splash when the editor opens. */
 @layer features {
   .s3-logo {
@@ -551,14 +551,11 @@
     flex: none;
   }
   .s3-brand-name {
-    background: var(--brand-grad);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--fg-strong);
     font-weight: 800;
   }
   .s3-root .s3-primary {
-    background: var(--brand-grad);
+    background: var(--accent);
     border-color: transparent;
     color: var(--on-color);
   }

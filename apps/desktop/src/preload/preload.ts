@@ -437,6 +437,7 @@ const api: OmniApi = {
     openExternal: call('app:openExternal') as OmniApi['app']['openExternal'],
     openLink: call('app:openLink') as OmniApi['app']['openLink'],
     quit: call('app:quit') as OmniApi['app']['quit'],
+    relaunch: call('app:relaunch') as OmniApi['app']['relaunch'],
     resumeOnLogin: call('app:resumeOnLogin') as OmniApi['app']['resumeOnLogin'],
     interruptedRuns: call('app:interruptedRuns') as OmniApi['app']['interruptedRuns'],
     newWindow: call('app:newWindow') as OmniApi['app']['newWindow'],

@@ -2352,6 +2352,8 @@ export interface OmniApi {
     openLink(url: string): Promise<void>;
     /** Closes this window (after the unsaved-changes check); the app quits with the last one. */
     quit(): Promise<void>;
+    /** Closes this window like quit() and opens the app again once it has exited. */
+    relaunch(): Promise<void>;
     /**
      * Opens the app when the user logs in (on) while a chat was left working, so a task cut by
      * a shutdown goes on by itself; off when nothing is pending.
@@ -2938,6 +2940,7 @@ export const CHANNELS = [
   'app:openExternal',
   'app:openLink',
   'app:quit',
+  'app:relaunch',
   'app:chrome',
   'app:menuBar',
   'app:popupMenu',

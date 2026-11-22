@@ -463,7 +463,7 @@
   width: 10px;
   height: 10px;
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   margin-right: var(--space-1);
   vertical-align: -1px;
 }

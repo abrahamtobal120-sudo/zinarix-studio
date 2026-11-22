@@ -24,7 +24,7 @@
   background: var(--bg-2);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -97,7 +97,7 @@
   display: flex;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -137,7 +137,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 .provider-row:hover {
@@ -196,7 +196,7 @@
   width: min(640px, 92vw);
   background: var(--bg-2);
   border: 1px solid var(--focus);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   padding: 10px;
   display: flex;
@@ -217,12 +217,12 @@
   padding: 8px;
   margin: 0;
   font-size: var(--text-sm);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 .shortcuts {
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 16px 22px;
   box-shadow: var(--shadow);
   max-height: 80vh;
@@ -252,7 +252,7 @@
 }
 ::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--fg-dim) 42%, transparent);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 2px solid transparent;
   background-clip: padding-box;
 }

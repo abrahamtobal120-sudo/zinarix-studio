@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Vector3 } from 'three';
 import type { Measure, MeshViewer } from './meshViewer';
 import { tc } from './cadStrings';
+import { Icon } from '../Icon';
 
 const f1 = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2));
 
@@ -46,7 +47,7 @@ export function ViewTools({ viewer, version, units = 'mm' }: { viewer: RefObject
   return (
     <div className="cad-tools">
       <button className={`btn ghost cad-small ${measuring ? 'on' : ''}`} aria-pressed={measuring} onClick={() => setMeasuring((v) => !v)}>
-        📏 {tc('measure')}
+        <Icon name="ruler" size={14} /> {tc('measure')}
       </button>
       {measuring && (
         <span className="cad-tools-val" aria-live="polite">

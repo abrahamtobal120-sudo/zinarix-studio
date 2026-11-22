@@ -5,7 +5,7 @@
 .chat-suggest {
   border: 1px solid var(--border);
   background: var(--bg-2);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   margin-bottom: 6px;
   max-height: 260px;
@@ -17,7 +17,7 @@
   gap: 8px;
   align-items: baseline;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -52,7 +52,7 @@
   background: transparent;
   font-size: var(--text-xs);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--fg-dim);
 }
 .turn-actions button:hover {
@@ -156,14 +156,14 @@
 }
 .sv-bar-track {
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--bg-3);
   overflow: hidden;
 }
 .sv-bar-fill {
   height: 100%;
-  border-radius: 5px;
-  background: linear-gradient(90deg, var(--brand-2), var(--brand-1));
+  border-radius: var(--radius-xs);
+  background: var(--accent);
 }
 .sv-bar-n {
   text-align: right;
@@ -181,7 +181,7 @@
   align-items: baseline;
   gap: 10px;
   padding: 7px 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--bg-2);
   border: 1px solid var(--border);
   text-align: left;
@@ -199,7 +199,7 @@
 .sv-cat {
   font-size: var(--text-xs);
   padding: 1px 7px;
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
   background: var(--bg-4);
   color: var(--fg-dim);
   text-transform: uppercase;
@@ -213,7 +213,7 @@
 .sv-finding-actions button {
   background: transparent;
   padding: 2px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   font-size: var(--text-sm);
   opacity: 0.6;
 }
@@ -281,7 +281,7 @@
   flex: 0 1 auto;
   gap: 5px;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border);
   cursor: pointer;
   user-select: none;
@@ -431,7 +431,7 @@
 .prov-chip {
   font-size: var(--text-xs);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border);
   background: transparent;
   cursor: pointer;
@@ -475,7 +475,9 @@
   align-items: center;
   gap: 6px;
   max-width: 180px;
-  min-width: 0;
+  /* Many chats: tabs get narrower before they overflow (then the strip scrolls). */
+  flex: 0 1 auto;
+  min-width: 74px;
   padding: 0 6px 0 9px;
   font-size: var(--text-sm);
   letter-spacing: 0;
@@ -483,7 +485,6 @@
   cursor: pointer;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 .chat-tab:hover {
   color: var(--fg);
@@ -530,7 +531,7 @@
   width: 18px;
   height: 18px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--fg-dim);
   opacity: 0;
@@ -538,6 +539,15 @@
 .chat-tab:hover .chat-tab-x,
 .chat-tab.focus .chat-tab-x {
   opacity: 1;
+}
+.chat-tabs-more {
+  min-width: 26px;
+  padding: 0 6px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--brand);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
 }
 .chat-tab-x:hover {
   background: var(--bg-4);
@@ -592,7 +602,7 @@
   width: 18px;
   height: 18px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--fg-dim);
   opacity: 0;
@@ -649,7 +659,7 @@
   color: var(--fg-dim);
   background: transparent;
   border: 1px dashed var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 .chat-list-new:hover {
   color: var(--fg-strong);
@@ -757,7 +767,7 @@
   align-items: center;
   gap: 4px;
   padding: 1px 7px 1px 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--sel-soft);
   color: var(--fg);
   font-size: var(--text-xs);
@@ -821,7 +831,7 @@
   max-width: 220px;
   height: 28px;
   padding: 0 4px 0 10px;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   font-size: var(--text-sm);
   color: var(--fg-dim);
   cursor: pointer;
@@ -856,7 +866,7 @@
 .browser-tab-owner {
   font-size: var(--text-xs);
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--sel-soft);
   color: var(--fg);
   max-width: 90px;
@@ -870,7 +880,7 @@
   width: 18px;
   height: 18px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--fg-dim);
 }

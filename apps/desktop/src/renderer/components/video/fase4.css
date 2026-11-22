@@ -13,7 +13,7 @@
   }
   .vs-rec-tabs > button {
     padding: 4px 12px;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     border: 1px solid var(--border);
     background: transparent;
     color: var(--fg);
@@ -137,7 +137,7 @@
     align-items: center;
     gap: 10px;
     padding: 6px 8px 6px 14px;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: var(--bg-2);
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
@@ -161,7 +161,7 @@
   }
   .vs-rec-bar button {
     padding: 3px 10px;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
   }
   .vs-rec-time {
     font-variant-numeric: tabular-nums;
@@ -174,7 +174,7 @@
   .vs-rec-level {
     width: 46px;
     height: 5px;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     background: var(--border);
     overflow: hidden;
   }
@@ -299,7 +299,7 @@
     left: 4px;
     top: 4px;
     padding: 0 5px;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     font-size: var(--text-2xs);
     background: color-mix(in oklab, var(--ok) 80%, var(--bg));
     color: var(--on-color);

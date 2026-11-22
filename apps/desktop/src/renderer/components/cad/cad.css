@@ -638,7 +638,7 @@
 }
 .cad-bar {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--bg-3);
   overflow: hidden;
 }

@@ -124,17 +124,17 @@
   color: inherit;
   padding: 2px 9px;
   font-size: var(--text-sm);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 .viewer-seg button {
   border-radius: 0;
 }
 .viewer-seg button:first-child {
-  border-radius: 4px 0 0 4px;
+  border-radius: var(--radius-xs) 0 0 var(--radius-xs);
 }
 .viewer-seg button:last-child {
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
   border-left: none;
 }
 .viewer-seg button.on,
@@ -153,7 +153,7 @@
   color: inherit;
   padding: 2px 6px;
   font-size: var(--text-sm);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   width: 230px;
 }
 .viewer-input.small {
@@ -181,7 +181,7 @@
 }
 .image-stage img {
   image-rendering: auto;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--elevation-2);
 }
 .image-stage.fit img {
   max-width: 100%;
@@ -242,15 +242,11 @@
   font-weight: 600;
   font-size: var(--text-display);
   letter-spacing: -0.4px;
-  background: linear-gradient(135deg, var(--fg-strong) 40%, var(--brand-1));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--fg-strong);
 }
 .welcome-logo {
   width: 112px;
   height: 112px;
-  filter: drop-shadow(0 0 22px color-mix(in srgb, var(--brand) 45%, transparent));
 }
 .welcome-actions {
   display: flex;
@@ -268,7 +264,7 @@ button.big {
   padding: 6px;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--elev);
 }
 .welcome-row {

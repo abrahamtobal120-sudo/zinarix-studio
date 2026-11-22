@@ -35,7 +35,7 @@
   color: inherit;
   padding: 3px 8px;
   font-size: var(--text-sm);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   min-width: 28px;
 }
@@ -94,7 +94,7 @@
     0 8px,
     8px -8px,
     -8px 0;
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--elevation-2);
 }
 .pv-cursor {
   position: absolute;
@@ -144,7 +144,7 @@
   height: 30px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: none;
   cursor: pointer;
 }
@@ -202,7 +202,7 @@
   border: 1px solid var(--border);
   color: var(--fg);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: var(--text-sm);
 }
 .pv-layers {
@@ -218,7 +218,7 @@
   align-items: center;
   gap: 6px;
   padding: 3px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   border: 1px solid transparent;
 }
@@ -253,7 +253,7 @@
   background: var(--bg-3);
   color: var(--fg);
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   font: inherit;
 }
 .pv-tag {

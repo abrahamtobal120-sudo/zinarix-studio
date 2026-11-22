@@ -4,6 +4,7 @@ import { askAgent } from '../Chat';
 import { PALETTES, TEMPLATES, buildTemplate, slugify, uniqueName } from '../../../shared/graphics';
 import { newPaintFile } from '../paint/PaintView';
 import { isEn, tg } from './graphicsStrings';
+import { Icon } from '../Icon';
 import './graphics.css';
 
 /**
@@ -213,7 +214,7 @@ export function GraphicsPanel() {
           {en ? t.name.en : t.name.es} · {w} × {h} px
         </p>
         <button className="gp-go" disabled={busy || !workspace} onClick={() => void createAi()}>
-          {tg('aiGo')}
+          <Icon name="sparkle" size={14} /> {tg('aiGo')}
         </button>
 
         <h4>{tg('newPaint')}</h4>
@@ -226,7 +227,7 @@ export function GraphicsPanel() {
           ))}
         </div>
         <button className="gp-go" disabled={busy || !workspace} onClick={() => void createPaint()}>
-          🖌 {tg('paintCreate')}
+          <Icon name="brush" size={14} /> {tg('paintCreate')}
         </button>
 
         <h4 className="gp-h-row">
@@ -241,7 +242,7 @@ export function GraphicsPanel() {
           <div className="gp-list">
             {mine.map((f) => (
               <button key={f} className="gp-file" title={f} onClick={() => void openFile(f)}>
-                <span>{/\.zdraw$/i.test(f) ? '🖌' : '◆'}</span>
+                <span>{/\.zdraw$/i.test(f) ? <Icon name="brush" size={14} /> : '◆'}</span>
                 <span className="gp-file-name">{f}</span>
               </button>
             ))}

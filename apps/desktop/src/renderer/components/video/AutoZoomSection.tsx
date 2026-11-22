@@ -9,6 +9,7 @@ import { ZOOM_DEFAULTS, ZOOM_MAX, ZOOM_MIN, hasZoom } from '../../../shared/vide
 import { toast } from '../../store';
 import { cursorTrackOf, unzoomClip, zoomClip } from './autoZoom';
 import { t4 } from './fase4Strings';
+import { Icon } from '../Icon';
 import { commit, getV } from './videoStore';
 
 export function AutoZoomSection({ clip, media }: { clip: Clip; media: MediaItem }) {
@@ -60,7 +61,7 @@ export function AutoZoomSection({ clip, media }: { clip: Clip; media: MediaItem 
       </div>
       <div className="vs-prop-block vs-chips">
         <button className="vs-chip" disabled={busy} onClick={() => void apply()}>
-          {t4('zoomApply')}
+          <Icon name="zoomIn" size={14} /> {t4('zoomApply')}
         </button>
         {hasZoom(clip) && (
           <button

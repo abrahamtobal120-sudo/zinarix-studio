@@ -9,6 +9,7 @@ import {
   type NbOutput,
 } from '../../../shared/notebook';
 import { tn } from './notebookStrings';
+import { Icon } from '../Icon';
 import { AnsiText } from './Ansi';
 
 /** What the view can show, richest first (widgets fall back to their text). */
@@ -144,7 +145,7 @@ export const OutputView = memo(function OutputView({ o, onFix }: { o: NbOutput; 
         {onFix && (
           <div className="nb-error-actions">
             <button className="btn" onClick={onFix} title={tn('fixAiTip')}>
-              ✨ {tn('fixAi')}
+              <Icon name="sparkle" size={14} /> {tn('fixAi')}
             </button>
             <button
               className="btn ghost"

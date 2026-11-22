@@ -137,7 +137,7 @@
 .hw-memtrack {
   flex: 1;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--bg-3);
   overflow: hidden;
 }
@@ -414,7 +414,7 @@
 .hw-swatch {
   width: 10px;
   height: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 .hw-lgval {
   font-family: var(--font-mono);

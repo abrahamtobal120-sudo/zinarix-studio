@@ -8,7 +8,7 @@
   flex-direction: column;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -38,7 +38,7 @@
   background: none;
   border: none;
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .diff-review-files button:hover {
   background: var(--bg-3);
@@ -52,7 +52,7 @@
 .diff-review-badge {
   font-size: var(--text-xs);
   padding: 0 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--danger);
   color: var(--bg);
 }
@@ -82,7 +82,7 @@
 }
 .diff-review-hunk {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   margin: 6px 0;
   overflow: hidden;
 }
@@ -159,7 +159,7 @@
   padding: 6px 8px;
   list-style: none;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg);
   font-size: var(--text-sm);
 }

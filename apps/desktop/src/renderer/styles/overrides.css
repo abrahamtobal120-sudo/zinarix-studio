@@ -25,11 +25,11 @@
   background: color-mix(in srgb, var(--dbg-breakpoint) 45%, transparent);
 }
 .monaco-editor .dbg-bp.cond::before {
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   transform: rotate(45deg) scale(0.85);
 }
 .monaco-editor .dbg-bp.log::before {
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   width: 10px;
   height: 6px;
 }

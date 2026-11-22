@@ -145,6 +145,8 @@ const es = {
   reasoningTitle:
     'Cuánto piensa el modelo antes de responder. Con un nivel elegido, los modelos que lo permiten muestran su razonamiento.',
   reasoningAuto: 'Razonar: auto',
+  chatOptions: 'Opciones',
+  computerMenu: 'Controlar la compu',
   computerPill: 'Compu',
   computerPillOn: 'Controla la compu',
   computerPillTitle:
@@ -159,7 +161,7 @@ const es = {
   reasoningHigh: 'Razonar: alto',
   chatScrollBottom: 'Ir al final',
   chatAttach: 'Adjuntar archivo del proyecto (@)',
-  chatAddMenu: 'Agregar contexto (archivo, imagen, terminal o video)',
+  chatAddMenu: 'Agregar contexto y opciones (archivo, imagen, razonar, compu, reglas…)',
   mcpHint:
     'Conecta servidores MCP (Slack, Figma, bases de datos, GitHub…) para que el agente de Zinarix use sus herramientas. Mismo formato que Cursor y Claude Desktop. Cada uso de una herramienta te pide permiso.',
   mcpSaved: 'Configuración MCP guardada',
@@ -264,6 +266,8 @@ const es = {
   go: 'Ir',
   prevPage: 'Anterior',
   nextPage: 'Siguiente',
+  firstPage: 'Ir al inicio',
+  lastPage: 'Ir al final',
   openFullEditor: 'Abrir completo en el editor',
   loading: 'Cargando…',
   terminal: 'Terminal',
@@ -465,6 +469,7 @@ const es = {
   cliModeFull: 'full — todo, incluidos comandos, sin preguntar',
   localOnly: '100 % local',
   localOnlyOn: 'Modo 100 % local activado',
+  localOnlyOff: 'Modo 100 % local desactivado',
   searchFiles: 'Buscar en archivos',
   regex: 'Regex',
   matchCase: 'Aa',
@@ -2471,6 +2476,8 @@ const en: Record<Key, string> = {
   reasoningTitle:
     'How much the model thinks before answering. With a level chosen, models that support it show their reasoning.',
   reasoningAuto: 'Reasoning: auto',
+  chatOptions: 'Options',
+  computerMenu: 'Control the computer',
   computerPill: 'Computer',
   computerPillOn: 'Controls the computer',
   computerPillTitle:
@@ -2485,7 +2492,7 @@ const en: Record<Key, string> = {
   reasoningHigh: 'Reasoning: high',
   chatScrollBottom: 'Jump to latest',
   chatAttach: 'Attach a project file (@)',
-  chatAddMenu: 'Add context (file, image, terminal or video)',
+  chatAddMenu: 'Add context and options (file, image, reasoning, computer, rules…)',
   mcpHint:
     'Connect MCP servers (Slack, Figma, databases, GitHub…) so Zinarix’s agent can use their tools. Same format as Cursor and Claude Desktop. Every tool call asks for your approval.',
   mcpSaved: 'MCP configuration saved',
@@ -2589,6 +2596,8 @@ const en: Record<Key, string> = {
   go: 'Go',
   prevPage: 'Previous',
   nextPage: 'Next',
+  firstPage: 'Go to start',
+  lastPage: 'Go to end',
   openFullEditor: 'Open whole file in editor',
   loading: 'Loading…',
   terminal: 'Terminal',
@@ -2786,6 +2795,7 @@ const en: Record<Key, string> = {
   cliModeFull: 'full — everything, including commands, without asking',
   localOnly: '100% local',
   localOnlyOn: '100% local mode enabled',
+  localOnlyOff: '100% local mode disabled',
   searchFiles: 'Search in files',
   regex: 'Regex',
   matchCase: 'Aa',

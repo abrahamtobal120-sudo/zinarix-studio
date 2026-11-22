@@ -676,13 +676,28 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 
 /** How long the screen gets to react before the screenshot that follows an action. */
 export const SETTLE_MS = 700;
+/**
+ * Per action: a hover or a click shows its result in a few frames, so waiting the full
+ * SETTLE_MS on every step made the AI feel slow. Keys (Enter can open a page) and opening
+ * programs keep more time; "open" also waits its own "wait".
+ */
+const SETTLE_BY_KIND: Record<string, number> = {
+  move: 150,
+  click: 350,
+  scroll: 250,
+  drag: 300,
+  type: 200,
+  key: 450,
+  windows: 350,
+  open: 300,
+};
 
 export async function runComputerTool(
   svc: ComputerService,
   name: string,
   a: Record<string, unknown>,
   signal?: AbortSignal,
-  settleMs = SETTLE_MS,
+  settleMs?: number,
 ): Promise<ComputerResult> {
   const act = parseComputerArgs(name, a);
   if ('error' in act) return { ok: false, content: act.error, summary: 'argumentos no válidos' };
@@ -801,6 +816,6 @@ export async function runComputerTool(
       break;
     }
   }
-  await sleep(settleMs, signal);
+  await sleep(settleMs ?? SETTLE_BY_KIND[act.kind] ?? SETTLE_MS, signal);
   return shoot(done, summary);
 }

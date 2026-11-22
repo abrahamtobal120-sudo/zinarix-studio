@@ -150,8 +150,8 @@ body.vs-open .toast {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-  background: var(--brand-grad);
+  border-radius: var(--radius-md);
+  background: var(--accent);
   color: var(--on-color);
 }
 .vs-brand {
@@ -413,13 +413,13 @@ body.vs-open .toast {
   place-items: center;
   width: 54px;
   height: 54px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--sel-soft);
   color: var(--fg-strong);
 }
 .vs-soon-badge {
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.3px;
@@ -492,7 +492,7 @@ body.vs-open .toast {
 }
 .vs-chips button {
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--bg-3);
   font-size: var(--text-sm);
 }
@@ -590,7 +590,7 @@ body.vs-open .toast {
   right: 4px;
   bottom: 4px;
   padding: 0 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: rgba(0, 0, 0, 0.7);
   color: var(--on-color);
   font-size: var(--text-xs);
@@ -759,7 +759,7 @@ body.vs-open .toast {
   padding: 0;
   display: grid;
   place-items: center;
-  background: var(--brand-grad);
+  background: var(--accent);
   color: var(--on-color);
 }
 .vs-timecode {
@@ -975,7 +975,7 @@ body.vs-open .toast {
   place-items: center;
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--on-color);
   flex: none;
 }
@@ -1022,7 +1022,7 @@ body.vs-open .toast {
   position: absolute;
   top: 4px;
   bottom: 4px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   cursor: grab;
   box-sizing: border-box;
@@ -1155,7 +1155,7 @@ body.vs-open .toast {
   flex: none;
   margin: 3px 8px 5px 164px;
   background: var(--bg-3);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   cursor: pointer;
 }
@@ -1175,7 +1175,7 @@ body.vs-open .toast {
   bottom: 0;
   border: 1px solid var(--fg-strong);
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   box-sizing: border-box;
 }
 
@@ -1221,7 +1221,7 @@ body.vs-open .toast {
   overflow: auto;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 16px 18px;
   display: flex;
@@ -1289,7 +1289,7 @@ body.vs-open .toast {
 .vs-format-box {
   display: block;
   border: 2px solid currentColor;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   box-sizing: border-box;
 }
 .vs-form {
@@ -1341,7 +1341,7 @@ body.vs-open .toast {
 .vs-keys kbd {
   font-family: ui-monospace, monospace;
   background: var(--bg-4);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 1px 6px;
   font-size: var(--text-xs);
 }
@@ -1360,8 +1360,8 @@ body.vs-open .toast {
   height: 16px;
   padding: 0 4px;
   box-sizing: border-box;
-  border-radius: 999px;
-  background: var(--brand-grad);
+  border-radius: var(--radius-full);
+  background: var(--accent);
   color: var(--on-color);
   font-size: var(--text-2xs);
   font-weight: 700;
@@ -1428,12 +1428,12 @@ body.vs-open .toast {
 .vs-progress {
   height: 5px;
   background: var(--bg-4);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 .vs-progress div {
   height: 100%;
-  background: var(--brand-grad);
+  background: var(--accent);
   transition: width 0.25s ease;
 }
 .vs-pill {
@@ -1445,7 +1445,7 @@ body.vs-open .toast {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--bg-2);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -1455,13 +1455,13 @@ body.vs-open .toast {
   width: 70px;
   height: 4px;
   background: var(--bg-4);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 .vs-pill-bar span {
   display: block;
   height: 100%;
-  background: var(--brand-grad);
+  background: var(--accent);
 }
 
 /* Track headers: the delete button only on hover, so the name keeps its room. */
@@ -1494,7 +1494,7 @@ body.vs-open .toast {
   background: var(--bg-input, rgba(255, 255, 255, 0.06));
   color: inherit;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -1521,7 +1521,7 @@ body.vs-open .toast {
 }
 .vs-chip {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
   background: transparent;
   color: inherit;
@@ -1540,7 +1540,7 @@ body.vs-open .toast {
 .vs-clip-speed {
   margin-left: 6px;
   padding: 0 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: rgba(0, 0, 0, 0.45);
   font-weight: 600;
 }
@@ -1581,7 +1581,7 @@ body.vs-open .toast {
   font-size: var(--text-xs);
   line-height: 1;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 .vs-key.animated {
   color: var(--fg);
@@ -1606,7 +1606,7 @@ body.vs-open .toast {
   background: var(--bg-input, rgba(255, 255, 255, 0.06));
   color: inherit;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 .vs-keynav {
   display: inline-flex;

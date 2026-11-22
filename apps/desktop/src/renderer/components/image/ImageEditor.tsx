@@ -25,6 +25,7 @@ import { BG_MODELS, type BgModelId, type BgStatusView } from '../../../shared/bg
 import { confirmDialog } from '../../confirm';
 import { api, openFile, toast } from '../../store';
 import { ti, type KeyImg } from './imageStrings';
+import { Icon } from '../Icon';
 import type { ImageRequest, ImageResponse } from './imageWorkerProtocol';
 import './image-editor.css';
 
@@ -708,7 +709,7 @@ export function ImageEditor({
           {ti('original')}
         </button>
         <button title={ti('autoHint')} disabled={!ready || !!cropDraft} onClick={() => void auto()}>
-          ✨ {ti('auto')}
+          <Icon name="sparkle" size={14} /> {ti('auto')}
         </button>
         <span className="viewer-dim">{ti('sizeNow', { w: outSize.w, h: outSize.h })}</span>
         <div className="spacer" />
@@ -901,7 +902,7 @@ export function ImageEditor({
                       disabled={!ready || !!cropDraft || bgBusy || !modelReady(bgModel)}
                       onClick={() => void removeBg()}
                     >
-                      {bgBusy ? ti('bgWorking') : ti('bgRemove')}
+                      {!bgBusy && <Icon name="scissors" size={14} />} {bgBusy ? ti('bgWorking') : ti('bgRemove')}
                     </button>
                   ) : (
                     <>

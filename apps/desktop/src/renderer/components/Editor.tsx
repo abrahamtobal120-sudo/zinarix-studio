@@ -211,19 +211,19 @@ export function EditorArea() {
           {/* Fase 3B: an SVG open as text can go back to the design editor. */}
           {!activeTab.viewer && !activeTab.notice && isSvgPath(activeTab.path) && (
             <button className="crumb-action" title={tg('designHint')} onClick={() => setTabViewer(activeTab.path, 'design')}>
-              🎨 {tg('design')}
+              <Icon name="palette" size={12} /> {tg('design')}
             </button>
           )}
           {/* Fase 6: a Godot scene open as text can go back to its node tree. */}
           {!activeTab.viewer && !activeTab.notice && isScenePath(activeTab.path) && (
             <button className="crumb-action" title={tgm('sceneHint')} onClick={() => setTabViewer(activeTab.path, 'scene')}>
-              🌳 {tgm('sceneTitle')}
+              <Icon name="tree" size={12} /> {tgm('sceneTitle')}
             </button>
           )}
           {/* Fase 7: a G-code open as text can go back to its layers. */}
           {!activeTab.viewer && !activeTab.notice && isGcodePath(activeTab.path) && (
             <button className="crumb-action" onClick={() => setTabViewer(activeTab.path, 'gcode')}>
-              🧱 {tc('sliceOpen')}
+              <Icon name="layers" size={12} /> {tc('sliceOpen')}
             </button>
           )}
         </div>

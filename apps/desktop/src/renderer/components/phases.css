@@ -4,7 +4,7 @@
 .phases-panel {
   margin: 0 0 6px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-2);
   font-size: var(--text-sm);
 }
@@ -34,7 +34,7 @@
 .phases-bar {
   flex: 1;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--bg-4);
   overflow: hidden;
 }
@@ -46,7 +46,7 @@
 .phases-x {
   display: inline-flex;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--fg-dim);
 }
 .phases-x:hover:not(:disabled) {
@@ -66,7 +66,7 @@
   padding: 3px 2px;
   color: var(--fg);
   text-align: left;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .phases-phase-head:hover {
   background: var(--bg-3);
@@ -90,7 +90,7 @@
   align-items: flex-start;
   gap: 6px;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--fg);
 }
 .phases-sub:hover {
@@ -151,7 +151,7 @@
 .phases-sub-actions button {
   display: inline-flex;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--fg-dim);
 }
 .phases-sub-actions button:hover {
@@ -178,7 +178,7 @@
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 .phases-go {
   background: var(--accent);
@@ -212,7 +212,7 @@
   padding: 14px;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
 }
 .phases-picker h3 {
@@ -231,7 +231,7 @@
 }
 .phases-picker-q {
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-1, var(--bg));
   color: var(--fg);
@@ -248,7 +248,7 @@
   align-items: center;
   gap: 6px;
   padding: 5px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   text-align: left;
   color: var(--fg);
 }
@@ -262,7 +262,7 @@
   gap: 6px;
   padding: 4px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--fg);
 }
 }

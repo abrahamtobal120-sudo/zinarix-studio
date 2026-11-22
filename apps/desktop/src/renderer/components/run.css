@@ -46,14 +46,14 @@
 }
 .rp-cmd.block {
   padding: 6px 8px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-xs);
   background: var(--code-bg, var(--bg-3));
   border: 1px solid var(--border);
 }
 .rp-badge {
   margin-left: 6px;
   padding: 0 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: var(--text-2xs, 10px);
   font-weight: 600;
   line-height: 16px;
@@ -69,7 +69,7 @@
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg-2);
 }
 .rp-hero-head {
@@ -84,7 +84,7 @@
   width: 34px;
   height: 34px;
   flex-shrink: 0;
-  border-radius: var(--radius, 6px);
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--brand) 16%, transparent);
   color: var(--brand);
 }
@@ -144,7 +144,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-left: 3px solid var(--fg-dim);
-  border-radius: var(--radius, 6px);
+  border-radius: var(--radius-md);
   background: var(--bg-2);
 }
 .rp-status-head {
@@ -273,7 +273,7 @@
   min-height: 38px;
   padding: 4px 6px 4px 8px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-xs);
 }
 .rp-target {
   cursor: pointer;
@@ -372,7 +372,7 @@
   gap: 6px;
   min-height: 22px;
   padding: 0 6px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-xs);
   cursor: pointer;
   white-space: nowrap;
   font-size: var(--text-sm);
@@ -394,7 +394,7 @@
   padding: 18px 14px;
   text-align: center;
   border: 1px dashed var(--border);
-  border-radius: var(--radius, 6px);
+  border-radius: var(--radius-md);
   margin: 4px 10px;
 }
 .rp-body .rp-empty {

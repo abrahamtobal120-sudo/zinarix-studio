@@ -105,6 +105,12 @@ export class Computer implements ComputerService {
     return this.driver.keys(combo);
   }
 
+  /** Starts the mouse / keyboard helper ahead of time (on Windows it compiles a small
+   * helper, a second or two), so the AI's first click does not wait for it. */
+  warm(): void {
+    void this.driver.pos().catch(() => undefined);
+  }
+
   /** The cursor in screen units (the "Controlar la compu" bar notices the user moving it). */
   async rawCursor() {
     return this.driver.pos();

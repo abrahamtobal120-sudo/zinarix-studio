@@ -54,7 +54,7 @@
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 4px 10px;
   font-size: var(--text-sm);
   cursor: pointer;
@@ -64,7 +64,7 @@
 }
 .auto-card {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -122,7 +122,7 @@
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 6px 8px;
   font: inherit;
 }
@@ -170,7 +170,7 @@
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .auto-icon {
@@ -249,7 +249,7 @@
   overflow: auto;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 6px 8px;
   user-select: text;
 }
@@ -262,7 +262,7 @@
   flex-direction: column;
   gap: 6px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 10px;
 }
 .auto-snippet code {
@@ -270,8 +270,23 @@
   font-size: var(--text-xs);
   background: var(--bg);
   padding: 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   overflow-wrap: anywhere;
   user-select: all;
 }
+}
+
+/* The panel cannot work yet (the app has to restart) or could not load. */
+.auto-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+}
+.auto-notice p {
+  margin: 0;
+  line-height: 1.45;
 }

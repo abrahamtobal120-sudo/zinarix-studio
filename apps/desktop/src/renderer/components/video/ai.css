@@ -14,7 +14,7 @@
   overflow: auto;
   padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: var(--text-sm);
   line-height: 1.6;
   user-select: none;
@@ -25,7 +25,7 @@
 }
 .vs-ai-word {
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 .vs-ai-word:hover {
   background: var(--bg-2);

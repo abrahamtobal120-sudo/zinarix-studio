@@ -37,7 +37,7 @@
   max-width: 100%;
   padding: 3px 8px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--fg-dim);
   font-size: var(--text-sm);
@@ -62,7 +62,7 @@
 }
 .ml-folder-count {
   padding: 0 5px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--hover);
   color: var(--fg-strong);
   font-size: var(--text-xs);
@@ -210,7 +210,7 @@
   margin: 14px 0;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-2);
 }
 .phone-hero-icon {
@@ -219,7 +219,7 @@
   flex-shrink: 0;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg);
   color: var(--fg-dim);
 }
@@ -283,7 +283,7 @@
 .phone-switch span {
   position: absolute;
   inset: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   background: var(--border);
   transition: background 0.15s;
   pointer-events: none;
@@ -315,7 +315,7 @@
 .phone-card {
   margin: 0 0 22px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 .phone-tabs {
@@ -332,14 +332,14 @@
   justify-content: center;
   gap: 6px;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--fg-dim);
 }
 .phone-tabs button.on {
   background: var(--bg);
   color: var(--fg-strong);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--elevation-1);
 }
 .phone-dot {
   width: 6px;
@@ -357,7 +357,7 @@
   flex-shrink: 0;
   width: 168px;
   height: 168px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 .phone-steps {
   flex: 1;
@@ -411,7 +411,7 @@
   user-select: all;
   font-size: var(--text-base);
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-2);
 }
@@ -424,7 +424,7 @@
   place-items: center;
   width: 34px;
   height: 42px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-2);
   font: 600 22px var(--mono, monospace);
@@ -486,7 +486,7 @@
 .bot-card {
   margin: 10px 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-2);
 }
 .bot-card h4 {
@@ -516,7 +516,7 @@
   gap: 10px;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .phone-device-name {
   flex: 1;
@@ -531,7 +531,7 @@
   margin: 0 18px 16px;
   padding: 12px;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .phone-fixed p {
   margin: 0;

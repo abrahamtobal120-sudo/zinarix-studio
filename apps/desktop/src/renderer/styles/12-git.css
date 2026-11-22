@@ -9,7 +9,7 @@
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   /* --danger contrasts with --bg in every theme (>= 4.5:1), so --bg is the text color. */
   background: var(--danger);
   color: var(--bg);
@@ -35,7 +35,7 @@
 }
 .git-branch {
   background: var(--bg-3);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 2px 8px;
   max-width: 50%;
   overflow: hidden;
@@ -60,7 +60,7 @@
   background: transparent;
   font-size: var(--text-xs);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--fg-dim);
 }
 .git-tabs button.on {
@@ -71,7 +71,7 @@
   margin: 0 10px 8px;
   padding: 8px 10px;
   border: 1px dashed var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 .git-connect-title {
   font-size: var(--text-sm);
@@ -97,7 +97,7 @@
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 6px;
 }
 .git-commit textarea:focus {
@@ -132,7 +132,7 @@
 }
 .git-count {
   background: var(--bg-4);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0 6px;
   font-weight: 400;
 }
@@ -227,7 +227,7 @@
 .git-ref {
   font-size: var(--text-xs);
   background: var(--bg-4);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0 6px;
   margin-right: 3px;
   color: var(--focus);
@@ -242,7 +242,7 @@
   flex-direction: column;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -320,7 +320,7 @@
 }
 .gh-repo {
   padding: 6px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 .gh-repo:hover {

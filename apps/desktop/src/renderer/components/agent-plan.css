@@ -36,7 +36,7 @@
   padding: 4px;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -49,7 +49,7 @@
   padding: 6px 8px;
   border: none;
   background: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   text-align: left;
   color: var(--fg);
   cursor: pointer;
@@ -79,7 +79,7 @@
 .task-list {
   margin: 0 0 6px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-2);
   font-size: var(--text-sm);
 }
@@ -94,7 +94,7 @@
 .task-list-bar {
   flex: 1;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--bg-4);
   overflow: hidden;
 }
@@ -162,7 +162,7 @@
   text-align: left;
   padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-3);
   color: var(--fg);
   cursor: pointer;
@@ -189,7 +189,7 @@
   margin-top: 8px;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--warn) 8%, var(--bg-2));
 }
 .plan-bar button {

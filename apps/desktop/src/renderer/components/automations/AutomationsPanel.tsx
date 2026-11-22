@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DocSourceView } from '../../../shared/api';
 import {
   describeSchedule,
@@ -11,7 +11,7 @@ import {
   type Schedule,
 } from '../../../shared/automations';
 import { confirmDialog } from '../../confirm';
-import { errText } from '../../errText';
+import { errText, needsRestart } from '../../errText';
 import { lang } from '../../i18n';
 import { openLink } from '../../links';
 import { api, newChat, setState, toast, useStore } from '../../store';
@@ -56,12 +56,28 @@ export function openBotChat(bot: BotDef): void {
 export function AutomationsPanel() {
   const status = useStore((s) => s.automations);
   const [tab, setTab] = useState<Tab>('tasks');
-  useEffect(() => {
-    void api()
-      .automations.status()
-      .then((automations) => setState({ automations }))
-      .catch(() => undefined);
+  // Why the panel has nothing to show: 'restart' when the running app is older than this window.
+  const [problem, setProblem] = useState<{ kind: 'restart' | 'error'; text: string } | null>(null);
+  const load = useCallback(async () => {
+    try {
+      const automations = await api().automations.status();
+      setProblem(null);
+      setState({ automations });
+    } catch (e) {
+      setProblem({ kind: needsRestart(e) ? 'restart' : 'error', text: errText(e) });
+    }
   }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const restart = async () => {
+    try {
+      await api().app.relaunch();
+    } catch {
+      // An app that old cannot restart itself either: the user closes and opens it.
+      toast(ta('restartManual'));
+    }
+  };
   return (
     <div className="run-panel auto-panel">
       <div className="sidebar-title">
@@ -76,13 +92,34 @@ export function AutomationsPanel() {
             className={`auto-tab${tab === k ? ' on' : ''}`}
             onClick={() => setTab(k)}
           >
-            {k === 'tasks' ? '⏰ ' + ta('tabTasks') : k === 'bots' ? '🤖 ' + ta('tabBots') : '🌐 ' + ta('tabWidget')}
+            <Icon name={k === 'tasks' ? 'clock' : k === 'bots' ? 'bot' : 'globe'} size={14} />{' '}
+            {k === 'tasks' ? ta('tabTasks') : k === 'bots' ? ta('tabBots') : ta('tabWidget')}
           </button>
         ))}
       </div>
       <div className="run-body auto-body">
-        {!status ? (
-          <div className="dim small">…</div>
+        {problem?.kind === 'restart' ? (
+          <div className="auto-notice" role="alert">
+            <strong>{ta('restartTitle')}</strong>
+            <p className="small">{ta('restartBody')}</p>
+            <div className="auto-actions">
+              <button className="primary" onClick={() => void restart()}>
+                {ta('restartNow')}
+              </button>
+              <button onClick={() => void load()}>{ta('retry')}</button>
+            </div>
+          </div>
+        ) : !status ? (
+          problem ? (
+            <div className="auto-notice" role="alert">
+              <p className="small">{ta('loadFailed', { error: problem.text })}</p>
+              <div className="auto-actions">
+                <button onClick={() => void load()}>{ta('retry')}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="dim small">{ta('loading')}</div>
+          )
         ) : tab === 'tasks' ? (
           <TasksTab tasks={status.tasks} runs={status.runs} bots={status.bots} running={status.running} />
         ) : tab === 'bots' ? (
@@ -511,7 +548,7 @@ function Runs({ runs }: { runs: AutoRun[] }) {
                 {r.state === 'running' && <div className="small dim">{ta('running')}</div>}
                 {r.error && <div className="small auto-error">{r.error}</div>}
                 {r.text && <div className="small auto-run-text">{r.text}</div>}
-                {r.denied > 0 && <div className="small dim">⚠ {ta('denied', { n: r.denied })}</div>}
+                {r.denied > 0 && <div className="small dim"><Icon name="warning" size={14} /> {ta('denied', { n: r.denied })}</div>}
                 {r.delivery?.map((d) => (
                   <div key={d} className="small auto-error">
                     {d}
@@ -923,7 +960,7 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
       )}
       <p className="dim small auto-note">{ta('wModelNote', { model: bot.model ?? ta('modelAppDefault') })}</p>
       {bot.docs.length > 0 && <p className="dim small auto-note">{ta('wDocsNote')}</p>}
-      <p className="dim small auto-note">⚠ {ta('wCost')}</p>
+      <p className="dim small auto-note"><Icon name="warning" size={14} /> <span>{ta('wCost')}</span></p>
     </>
   );
 }

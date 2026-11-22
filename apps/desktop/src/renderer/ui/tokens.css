@@ -49,8 +49,8 @@
   --brand-2: #3b82f6;
   --brand: #7d6ff8;
   --brand-grad: linear-gradient(135deg, #8b5cff, #3b82f6);
-  --radius: 7px;
-  --radius-sm: 5px;
+  --radius: 6px;
+  --radius-sm: 4px;
   --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 38%, transparent);
   --sel-soft: color-mix(in srgb, var(--brand) 18%, transparent);
   --elev: 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -84,8 +84,8 @@
   --brand-2: #2563eb;
   --brand: #6d4df2;
   --brand-grad: linear-gradient(135deg, #7c3aed, #2563eb);
-  --radius: 7px;
-  --radius-sm: 5px;
+  --radius: 6px;
+  --radius-sm: 4px;
   --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
   --sel-soft: color-mix(in srgb, var(--brand) 14%, transparent);
   --elev: 0 2px 8px rgba(0, 0, 0, 0.1);

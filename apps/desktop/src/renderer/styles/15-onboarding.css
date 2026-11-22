@@ -25,9 +25,9 @@ button.big {
 .status-item.plan-pro,
 .status-item.plan-proai,
 .status-item.plan-owner {
-  background: var(--brand-grad);
+  background: var(--accent);
   color: var(--on-color);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 0 9px;
   margin: 2px 0;
 }
@@ -38,7 +38,7 @@ button.big {
   overflow: auto;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 22px 24px;
   display: flex;
@@ -52,7 +52,7 @@ button.big {
   /* room for the close button */
   margin: 12px 0 0;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-3);
   border: 1px solid var(--border);
 }
@@ -64,10 +64,8 @@ button.big {
 .plan-hero.plan-proai,
 .plan-hero.plan-owner,
 .plan-hero.plan-trial {
-  background:
-    linear-gradient(var(--bg-3), var(--bg-3)) padding-box,
-    var(--brand-grad) border-box;
-  border: 1px solid transparent;
+  background: var(--bg-3);
+  border: 1px solid var(--accent);
 }
 .plan-name {
   font-size: var(--text-lg);
@@ -84,7 +82,7 @@ button.big {
   gap: 8px;
   align-items: flex-start;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--sel-soft);
   color: var(--fg);
   font-size: var(--text-base);
@@ -101,7 +99,7 @@ button.big {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--bg-2);
   font-size: var(--text-base);
@@ -158,15 +156,13 @@ button.big {
 .status-item.plan-ai {
   background: var(--teal);
   color: var(--on-color);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 0 9px;
   margin: 2px 0;
 }
 .plan-hero.plan-ai {
-  background:
-    linear-gradient(var(--bg-3), var(--bg-3)) padding-box,
-    linear-gradient(135deg, var(--teal-2), var(--teal)) border-box;
-  border: 1px solid transparent;
+  background: var(--bg-3);
+  border: 1px solid var(--teal);
 }
 .plan-buy {
   display: flex;
@@ -217,10 +213,10 @@ button.big {
 .upgrade-icon {
   width: 54px;
   height: 54px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   display: grid;
   place-items: center;
-  background: var(--brand-grad);
+  background: var(--accent);
   color: var(--on-color);
 }
 .upgrade-actions {
@@ -241,7 +237,7 @@ button.big {
   min-height: 430px;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: 26px 30px 22px;
   display: flex;
@@ -256,14 +252,14 @@ button.big {
 .onb-dots span {
   width: 22px;
   height: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--bg-4);
 }
 .onb-dots span.done {
   background: color-mix(in srgb, var(--brand) 50%, var(--bg-4));
 }
 .onb-dots span.on {
-  background: var(--brand-grad);
+  background: var(--accent);
 }
 .onb-step {
   flex: 1;
@@ -294,7 +290,6 @@ button.big {
 .onb-logo {
   width: 84px;
   height: 84px;
-  filter: drop-shadow(0 10px 28px color-mix(in srgb, var(--brand) 45%, transparent));
 }
 .onb-lead {
   max-width: 470px;
@@ -312,7 +307,7 @@ button.big {
   align-items: center;
   gap: 6px;
   padding: 5px 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--sel-soft);
   font-size: var(--text-sm);
 }
@@ -335,7 +330,7 @@ button.big {
   gap: 6px;
   padding: 14px;
   text-align: left;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-3);
   border: 1px solid var(--border);
   color: var(--fg);
@@ -400,7 +395,7 @@ button.big {
   display: flex;
   gap: 10px;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-3);
   border: 1px solid var(--border);
 }
@@ -418,7 +413,7 @@ button.big {
   flex-shrink: 0;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   display: grid;
   place-items: center;
   background: var(--sel-soft);
@@ -445,7 +440,7 @@ button.big {
   gap: 10px;
   max-width: min(520px, 90vw);
   padding: 9px 10px 9px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-3);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -502,7 +497,7 @@ button.big {
   max-width: 88%;
   margin-left: 0;
   padding: 9px 13px;
-  border-radius: 14px 14px 4px 14px;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
   line-height: 1.5;
   color: var(--fg-strong);
 }
@@ -542,7 +537,7 @@ button.big {
 .md code {
   font-size: 0.88em;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--fg) 10%, transparent);
   color: var(--fg-strong);
 }
@@ -554,7 +549,7 @@ button.big {
 }
 .code-block {
   margin: 10px 0 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .code-block pre {
   padding: 10px 12px;
@@ -565,7 +560,7 @@ button.big {
 .md-table {
   margin: 10px 0 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .md-table table {
   width: 100%;
@@ -601,7 +596,7 @@ button.big {
 .turn-error {
   padding: 7px 10px;
   margin: 6px 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: var(--text-base);
   line-height: 1.45;
 }
@@ -624,7 +619,7 @@ button.big {
 }
 .turn-actions button {
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 /* Welcome screen next to a wide chat: shrink instead of overflowing behind it. */
 .welcome {
@@ -701,12 +696,12 @@ button.big {
   right: 8px;
   top: 4px;
   background: var(--bg-2);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .git-pr {
   font-size: var(--text-xs);
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-3);
 }
 .git-pr.pass {

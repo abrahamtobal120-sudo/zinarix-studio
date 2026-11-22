@@ -352,7 +352,7 @@ function ProblemStatus() {
       {...pressable(() => setState({ panelOpen: true, panelView: 'problems' }))}
     >
       <span className={errors ? 'status-err' : ''}>⊗ {errors}</span>{' '}
-      <span className={warnings ? 'status-warn' : ''}>⚠ {warnings}</span>
+      <span className={warnings ? 'status-warn' : ''}><Icon name="warning" size={12} /> {warnings}</span>
     </span>
   );
 }

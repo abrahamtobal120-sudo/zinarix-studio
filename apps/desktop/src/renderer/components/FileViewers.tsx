@@ -8,6 +8,7 @@ import { ImageEditor } from './image/ImageEditor';
 import { ti } from './image/imageStrings';
 import { PaintView } from './paint/PaintView';
 import { tg } from './graphics/graphicsStrings';
+import { Icon } from './Icon';
 
 /** Human size: 1.2 MB, 340 KB… */
 export function formatBytes(n: number): string {
@@ -163,7 +164,7 @@ function ImageViewer({ path, size }: { path: string; size: number }) {
           </button>
         )}
         <button disabled={!url} title={tg('paintFromHint')} onClick={() => setPainting(true)}>
-          🖌 {tg('paintFrom')}
+          <Icon name="brush" size={14} /> {tg('paintFrom')}
         </button>
         <button className={zoom === 'fit' ? 'on' : ''} onClick={() => setZoom('fit')}>
           {t('zoomFit')}
@@ -468,8 +469,8 @@ function LargeTextViewer({ path, size }: { path: string; size: number }) {
   return (
     <div className="large-viewer">
       <div className="image-tools">
-        <button onClick={() => jump(0)} disabled={busy || offset === 0}>
-          ⏮
+        <button onClick={() => jump(0)} disabled={busy || offset === 0} title={t('firstPage')} aria-label={t('firstPage')}>
+          <Icon name="skipBack" size={14} />
         </button>
         <button onClick={prev} disabled={busy || offset === 0}>
           ◀ {t('prevPage')}
@@ -480,8 +481,10 @@ function LargeTextViewer({ path, size }: { path: string; size: number }) {
         <button
           onClick={() => jump(1 - TEXT_PAGE / Math.max(size, 1))}
           disabled={busy || end >= size}
+          title={t('lastPage')}
+          aria-label={t('lastPage')}
         >
-          ⏭
+          <Icon name="skipForward" size={14} />
         </button>
         <input
           className="viewer-input small"

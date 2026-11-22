@@ -87,6 +87,6 @@
     color: var(--fg);
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
   }
 }

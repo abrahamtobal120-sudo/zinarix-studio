@@ -534,7 +534,7 @@ function baseCommands(): Command[] {
         const on = !getState().settings.localOnly;
         await api().ai.setLocalOnly(on);
         await refreshSettings();
-        toast(on ? t('localOnlyOn') : '☁');
+        toast(on ? t('localOnlyOn') : t('localOnlyOff'));
       },
     },
     {

@@ -19,7 +19,7 @@
     gap: 6px;
     padding: 6px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--bg-2);
     color: inherit;
     cursor: pointer;
@@ -62,7 +62,7 @@
     align-items: center;
     justify-content: center;
     height: 54px;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     overflow: hidden;
     background: var(--vs-stage);
   }
@@ -99,7 +99,7 @@
   }
   .vs-tr-zoomIn i {
     inset: 12px 22px;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
   }
   .vs-tr-item {
     display: flex;
@@ -140,7 +140,7 @@
   }
   .vs-strip {
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     padding: 6px 8px;
     background: var(--bg-2);
   }
@@ -191,7 +191,7 @@
     /* The colours sit still under a cover that uncovers them as the level rises. */
     position: relative;
     height: 5px;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
     background: linear-gradient(90deg, var(--ok) 0%, var(--ok) 70%, var(--warn) 85%, var(--danger) 100%);
     overflow: hidden;
   }
@@ -231,7 +231,7 @@
     background: var(--bg-2);
     color: var(--fg);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     padding: 4px 6px;
     font: inherit;
   }
@@ -246,7 +246,7 @@
     height: 22px;
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     background: transparent;
     cursor: pointer;
   }
@@ -309,7 +309,7 @@
     height: 40px;
     font-size: var(--text-2xl);
     line-height: 1;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     border: 1px solid transparent;
     background: transparent;
     color: inherit;

@@ -36,7 +36,7 @@
   color: inherit;
   padding: 3px 8px;
   font-size: var(--text-sm);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 .gp button:hover:not(:disabled) {
@@ -100,13 +100,13 @@
   place-items: center;
   height: 72px;
   background: var(--bg-2);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 .gp-thumb img {
   max-width: 100%;
   max-height: 100%;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--elevation-1);
 }
 .gp-tpl-name {
   font-size: var(--text-xs);
@@ -129,7 +129,7 @@
   border: 1px solid var(--border);
   color: var(--fg);
   padding: 3px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font: inherit;
 }
 .gp-ai {

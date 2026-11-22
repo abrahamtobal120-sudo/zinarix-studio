@@ -1261,9 +1261,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const [rulesView, setRulesView] = useState<ActiveRulesView | null>(null);
   const [rulesMenu, setRulesMenu] = useState(false);
   const rulesMenuEl = useRef<HTMLDivElement>(null);
-  const rulesMenuBtn = useRef<HTMLButtonElement>(null);
   const closeRulesMenu = useCallback(() => setRulesMenu(false), []);
-  useDismiss(rulesMenu, closeRulesMenu, [rulesMenuEl, rulesMenuBtn], rulesMenuBtn);
+  useDismiss(rulesMenu, closeRulesMenu, [rulesMenuEl, termMenuBtn], termMenuBtn);
   const projectRules = useStore((s) => s.prefs.projectRules);
   const fsVersion = useStore((s) => s.fsVersion);
   /** Prompts sent in this session, for ↑ / ↓ in an empty box. */
@@ -1376,9 +1375,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const tasksStatus = useTasks();
   const tasksNow = taskBadge(tasksStatus);
   const kitMenuEl = useRef<HTMLDivElement>(null);
-  const kitMenuBtn = useRef<HTMLButtonElement>(null);
   const closeKitMenu = useCallback(() => setKitMenu(false), []);
-  useDismiss(kitMenu, closeKitMenu, [kitMenuEl, kitMenuBtn], kitMenuBtn);
+  useDismiss(kitMenu, closeKitMenu, [kitMenuEl, termMenuBtn], termMenuBtn);
   /** "Nuevo subagente / skill / comando": the file from a template, open in the editor. */
   const createKit = async (kind: KitKind) => {
     setKitMenu(false);
@@ -3029,6 +3027,107 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                 </button>
               );
             })}
+            <div className="term-menu-head">{t('chatOptions')}</div>
+            <label className="add-menu-item add-menu-row" title={t('reasoningTitle')}>
+              <Icon name="thinking" size={14} />
+              <select
+                value={reasoning}
+                onChange={(e) => {
+                  const v = e.target.value as ReasoningLevel | '';
+                  setReasoning(v);
+                  if (v) localStorage.setItem(REASONING_KEY, v);
+                  else localStorage.removeItem(REASONING_KEY);
+                }}
+              >
+                <option value="">{t('reasoningAuto')}</option>
+                <option value="low">{t('reasoningLow')}</option>
+                <option value="medium">{t('reasoningMedium')}</option>
+                <option value="high">{t('reasoningHigh')}</option>
+              </select>
+            </label>
+            {agentMode && (
+              <button
+                role="menuitemcheckbox"
+                aria-checked={computerOn}
+                className="add-menu-item"
+                title={t('computerPillTitle')}
+                onClick={() => {
+                  setTermMenu(null);
+                  void toggleComputer();
+                }}
+              >
+                <Icon name="monitor" size={14} />
+                <span className="add-menu-label">{t('computerMenu')}</span>
+                {computerOn && <Icon name="check" size={13} className="add-menu-check" />}
+              </button>
+            )}
+            <button
+              role="menuitemcheckbox"
+              aria-checked={includeFile}
+              className="add-menu-item"
+              onClick={() => setIncludeFile(!includeFile)}
+            >
+              <Icon name="file" size={14} />
+              <span className="add-menu-label">{t('includeFile')}</span>
+              {includeFile && <Icon name="check" size={13} className="add-menu-check" />}
+            </button>
+            {(Boolean(root) || tasksNow.active > 0) && (
+              <button
+                role="menuitem"
+                className="add-menu-item"
+                title={t('tasksChip', tasksNow)}
+                onClick={() => {
+                  setTermMenu(null);
+                  setTasksOpen(true);
+                }}
+              >
+                <Icon name="layers" size={14} />
+                <span className="add-menu-label">{t('tasksPanel')}</span>
+                {tasksNow.active > 0 && <span className="add-menu-hint">{tasksNow.active}</span>}
+              </button>
+            )}
+            {kit && (!noFolder || kitCommands.length + kitSkills.length + kit.agents.length > 0) && (
+              <button
+                role="menuitem"
+                className="add-menu-item"
+                title={t('kitChip', {
+                  agents: kit.agents.length,
+                  skills: kit.skills.length,
+                  commands: kit.commands.length,
+                  hooks: kit.hooks.length,
+                })}
+                onClick={() => {
+                  setTermMenu(null);
+                  setKitMenu(true);
+                }}
+              >
+                <Icon name="package" size={14} />
+                <span className="add-menu-label">{t('kitPanel')}</span>
+                {kit.agents.length + kit.skills.length > 0 && (
+                  <span className="add-menu-hint">{kit.agents.length + kit.skills.length}</span>
+                )}
+              </button>
+            )}
+            {rulesView?.enabled && rulesView.active.length + rulesView.available.length > 0 && (
+              <button
+                role="menuitem"
+                className="add-menu-item"
+                title={t('rulesActive', {
+                  n: rulesView.active.length,
+                  tokens: rulesView.tokens.toLocaleString(),
+                })}
+                onClick={() => {
+                  setTermMenu(null);
+                  setRulesMenu(true);
+                }}
+              >
+                <Icon name="scroll" size={14} />
+                <span className="add-menu-label">{t('rulesPanel')}</span>
+                {rulesView.active.length > 0 && (
+                  <span className="add-menu-hint">{rulesView.active.length}</span>
+                )}
+              </button>
+            )}
             <div className="term-menu-head">{t('terminal')}</div>
             {termMenu.length === 0 ? (
               <button
@@ -3197,33 +3296,36 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             aria-label={t('chatAddMenu')}
             aria-haspopup="menu"
             aria-expanded={termMenu !== null}
-            onClick={() => setTermMenu((m) => (m ? null : listTerminals()))}
+            onClick={() => {
+              setKitMenu(false);
+              setRulesMenu(false);
+              setTermMenu((m) => (m ? null : listTerminals()));
+            }}
           >
             <Icon name="plus" size={15} />
           </button>
           <ModeMenu mode={chatMode} onChange={(m) => setChatMode(m)} />
-          <label
-            className={`pill reasoning-pick ${reasoning ? 'on' : ''}`}
-            title={t('reasoningTitle')}
-          >
-            <Icon name="thinking" size={14} />
-            <select
-              value={reasoning}
-              onChange={(e) => {
-                const v = e.target.value as ReasoningLevel | '';
-                setReasoning(v);
-                if (v) localStorage.setItem(REASONING_KEY, v);
-                else localStorage.removeItem(REASONING_KEY);
-              }}
-            >
-              <option value="">{t('reasoningAuto')}</option>
-              <option value="low">{t('reasoningLow')}</option>
-              <option value="medium">{t('reasoningMedium')}</option>
-              <option value="high">{t('reasoningHigh')}</option>
-            </select>
-            <Icon name="chevronDown" size={12} className="reasoning-caret" />
-          </label>
-          {agentMode && (
+          {reasoning && (
+            <label className="pill reasoning-pick on" title={t('reasoningTitle')}>
+              <Icon name="thinking" size={14} />
+              <select
+                value={reasoning}
+                onChange={(e) => {
+                  const v = e.target.value as ReasoningLevel | '';
+                  setReasoning(v);
+                  if (v) localStorage.setItem(REASONING_KEY, v);
+                  else localStorage.removeItem(REASONING_KEY);
+                }}
+              >
+                <option value="">{t('reasoningAuto')}</option>
+                <option value="low">{t('reasoningLow')}</option>
+                <option value="medium">{t('reasoningMedium')}</option>
+                <option value="high">{t('reasoningHigh')}</option>
+              </select>
+              <Icon name="chevronDown" size={12} className="reasoning-caret" />
+            </label>
+          )}
+          {agentMode && computerOn && (
             <button
               type="button"
               className={`pill computer-pill ${computerOn ? 'on' : ''}`}
@@ -3237,17 +3339,17 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               </span>
             </button>
           )}
-          <label className={`check pill ${includeFile ? 'on' : ''}`} title={t('includeFile')}>
-            <input
-              type="checkbox"
-              checked={includeFile}
-              onChange={(e) => setIncludeFile(e.target.checked)}
-            />
-            <Icon name="file" size={14} />
-            <span className="pill-label">
-              {active && !active.startsWith('::') ? active.split('/').pop() : t('includeFile')}
-            </span>
-          </label>
+          {includeFile && active && !active.startsWith('::') && (
+            <label className="check pill on" title={t('includeFile')}>
+              <input
+                type="checkbox"
+                checked={includeFile}
+                onChange={(e) => setIncludeFile(e.target.checked)}
+              />
+              <Icon name="file" size={14} />
+              <span className="pill-label">{active.split('/').pop()}</span>
+            </label>
+          )}
           <input
             ref={imagePicker}
             type="file"
@@ -3259,7 +3361,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               e.target.value = '';
             }}
           />
-          {(Boolean(root) || tasksNow.active > 0) && (
+          {tasksNow.active > 0 && (
             <button
               className={`rules-chip ${tasksOpen ? 'on' : ''} ${tasksNow.waiting ? 'warn' : ''}`}
               title={t('tasksChip', tasksNow)}
@@ -3269,46 +3371,6 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             >
               <Icon name="layers" size={15} />
               {tasksNow.active > 0 && <span className="rules-count">{tasksNow.active}</span>}
-            </button>
-          )}
-          {kit && (!noFolder || kitCommands.length + kitSkills.length + kit.agents.length > 0) && (
-            <button
-              ref={kitMenuBtn}
-              className={`rules-chip ${kitMenu ? 'on' : ''}`}
-              title={t('kitChip', {
-                agents: kit.agents.length,
-                skills: kit.skills.length,
-                commands: kit.commands.length,
-                hooks: kit.hooks.length,
-              })}
-              aria-label={t('kitPanel')}
-              aria-haspopup="menu"
-              aria-expanded={kitMenu}
-              onClick={() => setKitMenu((v) => !v)}
-            >
-              <Icon name="package" size={15} />
-              {kit.agents.length + kit.skills.length > 0 && (
-                <span className="rules-count">{kit.agents.length + kit.skills.length}</span>
-              )}
-            </button>
-          )}
-          {rulesView?.enabled && rulesView.active.length + rulesView.available.length > 0 && (
-            <button
-              ref={rulesMenuBtn}
-              className={`rules-chip ${rulesMenu ? 'on' : ''}`}
-              title={t('rulesActive', {
-                n: rulesView.active.length,
-                tokens: rulesView.tokens.toLocaleString(),
-              })}
-              aria-label={t('rulesPanel')}
-              aria-haspopup="menu"
-              aria-expanded={rulesMenu}
-              onClick={() => setRulesMenu((v) => !v)}
-            >
-              <Icon name="scroll" size={15} />
-              {rulesView.active.length > 0 && (
-                <span className="rules-count">{rulesView.active.length}</span>
-              )}
             </button>
           )}
           <span className="chat-input-spacer" aria-hidden="true" />
@@ -3805,12 +3867,49 @@ export function ChatPanel() {
     strip.current?.querySelector<HTMLElement>(`[data-chat="${CSS.escape(to)}"]`)?.focus();
   };
 
-  // Keep the focused tab in view when there are many.
+  // Keep the focused tab in view when there are many. Only the tab strip scrolls (not
+  // scrollIntoView, which also scrolled the panels around it and moved the whole chat).
   useEffect(() => {
-    strip.current
-      ?.querySelector('.chat-tab.focus')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const el = strip.current;
+    const tab = el?.querySelector<HTMLElement>('.chat-tab.focus');
+    if (!el || !tab) return;
+    const box = el.getBoundingClientRect();
+    const r = tab.getBoundingClientRect();
+    if (r.left < box.left) el.scrollLeft -= box.left - r.left + 8;
+    else if (r.right > box.right) el.scrollLeft += r.right - box.right + 8;
   }, [focusedId, chats.length]);
+
+  // Tabs that do not fit: the mouse wheel scrolls the strip sideways, and a "+N" button
+  // opens the chat list so no chat is out of reach.
+  const [hiddenTabs, setHiddenTabs] = useState(0);
+  useEffect(() => {
+    const el = strip.current;
+    if (!el) return;
+    const count = () => {
+      const box = el.getBoundingClientRect();
+      let n = 0;
+      for (const tab of el.querySelectorAll<HTMLElement>('.chat-tab')) {
+        const r = tab.getBoundingClientRect();
+        if (r.right > box.right + 1 || r.left < box.left - 1) n++;
+      }
+      setHiddenTabs(n);
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    count();
+    const ro = new ResizeObserver(count);
+    ro.observe(el);
+    el.addEventListener('scroll', count, { passive: true });
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('scroll', count);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, [chats]);
 
   return (
     <div className="chat chat-multi">
@@ -3866,6 +3965,16 @@ export function ChatPanel() {
           })}
         </div>
         <span className="sidebar-actions">
+          {hiddenTabs > 0 && !list && (
+            <button
+              className="chat-tabs-more"
+              title={t('chatListToggle')}
+              aria-label={t('chatListToggle')}
+              onClick={toggleChatList}
+            >
+              +{hiddenTabs}
+            </button>
+          )}
           <button
             title={t('chatListToggle')}
             aria-label={t('chatListToggle')}

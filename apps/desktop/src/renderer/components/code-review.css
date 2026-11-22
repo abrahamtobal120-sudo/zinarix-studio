@@ -8,7 +8,7 @@
   flex-direction: column;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   overflow: hidden;
   color: var(--fg);
@@ -47,7 +47,7 @@
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
@@ -118,7 +118,7 @@
 }
 .cr-bar {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--bg-4);
   overflow: hidden;
 }
@@ -136,7 +136,7 @@
   margin: 0 14px 8px;
   padding: 8px 10px;
   border: 1px solid var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--danger);
   display: flex;
   gap: 6px;
@@ -159,7 +159,7 @@
 .cr-chip {
   font-size: var(--text-xs);
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
@@ -183,7 +183,7 @@
 .cr-finding {
   border: 1px solid var(--border);
   border-left: 3px solid var(--fg-dim);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 8px 10px;
   background: var(--bg);
   display: flex;
@@ -210,7 +210,7 @@
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1px solid currentColor;
 }
 .cr-sev.sev-critical,
@@ -250,7 +250,7 @@
 }
 .cr-verdict {
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--bg-3);
 }
 .cr-verdict.confirmed {

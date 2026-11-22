@@ -87,7 +87,7 @@ const es = {
   // Auto zoom of recordings
   zoomTitle: 'Zoom automático',
   zoomHint: 'Acerca la imagen hacia donde está el cursor cuando se queda quieto, como Screen Studio.',
-  zoomApply: '🔍 Aplicar zoom automático',
+  zoomApply: 'Aplicar zoom automático',
   zoomRemove: 'Quitar zoom',
   zoomAmount: 'Acercamiento',
   zoomNone: 'No se encontraron momentos para acercar (el cursor no se detuvo).',
@@ -182,7 +182,7 @@ const en: Record<Fase4Key, string> = {
   // Auto zoom of recordings
   zoomTitle: 'Auto zoom',
   zoomHint: 'Zooms in towards the cursor when it rests, like Screen Studio.',
-  zoomApply: '🔍 Apply auto zoom',
+  zoomApply: 'Apply auto zoom',
   zoomRemove: 'Remove zoom',
   zoomAmount: 'Zoom',
   zoomNone: 'No moments to zoom into were found (the cursor never rested).',

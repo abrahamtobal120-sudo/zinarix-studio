@@ -2384,6 +2384,8 @@ function registerIpc(): void {
         return;
       }
       if (task) where.task = task.scope;
+      // "Compu" on: the input helper starts now, while the model thinks its first step.
+      if (req.computer && ai.agent.computer instanceof Computer) ai.agent.computer.warm();
       if (req.computer)
         where.computerUi = (stop) => {
           const pc = ai.agent.computer;
@@ -2753,6 +2755,13 @@ function registerIpc(): void {
   });
   handle('app:quit', z.tuple([]), (w) => {
     w.allowClose = true;
+    w.win.close();
+  });
+  // Opens the app again after it exits. The window closes through the usual check (unsaved
+  // files, chats still working), so nothing is lost; with more windows open it restarts when
+  // the last one closes.
+  handle('app:relaunch', z.tuple([]), (w) => {
+    app.relaunch();
     w.win.close();
   });
   // Fase 18: the window's own title bar.

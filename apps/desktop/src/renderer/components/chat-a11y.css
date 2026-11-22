@@ -13,13 +13,13 @@
   margin-left: 0;
 }
 .send-split .send-btn:first-child:not(:last-child) {
-  border-top-right-radius: 2px;
-  border-bottom-right-radius: 2px;
+  border-top-right-radius: var(--radius-xs);
+  border-bottom-right-radius: var(--radius-xs);
 }
 .send-split .send-more {
   width: 20px;
-  border-top-left-radius: 2px;
-  border-bottom-left-radius: 2px;
+  border-top-left-radius: var(--radius-xs);
+  border-bottom-left-radius: var(--radius-xs);
 }
 .send-split + .stop-btn {
   margin-left: 0;
@@ -34,9 +34,9 @@
   min-width: 210px;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-2);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--elevation-3);
 }
 .send-menu button {
   display: flex;
@@ -45,7 +45,7 @@
   background: transparent;
   text-align: left;
   padding: 5px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: var(--text-sm);
 }
 .send-menu button > span {
@@ -68,7 +68,7 @@
   margin: 0 10px 6px;
   padding: 6px 10px;
   border: 1px solid var(--warn, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--warn) 12%, transparent);
   font-size: var(--text-sm);
 }

@@ -327,7 +327,7 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
                   {listed.map((m, i) => (
                     <li key={i}>
                       <button className={`cad-msg ${m.severity}`} onClick={() => goTo(m)} disabled={!m.line}>
-                        <span className="cad-msg-kind">{m.severity === 'echo' ? 'ECHO' : m.severity === 'error' ? '✖' : '⚠'}</span>
+                        <span className="cad-msg-kind">{m.severity === 'echo' ? 'ECHO' : <Icon name={m.severity === 'error' ? 'close' : 'warning'} size={14} />}</span>
                         <span className="cad-msg-text">{m.message}</span>
                         {m.line ? <span className="cad-msg-line">{tc('line', { n: m.line })}</span> : null}
                       </button>

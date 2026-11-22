@@ -42,7 +42,7 @@
   height: calc(var(--titlebar-h) - 8px);
   padding: 0 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: inherit;
   font: inherit;

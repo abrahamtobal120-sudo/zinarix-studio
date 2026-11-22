@@ -154,7 +154,7 @@
   gap: 6px;
   min-height: 24px;
   padding: 1px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -180,7 +180,7 @@
 .run-badge {
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: var(--text-xs);
   background: var(--bg-4);
   color: var(--fg-dim);
@@ -259,7 +259,7 @@
   background: var(--bg-2);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   padding: 4px;
   display: flex;
   flex-direction: column;
@@ -328,7 +328,7 @@
   width: 24px;
   height: 22px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: var(--text-base);
 }
 .sx-actions button:hover {
@@ -340,13 +340,13 @@
   margin: 0 10px 8px;
   padding: 3px;
   gap: 3px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-3);
 }
 .sx-tabs button {
   flex: 1;
   padding: 4px 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--fg-dim);
   font-size: var(--text-sm);
@@ -354,7 +354,7 @@
 .sx-tabs button.on {
   background: var(--bg);
   color: var(--fg-strong);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--elevation-1);
 }
 .sx-form {
   padding: 0 10px 4px;
@@ -389,7 +389,7 @@
   gap: 4px;
   height: 30px;
   padding: 0 3px 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg);
   transition:
@@ -432,7 +432,7 @@
   min-width: 24px;
   height: 22px;
   padding: 0 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--fg-dim);
   font:
@@ -490,7 +490,7 @@
 }
 .sx-filters input {
   height: 26px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg-strong);
@@ -543,7 +543,7 @@
     11px ui-monospace,
     monospace;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--border);
   background: var(--bg-3);
 }
@@ -608,7 +608,7 @@
   flex-shrink: 0;
   min-width: 18px;
   padding: 0 6px;
-  border-radius: 9px;
+  border-radius: var(--radius-lg);
   background: var(--bg-4);
   color: var(--fg);
   font-size: var(--text-xs);
@@ -657,7 +657,7 @@
 .search-view mark {
   background: rgba(234, 179, 8, 0.32);
   color: var(--fg-strong);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   outline: 1px solid rgba(234, 179, 8, 0.5);
 }
 .sx-text del {

@@ -8,7 +8,7 @@
   display: flex;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -36,7 +36,7 @@
   text-align: left;
   background: transparent;
   padding: 6px 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
 }
 .settings-nav button.on {
   background: var(--sel);
@@ -93,7 +93,7 @@
   margin-top: 12px;
   padding: 10px 12px;
   background: var(--code-bg);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   white-space: pre;
   overflow-x: auto;
 }
@@ -110,7 +110,7 @@
   padding: 6px;
   background: var(--bg-3);
   border: 2px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .theme-card.on {
   border-color: var(--focus);
@@ -118,7 +118,7 @@
 .theme-preview {
   display: flex;
   height: 64px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   border: 1px solid var(--border);
 }
@@ -134,7 +134,7 @@
 }
 .theme-lines span {
   height: 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 .theme-name {
   font-size: var(--text-sm);
