@@ -20,6 +20,7 @@ import { DockerPanel } from './components/docker/DockerPanel';
 import { HardwarePanel } from './components/hardware/HardwarePanel';
 import { GamesPanel } from './components/games/GamesPanel';
 import { CadPanel } from './components/cad/CadPanel';
+import { SketchupPanel } from './components/sketchup/SketchupPanel';
 import { MobilePanel } from './components/mobile/MobilePanel';
 import { GraphicsPanel } from './components/graphics/GraphicsPanel';
 import { SupabasePanel } from './components/SupabasePanel';
@@ -575,6 +576,8 @@ export function App() {
                 <GamesPanel />
               ) : sidebar === 'cad' ? (
                 <CadPanel />
+              ) : sidebar === 'sketchup' ? (
+                <SketchupPanel />
               ) : sidebar === 'graphics' ? (
                 <GraphicsPanel />
               ) : sidebar === 'vercel' ? (

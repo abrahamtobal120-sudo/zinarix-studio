@@ -148,6 +148,12 @@ describe('agent safety', () => {
       'slice_model',
       'gcode_info',
       'printer',
+      // SketchUp (sketchupTools.ts)
+      'sketchup_status',
+      'sketchup_inspect',
+      'sketchup_model',
+      'sketchup_screenshot',
+      'sketchup_install_extension',
       // Fase 3 (plan de funciones): designs and logos as SVG
       'design_templates',
       'design_new',

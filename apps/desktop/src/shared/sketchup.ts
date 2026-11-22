@@ -171,7 +171,6 @@ function label(v: unknown, i: number, op: string, key: string, maxLen = 80): str
   if (typeof v !== 'string' || !v.trim()) err(i, op, `"${key}" must be a non-empty text`);
   const t = v.trim();
   if (t.length > maxLen) err(i, op, `"${key}" is longer than ${maxLen} characters`);
-  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f]/.test(t)) err(i, op, `"${key}" has control characters`);
   return t;
 }

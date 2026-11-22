@@ -117,6 +117,8 @@ import type { PlatformioService } from './platformio.js';
 import { MOBILE_PROMPT_PART, MOBILE_TOOL_NAMES, MOBILE_TOOLS, mobilePreview, runMobileTool } from './mobileTools.js';
 import { GAME_PROMPT_PART, GAME_TOOL_NAMES, GAME_TOOLS, gamePreview, runGameTool } from './gameTools.js';
 import { CAD_PROMPT_PART, CAD_TOOL_NAMES, CAD_TOOLS, cadPreview, runCadTool } from './cadTools.js';
+import { SKETCHUP_PROMPT_PART, SKETCHUP_READ_ONLY, SKETCHUP_TOOL_NAMES, SKETCHUP_TOOLS, runSketchupTool, sketchupPreview } from './sketchupTools.js';
+import type { SketchupService } from './sketchup.js';
 import type { CadService } from './cad.js';
 import type { BlenderModelService } from './blenderModel.js';
 import type { SlicerService } from './slicer.js';
@@ -303,6 +305,7 @@ ${PIO_PROMPT_PART}
 ${MOBILE_PROMPT_PART}
 ${GAME_PROMPT_PART}
 ${CAD_PROMPT_PART}
+${SKETCHUP_PROMPT_PART}
 ${SCENE3D_PROMPT_PART}
 ${VIDEO_PROMPT_PART}
 ${COMPUTER_PROMPT_PART}
@@ -513,6 +516,7 @@ export const TOOLS: ToolDefinition[] = [
   ...MOBILE_TOOLS,
   ...GAME_TOOLS,
   ...CAD_TOOLS,
+  ...SKETCHUP_TOOLS,
   ...SCENE3D_TOOLS,
   ...VIDEO_TOOLS,
   ...COMPUTER_TOOLS,
@@ -643,6 +647,7 @@ const CLI_TOOL_NAMES = new Set([
   ...MOBILE_TOOL_NAMES,
   ...GAME_TOOL_NAMES,
   ...CAD_TOOL_NAMES,
+  ...SKETCHUP_TOOL_NAMES,
   ...VIDEO_TOOL_NAMES,
   ...COMPUTER_TOOL_NAMES,
   ...KNOWLEDGE_TOOL_NAMES,
@@ -687,6 +692,7 @@ const READ_ONLY = new Set([
   ...KNOWLEDGE_READ_ONLY,
   ...VIDEO_READ_ONLY,
   ...GRAPHICS_READ_ONLY,
+  ...SKETCHUP_READ_ONLY,
 ]);
 
 /**
@@ -1065,6 +1071,8 @@ export class Agent {
   /** Fase 7 (plan de funciones): CAD with OpenSCAD and structured Blender edits. */
   cad?: CadService;
   blenderModel?: BlenderModelService;
+  /** SketchUp (sketchup_* tools) through the Zinarix extension. */
+  sketchup?: SketchupService;
   /** Fase 7 (mejora): slicing to G-code and the network 3D printers. */
   slicer?: SlicerService;
   printers?: PrinterStore;
@@ -2214,6 +2222,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
       if (gameCard && 'error' in gameCard) return finish(false, gameCard.error, 'no aplica');
       const cadCard = CAD_TOOL_NAMES.has(call.name) ? cadPreview(call.name, a, ws?.root) : null;
       if (cadCard && 'error' in cadCard) return finish(false, cadCard.error, 'no aplica');
+      const skpCard = SKETCHUP_TOOL_NAMES.has(call.name) ? sketchupPreview(this.sketchup, call.name, a, ws?.root) : null;
+      if (skpCard && 'error' in skpCard) return finish(false, skpCard.error, 'no aplica');
       // Actions beyond the project: risk level + warning, approved per action unless the
       // preview offers an "always" key (low-impact reads such as GET on one site).
       const sys: SystemPreview | null = video
@@ -2234,6 +2244,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
           ? gameCard
         : cadCard
           ? cadCard
+        : skpCard
+          ? skpCard
         : SYSTEM_TOOL_NAMES.has(call.name)
         ? await systemPreview(call.name, a)
         : SECURITY_APPROVAL.has(call.name)
@@ -2431,6 +2443,12 @@ A project hook did not let you finish yet. Address it, then answer.`,
       }
       if (MOBILE_TOOL_NAMES.has(call.name)) {
         const r = await runMobileTool(this.mobile, call.name, a, ws?.root);
+        const out = finish(r.ok, r.content, r.summary);
+        return r.image ? { ...out, image: r.image } : out;
+      }
+      if (SKETCHUP_TOOL_NAMES.has(call.name)) {
+        const r = await runSketchupTool(this.sketchup, call.name, a, ws?.root, opts.signal, ws ? () => ws.listFiles(50_000) : undefined);
+        if (r.changed) opts.emit({ type: 'file_changed', path: r.changed });
         const out = finish(r.ok, r.content, r.summary);
         return r.image ? { ...out, image: r.image } : out;
       }

@@ -45,7 +45,7 @@ export interface Tab {
   size?: number;
 }
 
-export type FileViewer = 'image' | 'hex' | 'large' | 'notebook' | 'design' | 'paint' | 'scene' | 'model' | 'gcode';
+export type FileViewer = 'image' | 'hex' | 'large' | 'notebook' | 'design' | 'paint' | 'scene' | 'model' | 'gcode' | 'sketchup';
 
 /** Fase 7 (mejora): G-code opens as its toolpaths, layer by layer (with a switch to the text). */
 export const isGcodePath = (path: string): boolean => /\.(gcode|gco)$/i.test(path);
@@ -106,6 +106,8 @@ async function viewerFor(
   // Fase 7: meshes (STL, 3MF, glTF…) open in the 3D model viewer.
   if (isMeshPath(path)) return { viewer: 'model', size: 0 };
   if (isGcodePath(path)) return { viewer: 'gcode', size: 0 };
+  // SketchUp: the thumbnail stored in the .skp, its version and "open in SketchUp".
+  if (/\.skp$/i.test(path)) return { viewer: 'sketchup', size: 0 };
   if (!isImagePath(path) && !file.binary && !file.tooLarge) return null;
   const head = await api().workspace.readBytes(path, 0, 8000);
   if (isImagePath(path)) return { viewer: 'image', size: head.size };
@@ -180,6 +182,8 @@ export interface State {
     | 'games'
     /** Fase 7 (plan de funciones): CAD with OpenSCAD and 3D printing. */
     | 'cad'
+    /** SketchUp (.skp): status, extension, thumbnails and the sketchup_* tools. */
+    | 'sketchup'
     /** Fase 3 (plan de funciones): graphics studio (templates, new drawing, designs). */
     | 'graphics'
     /** Panel de Edición: takes the whole editor area (the chat stays beside it). */
@@ -414,7 +418,7 @@ async function loadTab(path: string): Promise<void> {
   const name = path.split('/').pop() ?? path;
   {
     const file =
-      isImagePath(path) || isNotebookPath(path) || isPaintPath(path) || isMeshPath(path) || isGcodePath(path)
+      isImagePath(path) || isNotebookPath(path) || isPaintPath(path) || isMeshPath(path) || isGcodePath(path) || /\.skp$/i.test(path)
       ? { content: '', binary: true, tooLarge: false }
       : await api().workspace.readFile(path);
     const view = await viewerFor(path, file).catch(() => null);

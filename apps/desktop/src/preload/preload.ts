@@ -348,6 +348,15 @@ const api: OmniApi = {
     create: call('cad:create') as OmniApi['cad']['create'],
     readMesh: call('cad:readMesh') as OmniApi['cad']['readMesh'],
   },
+  sketchup: {
+    status: call('sketchup:status') as OmniApi['sketchup']['status'],
+    pick: call('sketchup:pick') as OmniApi['sketchup']['pick'],
+    install: call('sketchup:install') as OmniApi['sketchup']['install'],
+    inspect: call('sketchup:inspect') as OmniApi['sketchup']['inspect'],
+    open: call('sketchup:open') as OmniApi['sketchup']['open'],
+    run: call('sketchup:run') as OmniApi['sketchup']['run'],
+    readExport: call('sketchup:readExport') as OmniApi['sketchup']['readExport'],
+  },
   print: {
     slicer: call('print:slicer') as OmniApi['print']['slicer'],
     pickSlicer: call('print:pickSlicer') as OmniApi['print']['pickSlicer'],

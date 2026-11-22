@@ -60,7 +60,6 @@ const NOT_GRAPHIC = new Set([
   'defs', 'style', 'title', 'desc', 'metadata', 'script', 'linearGradient', 'radialGradient',
   'pattern', 'clipPath', 'mask', 'filter', 'symbol', 'marker', 'foreignObject',
 ]);
-const SHAPES = new Set(['rect', 'circle', 'ellipse', 'line', 'path', 'polygon', 'polyline', 'text', 'image', 'use']);
 
 export type Tool = 'select' | 'rect' | 'ellipse' | 'line' | 'pen' | 'text' | 'hand';
 

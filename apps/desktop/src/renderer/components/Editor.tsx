@@ -41,6 +41,7 @@ import { isGcodePath, isScenePath, isSvgPath, setTabViewer } from '../store';
 import { CadPreview } from './cad/CadPreview';
 import { ModelView } from './cad/ModelView';
 import { GcodeView } from './cad/GcodeView';
+import { SkpView } from './sketchup/SketchupPanel';
 import { tc } from './cad/cadStrings';
 
 function prefOptions(p: Prefs): monaco.editor.IEditorOptions {
@@ -264,6 +265,8 @@ export function EditorArea() {
         <ModelView key={activeTab.path} path={activeTab.path} />
       ) : activeTab?.viewer === 'gcode' ? (
         <GcodeView key={activeTab.path} path={activeTab.path} />
+      ) : activeTab?.viewer === 'sketchup' ? (
+        <SkpView key={activeTab.path} path={activeTab.path} />
       ) : (
         activeTab?.viewer && <FileViewerPane key={activeTab.path} tab={activeTab} />
       )}

@@ -832,6 +832,7 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
     setW(bot?.widget);
     setOrigins((bot?.widget.origins ?? []).join('\n'));
     setKeyMissing(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when another bot is picked
   }, [bot?.id]);
   useEffect(() => {
     void api()

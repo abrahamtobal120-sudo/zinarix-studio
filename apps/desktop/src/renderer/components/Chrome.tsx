@@ -14,6 +14,7 @@ import { th } from './hardware/hardwareStrings';
 import { tm } from './mobile/mobileStrings';
 import { tgm } from './games/gamesStrings';
 import { tc as tcad } from './cad/cadStrings';
+import { tsu } from './sketchup/sketchupStrings';
 import { tg } from './graphics/graphicsStrings';
 import { ta } from './automations/automationsStrings';
 import { td } from '../i18nDebug';
@@ -127,6 +128,7 @@ function useBarItems() {
     mobile: view('mobile', tm('title'), 'smartphone'),
     games: view('games', tgm('title'), 'gamepad'),
     cad: view('cad', tcad('title'), 'compass'),
+    sketchup: view('sketchup', tsu('title'), 'home'),
     graphics: view('graphics', tg('title'), 'image'),
     browser: tool('browser', t('browser'), 'globe', 'toggle', browserActive, () =>
       browserActive ? leaveTab() : openBrowserTab(),
@@ -259,6 +261,7 @@ export function ActivityBar() {
     items.mobile,
     items.games,
     items.cad,
+    items.sketchup,
     items.graphics,
     items.whatsapp,
     items.browser,
@@ -343,6 +346,7 @@ export function AppsPanel() {
         {row(items.studio3d, t('apps3d'))}
         {row(items.graphics, tg('desc'))}
         {row(items.cad, tcad('desc'))}
+        {row(items.sketchup, tsu('desc'))}
         {row(items.games, tgm('desc'))}
         <div className="apps-section">{t('appsTools')}</div>
         {row(items.testing, t('appsTesting'), t('appsTestingName'))}

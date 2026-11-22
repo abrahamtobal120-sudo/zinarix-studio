@@ -103,8 +103,7 @@ export class SketchupService {
   }
 
   async pick(exe: string): Promise<boolean> {
-    let p = exe;
-    if (/\.app$/i.test(p) === false && process.platform === 'darwin' && /SketchUp\.app/i.test(p)) p = p.replace(/(SketchUp\.app).*/i, '$1');
+    const p = process.platform === 'darwin' ? exe.replace(/(SketchUp\.app).*/i, '$1') : exe;
     if (!existsSync(p) || !/sketchup/i.test(p)) return false;
     this.picked = p;
     await mkdir(dirname(this.configPath), { recursive: true });

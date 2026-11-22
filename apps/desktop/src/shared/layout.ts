@@ -38,6 +38,7 @@ export const SIDE_VIEWS = [
   'mobile',
   'games',
   'cad',
+  'sketchup',
   'design',
   'graphics',
 ] as const;

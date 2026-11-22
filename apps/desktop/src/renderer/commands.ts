@@ -152,6 +152,11 @@ function baseCommands(): Command[] {
       run: () => setState({ sidebar: 'cad' }),
     },
     {
+      id: 'sketchup.open',
+      label: 'SketchUp: modelos .skp / .skp models',
+      run: () => setState({ sidebar: 'sketchup' }),
+    },
+    {
       id: 'mobile.open',
       label: 'Celular / Phone: Android, Flutter, Expo',
       run: () => setState({ sidebar: 'mobile' }),

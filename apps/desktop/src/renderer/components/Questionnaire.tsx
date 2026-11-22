@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { lang } from '../i18n';
 import {
   recommend,
@@ -72,6 +72,19 @@ const es = {
   finish: 'Listo, armar mi app',
   pickOne: 'Elige al menos una opción.',
   done: 'Zinarix quedó listo para ti. Puedes repetir el cuestionario en Configuración.',
+  stepOf: 'Pregunta {n} de 5',
+  picked: '{n} elegidas',
+  sumTitle: 'Así quedará tu app',
+  sumLead: 'Revisa el resumen. Todo se puede cambiar después en Configuración.',
+  sumPanels: 'Paneles en tu barra',
+  sumNoPanels: 'La barra queda sencilla: lo demás está en «Más».',
+  sumOpens: 'Se abre primero',
+  sumAi: 'La IA',
+  sumHelp: 'Ayuda',
+  sumLook: 'Tema',
+  helpNew: 'Burbuja de ayuda, texto ajustado y explicaciones paso a paso',
+  helpSome: 'Burbuja de ayuda y explicaciones normales',
+  helpPro: 'Sin burbuja de ayuda, con minimapa',
 };
 const en: typeof es = {
   label: 'Getting started questionnaire',
@@ -123,9 +136,78 @@ const en: typeof es = {
   finish: 'Done, build my app',
   pickOne: 'Pick at least one option.',
   done: 'Zinarix is ready for you. You can repeat the questionnaire in Settings.',
+  stepOf: 'Question {n} of 5',
+  picked: '{n} picked',
+  sumTitle: 'This is how your app will look',
+  sumLead: 'Check the summary. Everything can be changed later in Settings.',
+  sumPanels: 'Panels in your bar',
+  sumNoPanels: 'The bar stays simple: everything else is under “More”.',
+  sumOpens: 'Opens first',
+  sumAi: 'The AI',
+  sumHelp: 'Help',
+  sumLook: 'Theme',
+  helpNew: 'Help bubble, word wrap and step by step explanations',
+  helpSome: 'Help bubble and normal explanations',
+  helpPro: 'No help bubble, minimap on',
 };
 type K = keyof typeof es;
 const tq = (k: K) => (lang === 'en' ? en : es)[k];
+
+/** Name and icon of each panel the questionnaire can pin (keys of Chrome.tsx useBarItems). */
+const PANEL: Record<string, { icon: IconName; es: string; en: string }> = {
+  browser: { icon: 'globe', es: 'Navegador', en: 'Browser' },
+  design: { icon: 'palette', es: 'Edición', en: 'Design' },
+  playground: { icon: 'sparkle', es: 'Playground', en: 'Playground' },
+  mobile: { icon: 'smartphone', es: 'Celular', en: 'Mobile' },
+  games: { icon: 'gamepad', es: 'Juegos', en: 'Games' },
+  studio3d: { icon: 'cube', es: 'Estudio 3D', en: '3D Studio' },
+  hardware: { icon: 'cpu', es: 'Hardware', en: 'Hardware' },
+  sketchup: { icon: 'home', es: 'SketchUp', en: 'SketchUp' },
+  cad: { icon: 'compass', es: 'CAD', en: 'CAD' },
+  video: { icon: 'film', es: 'Video', en: 'Video' },
+  graphics: { icon: 'image', es: 'Gráficos', en: 'Graphics' },
+  testing: { icon: 'beaker', es: 'Pruebas', en: 'Tests' },
+  docker: { icon: 'package', es: 'Docker', en: 'Docker' },
+  vercel: { icon: 'vercel', es: 'Vercel', en: 'Vercel' },
+  supabase: { icon: 'supabase', es: 'Supabase', en: 'Supabase' },
+  gcloud: { icon: 'cloud', es: 'Google Cloud', en: 'Google Cloud' },
+  mail: { icon: 'mail', es: 'Correo', en: 'Mail' },
+  automations: { icon: 'clock', es: 'Automatizaciones', en: 'Automations' },
+};
+const panelName = (k: string) => PANEL[k]?.[lang === 'en' ? 'en' : 'es'] ?? k;
+
+function Summary({ a }: { a: Answers }) {
+  const r = recommend(a);
+  const help: K = a.level === 'new' ? 'helpNew' : a.level === 'pro' ? 'helpPro' : 'helpSome';
+  const row = (label: K, value: ReactNode) => (
+    <div className="quiz-sum-row">
+      <span className="dim">{tq(label)}</span>
+      <span>{value}</span>
+    </div>
+  );
+  return (
+    <div className="quiz-sum">
+      <div className="quiz-sum-bar">
+        <span className="dim">{tq('sumPanels')}</span>
+        {r.pinned.length ? (
+          <div className="quiz-sum-chips">
+            {r.pinned.map((k) => (
+              <span key={k} className={`quiz-chip${k === r.start ? ' first' : ''}`}>
+                <Icon name={PANEL[k]?.icon ?? 'apps'} size={14} /> {panelName(k)}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="dim">{tq('sumNoPanels')}</p>
+        )}
+      </div>
+      {r.start && row('sumOpens', panelName(r.start))}
+      {row('sumAi', tq(a.help))}
+      {row('sumHelp', tq(help))}
+      {row('sumLook', tq(a.look))}
+    </div>
+  );
+}
 
 const USE_ICON: Record<Use, IconName> = {
   web: 'globe',
@@ -200,7 +282,7 @@ export function Questionnaire({ onDone }: { onDone: () => void }) {
   const [help, setHelp] = useState<Help>('ask');
   const [look, setLook] = useState<Look>('dark');
   const [busy, setBusy] = useState(false);
-  const steps = 6;
+  const steps = 7;
   const skip = () => {
     saveProfile({
       answers: { uses: [], level, ai, help, look },
@@ -217,6 +299,13 @@ export function Questionnaire({ onDone }: { onDone: () => void }) {
     setBusy(true);
     void apply({ uses, level, ai, help, look }, onDone).finally(() => setBusy(false));
   };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' || busy) return;
+    // Enter on a focused button presses that button; anywhere else it goes on.
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    next();
+  };
   return (
     <ModalShell
       onClose={skip}
@@ -225,6 +314,10 @@ export function Questionnaire({ onDone }: { onDone: () => void }) {
       className="onboarding quiz"
       label={tq('label')}
     >
+      <div className="quiz-wrap" onKeyDown={onKey}>
+      {step > 0 && step < steps - 1 && (
+        <div className="quiz-step">{tq('stepOf').replace('{n}', String(step))}</div>
+      )}
       <div className="onb-dots" aria-hidden="true">
         {Array.from({ length: steps }, (_, i) => (
           <span key={i} className={i === step ? 'on' : i < step ? 'done' : ''} />
@@ -240,7 +333,12 @@ export function Questionnaire({ onDone }: { onDone: () => void }) {
       {step === 1 && (
         <div className="onb-step">
           <h2>{tq('q1')}</h2>
-          <p className="dim">{tq('q1Hint')}</p>
+          <p className="dim">
+            {tq('q1Hint')}
+            {uses.length > 0 && (
+              <span className="quiz-count">{tq('picked').replace('{n}', String(uses.length))}</span>
+            )}
+          </p>
           <div className="quiz-uses">
             {USES.map((u) => (
               <button
@@ -312,6 +410,13 @@ export function Questionnaire({ onDone }: { onDone: () => void }) {
           />
         </div>
       )}
+      {step === 6 && (
+        <div className="onb-step">
+          <h2>{tq('sumTitle')}</h2>
+          <p className="dim">{tq('sumLead')}</p>
+          <Summary a={{ uses, level, ai, help, look }} />
+        </div>
+      )}
       <div className="onb-nav">
         {step > 0 ? (
           <button onClick={() => setStep(step - 1)}>{tq('back')}</button>
@@ -323,6 +428,7 @@ export function Questionnaire({ onDone }: { onDone: () => void }) {
         <button className="primary" disabled={busy} onClick={next}>
           {step === 0 ? tq('start') : step === steps - 1 ? tq('finish') : tq('next')}
         </button>
+      </div>
       </div>
     </ModalShell>
   );

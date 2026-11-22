@@ -1,0 +1,189 @@
+@layer features {
+/* SketchUp panel and the .skp viewer (builds on cad.css) */
+.skp-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  color: var(--fg-dim);
+}
+.skp-line.ok {
+  color: var(--ok);
+}
+.skp-line.warn {
+  color: var(--warn);
+}
+.skp-dim {
+  color: var(--fg-dim);
+  word-break: break-all;
+}
+.skp-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: var(--radius-full);
+  background: var(--fg-dim);
+}
+.skp-dot.on {
+  background: var(--ok);
+}
+.skp-ask {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  font: inherit;
+  font-size: var(--text-xs);
+}
+.skp-ask:focus {
+  outline: 1px solid var(--focus);
+}
+.skp-box {
+  display: grid;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--fg-dim);
+}
+.skp-box input {
+  min-width: 0;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-1);
+  font-size: var(--text-xs);
+}
+.skp-shot {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.skp-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.skp-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.skp-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.skp-item-main:hover {
+  background: var(--hover);
+}
+.skp-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skp-thumb {
+  flex: none;
+  width: 48px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  color: var(--fg-dim);
+}
+.skp-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.skp-thumb.big {
+  width: 240px;
+  height: 160px;
+  font-size: var(--text-xs);
+}
+.cad-file.on {
+  background: var(--sel-soft);
+}
+.skp-mesh {
+  position: relative;
+  height: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+}
+.skp-mesh-view {
+  position: absolute;
+  inset: 0;
+}
+.skp-mesh-btns {
+  position: absolute;
+  right: var(--space-1);
+  bottom: var(--space-1);
+  display: flex;
+  gap: 2px;
+}
+.skp-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.skp-view-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+.skp-view-img {
+  max-width: 100%;
+  max-height: 70%;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-2);
+}
+.skp-meta {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: var(--text-sm);
+}
+.cad-engine.skp-missing {
+  color: var(--fg-strong);
+}
+.cad-engine.skp-missing .icon {
+  color: var(--warn);
+}
+.skp-empty {
+  align-items: center;
+  text-align: center;
+  color: var(--fg-dim);
+}
+}

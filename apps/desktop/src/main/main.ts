@@ -126,6 +126,9 @@ import { CadService, builtinViaProcess } from './cad.js';
 import { BgRemoveService, bgViaProcess } from './bgRemove.js';
 import { BG_MODELS, type BgStatusView } from '../shared/bgRemove.js';
 import { BlenderModelService } from './blenderModel.js';
+import { SketchupService } from './sketchup.js';
+import { readSkpHead } from './sketchupTools.js';
+import { SKETCHUP_PREVIEWABLE, SKETCHUP_UNITS, parseSkp, validateSketchupOps, type SketchupRunView, type SketchupStatusView, type SkpInfoView } from '../shared/sketchup.js';
 import { SlicerService } from './slicer.js';
 import { PrinterClient, PrinterStore, normalizePrinterUrl, printerFileName } from './printers.js';
 import { TokenStore } from './token-store.js';
@@ -3457,23 +3460,21 @@ function registerReviewIpc(): void {
 let docker: DockerService | undefined;
 // ---------------- Fase 4: screen recording and proxies (Video Studio) ----------------
 
-let recorder: Recorder | undefined;
-let proxies: ProxyMaker | undefined;
 /** Recording ids by window (only the window that started one may write to it). */
 const recOwner = new Map<string, Win>();
 const REC_STOP_KEY = 'CommandOrControl+Alt+R';
 
 function registerVideoPhase4Ipc(): void {
-  const rec = (recorder = new Recorder(() => videoService().tools().ffmpeg));
+  const rec = new Recorder(() => videoService().tools().ffmpeg);
   rec.install(session.defaultSession);
-  const px = (proxies = new ProxyMaker(
+  const px = new ProxyMaker(
     () => videoService().cacheDir,
     () => {
       const bin = videoService().tools().ffmpeg;
       if (!bin) throw new Error('FFmpeg no está disponible en este equipo.');
       return bin;
     },
-  ));
+  );
   const recId = z.string().min(1).max(80);
   const ownRec = (w: Win, id: string) => {
     if (recOwner.get(id) !== w) throw new Error('Esa grabación no es de esta ventana.');
@@ -3749,6 +3750,93 @@ function registerCadIpc(): void {
     return new Uint8Array(await readFile(abs));
   });
   registerPrintIpc(c, absOf, rootOf);
+}
+
+/** SketchUp (.skp): the side panel, and the sketchup_* tools of the agent. */
+function registerSketchupIpc(): void {
+  const su = new SketchupService(join(app.getPath('userData'), 'sketchup.json'));
+  ai.agent.sketchup = su;
+  const rootOf = (w: Win) => w.workspace?.root;
+  // Paths of the panel are relative to the open folder (like tabs) and must stay inside it.
+  const inside = (w: Win, p: string, ext?: RegExp) => {
+    const root = rootOf(w);
+    if (!root) throw new Error('Abre una carpeta primero.');
+    const abs = resolve(root, p);
+    const r = relative(root, abs);
+    if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error('El archivo tiene que estar dentro de la carpeta abierta.');
+    if (ext && !ext.test(abs)) throw new Error('Ese tipo de archivo no sirve aquí.');
+    return abs;
+  };
+  const relOf = (w: Win, p: string) => {
+    const root = rootOf(w);
+    if (!root || !p) return p;
+    const r = relative(root, p);
+    return r.startsWith('..') || isAbsolute(r) ? p : r.split(sep).join('/');
+  };
+  const path = z.string().min(1).max(4096);
+  handle('sketchup:status', z.tuple([]), (): SketchupStatusView => su.status());
+  handle('sketchup:pick', z.tuple([]), async (w): Promise<SketchupStatusView | null> => {
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Elige SketchUp',
+      properties: ['openFile'],
+      ...(process.platform === 'win32' ? { filters: [{ name: 'SketchUp', extensions: ['exe'] }] } : {}),
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return (await su.pick(r.filePaths[0])) ? su.status() : null;
+  });
+  handle('sketchup:install', z.tuple([]), async (): Promise<SketchupStatusView> => {
+    await su.installExtension();
+    return su.status();
+  });
+  handle('sketchup:inspect', z.tuple([path]), async (w, p): Promise<SkpInfoView> => {
+    const abs = inside(w, p, /\.skp$/i);
+    const info = parseSkp(await readSkpHead(abs));
+    return {
+      path: p,
+      size: statSync(abs).size,
+      version: info.version,
+      label: info.label,
+      thumbnail: info.thumbnail ? new Uint8Array(info.thumbnail.png) : null,
+      width: info.thumbnail?.width ?? 0,
+      height: info.thumbnail?.height ?? 0,
+    };
+  });
+  handle('sketchup:open', z.tuple([path]), async (w, p) => {
+    const abs = inside(w, p, /\.skp$/i);
+    if (!existsSync(abs)) throw new Error('El archivo no existe.');
+    await su.open(abs);
+  });
+  handle(
+    'sketchup:run',
+    z.tuple([
+      path.nullable(),
+      z.array(z.record(z.string().max(40), z.unknown())).max(100),
+      z.object({ units: z.enum(SKETCHUP_UNITS).optional(), save: z.boolean().optional(), shot: z.boolean().optional() }),
+    ]),
+    async (w, p, raw, o): Promise<SketchupRunView> => {
+      try {
+        const file = p ? inside(w, p, /\.skp$/i) : undefined;
+        const ops = validateSketchupOps(raw, (q) => inside(w, q));
+        for (const op of ops) if (typeof op.path === 'string' && (op.op === 'export' || op.op === 'save')) mkdirSync(dirname(op.path), { recursive: true });
+        const r = await su.run(
+          { ...(file ? { path: file } : {}), units: o.units ?? 'mm', ops, save: o.save ?? false, ...(o.shot ? { shot: { path: '', width: 960, height: 600 } } : {}) },
+          { launch: true },
+        );
+        const report = r.report
+          ? { ...r.report, model: relOf(w, r.report.model), exported: r.report.exported.map((x) => relOf(w, x)), ...(r.report.saved ? { saved: relOf(w, r.report.saved) } : {}) }
+          : undefined;
+        return { ok: r.ok, ...(r.error ? { error: r.error } : {}), ...(report ? { report } : {}), ...(r.shot ? { shot: new Uint8Array(r.shot) } : {}) };
+      } catch (e) {
+        return { ok: false, error: (e as Error).message };
+      }
+    },
+  );
+  // Meshes exported by SketchUp (.stl/.obj/.dae) for the panel's 3D preview.
+  handle('sketchup:readExport', z.tuple([path]), async (w, p) => {
+    const abs = inside(w, p, SKETCHUP_PREVIEWABLE);
+    if (!existsSync(abs) || statSync(abs).size > 200 * 1024 * 1024) throw new Error('El archivo no existe o pesa más de 200 MB.');
+    return new Uint8Array(await readFile(abs));
+  });
 }
 
 /** Fase 7 (mejora): slicing to G-code (PrusaSlicer) and the network 3D printers. */
@@ -5598,6 +5686,7 @@ app.whenReady().then(async () => {
   registerPioIpc();
   registerGamesIpc();
   registerCadIpc();
+  registerSketchupIpc();
   registerBgIpc();
   registerMobileIpc();
   registerVideoPhase4Ipc();

@@ -1,4 +1,5 @@
 import type { CadEnginesView, CadFormat, CadRenderView } from './cad.js';
+import type { SketchupRunView, SketchupStatusView, SketchupUnits, SkpInfoView } from './sketchup.js';
 import type { BgModelId, BgStatusView } from './bgRemove.js';
 import type { PrinterAction, PrinterConfig, PrinterKind, PrinterStatus, SliceSettings, SliceView, SlicerView } from './slicer.js';
 import type { DesignApplyResult, DesignOp, DesignSessionView } from './design.js';
@@ -2269,6 +2270,22 @@ export interface OmniApi {
     /** Bytes of a mesh file of the open folder, for the model viewer (at most 300 MB). */
     readMesh(path: string): Promise<Uint8Array>;
   };
+  /** SketchUp (.skp): status, the Zinarix extension, thumbnails and running validated ops. */
+  sketchup: {
+    status(): Promise<SketchupStatusView>;
+    /** Asks for SketchUp.exe / SketchUp.app (null = cancelled or not SketchUp). */
+    pick(): Promise<SketchupStatusView | null>;
+    /** Copies the Zinarix extension to SketchUp's Plugins folder. */
+    install(): Promise<SketchupStatusView>;
+    /** Version and embedded preview of a .skp of the open folder (no SketchUp needed). */
+    inspect(path: string): Promise<SkpInfoView>;
+    /** Opens a .skp of the open folder in SketchUp. */
+    open(path: string): Promise<void>;
+    /** Runs ops (validated like sketchup_model) on a .skp, or on the model open in SketchUp (null). */
+    run(path: string | null, ops: Record<string, unknown>[], opts: { units?: SketchupUnits; save?: boolean; shot?: boolean }): Promise<SketchupRunView>;
+    /** Bytes of an .stl/.obj/.dae of the open folder, for the preview. */
+    readExport(path: string): Promise<Uint8Array>;
+  };
   /** Fase 7 (mejora): slicing to G-code with PrusaSlicer, and the network 3D printers. */
   print: {
     slicer(refresh?: boolean): Promise<SlicerView>;
@@ -3039,6 +3056,13 @@ export const CHANNELS = [
   'cad:export',
   'cad:create',
   'cad:readMesh',
+  'sketchup:status',
+  'sketchup:pick',
+  'sketchup:install',
+  'sketchup:inspect',
+  'sketchup:open',
+  'sketchup:run',
+  'sketchup:readExport',
   'print:slicer',
   'print:pickSlicer',
   'print:pickProfile',

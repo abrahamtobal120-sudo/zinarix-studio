@@ -230,6 +230,7 @@ export function PaintView({
     });
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clipped() only reads st
   }, [st]);
 
   /** The stroke kept inside the selection (the stroke canvas itself when there is none). */
