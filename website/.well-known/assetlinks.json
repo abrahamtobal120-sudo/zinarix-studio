@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.zinarix.remote",
+      "sha256_cert_fingerprints": [
+        "64:93:73:BF:4B:E4:BD:52:49:5E:C2:19:35:D6:C3:91:04:26:A3:60:26:A0:06:7E:A4:7E:BD:AB:B0:A0:A7:9B"
+      ]
+    }
+  }
+]

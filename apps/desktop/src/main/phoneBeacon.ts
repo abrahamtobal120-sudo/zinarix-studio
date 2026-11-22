@@ -14,6 +14,9 @@ import { bin } from './bin.js';
 export const RELAY_PAGE = 'https://zinarix-studio.vercel.app/p';
 export const BEACON_FILE = 'zinarix-remote.json';
 
+/** The Android app of the remote (link shown on the phone page). */
+export { REMOTE_APP_APK as APP_APK } from '../shared/api.js';
+
 /** Publishes the address (null: the remote is off); returns the gist id (new or the same). */
 export type PhoneBeacon = (url: string | null, id?: string) => Promise<string>;
 

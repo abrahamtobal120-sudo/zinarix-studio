@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain http is needed for the computer on the same Wi-Fi (http://192.168.x.x:47390).
+     The app only lets the WebView load the host of the saved link, and only accepts plain
+     http links to private addresses (Link.java). -->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hold the app icon: a new chat, or dictate a message to the AI. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_new"
+        android:shortcutId="new_chat"
+        android:shortcutLongLabel="@string/sc_new_long"
+        android:shortcutShortLabel="@string/sc_new">
+        <intent
+            android:action="com.zinarix.remote.NEW_CHAT"
+            android:targetClass="com.zinarix.remote.MainActivity"
+            android:targetPackage="com.zinarix.remote" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_mic"
+        android:shortcutId="dictate"
+        android:shortcutLongLabel="@string/sc_dictate_long"
+        android:shortcutShortLabel="@string/sc_dictate">
+        <intent
+            android:action="com.zinarix.remote.DICTATE"
+            android:targetClass="com.zinarix.remote.MainActivity"
+            android:targetPackage="com.zinarix.remote" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_stop"
+        android:shortcutId="stop"
+        android:shortcutLongLabel="@string/sc_stop_long"
+        android:shortcutShortLabel="@string/stop">
+        <intent
+            android:action="com.zinarix.remote.STOP_AI"
+            android:targetClass="com.zinarix.remote.MainActivity"
+            android:targetPackage="com.zinarix.remote" />
+    </shortcut>
+</shortcuts>

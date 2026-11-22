@@ -3,7 +3,7 @@
  * approvals, stop). Self-contained (no files, no outside requests); text is never parsed as
  * HTML.
  */
-import { RELAY_PAGE } from './phoneBeacon.js';
+import { APP_APK, RELAY_PAGE } from './phoneBeacon.js';
 import { CONFIG_CSS, CONFIG_ICONS, CONFIG_JS, CONFIG_TEXT } from './phoneConfig.js';
 import { TOOLS_CSS, TOOLS_ICONS, TOOLS_JS, TOOLS_TEXT } from './phoneTools.js';
 
@@ -108,6 +108,10 @@ const TEXT = {
     install: 'Instalar como app',
     installHint: 'Para tenerlo como app con el mismo enlace: menú del navegador → "Agregar a pantalla de inicio".',
     unpairMe: 'Desconectar este celular',
+    changeComputer: 'Cambiar de computadora',
+    appOptions: 'Opciones de la app',
+    getApp: 'Descargar la app para Android',
+    getAppHint: 'Con la app recibes avisos aunque el celular esté bloqueado, dictas por voz y el enlace se abre solo desde el QR.',
     unpairConfirm: '¿Desconectar este celular? Tendrás que escribir el PIN otra vez.',
     stays: 'Este celular queda conectado aunque cierres Zinarix: cuando lo abras otra vez se reconecta solo, con el mismo enlace.',
     voice: 'Dictar',
@@ -234,6 +238,10 @@ const TEXT = {
     install: 'Install as an app',
     installHint: 'To keep it as an app with the same link: browser menu → "Add to Home screen".',
     unpairMe: 'Disconnect this phone',
+    changeComputer: 'Change computer',
+    appOptions: 'App options',
+    getApp: 'Get the Android app',
+    getAppHint: 'With the app you get alerts even with the phone locked, dictate by voice, and the QR link opens straight in it.',
     unpairConfirm: 'Disconnect this phone? You will have to type the PIN again.',
     stays: 'This phone stays connected even if you close Zinarix: when it opens again it reconnects by itself, with the same link.',
     voice: 'Dictate',
@@ -276,7 +284,11 @@ export function phoneLang(accept: string | undefined): PhoneLang {
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export function phonePage(nonce: string, lang: PhoneLang = 'es'): string {
+export function phonePage(
+  nonce: string,
+  lang: PhoneLang = 'es',
+  opts: { /** Path of the Android app on this computer, when Zinarix ships it. */ localApk?: string } = {},
+): string {
   const T = {
     ...(TEXT[lang] ?? TEXT.es),
     ...(TOOLS_TEXT[lang] ?? TOOLS_TEXT.es),
@@ -330,6 +342,7 @@ button:active{background:var(--hover)}
 button:disabled{opacity:.45}
 button.primary{background:var(--accent);color:var(--accent-fg);border:0;font-weight:500}
 button.danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+a.btn-link{display:block;text-align:center;text-decoration:none;color:var(--accent-fg);background:var(--accent);border-radius:6px;padding:8px 14px;font-weight:500}
 svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .hide{display:none!important}
 .logo{width:28px;height:28px;border-radius:8px;background:var(--grad);display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;flex:none}
@@ -598,6 +611,7 @@ let token = localStorage.getItem('zx.token') || '';
  * address of the free tunnel is a new site for the phone, with its storage empty.
  */
 const RELAY = ${JSON.stringify(RELAY_PAGE)};
+const APP_APK = ${JSON.stringify(opts.localApk ?? APP_APK)};
 const HASH = new URLSearchParams(location.hash.slice(1));
 const KEY = /^[0-9a-f]{32,}$/.test(HASH.get('k') || '') ? HASH.get('k') : '';
 const RELAY_G = /^[0-9a-f]{20,40}$/.test(HASH.get('g') || '') ? HASH.get('g') : localStorage.getItem('zx.relay') || '';
@@ -608,6 +622,8 @@ if (HASH.has('t') || HASH.has('g')) history.replaceState(null, '', location.path
 function toRelay(extra) {
   location.replace(RELAY + '#g=' + RELAY_G + (KEY ? '&k=' + KEY : '') + (extra || ''));
 }
+/** The Android app (Zinarix Remote) adds notifications, dictation and more; null in a browser. */
+const NATIVE = window.ZinarixNative || null;
 let snap = null, es = null, stick = true, online = false;
 const PANELS = ['head', 'tabs', 'log', 'foot'];
 const ICONS = {
@@ -710,6 +726,7 @@ function drawer(open) { document.body.classList.toggle('open', open); }
 
 function unpair() {
   token = '';
+  nativeStatus(false, 0);
   localStorage.removeItem('zx.token');
   if (es) es.close();
   es = null;
@@ -722,11 +739,18 @@ function unpair() {
   setOnline(false);
   $('offline').classList.add('hide');
 }
+/** The app lists the saved computers by their name. */
+function nativeComputer(d) {
+  if (!NATIVE || typeof NATIVE.computer !== 'function' || !d || !d.computer) return;
+  try { NATIVE.computer(String(d.computer).slice(0, 60)); } catch {}
+}
 function paired() {
   $('pair').classList.add('hide');
   for (const id of PANELS) $(id).classList.remove('hide');
   connect();
   loadCaps();
+  if (NATIVE) fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } })
+    .then((r) => (r.ok ? r.json() : null)).then(nativeComputer).catch(() => undefined);
   // Model names for the header and the messages (the picker fetches them again when opened).
   fetch('/api/models', { headers: { Authorization: 'Bearer ' + token } })
     .then((r) => (r.ok ? r.json() : null))
@@ -1236,6 +1260,7 @@ function alertChanges(waiting) {
   const other = snap.chats.some((c) => c.waiting && c.id !== snap.chatId);
   const n = waiting.length + snap.chats.filter((c) => c.waiting && c.id !== snap.chatId).length;
   document.title = (n ? '(' + n + ') ' : '') + 'Zinarix Studio';
+  nativeStatus(snap.chats.some((c) => c.busy) || !!snap.busy, n);
   if (lastBusy !== null && PREFS.notify) {
     if ((ask && ask !== lastAsk) || (other && !lastOther)) ping(ask ? L.approvalNotify : L.otherWaiting);
     else if (lastBusy && !snap.busy) ping(L.doneNotify);
@@ -1243,6 +1268,11 @@ function alertChanges(waiting) {
   lastBusy = snap.busy; lastAsk = ask; lastOther = other;
 }
 function ping(text) {
+  if (NATIVE) {
+    // The app knows whether it is on screen: it vibrates, or posts a system notification.
+    try { NATIVE.vibrate(document.hidden ? 300 : 60); NATIVE.notify(text); } catch {}
+    return;
+  }
   if (!document.hidden) { if (navigator.vibrate) navigator.vibrate(60); return; }
   if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
   try {
@@ -1250,9 +1280,36 @@ function ping(text) {
   } catch {}
 }
 
+/**
+ * The app keeps a fixed notification ("the AI is working", with Stop) while the AI works or
+ * waits: it keeps the app awake in the background, so the alerts arrive.
+ */
+let lastNative = '';
+function nativeStatus(busy, waiting) {
+  if (!NATIVE || typeof NATIVE.status !== 'function') return;
+  const k = (busy ? 1 : 0) + ':' + waiting;
+  if (k === lastNative) return;
+  lastNative = k;
+  try { NATIVE.status(busy, waiting, curFolder() || ''); } catch {}
+}
+/** What the app asks of the panel: Stop from the notification, shared text, its shortcuts. */
+window.__zxStop = () => { if (token) act({ kind: 'stop' }); return !!token; };
+window.__zxNewChat = () => { if (token) act({ kind: 'newChat' }); return !!token; };
+window.__zxCompose = (text) => {
+  if (!token) return false;
+  const t = $('text');
+  t.value = t.value.trim() ? t.value.replace(/\\s*$/, '') + '\\n\\n' + text : text;
+  grow();
+  saveDraft();
+  t.focus();
+  return true;
+};
+window.__zxDictate = () => { if (!token || !Speech) return !!token; if (!rec) dictate(); return true; };
+
 /** The screen stays on while the AI works (only where the browser allows it: https). */
 let lock = null;
 function keepAwake() {
+  if (NATIVE) { try { NATIVE.keepAwake(!!(PREFS.wake && snap && snap.busy)); } catch {} return; }
   const want = PREFS.wake && snap && snap.busy && !document.hidden && navigator.wakeLock;
   if (want && !lock) {
     lock = 'pending';
@@ -1289,9 +1346,10 @@ async function openSettings() {
   }
   box.append(seg);
   box.append(check(L.notify, 'notify', (on) => {
-    if (on && window.Notification && Notification.permission === 'default') Notification.requestPermission().catch(() => undefined);
+    if (on && NATIVE) { try { NATIVE.askNotify(); } catch {} }
+    else if (on && window.Notification && Notification.permission === 'default') Notification.requestPermission().catch(() => undefined);
   }));
-  if (navigator.wakeLock) box.append(check(L.wake, 'wake', () => keepAwake()));
+  if (navigator.wakeLock || NATIVE) box.append(check(L.wake, 'wake', () => keepAwake()));
   box.append(check(L.enterSend, 'enter'));
   box.append(el('div', 'stitle', L.deviceName));
   const nr = el('div', 'row');
@@ -1311,7 +1369,7 @@ async function openSettings() {
   box.append(since);
   fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } })
     .then((r) => (r.ok ? r.json() : null))
-    .then((d) => { if (d) { name.value = d.name || ''; since.textContent = L.pairedSince + ': ' + new Date(d.at).toLocaleString(); } })
+    .then((d) => { if (d) { name.value = d.name || ''; nativeComputer(d); since.textContent = L.pairedSince + ': ' + new Date(d.at).toLocaleString(); } })
     .catch(() => undefined);
   if (caps.config !== false) {
     const cb = el('button', '', L.appConfig);
@@ -1319,7 +1377,25 @@ async function openSettings() {
     box.append(cb);
   }
   box.append(el('p', 'hint', L.stays));
-  if (installEv) {
+  if (NATIVE) {
+    const cc = el('button', '', L.changeComputer);
+    cc.onclick = () => { try { NATIVE.setup(); } catch {} };
+    box.append(cc);
+    if (typeof NATIVE.options === 'function') {
+      const ob = el('button', '', L.appOptions);
+      ob.onclick = () => { try { NATIVE.options(); } catch {} };
+      box.append(ob);
+    }
+  } else if (/Android/i.test(navigator.userAgent)) {
+    const a = el('a', 'btn-link', L.getApp);
+    a.href = APP_APK;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    box.append(a, el('p', 'hint', L.getAppHint));
+  }
+  if (NATIVE) {
+    // Already an app.
+  } else if (installEv) {
     const ib = el('button', 'primary', L.install);
     ib.onclick = () => { installEv.prompt(); installEv = null; ib.remove(); };
     box.append(ib);
@@ -1371,7 +1447,28 @@ function openPrompts() {
 }
 
 /** Dictation with the phone's voice recognition (where the browser has it). */
-const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+/** In the Android app: the phone's own voice typing (a dialog), with the same shape as the web API. */
+class NativeSpeech {
+  start() {
+    window.__zxDictated = (text) => {
+      window.__zxDictated = null;
+      if (text && this.onresult) this.onresult({ results: [[{ transcript: text }]] });
+      if (this.onend) this.onend();
+    };
+    NATIVE.dictate(this.lang || '');
+  }
+  stop() {}
+}
+// The app first: Android's WebView has webkitSpeechRecognition too, but it fails there (no
+// microphone permission for pages), so the phone's own voice typing must win.
+const Speech = (NATIVE && (() => { try { return NATIVE.canDictate(); } catch { return false; } })() ? NativeSpeech : null) ||
+  window.SpeechRecognition || window.webkitSpeechRecognition || null;
+/** The phone's back button (in the app): close the sheet or the menu first. */
+window.__zxBack = () => {
+  if (!$('msheet').classList.contains('hide')) { closeM(); return true; }
+  if (document.body.classList.contains('open')) { drawer(false); return true; }
+  return false;
+};
 let rec = null;
 function dictate() {
   if (rec) return void rec.stop();
@@ -1379,7 +1476,7 @@ function dictate() {
   rec.lang = document.documentElement.lang === 'en' ? 'en-US' : 'es-MX';
   rec.interimResults = true;
   rec.continuous = true;
-  const base = $('text').value ? $('text').value.replace(/\s*$/, ' ') : '';
+  const base = $('text').value ? $('text').value.replace(/\\s*$/, ' ') : '';
   rec.onresult = (e) => {
     let said = '';
     for (const r of e.results) said += r[0].transcript;

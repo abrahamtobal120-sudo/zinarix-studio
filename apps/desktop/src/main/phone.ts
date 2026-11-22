@@ -1,8 +1,8 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
-import { networkInterfaces } from 'node:os';
+import { hostname, networkInterfaces } from 'node:os';
 import { z } from 'zod';
 import type {
   PhoneAction,
@@ -459,6 +459,15 @@ export class PhoneRemote {
 
   /** Called when the terminal is turned off for the phones (main closes the phone's shells). */
   onTerminalOff?: () => void;
+  /**
+   * The Android app (Zinarix-Remote.apk) shipped with this Zinarix: phones download it from
+   * this computer at /Zinarix-Remote.apk (same Wi-Fi or the tunnel), no GitHub needed.
+   */
+  appApk: string | null = null;
+
+  private hasApk(): boolean {
+    return !!this.appApk && existsSync(this.appApk);
+  }
 
   private fixedTunnel(): { host: string; token: string } | undefined {
     const f = this.state().fixed;
@@ -491,6 +500,7 @@ export class PhoneRemote {
     return {
       running: true,
       url: `http://${ip ? `${ip}:${this.port}` : this.host}`,
+      apkUrl: this.hasApk() ? `http://${ip ? `${ip}:${this.port}` : this.host}${APK_PATH}` : undefined,
       pin: this.pin,
       phones: s.devices!.length,
       remote: r
@@ -790,7 +800,9 @@ export class PhoneRemote {
           'Referrer-Policy': 'no-referrer',
           'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data: blob:; media-src blob:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
         });
-        return void res.end(phonePage(nonce, phoneLang(req.headers['accept-language'])));
+        return void res.end(phonePage(nonce, phoneLang(req.headers['accept-language']), {
+            localApk: this.hasApk() ? APK_PATH : undefined,
+          }));
       }
       // Installable as an app on the phone (home screen icon, full screen, same link).
       if (req.method === 'GET' && url.pathname === '/manifest.webmanifest') {
@@ -808,6 +820,17 @@ export class PhoneRemote {
           'Cache-Control': 'no-store',
         });
         return void res.end();
+      }
+      // The Android app, public like on GitHub (it holds no secret; pairing still needs the PIN).
+      if (req.method === 'GET' && url.pathname === APK_PATH && this.hasApk()) {
+        res.writeHead(200, {
+          'Content-Type': 'application/vnd.android.package-archive',
+          'Content-Length': statSync(this.appApk!).size,
+          'Content-Disposition': 'attachment; filename="Zinarix-Remote.apk"',
+          'Cache-Control': 'no-cache',
+          'X-Content-Type-Options': 'nosniff',
+        });
+        return void createReadStream(this.appApk!).pipe(res);
       }
       if (req.method === 'GET' && url.pathname === '/icon.svg') {
         res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400' });
@@ -854,7 +877,7 @@ export class PhoneRemote {
         return end(res, 200, { ok: true });
       }
       if (req.method === 'GET' && url.pathname === '/api/me')
-        return end(res, 200, { id: device.id, name: device.name, at: device.at });
+        return end(res, 200, { id: device.id, name: device.name, at: device.at, computer: hostname() });
       if (req.method === 'POST' && url.pathname === '/api/rename') {
         const { name } = z
           .object({ name: z.string().trim().min(1).max(60) })
@@ -1113,6 +1136,9 @@ const MANIFEST = {
     { src: '/icon.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
   ],
 };
+
+/** Where the phone server hands out the bundled Android app. */
+const APK_PATH = '/Zinarix-Remote.apk';
 
 function end(res: ServerResponse, code: number, json: unknown): void {
   if (res.headersSent) return void res.end();

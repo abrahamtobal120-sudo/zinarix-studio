@@ -103,10 +103,48 @@ jobs:
         # (free), Pro, AI and Pro + AI, each with its own installers and update channel.
         run: node scripts/build-editions.mjs -- ${{ matrix.target }} --publish always
 
+  # The Android app of the phone remote (apps/remote-android): Zinarix-Remote.apk on the
+  # release (the desktop app and the phone panel link to releases/latest/download/…).
+  # Signed with the project's permanent key (Android only installs updates signed with
+  # the same key): secrets ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD.
+  android:
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Build Zinarix-Remote.apk
+        working-directory: apps/remote-android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set: the release has no Android app"
+            exit 0
+          fi
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" > /dev/null
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/zinarix-remote.jks"
+          ZX_KEYSTORE="$RUNNER_TEMP/zinarix-remote.jks" ZX_KEYSTORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"             ./gradlew --no-daemon assembleRelease lintRelease -PzxVersion="$GITHUB_REF_NAME"
+          rm -f "$RUNNER_TEMP/zinarix-remote.jks"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/Zinarix-Remote.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/Zinarix-Remote.apk"
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [ -f "$RUNNER_TEMP/Zinarix-Remote.apk" ] || exit 0
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/Zinarix-Remote.apk" --repo "$GITHUB_REPOSITORY" --clobber
+
   # Runs only when every build succeeded: a failed platform leaves the release as a draft
   # (fix it and re-run the failed job, then this one).
   publish:
-    needs: build
+    needs: [build, android]
     runs-on: ubuntu-latest
     permissions:
       contents: write

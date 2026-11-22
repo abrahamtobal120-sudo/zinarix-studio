@@ -438,6 +438,8 @@ const api: OmniApi = {
     fixed: call('phone:fixed') as OmniApi['phone']['fixed'],
     allow: call('phone:allow') as OmniApi['phone']['allow'],
     push: call('phone:push') as OmniApi['phone']['push'],
+    appInfo: call('phone:appInfo') as OmniApi['phone']['appInfo'],
+    saveApp: call('phone:saveApp') as OmniApi['phone']['saveApp'],
   },
   bots: {
     status: call('bots:status') as OmniApi['bots']['status'],

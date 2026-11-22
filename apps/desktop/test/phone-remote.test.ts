@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -116,6 +116,26 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     const saved = JSON.parse(readFileSync(join(dir, 'phone-remote.json'), 'utf8'));
     expect(saved.fixed.token.startsWith('S:eyJh')).toBe(true);
     expect((await a.setFixed(null)).fixedHost).toBeUndefined();
+  });
+
+  it('hands out the bundled Android app from this computer', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zx-phone-'));
+    dirs.push(dir);
+    const a = make(dir);
+    const none = await a.start();
+    expect(none.apkUrl).toBeUndefined();
+    expect((await get(`${none.url}/Zinarix-Remote.apk`)).status).not.toBe(200);
+    const apk = join(dir, 'Zinarix-Remote.apk');
+    writeFileSync(apk, Buffer.from('PK\x03\x04 fake apk'));
+    a.appApk = apk;
+    const st = a.status();
+    expect(st.apkUrl).toBe(`${st.url}/Zinarix-Remote.apk`);
+    const res = await get(st.apkUrl!);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/vnd.android.package-archive');
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe('PK\x03\x04 fake apk');
+    // The panel links to it instead of GitHub.
+    expect(await (await get(`${st.url}/`)).text()).toContain('const APP_APK = "/Zinarix-Remote.apk"');
   });
 });
 

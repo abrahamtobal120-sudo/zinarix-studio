@@ -703,6 +703,12 @@ const phone = new PhoneRemote(
   githubBeacon,
 );
 phone.onTerminalOff = closePhoneTerms;
+// The Android app (apps/remote-android, built by scripts/build-remote-apk.mjs) ships next to the
+// app: Settings → Celular saves it, and phones download it from this computer.
+const remoteAppDir = app.isPackaged
+  ? join(process.resourcesPath, 'remote-app')
+  : join(appRoot, 'build', 'remote-app');
+phone.appApk = join(remoteAppDir, 'Zinarix-Remote.apk');
 /** Telegram / Discord bots: the same remote control, from those apps (see bots.ts). */
 const bots = new ChatBots({
   dir: () => ai.core.paths.home,
@@ -2829,6 +2835,34 @@ function registerIpc(): void {
       phoneOwner = undefined;
       return { running: false, phones: 0, error: e instanceof Error ? e.message : String(e) };
     }
+  });
+  handle('phone:appInfo', z.tuple([]), async () => {
+    const apk = phone.appApk;
+    const st = apk ? await statAsync(apk).catch(() => null) : null;
+    if (!st?.isFile()) return null;
+    let version = app.getVersion();
+    try {
+      const file = await readFile(join(remoteAppDir, 'Zinarix-Remote.json'), 'utf8');
+      const v = (JSON.parse(file) as { version?: unknown }).version;
+      if (typeof v === 'string' && /^[\w.+-]{1,32}$/.test(v)) version = v;
+    } catch {
+      /* no version file: the app's own */
+    }
+    return { version, bytes: st.size };
+  });
+  handle('phone:saveApp', z.tuple([]), async (w) => {
+    const apk = phone.appApk;
+    if (!apk || !(await statAsync(apk).catch(() => null)))
+      throw new Error('Esta versión de Zinarix no trae la app.');
+    const r = await dialog.showSaveDialog(w.win, {
+      title: 'Guardar la app para Android',
+      defaultPath: join(app.getPath('downloads'), 'Zinarix-Remote.apk'),
+      filters: [{ name: 'Android (APK)', extensions: ['apk'] }],
+    });
+    if (r.canceled || !r.filePath) return false;
+    const out = r.filePath.toLowerCase().endsWith('.apk') ? r.filePath : `${r.filePath}.apk`;
+    await writeFile(out, await readFile(apk));
+    return true;
   });
   handle('phone:forget', z.tuple([z.string().max(64).nullable()]), (w, id) => {
     const status = phone.forget(id);

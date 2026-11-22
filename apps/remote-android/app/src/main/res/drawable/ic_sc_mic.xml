@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shortcut "Dictate": a microphone on the app's circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FF1A1D24"
+        android:pathData="M24,0a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
+    <path
+        android:pathData="M24,13a4,4 0,0 1,4 4v7a4,4 0,0 1,-8 0v-7a4,4 0,0 1,4 -4zM16.5,23a7.5,7.5 0,0 0,15 0M24,30.5v4.5"
+        android:strokeWidth="2.6"
+        android:strokeColor="#FF7AA2FF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

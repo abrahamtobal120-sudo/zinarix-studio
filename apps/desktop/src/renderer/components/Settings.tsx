@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BotKind, BotsStatus, PhoneStatus, ThemeId } from '../../shared/api';
-import { THEME_IDS } from '../../shared/api';
+import { REMOTE_APP_APK, THEME_IDS } from '../../shared/api';
 import { commands, defaultKeys, runCommand } from '../commands';
 import { lang, t } from '../i18n';
 import { confirmDialog } from '../confirm';
@@ -264,12 +264,75 @@ function PhoneSection() {
         </div>
       )}
 
+      <PhoneAppCard status={status} onCopy={copy} />
+
       {status.running && <PhoneDevices status={status} />}
 
       {status.running && <PhoneAllowCard status={status} />}
 
       {status.running && <BotsSection pin={status.pin} />}
     </>
+  );
+}
+
+/**
+ * The Android app of the remote. This Zinarix ships it: a QR to download it from this computer
+ * (same Wi-Fi, while the remote is on) and a button to save the .apk. Builds without it fall
+ * back to the latest one on GitHub.
+ */
+function PhoneAppCard({ status, onCopy }: { status: PhoneStatus; onCopy: (text: string) => void }) {
+  const [info, setInfo] = useState<{ version: string; bytes: number } | null | undefined>();
+  useEffect(() => {
+    let live = true;
+    api()
+      .phone.appInfo()
+      .then((i) => live && setInfo(i))
+      .catch(() => live && setInfo(null));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const link = (info && status.apkUrl) || REMOTE_APP_APK;
+  const save = async () => {
+    try {
+      if (await api().phone.saveApp()) toast(t('phoneAppSaved'));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <div className="phone-card phone-app">
+      <div className="phone-pair">
+        <QrCode text={link} />
+        <div className="phone-steps">
+          <span className="settings-label">
+            <Icon name="smartphone" size={14} /> {t('phoneAppTitle')}
+            {info && <span className="dim small"> · v{info.version}</span>}
+          </span>
+          <p className="settings-hint">{t('phoneAppHint')}</p>
+          <p className="settings-hint">
+            {info && status.apkUrl ? t('phoneAppStepsLocal') : t('phoneAppSteps')}
+          </p>
+          <div className="phone-url">
+            <code title={link}>{link}</code>
+            <button title={t('copy')} aria-label={t('copy')} onClick={() => onCopy(link)}>
+              <Icon name="copy" size={14} />
+            </button>
+          </div>
+          {info && (
+            <div className="phone-app-actions">
+              <button className="btn ghost" onClick={() => void save()}>
+                <Icon name="download" size={14} /> {t('phoneAppSave')} (
+                {Math.max(1, Math.round(info.bytes / 1024))} KB)
+              </button>
+            </div>
+          )}
+          <p className="settings-hint phone-app-ios">
+            <Icon name="info" size={13} /> {t('phoneAppIos')}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

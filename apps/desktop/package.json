@@ -22,7 +22,8 @@
     "install:local": "node scripts/install-local.mjs",
     "smoke": "node scripts/smoke.mjs /tmp",
     "smoke:video": "node scripts/video-e2e.mjs",
-    "dist:especial": "pnpm build && node scripts/build-especial.mjs"
+    "dist:especial": "pnpm build && node scripts/build-especial.mjs",
+    "apk": "node scripts/build-remote-apk.mjs"
   },
   "dependencies": {
     "@lydell/node-pty": "1.2.0-beta.15",
@@ -115,6 +116,10 @@
       },
       "extraResources": [
         {
+          "from": "build/remote-app",
+          "to": "remote-app"
+        },
+        {
           "from": "dist/openscad",
           "to": "openscad"
         },
@@ -196,6 +201,10 @@
       "identity": null,
       "extraResources": [
         {
+          "from": "build/remote-app",
+          "to": "remote-app"
+        },
+        {
           "from": "dist/openscad",
           "to": "openscad"
         },
@@ -253,6 +262,10 @@
       "icon": "build/icon.png",
       "artifactName": "Zinarix-Studio-${version}-${arch}-setup.${ext}",
       "extraResources": [
+        {
+          "from": "build/remote-app",
+          "to": "remote-app"
+        },
         {
           "from": "dist/openscad",
           "to": "openscad"

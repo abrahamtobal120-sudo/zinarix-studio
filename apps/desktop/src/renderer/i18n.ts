@@ -276,6 +276,16 @@ const es = {
   copy: 'Copiar',
   copied: 'Copiado',
   phoneTitle: 'Celular',
+  phoneAppTitle: 'App para Android: Zinarix Remote',
+  phoneAppHint:
+    'El mismo panel como app: avisos aunque el celular esté bloqueado, dictado por voz, la pantalla encendida mientras la IA trabaja y el QR de arriba se abre directo en ella.',
+  phoneAppSteps:
+    'Escanea este código con el celular para descargarla. Android pedirá permitir instalar apps de esta fuente la primera vez.',
+  phoneAppStepsLocal:
+    'Escanea este código con el celular conectado a la misma red Wi-Fi: la descarga sale de esta computadora. Android pedirá permitir instalar apps de esta fuente la primera vez.',
+  phoneAppSave: 'Guardar APK',
+  phoneAppSaved: 'APK guardada',
+  phoneAppIos: 'iPhone: la app está en camino, la estamos preparando. Mientras tanto, abre el panel en Safari y usa «Agregar a inicio».',
   phoneOff: 'Apagado',
   phoneLan: 'Misma red Wi-Fi',
   phoneScanLan:
@@ -2521,6 +2531,16 @@ const en: Record<Key, string> = {
   copy: 'Copy',
   copied: 'Copied',
   phoneTitle: 'Phone',
+  phoneAppTitle: 'Android app: Zinarix Remote',
+  phoneAppHint:
+    'The same panel as an app: alerts even with the phone locked, voice dictation, the screen stays on while the AI works, and the QR above opens straight in it.',
+  phoneAppSteps:
+    'Scan this code with the phone to download it. The first time, Android asks to allow installing apps from this source.',
+  phoneAppStepsLocal:
+    'Scan this code with the phone on the same Wi-Fi: it downloads from this computer. The first time, Android asks to allow installing apps from this source.',
+  phoneAppSave: 'Save APK',
+  phoneAppSaved: 'APK saved',
+  phoneAppIos: 'iPhone: the app is on its way, we are working on it. Meanwhile, open the panel in Safari and use “Add to Home Screen”.',
   phoneOff: 'Off',
   phoneLan: 'Same Wi-Fi',
   phoneScanLan:

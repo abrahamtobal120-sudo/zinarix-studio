@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Same version as the desktop app (CI passes -PzxVersion=0.6.3); versionCode grows with it.
+def zxVersion = (project.findProperty('zxVersion') ?: '0.6.2').toString().replaceFirst(/^v/, '')
+def parts = zxVersion.tokenize('.-')
+def code = { int i -> parts.size() > i && parts[i].isInteger() ? parts[i].toInteger() : 0 }
+def zxCode = code(0) * 1_000_000 + code(1) * 1_000 + code(2)
+
+// Release signing: a keystore that never changes (Android only installs an update signed
+// with the same key). CI writes it from the ANDROID_KEYSTORE_* secrets.
+def ks = System.getenv('ZX_KEYSTORE')
+
+android {
+    namespace 'com.zinarix.remote'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.zinarix.remote'
+        minSdk 26
+        targetSdk 35
+        versionCode Math.max(zxCode, 1)
+        versionName zxVersion
+    }
+
+    signingConfigs {
+        if (ks) {
+            release {
+                storeFile file(ks)
+                storePassword System.getenv('ZX_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ZX_KEY_ALIAS') ?: 'zinarix'
+                keyPassword System.getenv('ZX_KEY_PASSWORD') ?: System.getenv('ZX_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ks) signingConfig signingConfigs.release
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError true
+        checkReleaseBuilds true
+    }
+}

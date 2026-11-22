@@ -385,7 +385,8 @@
   font-weight: 600;
 }
 .phone-steps > .phone-url,
-.phone-steps > .phone-pin {
+.phone-steps > .phone-pin,
+.phone-steps > .phone-app-actions {
   margin-left: 28px;
 }
 .phone-steps > .phone-step:not(:first-child) {
@@ -447,6 +448,35 @@
 }
 .phone-error {
   color: var(--danger);
+}
+.phone-app .phone-qr {
+  width: 120px;
+  height: 120px;
+}
+.phone-app .settings-label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.phone-app-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.phone-app-actions .btn {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.phone-app .phone-app-ios {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+.phone-app-ios svg {
+  flex: none;
+  margin-top: 2px;
 }
 .phone-card-foot {
   display: flex;

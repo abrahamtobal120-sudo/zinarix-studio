@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Zinarix logo (same as the panel's icon.svg). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="72dp"
+    android:height="72dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <path android:pathData="M112,0h288a112,112 0,0 1,112 112v288a112,112 0,0 1,-112 112h-288a112,112 0,0 1,-112 -112v-288a112,112 0,0 1,112 -112z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endColor="#FF3B82F6"
+                android:endX="512"
+                android:endY="512"
+                android:startColor="#FF8B5CFF"
+                android:startX="0"
+                android:startY="0"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M150,150h212v40L208,322h154v40H150v-40l154,-132H150z" />
+</vector>

@@ -1369,10 +1369,16 @@ export interface WhatsAppEvent {
 }
 
 /** Remote control from a phone on the same network (a page served by the app). */
+/** The Android app of the phone remote (apps/remote-android), attached to every release. */
+export const REMOTE_APP_APK =
+  'https://github.com/abrahamtobal120-sudo/zinarix-studio/releases/latest/download/Zinarix-Remote.apk';
+
 export interface PhoneStatus {
   running: boolean;
   /** Address to open on the phone (http://<LAN IP>:<port>). */
   url?: string;
+  /** Download of the Android app from this computer (when this Zinarix ships it). */
+  apkUrl?: string;
   /** Code the phone asks for once; changes after too many wrong tries. */
   pin?: string;
   /** Phones paired (they stay paired after a restart). */
@@ -2361,6 +2367,10 @@ export interface OmniApi {
     allow(allow: PhoneAllow): Promise<PhoneStatus>;
     /** What the phone should show now (sent while the remote runs). */
     push(snapshot: PhoneSnapshot): Promise<void>;
+    /** The Android app shipped with this Zinarix (null: this build has none). */
+    appInfo(): Promise<{ version: string; bytes: number } | null>;
+    /** Saves a copy of the Android app where the user picks (false: cancelled). */
+    saveApp(): Promise<boolean>;
   };
   bots: {
     status(): Promise<BotsStatus>;
@@ -2898,6 +2908,8 @@ export const CHANNELS = [
   'phone:fixed',
   'phone:allow',
   'phone:push',
+  'phone:appInfo',
+  'phone:saveApp',
   'bots:status',
   'bots:connect',
   'bots:disconnect',
