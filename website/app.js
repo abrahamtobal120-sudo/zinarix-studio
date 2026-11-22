@@ -113,7 +113,7 @@ function setupProviders() {
 // ---------- reveal on scroll (added from JS so the page never hides content without it) ----------
 function setupReveal() {
   if (reduceMotion || !('IntersectionObserver' in window)) return;
-  const els = document.querySelectorAll('.sec-head, .feature, .more, .plans, .os-grid, .term, .qa');
+  const els = document.querySelectorAll('.sec-head, .feature, .more, .plans, .os-grid, .term, .qa, .gallery, .card');
   const io = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
@@ -128,6 +128,28 @@ function setupReveal() {
     e.classList.add('reveal');
     io.observe(e);
   });
+}
+
+// ---------- feature gallery: one tab per screenshot ----------
+function setupGallery() {
+  const root = document.getElementById('gallery');
+  if (!root) return;
+  const tabs = root.querySelector('.gallery-tabs');
+  const figs = [...root.querySelectorAll('.gal')];
+  root.classList.add('js');
+  const show = (i) => {
+    figs.forEach((f, j) => (f.hidden = j !== i));
+    [...tabs.children].forEach((b, j) => b.setAttribute('aria-selected', String(j === i)));
+  };
+  figs.forEach((f, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.textContent = f.dataset.title;
+    b.addEventListener('click', () => show(i));
+    tabs.append(b);
+  });
+  show(0);
 }
 
 // ---------- tabs ----------
@@ -193,6 +215,7 @@ function setupNav() {
 setupProviders();
 setupReveal();
 setupTabs();
+setupGallery();
 setupTerminalInstall();
 setupNav();
 setupDownloads();

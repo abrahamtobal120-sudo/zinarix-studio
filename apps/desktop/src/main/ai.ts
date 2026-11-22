@@ -44,6 +44,7 @@ import { hooksFingerprint, type KitKind } from '../shared/agentKit.js';
 import { setCredentialEnvNames } from './env.js';
 import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
+import { botBlock, type BotDef } from '../shared/automations.js';
 import type { BrowserController } from './browser.js';
 import type { Workspace } from './workspace.js';
 import { COMPUTER_MODE_NOTE, type ComputerRunHooks } from './computerTools.js';
@@ -233,6 +234,30 @@ export class AiService {
   onTitle?: (conversationId: string, title: string) => void;
   /** What the plan includes (delegation between AIs is Pro). */
   features: () => { delegation: boolean } = () => ({ delegation: true });
+  /** "Mis bots": finds a bot by id (set by main once the automations service exists). */
+  botFor?: (id: string) => BotDef | undefined;
+
+  /**
+   * A chat that talks as one of the user's bots: its model when the chat has none, and the
+   * system-prompt block with its instructions, knowledge and the best @Docs passages.
+   */
+  private async withBot(req: ChatRequestView): Promise<{ req: ChatRequestView; block: string }> {
+    const bot = req.bot ? this.botFor?.(req.bot) : undefined;
+    if (!bot) return { req, block: '' };
+    const passages: { title?: string; source: string; text: string }[] = [];
+    const k = this.agent.knowledge;
+    if (k && bot.docs.length && req.prompt.trim()) {
+      const known = new Set(k.docs().map((d) => d.name.toLowerCase()));
+      for (const src of bot.docs.filter((d) => known.has(d.toLowerCase())).slice(0, 4)) {
+        const hits = await k.docsSearch(req.prompt.slice(0, 2000), src, 3).catch(() => []);
+        for (const h of hits) passages.push({ title: h.title, source: h.source, text: h.text.slice(0, 2000) });
+      }
+    }
+    return {
+      req: { ...req, model: req.model ?? bot.model },
+      block: botBlock(bot, passages.slice(0, 8)),
+    };
+  }
 
   /** Used when a call does not say which window it comes from (CLI tests, one window). */
   private readonly scope: Scope;
@@ -632,11 +657,12 @@ export class AiService {
 
   private async chatTurn(
     requestId: string,
-    req: ChatRequestView,
+    asked: ChatRequestView,
     emit: Emit,
     scope: Scope,
   ): Promise<void> {
-    if (req.agent) return this.agentChat(requestId, req, emit, scope);
+    const { req, block: botRules } = await this.withBot(asked);
+    if (req.agent) return this.agentChat(requestId, req, emit, scope, botRules);
     const [system, user] = buildContextMessages(
       req.prompt,
       req.context,
@@ -645,13 +671,14 @@ export class AiService {
           scope,
           req.context.map((c) => c.source),
           req.prompt,
-        ),
+        ) +
+        botRules,
     ) as [ChatMessage, ChatMessage];
     const img = this.withImages(user, req, 'chat', requestId, emit);
     let messages: ChatMessage[] = [system, ...recentHistory(req.history), img];
     // CLI agents (Claude Code, Codex…) drop the system prompt: the identity rides on the user message.
     if (this.isCliModel(req.model, 'chat'))
-      messages = withProtocol(messages, cliIdentityBlock(), 'user');
+      messages = withProtocol(messages, cliIdentityBlock() + botRules, 'user');
     let conversationId: string;
     try {
       conversationId = this.newConversation(req, requestId, emit, scope);
@@ -710,6 +737,7 @@ export class AiService {
     req: ChatRequestView,
     emit: Emit,
     scope: Scope,
+    botRules = '',
   ): Promise<void> {
     const ctrl = new AbortController();
     this.running.set(requestId, ctrl);
@@ -765,7 +793,9 @@ export class AiService {
             scope,
             req.context.map((c) => c.source),
             req.prompt,
-          ) + (pc ? COMPUTER_MODE_NOTE : ''),
+          ) +
+          botRules +
+          (pc ? COMPUTER_MODE_NOTE : ''),
         ruleFeed: this.ruleFeed(
           scope,
           new RuleTracker(

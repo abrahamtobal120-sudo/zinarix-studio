@@ -24,7 +24,7 @@ El script descarga la última versión desde GitHub Releases y comprueba su SHA-
 
 > La suma SHA-256 viene del mismo release que el binario: comprueba que la descarga llegó íntegra, no quién la publicó. Los binarios todavía **no tienen firma de código** (Authenticode / notarización de Apple) y `SHA256SUMS` aún no está firmado con minisign o cosign.
 
-![Zinarix Studio](website/assets/screenshot-agent.png)
+![Zinarix Studio](website/assets/shots/shot-agent.webp)
 
 ## Funciones
 

@@ -345,7 +345,7 @@ button.danger{background:transparent;color:var(--danger);border-color:var(--dang
 a.btn-link{display:block;text-align:center;text-decoration:none;color:var(--accent-fg);background:var(--accent);border-radius:6px;padding:8px 14px;font-weight:500}
 svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .hide{display:none!important}
-.logo{width:28px;height:28px;border-radius:8px;background:var(--grad);display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;flex:none}
+.logo{width:28px;height:28px;flex:none;display:block;object-fit:contain}
 
 /* Header */
 header{display:flex;align-items:center;gap:4px;padding:6px;padding-top:max(6px,env(safe-area-inset-top));background:var(--bg-2);border-bottom:1px solid var(--border)}
@@ -389,10 +389,14 @@ header{display:flex;align-items:center;gap:4px;padding:6px;padding-top:max(6px,e
 #drawer{position:fixed;top:0;bottom:0;left:0;width:min(84vw,320px);background:var(--bg-2);border-right:1px solid var(--border);z-index:11;transform:translateX(-102%);transition:transform .22s ease;display:flex;flex-direction:column;box-shadow:var(--shadow);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 body.open #scrim{opacity:1;pointer-events:auto}
 body.open #drawer{transform:none}
-.dhead{display:flex;align-items:center;gap:10px;padding:14px 14px 10px}
+.dhead{display:flex;align-items:center;gap:10px;padding:16px 16px 12px}
 .dhead b{font-size:15px;color:var(--strong)}
-.newbtn{margin:2px 12px 10px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px}
-.dtitle{padding:6px 16px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-dim)}
+.newbtn{margin:0 8px;display:flex;align-items:center;gap:12px;padding:10px 12px;background:transparent;border-radius:8px;text-align:left;color:var(--fg);font-size:14px}
+.newbtn svg{color:var(--fg-dim)}
+.newbtn:active{background:var(--hover)}
+.newbtn.primary{margin:0 12px 10px;justify-content:center;background:var(--grad);color:#fff;font-weight:600;padding:11px}
+.newbtn.primary svg{color:#fff}
+.dtitle{margin-top:8px;border-top:1px solid var(--border);padding:14px 16px 6px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-dim)}
 #list{flex:1;overflow-y:auto;padding:0 8px 12px}
 .item{width:100%;display:flex;align-items:center;gap:8px;padding:10px;border-radius:6px;text-align:left;background:transparent;color:var(--fg)}
 .item span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -406,7 +410,7 @@ body.open #drawer{transform:none}
 .user{align-self:flex-end;max-width:88%;padding:9px 13px;border-radius:14px 14px 4px 14px;background:var(--bg-3);border:1px solid var(--border);color:var(--strong);line-height:1.5}
 .assistant{align-self:stretch}
 .model{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--strong);margin-bottom:6px;white-space:nowrap}
-.model .logo{width:18px;height:18px;border-radius:5px;font-size:10px}
+.model .logo{width:20px;height:20px}
 pre{white-space:pre;overflow-x:auto;background:var(--code);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:8px 0;font:12.5px/1.5 ui-monospace,"JetBrains Mono",Menlo,monospace}
 code{font:12.5px ui-monospace,"JetBrains Mono",Menlo,monospace;background:var(--bg-4);padding:0 4px;border-radius:3px}
 .err{color:var(--danger);font-size:13px;margin-top:6px}
@@ -431,7 +435,7 @@ code{font:12.5px ui-monospace,"JetBrains Mono",Menlo,monospace;background:var(--
 .typing i{width:6px;height:6px;border-radius:50%;background:var(--brand);animation:dot 1.1s infinite ease-in-out}
 .typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
 .empty{margin:auto;text-align:center;color:var(--fg-dim);padding:24px;display:flex;flex-direction:column;align-items:center;gap:10px;white-space:normal}
-.empty .logo{width:56px;height:56px;border-radius:16px;font-size:28px;filter:drop-shadow(0 0 14px color-mix(in srgb,var(--brand) 40%,transparent))}
+.empty .logo{width:72px;height:72px;filter:drop-shadow(0 0 18px color-mix(in srgb,#2f6bff 45%,transparent))}
 .empty b{color:var(--strong);font-size:17px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes dot{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:none}}
@@ -441,18 +445,21 @@ footer{padding:0 10px;padding-bottom:max(10px,env(safe-area-inset-bottom));backg
 .composer{padding:8px 8px 6px;border-radius:10px;background:var(--bg);border:1px solid var(--border);transition:border-color .13s,box-shadow .13s}
 .composer:focus-within{border-color:var(--focus);box-shadow:var(--ring)}
 textarea{display:block;width:100%;resize:none;max-height:35vh;min-height:24px;border:0;outline:0;background:none;padding:2px 4px;line-height:1.45}
-.bar{display:flex;align-items:center;gap:6px;margin-top:6px}
+.bar{display:flex;align-items:center;gap:4px;margin-top:6px;min-width:0}
+.bar .pill{flex:none}
+.bar #model{flex:0 1 auto;min-width:0}
 .pill{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:transparent;color:var(--fg-dim);font-size:12.5px}
 .pill.on{background:var(--bg-4);color:var(--strong)}
 .pill.on svg{color:var(--brand)}
 .pill svg{width:15px;height:15px}
-.send{margin-left:auto;width:40px;height:34px;padding:0;display:grid;place-items:center;border-radius:8px}
+.send{margin-left:auto;width:40px;height:34px;padding:0;display:grid;place-items:center;border-radius:8px;flex:none;background:var(--grad)}
+.send:disabled{background:var(--bg-4);color:var(--fg-dim);opacity:1}
 .send svg{width:18px;height:18px}
-.stopb{margin-left:auto;display:flex;align-items:center;gap:6px;padding:6px 12px}
+.stopb{margin-left:auto;width:40px;height:34px;padding:0;display:grid;place-items:center;border-radius:8px;flex:none}
 .stopb svg{width:14px;height:14px}
 
 /* Mode and model pills, queue */
-.pill .pl{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill .pl{max-width:34vw;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pill.on.m-plan svg{color:var(--focus)}
 .pill.on.m-auto svg,.pill.on.m-full svg,.pill.m-full{color:var(--warn)}
 #queue{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--fg-dim);padding:0 4px 6px}
@@ -530,12 +537,13 @@ h4{margin:10px 0 4px;color:var(--strong);font-size:1.02em}
 
 /* Pairing */
 #pair{margin:auto;padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:12px;width:min(380px,100%);text-align:center}
-#pair .logo{width:60px;height:60px;border-radius:16px;font-size:30px;margin-bottom:6px}
+#pair .logo{width:96px;height:96px;margin-bottom:4px;filter:drop-shadow(0 0 24px color-mix(in srgb,#2f6bff 50%,transparent))}
+#pair .brand{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin-top:-4px}
 #pair h1{margin:0;font-size:20px;color:var(--strong)}
 #pair p{margin:0;color:var(--fg-dim);font-size:14px}
 #pin{width:100%;font-size:28px;letter-spacing:12px;text-indent:12px;text-align:center;font-weight:600;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:12px;outline:0;margin-top:8px}
 #pin:focus{border-color:var(--focus);box-shadow:var(--ring)}
-#go{width:100%;padding:12px;font-size:15px}
+#go{width:100%;padding:12px;font-size:15px;background:var(--grad);font-weight:600}
 ${TOOLS_CSS}
 ${CONFIG_CSS}
 </style>
@@ -552,7 +560,7 @@ ${CONFIG_CSS}
 <div id="tabs" class="hide" role="tablist" aria-label="${h('projects')}"></div>
 <div id="scrim"></div>
 <nav id="drawer" aria-label="${h('chats')}">
-  <div class="dhead"><span class="logo">Z</span><b>Zinarix Studio</b></div>
+  <div class="dhead"><img class="logo" src="/logo.svg" alt=""><b>Zinarix Studio</b></div>
   <button class="newbtn primary" id="new2"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>${h('newChat')}</button>
   <button class="newbtn" id="open2"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>${h('openFolder')}</button>
   <div class="dtools">
@@ -568,7 +576,8 @@ ${CONFIG_CSS}
   <div class="dfoot"><span>${h('today')}</span><b id="usd">$0.00</b></div>
 </nav>
 <div id="pair">
-  <span class="logo">Z</span>
+  <img class="logo" src="/logo.svg" alt="">
+  <span class="brand">Zinarix Studio</span>
   <h1>${h('pairTitle')}</h1>
   <p>${h('pairHint')}<br><small>${h('pairWhere')}</small></p>
   <input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="${h('pin')}">
@@ -596,7 +605,7 @@ ${CONFIG_CSS}
       <button class="pill on" id="model" aria-label="${h('model')}"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2 8 12.7 4 8.8l5.5-.8Z"/></svg><span class="pl" id="mname">${h('model')}</span></button>
       <button class="pill" id="bolt" aria-label="${h('prompts')}"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg></button>
       <button class="pill hide" id="mic" aria-label="${h('voice')}"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-      <button class="danger stopb hide" id="stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>${h('stop')}</button>
+      <button class="danger stopb hide" id="stop" aria-label="${h('stop')}" title="${h('stop')}"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg></button>
       <button class="primary send" id="send" aria-label="${h('send')}" disabled><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
     </div>
   </div>
@@ -659,6 +668,13 @@ function el(tag, cls, text) {
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
+}
+/** The Zinarix logo (served by the computer). */
+function logo() {
+  const i = el('img', 'logo');
+  i.src = '/logo.svg';
+  i.alt = '';
+  return i;
 }
 /** A fixed icon from ICONS (never text from the computer). */
 function icon(name) {
@@ -1154,7 +1170,7 @@ function render() {
   log.textContent = '';
   if (!snap.turns.length) {
     const e = el('div', 'empty');
-    e.append(el('span', 'logo', 'Z'), el('b', '', L.emptyTitle), el('span', '', L.emptyHint));
+    e.append(logo(), el('b', '', L.emptyTitle), el('span', '', L.emptyHint));
     const quick = el('div', 'quick');
     for (const k of ['q1', 'q2', 'q3', 'q4', 'q5']) {
       const b = el('button', '', L[k]);
@@ -1182,7 +1198,7 @@ function render() {
     } else {
       m = el('div', 'turn assistant');
       const h = el('div', 'model');
-      h.append(el('span', 'logo', 'Z'), t.model ? shortModel(t.model) : 'Zinarix');
+      h.append(logo(), t.model ? shortModel(t.model) : 'Zinarix');
       if (t.model) h.title = t.model;
       m.append(h, rich(t.text));
       if (t.text) {

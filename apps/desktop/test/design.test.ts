@@ -11,7 +11,14 @@ import {
   stripMarkers,
 } from '../src/main/design/htmlSource.js';
 import { applyOp, opLabel } from '../src/main/design/ops.js';
-import { detectProfile, htmlPages, pageName } from '../src/main/design/projectProfile.js';
+import {
+  detectProfile,
+  gitignoreMatcher,
+  htmlPages,
+  MAX_PAGES,
+  pageName,
+  pageProblem,
+} from '../src/main/design/projectProfile.js';
 import { DesignSession, type DesignFiles } from '../src/main/design/session.js';
 
 const PAGE = `<!doctype html>
@@ -156,6 +163,122 @@ describe('project profile', () => {
     const react = detectProfile(['index.html', 'src/App.tsx'], JSON.stringify({ devDependencies: { vite: '1', react: '1' } }));
     expect(react).toMatchObject({ kind: 'vite', label: 'React con Vite', editable: false });
     expect(detectProfile(['README.md'], null)).toMatchObject({ kind: 'unknown', editable: false });
+  });
+});
+
+describe('page discovery (only real pages of the site)', () => {
+  it('skips dependencies, build output, vendored code and template folders', () => {
+    const files = [
+      'blender/doc/blender_file_format/index.html',
+      'blender/doc/doxygen/footer.html',
+      'blender/doc/python_api/templates/versions.html',
+      'lib/docs/api.html',
+      'node_modules/pkg/readme.html',
+      'apps/web/dist/index.html',
+      'build/index.html',
+      'vendor/x/index.html',
+      'third_party/lib/page.html',
+      'third-party/lib/page.html',
+      'src/_includes/header.html',
+      'src/partials/nav.html',
+      'src/layouts/base.html',
+      'templates/home.html',
+      '.git/hooks/x.html',
+      'apps/desktop/release-3d/win-unpacked/LICENSES.chromium.html',
+      'blender/tests/python/modules/render_report.template.html',
+      'docs/index.html',
+      'website/index.html',
+    ];
+    expect(htmlPages(files).map((p) => p.file)).toEqual(['docs/index.html', 'website/index.html']);
+  });
+
+  it('ranks the real entry pages first', () => {
+    const files = [
+      'misc/old/test.html',
+      'about.html',
+      'apps/landing/index.html',
+      'website/precios.html',
+      'website/index.html',
+      'public/index.html',
+      'index.html',
+      'examples/demo/index.html',
+    ];
+    expect(htmlPages(files).map((p) => p.file)).toEqual([
+      'index.html',
+      'public/index.html',
+      'website/index.html',
+      'apps/landing/index.html',
+      'about.html',
+      'website/precios.html',
+      'examples/demo/index.html',
+      'misc/old/test.html',
+    ]);
+  });
+
+  it('lists each address once and caps the list', () => {
+    const dup = htmlPages(['about.html', 'about/index.html', 'Index.htm', 'index.html']);
+    expect(dup.map((p) => p.path)).toEqual(['/', '/about']);
+    const many = Array.from({ length: 500 }, (_, i) => `p${String(i).padStart(3, '0')}.html`);
+    expect(htmlPages(many)).toHaveLength(MAX_PAGES);
+  });
+
+  it('tells templates and fragments from real pages', () => {
+    expect(pageProblem(PAGE)).toBeNull();
+    expect(pageProblem('<body><h1>Hola</h1></body>')).toBeNull();
+    expect(pageProblem('<!doctype html><html><body>{{ release }} Versions Loading…</body></html>')).toBe('template');
+    expect(pageProblem('<html><body>{% block content %}{% endblock %}</body></html>')).toBe('template');
+    expect(pageProblem('<html><body><%= title %></body></html>')).toBe('template');
+    expect(pageProblem('<footer><p>© Blender</p></footer>')).toBe('fragment');
+    expect(pageProblem('')).toBe('fragment');
+  });
+
+  it('reads the common .gitignore patterns', () => {
+    const ignored = gitignoreMatcher(
+      [
+        '# comment',
+        'node_modules/',
+        '/blender/',
+        '*.log',
+        'release/',
+        'vendor/',
+        '!vendor/keep.html',
+        'docs/**/draft-*.html',
+        '',
+      ].join('\n'),
+    );
+    expect(ignored('blender/doc/index.html')).toBe(true);
+    expect(ignored('apps/blender/index.html')).toBe(false); // anchored to the root
+    expect(ignored('apps/desktop/release/x.html')).toBe(true);
+    expect(ignored('a/b.log')).toBe(true);
+    expect(ignored('vendor/keep.html')).toBe(false);
+    expect(ignored('vendor/other.html')).toBe(true);
+    expect(ignored('docs/a/b/draft-1.html')).toBe(true);
+    expect(ignored('docs/draft-1.html')).toBe(true);
+    expect(ignored('website/index.html')).toBe(false);
+  });
+
+  it('a session lists only real pages (no templates, fragments or ignored copies)', async () => {
+    const s = new DesignSession(
+      fakeFiles({
+        '.gitignore': '/blender/\n',
+        'blender/index.html': PAGE,
+        'tools/doc/versions.html': '<html><body>{{ release }} Versions Loading…</body></html>',
+        'tools/footer.html': '<footer>x</footer>',
+        'website/index.html': PAGE,
+        'website/contacto.html': PAGE,
+      }),
+      'zxp://w1',
+    );
+    const view = await s.open();
+    expect(view.pages.map((p) => p.file)).toEqual(['website/index.html', 'website/contacto.html']);
+  });
+
+  it('a folder with only templates has no pages', async () => {
+    const s = new DesignSession(
+      fakeFiles({ 'layout.html': '<html><body>{{ content }}</body></html>', 'nav.html': '<nav></nav>' }),
+      'zxp://w1',
+    );
+    expect(await s.open()).toMatchObject({ kind: 'unknown', editable: false, pages: [] });
   });
 });
 

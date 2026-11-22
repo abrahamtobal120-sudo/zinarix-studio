@@ -1,5 +1,6 @@
 import { BrowserWindow, globalShortcut, screen } from 'electron';
 import type { ComputerRunHooks } from './computerTools.js';
+import { LOGO_SVG } from './zinarixLogo.js';
 
 /**
  * "Controlar la compu" (full computer control) for one chat run: the first time the AI acts
@@ -12,7 +13,9 @@ import type { ComputerRunHooks } from './computerTools.js';
  * Ctrl+Alt+Esc stops it from anywhere, and so does the mouse in the top-left corner.
  *
  * The bar never takes the focus (the AI types into the program below it) and is kept out of
- * screenshots where the OS allows it.
+ * screenshots where the OS allows it. While the AI acts, a thin glowing border around the
+ * screen (click-through, also kept out of screenshots) says "the AI is driving" at a glance;
+ * it goes away when the AI pauses or stops.
  */
 
 const BAR_W = 560;
@@ -34,13 +37,17 @@ function barHtml(labels: ComputerBarLabels): string {
 <style>
 html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:12px/1.2 "Segoe UI",system-ui,sans-serif;user-select:none}
 .bar{box-sizing:border-box;height:100%;display:flex;align-items:center;gap:6px;padding:0 6px 0 12px;
- background:#1d1f24;color:#e8e9ec;border:1px solid #3a3d45;border-radius:10px;-webkit-app-region:drag}
-.paused .bar{border-color:#b98a2c}
-.dot{width:8px;height:8px;border-radius:50%;background:#e5534b;flex:none;animation:p 1.4s ease-in-out infinite}
+ background:#1d1f24;color:#e8e9ec;border:1px solid #2f6bff;border-radius:10px;-webkit-app-region:drag;
+ box-shadow:inset 0 0 0 1px rgba(56,225,255,.22),inset 0 0 14px rgba(47,107,255,.35)}
+.paused .bar{border-color:#b98a2c;box-shadow:none}
+.logo{position:relative;width:28px;height:28px;flex:none;margin-right:2px}
+.logo svg{width:28px;height:28px;display:block}
+.dot{position:absolute;right:-1px;bottom:-1px;width:8px;height:8px;border-radius:50%;background:#e5534b;border:2px solid #1d1f24;animation:p 1.4s ease-in-out infinite}
 .paused .dot{background:#e0a33a;animation:none}
 @keyframes p{50%{opacity:.35}}
 .txt{flex:1;min-width:0;display:flex;flex-direction:column}
-b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+b{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(90deg,#7cecff,#8fb0ff 55%,#c9a8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.paused b{background:none;color:#f1c46b}
 #st{color:#a3a7b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 button{-webkit-app-region:no-drag;font:inherit;border-radius:6px;padding:5px 10px;cursor:pointer;border:1px solid #474b55;background:transparent;color:#e8e9ec;white-space:nowrap}
 button:hover{background:#2b2e35}
@@ -48,7 +55,7 @@ button:hover{background:#2b2e35}
 #stop{background:#c93c37;border-color:#c93c37;color:#fff;font-weight:600}
 #stop:hover{background:#b3322d}
 </style></head><body><div class="bar">
-<span class="dot"></span>
+<span class="logo">${LOGO_SVG}<span class="dot"></span></span>
 <div class="txt"><b id="ti">${esc(labels.title)}</b><span id="st">${esc(labels.starting)}</span></div>
 <button id="pause" title="${esc(labels.pauseHint)}">${esc(labels.pause)}</button>
 <button id="show" title="${esc(labels.showHint)}">${esc(labels.show)}</button>
@@ -87,7 +94,7 @@ export interface ComputerBarLabels {
 
 export const BAR_LABELS: Record<'es' | 'en', ComputerBarLabels> = {
   es: {
-    title: 'Zinarix está controlando tu compu',
+    title: 'Zinarix Studio AI navegando…',
     starting: 'Empezando…',
     step: 'Paso {n}: {what}',
     stop: 'Detener',
@@ -99,12 +106,12 @@ export const BAR_LABELS: Record<'es' | 'en', ComputerBarLabels> = {
     pauseHint: 'Pausa a la IA para que uses tu compu (también: mover el mouse)',
     resume: 'Continuar',
     resumeHint: 'La IA sigue desde donde quedó la pantalla',
-    pausedTitle: 'Zinarix está en pausa',
+    pausedTitle: 'Zinarix Studio AI en pausa',
     pausedByUser: 'Pulsa Continuar cuando quieras que siga.',
     pausedTakeover: 'Moviste el mouse. Pulsa Continuar cuando quieras que siga.',
   },
   en: {
-    title: 'Zinarix is controlling your computer',
+    title: 'Zinarix Studio AI navigating…',
     starting: 'Starting…',
     step: 'Step {n}: {what}',
     stop: 'Stop',
@@ -115,11 +122,29 @@ export const BAR_LABELS: Record<'es' | 'en', ComputerBarLabels> = {
     pauseHint: 'Pauses the AI so you can use your computer (moving the mouse does too)',
     resume: 'Continue',
     resumeHint: 'The AI goes on from what is on screen now',
-    pausedTitle: 'Zinarix is paused',
+    pausedTitle: 'Zinarix Studio AI is paused',
     pausedByUser: 'Press Continue when you want it to go on.',
     pausedTakeover: 'You moved the mouse. Press Continue when you want it to go on.',
   },
 };
+
+/**
+ * The name the bar shows for the AI: the app's own name (its edition), with "AI" when the
+ * name does not already say it ("Zinarix Studio" → "Zinarix Studio AI").
+ */
+export function aiName(productName: string): string {
+  const name = productName.trim() || 'Zinarix Studio';
+  return /\bAI\b/.test(name) ? name : `${name} AI`;
+}
+
+/** The bar's labels with the edition's name: "Zinarix Studio AI navegando…". */
+export function barLabelsFor(lang: 'es' | 'en', productName: string): ComputerBarLabels {
+  const name = aiName(productName);
+  const base = BAR_LABELS[lang];
+  return lang === 'en'
+    ? { ...base, title: `${name} navigating…`, pausedTitle: `${name} is paused` }
+    : { ...base, title: `${name} navegando…`, pausedTitle: `${name} en pausa` };
+}
 
 /** Note for the AI after a pause (the action it asked for is not carried out). */
 export const PAUSE_NOTE =
@@ -303,7 +328,100 @@ function registerGlobalStop(cb: () => void): (() => void) | null {
   }
 }
 
+/**
+ * The glowing border around the screen while the AI acts: a transparent window over the
+ * whole main monitor that lets every click through and never takes the focus. It is kept
+ * out of screenshots where the OS allows it (Windows 10 2004+, macOS); elsewhere it is only
+ * a thin line, so the AI's view of the screen barely changes.
+ */
+function glowHtml(thin: boolean): string {
+  const glow = thin
+    ? ''
+    : 'box-shadow:inset 0 0 18px 4px rgba(47,107,255,.55),inset 0 0 42px 6px rgba(139,61,255,.22);';
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<style>
+html,body{margin:0;height:100%;background:transparent;overflow:hidden;pointer-events:none}
+.edge{position:fixed;inset:0;box-sizing:border-box;border:${thin ? 2 : 3}px solid transparent;
+ border-image:linear-gradient(135deg,#38e1ff,#2f6bff 45%,#8b3dff) 1;${glow}
+ animation:g 2.4s ease-in-out infinite}
+@keyframes g{50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.edge{animation:none}}
+</style></head><body><div class="edge"></div></body></html>`;
+}
+
+interface GlowHandle {
+  show(): void;
+  hide(): void;
+  destroy(): void;
+}
+
+function electronGlow(): GlowHandle | null {
+  try {
+    const { bounds } = screen.getPrimaryDisplay();
+    const glow = new BrowserWindow({
+      ...bounds,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      focusable: false,
+      show: false,
+      hasShadow: false,
+      enableLargerThanScreen: true,
+      title: 'Zinarix',
+      webPreferences: {
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        javascript: false,
+        spellcheck: false,
+      },
+    });
+    glow.setAlwaysOnTop(true, 'screen-saver');
+    // Clicks, the wheel and the AI's own input go to the programs below.
+    glow.setIgnoreMouseEvents(true);
+    glow.setContentProtection(true);
+    if (process.platform === 'darwin') glow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    glow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    glow.webContents.on('will-navigate', (e) => e.preventDefault());
+    let want = true;
+    let ready = false;
+    glow.once('ready-to-show', () => {
+      ready = true;
+      if (want && !glow.isDestroyed()) {
+        glow.setBounds(bounds);
+        glow.showInactive();
+      }
+    });
+    const thin = process.platform !== 'win32' && process.platform !== 'darwin';
+    void glow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(glowHtml(thin))}`);
+    return {
+      show: () => {
+        want = true;
+        if (ready && !glow.isDestroyed() && !glow.isVisible()) glow.showInactive();
+      },
+      hide: () => {
+        want = false;
+        if (!glow.isDestroyed()) glow.hide();
+      },
+      destroy: () => {
+        if (!glow.isDestroyed()) glow.destroy();
+      },
+    };
+  } catch {
+    return null; // no border: the bar still says the AI is acting
+  }
+}
+
 function electronBar(run: ComputerControlRun): BarHandle {
+  // The border first, so the bar sits above it.
+  const glow = electronGlow();
   const area = screen.getPrimaryDisplay().workArea;
   const w = Math.min(BAR_W, area.width - 20);
   const bar = new BrowserWindow({
@@ -335,6 +453,7 @@ function electronBar(run: ComputerControlRun): BarHandle {
   bar.setAlwaysOnTop(true, 'screen-saver');
   // Out of the AI's screenshots (Windows 10 2004+ and macOS); elsewhere it shows as a box.
   bar.setContentProtection(true);
+  bar.on('closed', () => glow?.destroy());
   bar.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   bar.webContents.on('will-navigate', (e) => e.preventDefault());
   bar.on('page-title-updated', (e, title) => {
@@ -353,14 +472,19 @@ function electronBar(run: ComputerControlRun): BarHandle {
   };
   return {
     status: (text) => js(`window.zxStatus && window.zxStatus(${JSON.stringify(text)})`),
-    paused: (on, takeover) =>
+    paused: (on, takeover) => {
+      // The border only while the AI is acting: off during a pause.
+      if (on) glow?.hide();
+      else glow?.show();
       js(
         `window.zxPaused && window.zxPaused(${JSON.stringify(on)}, ${run
           .pausedTexts(on, takeover)
           .map((s) => JSON.stringify(s))
           .join(', ')})`,
-      ),
+      );
+    },
     destroy: () => {
+      glow?.destroy();
       if (!bar.isDestroyed()) bar.destroy();
     },
   };

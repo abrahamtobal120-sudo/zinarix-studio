@@ -462,6 +462,50 @@ export class ChatBots {
     writeFileSync(this.pairedFile(), JSON.stringify(p), { mode: 0o600 });
   }
 
+  /** The last linked chat of each app (where scheduled tasks send their results). */
+  private chatsFile(): string {
+    return join(this.deps.dir(), 'bots-chats.json');
+  }
+
+  private lastChats(): Partial<Record<LinkKind, string>> {
+    try {
+      return JSON.parse(readFileSync(this.chatsFile(), 'utf8')) as Partial<Record<LinkKind, string>>;
+    } catch {
+      return {};
+    }
+  }
+
+  private rememberChat(kind: LinkKind, chat: string): void {
+    const all = this.lastChats();
+    if (all[kind] === chat) return;
+    all[kind] = chat;
+    try {
+      writeFileSync(this.chatsFile(), JSON.stringify(all), { mode: 0o600 });
+    } catch {
+      // not critical: only scheduled results use it
+    }
+  }
+
+  /** Whether a scheduled result can be sent to this app right now. */
+  canNotify(kind: LinkKind): boolean {
+    if (!this.active || !this.links.has(kind)) return false;
+    return Boolean(this.lastChats()[kind] ?? (kind === 'telegram' ? this.paired().telegram[0] : undefined));
+  }
+
+  /**
+   * Sends a message on its own (a scheduled task's result) to the last linked chat of that
+   * app. Throws a readable error when it cannot (remote off, bot not connected, no chat yet).
+   */
+  async notify(kind: LinkKind, text: string, fallbackChat?: string): Promise<void> {
+    if (!this.active) throw new Error('el control desde el celular está apagado (Configuración → Celular)');
+    if (!this.links.has(kind)) throw new Error('no está conectado');
+    // In private Telegram chats the chat id is the user id.
+    const chat =
+      this.lastChats()[kind] ?? (kind === 'telegram' ? this.paired().telegram[0] : undefined) ?? fallbackChat;
+    if (!chat) throw new Error('escríbele primero al bot desde tu chat para vincularlo');
+    await this.say(kind, chat, text);
+  }
+
   status(): BotsStatus {
     const p = this.paired();
     for (const k of KINDS) {
@@ -601,10 +645,12 @@ export class ChatBots {
       if (!now[kind].includes(m.user)) now[kind].push(m.user);
       this.savePaired(now);
       this.target = { kind, chat: m.chat };
+      this.rememberChat(kind, m.chat);
       this.changed();
       return this.say(kind, m.chat, `Listo, este chat quedó vinculado a Zinarix.\n\n${HELP}`);
     }
     this.target = { kind, chat: m.chat };
+    this.rememberChat(kind, m.chat);
 
     if (m.button) {
       const [verb, code] = m.button.data.split(':');

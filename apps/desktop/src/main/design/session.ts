@@ -16,8 +16,11 @@ import { applyOp, opLabel, parseSrc } from './ops.js';
 import {
   builtPages,
   detectProfile,
+  gitignoreMatcher,
   htmlPages,
   isBundlerEntry,
+  MAX_PAGES,
+  pageProblem,
   type ProjectProfile,
 } from './projectProfile.js';
 import { PREVIEW_TYPES } from './previewServer.js';
@@ -97,13 +100,24 @@ export class DesignSession {
       const json = await text(f);
       if (json) nested[m[1]!.slice(0, -1)] = json;
     }
-    // HTML files that only start a bundler (Vite's index.html): not pages to edit.
+    // What the project's .gitignore leaves out (a vendored copy of another project, build
+    // output) is never a page, even when the file list came without ripgrep.
+    const gi = list.includes('.gitignore') ? await text('.gitignore') : null;
+    const ignored = gi ? gitignoreMatcher(gi) : undefined;
+    // Each candidate page is read: HTML that only starts a bundler (Vite's index.html), the
+    // templates of other tools ("{{ release }}") and fragments without <html>/<body> are
+    // not pages to show or edit. Only pages read and found real are listed.
     const entries = new Set<string>();
-    for (const p of htmlPages(list).slice(0, 60)) {
+    const allowed = new Set<string>();
+    const candidates = htmlPages(ignored ? list.filter((f) => !ignored(f)) : list, undefined, 400);
+    for (const p of candidates) {
+      if (allowed.size >= MAX_PAGES) break;
       const html = await text(p.file);
-      if (html && isBundlerEntry(html)) entries.add(p.file);
+      if (html === null || pageProblem(html)) continue;
+      if (isBundlerEntry(html)) entries.add(p.file);
+      else allowed.add(p.file);
     }
-    this.profile = detectProfile(list, pkg, { nested, entries });
+    this.profile = detectProfile(list, pkg, { nested, entries, allowed, ignored });
     this.target = undefined;
     return this.view();
   }

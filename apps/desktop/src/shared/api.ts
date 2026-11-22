@@ -2,6 +2,7 @@ import type { CadEnginesView, CadFormat, CadRenderView } from './cad.js';
 import type { BgModelId, BgStatusView } from './bgRemove.js';
 import type { PrinterAction, PrinterConfig, PrinterKind, PrinterStatus, SliceSettings, SliceView, SlicerView } from './slicer.js';
 import type { DesignApplyResult, DesignOp, DesignSessionView } from './design.js';
+import type { AutoTaskInput, AutomationsStatus, BotInput } from './automations.js';
 /**
  * The only surface the sandboxed renderer can call. Implemented in preload over a
  * whitelisted set of IPC channels; every argument is re-validated with Zod in main.
@@ -1088,6 +1089,8 @@ export interface ChatRequestView {
   computer?: boolean;
   /** Language of the Zinarix window (the "Controlar la compu" bar uses it). */
   uiLang?: 'es' | 'en';
+  /** "Mis bots": the bot this chat talks as (its instructions, knowledge and @Docs ride along). */
+  bot?: string;
 }
 
 export interface EditRequestView {
@@ -1137,6 +1140,8 @@ export type ChatEventView =
 
 export type AppEvent =
   | { type: 'chat'; requestId: string; event: ChatEventView }
+  /** "Automatizar": a scheduled task ran, or tasks / bots changed. */
+  | { type: 'automations'; status: AutomationsStatus }
   | { type: 'term:data'; id: number; data: string }
   | { type: 'term:exit'; id: number; code: number }
   | { type: 'fs:changed' }
@@ -1638,6 +1643,33 @@ export interface BridgeState {
 }
 
 export interface OmniApi {
+  /** "Automatizar": scheduled tasks, "Mis bots" and the website widget. */
+  automations: {
+    status(): Promise<AutomationsStatus>;
+    createTask(input: AutoTaskInput): Promise<AutomationsStatus>;
+    updateTask(id: string, input: AutoTaskInput): Promise<AutomationsStatus>;
+    setEnabled(id: string, on: boolean): Promise<AutomationsStatus>;
+    deleteTask(id: string): Promise<AutomationsStatus>;
+    runNow(id: string): Promise<AutomationsStatus>;
+    cancel(id: string): Promise<AutomationsStatus>;
+    clearRuns(task?: string): Promise<AutomationsStatus>;
+    createBot(input: BotInput): Promise<{ status: AutomationsStatus; id: string }>;
+    updateBot(id: string, input: BotInput): Promise<AutomationsStatus>;
+    deleteBot(id: string): Promise<AutomationsStatus>;
+    /** Saves the bot as a .zinarix-bot.json file (save dialog); false when cancelled. */
+    exportBot(id: string): Promise<boolean>;
+    /** Opens a .zinarix-bot.json file (open dialog) and adds it; null when cancelled. */
+    importBot(): Promise<{ status: AutomationsStatus; id: string } | null>;
+    /** Writes the bot as a subagent of the open folder (.zinarix/agents/<name>.md). */
+    saveAsAgent(id: string): Promise<string>;
+    /** Writes the website widget into a folder the user picks; null when cancelled. */
+    exportWidget(id: string): Promise<{ dir: string; files: string[] } | null>;
+    /** Publishes the widget on the connected Vercel account. sendKey = store the provider
+     * key as BOT_API_KEY (encrypted) in the Vercel project (the user confirmed it). */
+    publishWidget(id: string, sendKey: boolean): Promise<{ status: AutomationsStatus; url: string; keySet: boolean }>;
+    /** Where results can be delivered right now (bots connected, WhatsApp chat linked). */
+    deliveries(): Promise<{ telegram: boolean; discord: boolean; whatsapp: boolean }>;
+  };
   /** Panel de Edición: the visual editor of the open folder's pages. */
   design: {
     open(): Promise<DesignSessionView>;
@@ -2682,6 +2714,23 @@ export interface VideoJobView {
 }
 
 export const CHANNELS = [
+  'automations:status',
+  'automations:createTask',
+  'automations:updateTask',
+  'automations:setEnabled',
+  'automations:deleteTask',
+  'automations:runNow',
+  'automations:cancel',
+  'automations:clearRuns',
+  'automations:createBot',
+  'automations:updateBot',
+  'automations:deleteBot',
+  'automations:exportBot',
+  'automations:importBot',
+  'automations:saveAsAgent',
+  'automations:exportWidget',
+  'automations:publishWidget',
+  'automations:deliveries',
   'workspace:current',
   'workspace:openDialog',
   'workspace:pickChatFolder',

@@ -29,6 +29,7 @@ export const SIDE_VIEWS = [
   'gcloud',
   'mail',
   'watch',
+  'automations',
   'apps',
   'debug',
   'testing',

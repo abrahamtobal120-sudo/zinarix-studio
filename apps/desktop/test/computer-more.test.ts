@@ -12,7 +12,9 @@ import {
 } from '../src/main/computerTools.js';
 import { parseWinList } from '../src/main/computerDrivers.js';
 import {
+  aiName,
   BAR_LABELS,
+  barLabelsFor,
   ComputerControlRun,
   PAUSE_NOTE,
   type BarHandle,
@@ -332,6 +334,17 @@ describe('Controlar la compu: the bar', () => {
     run.needUser();
     cur.x = 900;
     expect(await run.before()).toBeUndefined();
+  });
+
+  it('the bar says which Zinarix is driving, with the edition name', () => {
+    expect(aiName('Zinarix Studio')).toBe('Zinarix Studio AI');
+    expect(aiName('Zinarix Studio AI')).toBe('Zinarix Studio AI');
+    expect(aiName('Zinarix Studio Pro + AI')).toBe('Zinarix Studio Pro + AI');
+    expect(aiName('Zinarix Studio Pro')).toBe('Zinarix Studio Pro AI');
+    expect(barLabelsFor('es', 'Zinarix Studio').title).toBe('Zinarix Studio AI navegando…');
+    expect(barLabelsFor('es', 'Zinarix Studio AI').pausedTitle).toBe('Zinarix Studio AI en pausa');
+    expect(barLabelsFor('en', 'Zinarix Studio').title).toBe('Zinarix Studio AI navigating…');
+    expect(barLabelsFor('en', 'Zinarix Studio').pause).toBe('Pause');
   });
 
   it('the bar speaks English too', () => {

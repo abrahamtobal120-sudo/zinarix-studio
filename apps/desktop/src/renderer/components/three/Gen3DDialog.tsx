@@ -77,7 +77,12 @@ export function Gen3DDialog() {
   };
 
   return (
-    <div className="s3-modal" role="dialog" aria-label={t3('genTitle')}>
+    <div
+      className="s3-modal"
+      role="dialog"
+      aria-label={t3('genTitle')}
+      onMouseDown={(e) => e.target === e.currentTarget && close()}
+    >
       <div className="s3-card">
         <h3>{t3('genTitle')}</h3>
         {info && !info.connected ? (

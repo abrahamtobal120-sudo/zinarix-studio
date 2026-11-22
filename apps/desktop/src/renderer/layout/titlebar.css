@@ -1,8 +1,11 @@
 @layer features {
 /* Fase 18: the window's own title bar, and Mica / vibrancy behind the bars. */
 
-.titlebar {
+:root {
+  /* Also read by the full-window studios (Video, 3D), which start below the bar. */
   --titlebar-h: 34px;
+}
+.titlebar {
   flex-shrink: 0;
   display: flex;
   align-items: center;

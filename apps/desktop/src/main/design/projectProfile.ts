@@ -14,10 +14,22 @@ export interface ProjectProfile {
 
 /**
  * Folders whose HTML is never a page of the site (build output, dependencies, tooling,
- * packaged apps).
+ * packaged apps, vendored code, and the template folders of other tools).
  */
 const SKIP =
-  /(^|\/)(node_modules|dist|build|out|release|\.next|\.nuxt|\.svelte-kit|\.output|\.vercel|\.turbo|\.cache|\.angular|\.astro|storybook-static|coverage|vendor|target|\.venv|__pycache__|\.git|\.zinarix)\//;
+  /(^|\/)(node_modules|bower_components|jspm_packages|dist|build|out|release|release[-_][^/]*|[a-z0-9]+-unpacked|\.next|\.nuxt|\.svelte-kit|\.output|\.vercel|\.turbo|\.cache|\.angular|\.astro|storybook-static|coverage|vendor|vendors|third[_-]?party|external|externals|extern|target|\.venv|venv|__pycache__|\.git|\.zinarix|templates|_templates|partials|_partials|includes|_includes|layouts|_layouts|doxygen|_build|_site)\//;
+
+/**
+ * Documentation folders below the root (a vendored project's "blender/doc/…", "lib/docs/…")
+ * hold templates and generated references, not the site. A root docs/ (GitHub Pages) stays.
+ */
+const NESTED_DOCS = /^[^/]+\/(?:.+\/)?(doc|docs)\//;
+
+/** Folders where a web project usually keeps its site, searched first. */
+const SITE_DIRS = /^(website|site|web|www|public|docs|src|static|html)\//;
+
+/** Pages shown at most in the list (a big folder must not flood the panel). */
+export const MAX_PAGES = 100;
 
 /** Friendly name of a page from its file ("acerca-de.html" → "Acerca de"). */
 export function pageName(file: string): string {
@@ -35,19 +47,120 @@ function pagePath(file: string): string {
   return p === '' ? '/' : p;
 }
 
-/** Pages of a plain HTML site: index first, then by folder and name. */
-export function htmlPages(files: string[], skip: RegExp = SKIP): DesignPage[] {
-  return files
-    .filter((f) => /\.html?$/i.test(f) && !skip.test(`${f}`) && !/(^|\/)\./.test(f))
+/** True for the main page of a site: index.html at the root, in website/, public/, apps/x/… */
+function isEntry(file: string): boolean {
+  return /^(?:(?:website|site|web|www|public|docs|src|static|html)\/|(?:apps|packages|sites)\/[^/]+\/(?:public\/|src\/)?)?index\.html?$/i.test(
+    file,
+  );
+}
+
+/** Where the folder of a page usually sits: the root and site folders first. */
+function group(file: string): number {
+  if (!file.includes('/')) return 0;
+  if (SITE_DIRS.test(file)) return 1;
+  if (/^(apps|packages|sites)\//.test(file)) return 2;
+  return 3;
+}
+
+/**
+ * Pages of a plain HTML site, by their path alone: real entry pages first (index.html at
+ * the root, website/, public/, apps/x/), then by folder and name; dependencies, build
+ * output, vendored code and template folders are left out, the same address only once.
+ */
+export function htmlPages(files: string[], skip: RegExp = SKIP, limit = MAX_PAGES): DesignPage[] {
+  const nestedDocs = skip === SKIP;
+  const seen = new Set<string>();
+  const out: DesignPage[] = [];
+  const sorted = files
+    .filter(
+      (f) =>
+        /\.html?$/i.test(f) &&
+        !skip.test(f) &&
+        !/(^|\/)\./.test(f) &&
+        !(nestedDocs && NESTED_DOCS.test(f)) &&
+        // "report.template.html", "nav.partial.html": pieces for other tools.
+        !(nestedDocs && /\.(template|tpl|tmpl|partial)\.html?$/i.test(f)),
+    )
     .sort((a, b) => {
+      const ea = isEntry(a) ? 0 : 1;
+      const eb = isEntry(b) ? 0 : 1;
       const da = a.split('/').length;
       const db = b.split('/').length;
       const ia = /(^|\/)index\.html?$/i.test(a) ? 0 : 1;
       const ib = /(^|\/)index\.html?$/i.test(b) ? 0 : 1;
-      return da - db || ia - ib || a.localeCompare(b);
-    })
-    .slice(0, 300)
-    .map((file) => ({ file, path: pagePath(file), name: pageName(file) }));
+      return ea - eb || group(a) - group(b) || da - db || ia - ib || a.localeCompare(b);
+    });
+  for (const file of sorted) {
+    if (out.length >= limit) break;
+    const path = pagePath(file);
+    const key = path.replace(/\/$/, '').toLowerCase() || '/';
+    if (seen.has(key)) continue; // about.html and about/index.html: one address
+    seen.add(key);
+    out.push({ file, path, name: pageName(file) });
+  }
+  return out;
+}
+
+/**
+ * Why an HTML file is not a page to show and edit (null: it is one). Files of other tools
+ * use template syntax ("{{ release }}", "{% block %}", "<% %>") that only shows as raw text,
+ * and fragments (a footer, a partial) have no <html> or <body> of their own.
+ */
+export function pageProblem(html: string): 'template' | 'fragment' | null {
+  if (/\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}|<%[\s\S]*?%>/.test(html)) return 'template';
+  if (!/<html[\s>]|<body[\s>]/i.test(html)) return 'fragment';
+  return null;
+}
+
+/**
+ * Tells whether a project path is ignored by a .gitignore (its common patterns: names,
+ * folders, globs with * ** ?, anchored /paths and !exceptions; the last match wins).
+ */
+export function gitignoreMatcher(text: string): (file: string) => boolean {
+  const rules: { re: RegExp; neg: boolean }[] = [];
+  const glob = (p: string) => {
+    let re = '';
+    for (let i = 0; i < p.length; i++) {
+      const c = p[i]!;
+      if (c === '*' && p[i + 1] === '*') {
+        // "**/" any folders (or none), a trailing "**" everything inside.
+        if (p[i + 2] === '/') {
+          re += '(?:.*/)?';
+          i += 2;
+        } else {
+          re += '.*';
+          i += 1;
+        }
+      } else if (c === '*') re += '[^/]*';
+      else if (c === '?') re += '[^/]';
+      else re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    }
+    return re;
+  };
+  for (const raw of text.split(/\r?\n/)) {
+    let line = raw.replace(/\s+$/, '');
+    if (!line || line.startsWith('#')) continue;
+    const neg = line.startsWith('!');
+    if (neg) line = line.slice(1);
+    const dirOnly = line.endsWith('/');
+    line = line.replace(/\/+$/, '');
+    const anchored = line.includes('/');
+    line = line.replace(/^\//, '');
+    if (!line) continue;
+    const head = anchored ? '^' : '(?:^|/)';
+    // A folder pattern matches everything inside it; a name matches the file or a folder.
+    const tail = dirOnly ? '/' : '(?:/|$)';
+    try {
+      rules.push({ re: new RegExp(head + glob(line) + tail), neg });
+    } catch {
+      /* a pattern we can't read: skipped */
+    }
+  }
+  return (file) => {
+    let ignored = false;
+    for (const r of rules) if (r.re.test(file)) ignored = !r.neg;
+    return ignored;
+  };
 }
 
 /** Pages of a built site (dist/, build/…): relative to that folder, which is its root. */
@@ -123,6 +236,10 @@ export interface ProfileExtra {
   nested?: Record<string, string>;
   /** HTML files that are only a bundler's entry point (see isBundlerEntry). */
   entries?: Set<string>;
+  /** When given, only these HTML files can be pages (they were read and are real pages). */
+  allowed?: Set<string>;
+  /** Paths ignored by the project's .gitignore (never pages). */
+  ignored?: (file: string) => boolean;
 }
 
 /**
@@ -158,9 +275,15 @@ export function detectProfile(
 
   // Pages inside an app of a monorepo belong to that app (its entry or its public/ folder).
   const appDirs = nested.map((a) => `${a.dir}/`);
-  const pages = htmlPages(files).filter(
-    (p) => !extra.entries?.has(p.file) && !appDirs.some((d) => p.file.startsWith(d)),
+  const { ignored, allowed } = extra;
+  const candidates = files.filter(
+    (f) =>
+      !(ignored && ignored(f)) &&
+      !extra.entries?.has(f) &&
+      (!allowed || allowed.has(f)) &&
+      !appDirs.some((d) => f.startsWith(d)),
   );
+  const pages = htmlPages(candidates);
   const apps = nested.filter(web);
   if (pages.length)
     return { kind: 'html', label: 'Página web (HTML)', editable: true, pages, apps };

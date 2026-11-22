@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
+import { ICON_SVG, LOGO_SVG } from './zinarixLogo';
 import { createReadStream, existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
@@ -832,6 +833,10 @@ export class PhoneRemote {
         });
         return void createReadStream(this.appApk!).pipe(res);
       }
+      if (req.method === 'GET' && url.pathname === '/logo.svg') {
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400' });
+        return void res.end(LOGO_SVG);
+      }
       if (req.method === 'GET' && url.pathname === '/icon.svg') {
         res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400' });
         return void res.end(ICON);
@@ -1120,7 +1125,7 @@ function friendly(e: unknown): string {
   return m.slice(0, 2000);
 }
 
-const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cff"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#g)"/><path d="M150 150h212v40L208 322h154v40H150v-40l154-132H150z" fill="#fff"/></svg>`;
+const ICON = ICON_SVG;
 
 const MANIFEST = {
   name: 'Zinarix Studio',

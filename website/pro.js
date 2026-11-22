@@ -68,7 +68,9 @@ const prices = {
 };
 
 let current = 'pro';
-const shotSrc = (name) => `assets/app-light-${name}.png`;
+// New captures (assets/shots) for every view that has one; the plan panel keeps its older shot.
+const shotSrc = (name) =>
+  name === 'plan' ? 'assets/app-light-plan.png' : `assets/shots/shot-${name}.webp`;
 
 function setAll(sel, fn) {
   document.querySelectorAll(sel).forEach(fn);

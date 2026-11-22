@@ -15,6 +15,7 @@ import { tm } from './mobile/mobileStrings';
 import { tgm } from './games/gamesStrings';
 import { tc as tcad } from './cad/cadStrings';
 import { tg } from './graphics/graphicsStrings';
+import { ta } from './automations/automationsStrings';
 import { td } from '../i18nDebug';
 import { tp } from '../i18nPlayground';
 import { useProblemCounts } from './Problems';
@@ -65,6 +66,7 @@ function useBarItems() {
   const gitChanges = useStore((s) => s.gitChanges);
   const sideMax = useStore((s) => s.maximized === 'side');
   const watchNew = useStore((s) => s.watch?.reports.filter((r) => !r.seen).length ?? 0);
+  const autoRunning = useStore((s) => s.automations?.running.length ?? 0);
   const videoOn = useV((s) => s.open && !s.minimized);
   const studio3dOn = use3((s) => s.open);
   type View = Exclude<typeof sidebar, null>;
@@ -91,16 +93,22 @@ function useBarItems() {
     badge?: number,
   ): BarItem => ({ key, title, icon, kind, on, run, badge });
   const items = {
-    explorer: view('explorer', t('explorer'), 'files'),
-    search: view('search', t('search'), 'search'),
+    // Search is part of the Explorer (its magnifier, Ctrl+Shift+F): no button of its own.
+    explorer: {
+      ...view('explorer', t('explorer'), 'files'),
+      on: sidebar === 'explorer' || sidebar === 'search',
+      run: () =>
+        setState({ sidebar: sidebar === 'explorer' || sidebar === 'search' ? null : 'explorer' }),
+    },
     git: view('git', t('gitTitle'), 'git', gitChanges),
     run: view('run', t('runTitle'), 'run'),
     debug: view('debug', td('dbgBarTip'), 'bug'),
     testing: view('testing', t('teBarTip'), 'beaker'),
-    chat: tool('chat', t('chat'), 'agent', 'toggle', chatOpen, () =>
+    chat: tool('chat', t('chat'), 'aiChat', 'toggle', chatOpen, () =>
       setState({ chatOpen: !chatOpen }),
     ),
     watch: view('watch', t('wtBarTip'), 'eye', watchNew),
+    automations: view('automations', ta('barTip'), 'clock', autoRunning),
     design: tool('design', t('dzTitle'), 'palette', 'view', sidebar === 'design', () =>
       setState({ sidebar: sidebar === 'design' ? 'explorer' : 'design', maximized: null }),
     ),
@@ -249,7 +257,6 @@ export function ActivityBar() {
   return (
     <nav className="activity-bar" aria-label={t('appsBar')}>
       {button(items.explorer)}
-      {button(items.search)}
       {button(items.git)}
       {button(items.run)}
       {button(items.debug)}
@@ -257,6 +264,7 @@ export function ActivityBar() {
       {sep('s1')}
       {button(items.chat)}
       {button(items.watch)}
+      {button(items.automations)}
       {button(items.design)}
       {button(items.video)}
       {button(items.studio3d)}
@@ -313,6 +321,7 @@ export function AppsPanel() {
         {row(items.supabase, t('appsSupabase'))}
         {row(items.gcloud, t('appsGcloud'))}
         {row(items.mail, t('appsMail'))}
+        {row(items.automations, ta('desc'))}
         {row(items.whatsapp, t('appsWhatsapp'))}
         {row(items.browser, t('appsBrowser'))}
         <div className="apps-section">{t('appsTools')}</div>

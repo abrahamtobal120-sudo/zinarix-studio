@@ -48,10 +48,7 @@
 }
 
 .te-project-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 10px;
+  padding-left: 8px;
 }
 
 .te-fw {
@@ -67,6 +64,7 @@
 }
 
 .te-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -85,8 +83,42 @@
   background: var(--sel);
 }
 
-.te-file {
-  padding-left: 8px;
+/* Folder chains ("apps/desktop/test") and runner folders lose their start, never their end. */
+.te-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  color: var(--fg);
+}
+
+.te-path.dim {
+  color: var(--fg-dim);
+}
+
+.te-ficon {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.te-counts {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  gap: 5px;
+  padding-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.te-n-pass {
+  color: var(--ok);
+}
+
+.te-n-fail {
+  color: var(--danger);
 }
 
 .te-chev {
@@ -99,6 +131,8 @@
 }
 
 .te-name {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--fg);
@@ -108,23 +142,32 @@
   color: var(--fg-strong);
 }
 
-.te-dir {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+.te-fw {
+  flex: none;
 }
 
+/* Run / debug float over the counts on hover, so they never take room from the names. */
 .te-actions {
-  margin-left: auto;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   gap: 2px;
+  padding-left: 6px;
+  background: linear-gradient(var(--hover), var(--hover)), var(--bg-2);
   opacity: 0;
+  pointer-events: none;
+}
+
+.te-row.sel .te-actions {
+  background: linear-gradient(var(--sel), var(--sel)), var(--bg-2);
 }
 
 .te-row:hover .te-actions,
-.te-row:focus-within .te-actions,
-.te-project-head .te-actions {
+.te-row:focus-within .te-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .te-actions button {

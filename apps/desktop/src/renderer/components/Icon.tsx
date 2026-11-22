@@ -106,6 +106,19 @@ const ICONS = {
     ['path', { d: 'm8 8.5 2.5 2-2.5 2' }],
     ['path', { d: 'M13 12.5h3' }],
   ],
+  // The AI chat (activity bar, floating help button): a speech bubble holding a sparkle.
+  aiChat: [
+    ['path', { d: 'M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z' }],
+    [
+      'path',
+      {
+        d: 'M12 7.5c.35 2.1 1.15 2.9 3.25 3.25-2.1.35-2.9 1.15-3.25 3.25-.35-2.1-1.15-2.9-3.25-3.25C10.85 10.4 11.65 9.6 12 7.5z',
+        strokeLinejoin: 'round',
+      },
+    ],
+    ['path', { d: 'M17.5 6.75v1.5' }],
+    ['path', { d: 'M16.75 7.5h1.5' }],
+  ],
   terminal: [
     ['path', { d: 'm7 11 2-2-2-2' }],
     ['path', { d: 'M11 13h4' }],

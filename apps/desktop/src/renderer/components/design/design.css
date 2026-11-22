@@ -676,4 +676,48 @@
   justify-content: center;
   gap: 6px;
 }
+
+/* The preview frame while its page loads, or when it is too slow. */
+.dz-frame-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  color: var(--fg-dim);
+  background: color-mix(in srgb, var(--bg-4) 85%, transparent);
+  font-size: var(--text-sm);
+  z-index: 1;
+}
+.dz-frame-state.slow {
+  color: var(--fg-strong);
+  background: color-mix(in srgb, var(--bg-4) 92%, transparent);
+}
+.dz-frame-state.slow > span {
+  max-width: 420px;
+  line-height: 1.5;
+  color: var(--fg-dim);
+}
+.dz-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: var(--accent, currentColor);
+  animation: dz-spin 0.8s linear infinite;
+}
+@keyframes dz-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dz-spinner {
+    animation-duration: 2.4s;
+  }
+}
 }

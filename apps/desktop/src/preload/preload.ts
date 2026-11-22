@@ -8,6 +8,25 @@ const call =
     ipcRenderer.invoke(channel, ...args);
 
 const api: OmniApi = {
+  automations: {
+    status: call('automations:status') as OmniApi['automations']['status'],
+    createTask: call('automations:createTask') as OmniApi['automations']['createTask'],
+    updateTask: call('automations:updateTask') as OmniApi['automations']['updateTask'],
+    setEnabled: call('automations:setEnabled') as OmniApi['automations']['setEnabled'],
+    deleteTask: call('automations:deleteTask') as OmniApi['automations']['deleteTask'],
+    runNow: call('automations:runNow') as OmniApi['automations']['runNow'],
+    cancel: call('automations:cancel') as OmniApi['automations']['cancel'],
+    clearRuns: call('automations:clearRuns') as OmniApi['automations']['clearRuns'],
+    createBot: call('automations:createBot') as OmniApi['automations']['createBot'],
+    updateBot: call('automations:updateBot') as OmniApi['automations']['updateBot'],
+    deleteBot: call('automations:deleteBot') as OmniApi['automations']['deleteBot'],
+    exportBot: call('automations:exportBot') as OmniApi['automations']['exportBot'],
+    importBot: call('automations:importBot') as OmniApi['automations']['importBot'],
+    saveAsAgent: call('automations:saveAsAgent') as OmniApi['automations']['saveAsAgent'],
+    exportWidget: call('automations:exportWidget') as OmniApi['automations']['exportWidget'],
+    publishWidget: call('automations:publishWidget') as OmniApi['automations']['publishWidget'],
+    deliveries: call('automations:deliveries') as OmniApi['automations']['deliveries'],
+  },
   design: {
     open: call('design:open') as OmniApi['design']['open'],
     close: call('design:close') as OmniApi['design']['close'],

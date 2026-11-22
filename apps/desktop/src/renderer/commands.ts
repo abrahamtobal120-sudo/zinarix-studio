@@ -3,6 +3,7 @@ import { openNewTask } from './components/TasksPanel';
 import { listTerminals, sendTerminalToChat, terminalFocused } from './components/Terminal';
 import { confirmDialog } from './confirm';
 import { goToNextProblem } from './components/Problems';
+import { FOCUS_SEARCH_EVENT } from './components/Search';
 import {
   getDebug,
   pause,
@@ -21,6 +22,7 @@ import { studioCommand, videoCommands } from './components/video/videoCommands';
 import { lang, setLang, t } from './i18n';
 import { toggle3d } from './components/three/store3d';
 import { t3 } from './components/three/strings3d';
+import { ta } from './components/automations/automationsStrings';
 import { layoutCommands } from './layout/layoutCommands';
 import { comboFromEvent } from './keys';
 import {
@@ -203,7 +205,10 @@ function baseCommands(): Command[] {
       id: 'view.explorer',
       label: t('explorer'),
       keys: `${mod}+Shift+E`,
-      run: () => setState((s) => ({ sidebar: s.sidebar === 'explorer' ? null : 'explorer' })),
+      run: () =>
+        setState((s) => ({
+          sidebar: s.sidebar === 'explorer' || s.sidebar === 'search' ? null : 'explorer',
+        })),
     },
     {
       id: 'view.git',
@@ -246,7 +251,11 @@ function baseCommands(): Command[] {
       id: 'view.search',
       label: t('searchFiles'),
       keys: `${mod}+Shift+F`,
-      run: () => setState({ sidebar: 'search' }),
+      // The Explorer with its search box open (and focused, if it already was).
+      run: () => {
+        setState({ sidebar: 'search' });
+        requestAnimationFrame(() => window.dispatchEvent(new Event(FOCUS_SEARCH_EVENT)));
+      },
     },
     {
       id: 'view.run',
@@ -311,6 +320,12 @@ function baseCommands(): Command[] {
       id: 'view.watch',
       label: t('wtTitle'),
       run: () => setState((s) => ({ sidebar: s.sidebar === 'watch' ? null : 'watch' })),
+    },
+    {
+      id: 'view.automations',
+      label: ta('barTip'),
+      run: () =>
+        setState((s) => ({ sidebar: s.sidebar === 'automations' ? null : 'automations' })),
     },
     {
       id: 'app.studio3d',

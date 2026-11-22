@@ -1,9 +1,11 @@
 @layer features {
 /* Zinarix Video Studio — uses the app's theme variables (styles.css), so it follows the theme. */
 
+/* Below the window's title bar, so "Volver al chat" is never under − □ × or its drag area. */
 .vs-root {
   position: fixed;
   inset: 0;
+  top: var(--titlebar-h, 34px);
   z-index: var(--z-studio);
   display: flex;
   flex-direction: column;

@@ -75,6 +75,7 @@ import { tv } from './video/strings';
 import { openStudio } from './video/videoStore';
 import { ProviderLogo } from './ProviderLogo';
 import { ChatHistory, when } from './ChatHistory';
+import { DeleteSavedChat, LimitedList, RecentChats } from './ChatListParts';
 import { SendButton, useDismiss, menuArrows } from './ChatSendMenu';
 import { Markdown } from './Markdown';
 import { DiffReview, RewindDialog, type RewindMode } from './DiffReview';
@@ -116,6 +117,8 @@ import {
 } from '../../shared/mentions';
 import type { MentionKind } from '../../shared/mentions';
 import './chat-composer.css';
+import { PhasesPanel, PhasesPicker, ps, usePhases } from './PhasesPanel';
+import { isAnalyzePrompt } from '../../shared/phases';
 
 const NO_KIT_COMMANDS: AgentKitView['commands'] = [];
 const NO_KIT_SKILLS: AgentKitView['skills'] = [];
@@ -203,7 +206,7 @@ interface Slash {
   hint: string;
   prompt?: string;
   agent?: boolean;
-  action?: 'new' | 'agent' | 'chat' | 'plan' | 'rules' | 'commit' | 'docs';
+  action?: 'new' | 'agent' | 'chat' | 'plan' | 'rules' | 'commit' | 'docs' | 'phases';
 }
 function slashCommands(): Slash[] {
   return [
@@ -235,6 +238,7 @@ function slashCommands(): Slash[] {
     { name: 'init', en: 'init', hint: t('slashInit'), prompt: t('slashInitPrompt'), agent: true },
     { name: 'agente', en: 'agent', hint: t('slashAgent'), action: 'agent' },
     { name: 'plan', en: 'plan', hint: t('slashPlan'), action: 'plan' },
+    { name: 'fases', en: 'phases', hint: ps().menu, action: 'phases' },
     { name: 'chat', en: 'chat', hint: t('slashChat'), action: 'chat' },
     { name: 'nuevo', en: 'new', hint: t('newChat'), action: 'new' },
     { name: 'indexar', en: 'index', hint: t('slashIndexDocs'), action: 'docs' },
@@ -1148,6 +1152,8 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const models = useStore((s) => s.models);
   const workspace = useStore((s) => s.workspace);
   const meta = useStore((s) => s.chats.find((c) => c.id === id));
+  // "Mis bots": the bot this chat talks as (its greeting shows while the chat is empty).
+  const chatBot = useStore((s) => (meta?.bot ? s.automations?.bots.find((b) => b.id === meta.bot) : undefined));
   const focusedPane = useStore((s) => s.chatFocus);
   const [turns, setTurns] = useState<Turn[]>([]);
   const turnsNow = useRef(turns);
@@ -1832,6 +1838,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         conversationId: conversationNow.current,
         folder: ownFolder,
         noFolder: noFolder || undefined,
+        ...(meta?.bot ? { bot: meta.bot } : {}),
         ...(reasoning ? { reasoning } : {}),
         ...(sentImages.length
           ? { images: sentImages.map(({ mediaType, data }) => ({ mediaType, data })) }
@@ -1847,6 +1854,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       finish();
     }
   };
+
+  /** Modo Fases: a .md of changes split into phases and subphases, run one per message. */
+  const phases = usePhases({
+    // Its files are read and saved through the window's folder.
+    root: ownFolder ? undefined : root,
+    chatMode,
+    send: (prompt, context, mode) => void send(prompt, context, false, undefined, true, mode),
+  });
 
   /** Empties this chat (a new conversation in the same tab). */
   const resetChat = () => {
@@ -1903,6 +1918,19 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const onFinished = useEffectEvent(() => {
     const byUser = stopped.current;
     stopped.current = false;
+    {
+      const all = turnsNow.current;
+      const last = all.at(-1);
+      const user = last?.rid ? all.find((x) => x.role === 'user' && x.rid === last.rid) : undefined;
+      // A message of Modo Fases: its panel decides what goes next (no queue retries).
+      if (
+        last?.role === 'assistant' &&
+        phases.onFinished(user?.content, last.content, Boolean(last.error), byUser)
+      ) {
+        cancelRetry();
+        return;
+      }
+    }
     if (byUser) {
       cancelRetry();
       return;
@@ -2107,6 +2135,13 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
       case 'plan':
         setChatMode('plan', true);
         return true;
+      case 'phases': {
+        // /fases <file.md> analyses that file; /fases alone opens the picker.
+        const path = rest.replace(/^@/, '');
+        if (path && files.includes(path)) void phases.open(path);
+        else phases.setPicker(true);
+        return true;
+      }
       case 'rules':
         void runCommand('ai.rules');
         return true;
@@ -2592,7 +2627,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   /** The agent's live task list (its last todo_write in this chat), Fase 3. */
   const todos = useMemo(() => latestTodos(turns), [turns]);
   /** Which answers are plans, and the user's verdict on each (also after reopening). */
-  const plans = useMemo(() => planStates(turns), [turns]);
+  const plans = useMemo(
+    () =>
+      // The analysis of Modo Fases is run from its own panel, not approved as a plan.
+      planStates(turns).map((st, i) =>
+        st && turns[i - 1]?.role === 'user' && isAnalyzePrompt(turns[i - 1]!.content) ? null : st,
+      ),
+    [turns],
+  );
 
   const shownModel =
     chatModel ?? (agentMode ? settings.roles.agent : undefined) ?? settings.defaultModel;
@@ -2671,6 +2713,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               </>
             ) : !online ? (
               <OfflineGames offline />
+            ) : chatBot ? (
+              <div className="chat-hints chat-bot-intro">
+                <p className="chat-bot-name">
+                  <span aria-hidden="true">{chatBot.icon}</span> <strong>{chatBot.name}</strong>
+                </p>
+                {chatBot.description && <p className="dim">{chatBot.description}</p>}
+                {chatBot.greeting && <p className="chat-bot-greeting">{chatBot.greeting}</p>}
+              </div>
             ) : (
               <div className="dim chat-hints">
                 <p>{agentMode ? t('agentHint') : t('chatHint')}</p>
@@ -2956,6 +3006,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             {(
               [
                 ['paperclip', t('chatAttach'), attachFile],
+                ['layers', ps().menu, () => phases.setPicker(true)],
                 ['image', t('chatAttachImage'), () => imagePicker.current?.click()],
                 ['film', tv('openStudioHint'), () => void openStudio()],
               ] as const
@@ -3043,6 +3094,15 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               </div>
             ))}
           </div>
+        )}
+        {(phases.plan || phases.analyzing) && <PhasesPanel s={phases} busy={Boolean(busy)} />}
+        {phases.picker && (
+          <PhasesPicker
+            files={files}
+            active={ownFolder ? null : active}
+            onPick={(f) => void phases.open(f)}
+            onClose={() => phases.setPicker(false)}
+          />
         )}
         {todos && (busy || todos.some((x) => x.status !== 'completed')) && (
           <TaskList todos={todos} live={Boolean(busy)} />
@@ -3517,15 +3577,20 @@ function ChatProject({
           {items.length > 0 && past.length > 0 && (
             <div className="chat-list-sub">{t('chatOpenNow')}</div>
           )}
-          {items.map(({ c, n }) => {
+          <LimitedList
+            items={items}
+            keep={({ c }) => c.id === focusedId || c.id === activeChat || c.id === split}
+          >
+          {({ c, n }) => {
             const label = c.title || t('chatTabN', { n });
             const status = chatStatusText(c);
             const shown = c.id === activeChat || c.id === split;
+            const modelName = c.model ? c.model.split('/').pop() : t('chatNoModel');
             return (
               <div
                 key={c.id}
                 className={`chat-list-item ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
-                title={status ? `${label} · ${status}` : label}
+                title={`${label}\n${status ? `${status} · ` : ''}${modelName}`}
                 draggable={Boolean(folder)}
                 onDragStart={(e) => startChatDrag(e, { chat: c.id, from: folder })}
                 // Mouse: the whole row. Keyboard: the name is the button (the row holds the
@@ -3535,18 +3600,11 @@ function ChatProject({
                   if (e.button === 1) void requestCloseChat(c.id);
                 }}
               >
-                <span className="chat-list-avatar">
-                  {c.model ? (
-                    <ProviderLogo id={c.model.split('/')[0]!} size={18} />
-                  ) : (
-                    <Icon name={c.agent ? 'agent' : 'message'} size={13} />
-                  )}
-                  {(c.busy || c.waiting || c.unread) && (
-                    <span className="chat-list-badge">
-                      <ChatStatus c={c} />
-                    </span>
-                  )}
-                </span>
+                {(c.busy || c.waiting || c.unread) && (
+                  <span className="chat-list-state">
+                    <ChatStatus c={c} />
+                  </span>
+                )}
                 <span
                   className="chat-list-main"
                   role="button"
@@ -3563,9 +3621,6 @@ function ChatProject({
                   }}
                 >
                   <span className="chat-tab-label">{label}</span>
-                  <span className="chat-list-meta">
-                    {status || (c.model ? c.model.split('/').pop() : t('chatNoModel'))}
-                  </span>
                 </span>
                 {c.queued.length > 0 && (
                   <em className="chat-list-count" title={t('chatQueued')}>
@@ -3587,34 +3642,32 @@ function ChatProject({
                 )}
               </div>
             );
-          })}
-          {past.length > 0 && <div className="chat-list-sub">{t('chatRecent')}</div>}
-          {past.slice(0, 8).map((v) => (
-            <div
-              key={v.id}
-              className="chat-list-item past"
-              title={`${v.title} · ${new Date(v.updatedAt).toLocaleString()}\n${t('chatDragHint')}`}
-              draggable
-              onDragStart={(e) => startChatDrag(e, { conv: v.id, from: folder })}
-              {...pressable(() =>
-                newChat({ conversationId: v.id, title: v.title.slice(0, 60), folder: own }),
-              )}
-            >
-              <span className="chat-list-avatar">
-                {v.model ? (
-                  <ProviderLogo id={v.model.split('/')[0]!} size={18} />
-                ) : (
-                  <Icon name="history" size={13} />
+          }}
+          </LimitedList>
+          {/* Saved chats under date headers (Hoy, Ayer, Últimos 7 días...). */}
+          <RecentChats items={past}>
+            {(v) => (
+              <div
+                key={v.id}
+                className="chat-list-item past"
+                title={`${v.title}\n${new Date(v.updatedAt).toLocaleString()} · ${t('histMessages', { n: v.messageCount })}${v.model ? ` · ${v.model.split('/').pop()}` : ''}\n${t('chatDragHint')}`}
+                draggable
+                onDragStart={(e) => startChatDrag(e, { conv: v.id, from: folder })}
+                {...pressable(() =>
+                  newChat({ conversationId: v.id, title: v.title.slice(0, 60), folder: own }),
                 )}
-              </span>
-              <span className="chat-list-main">
-                <span className="chat-tab-label">{v.title}</span>
-                <span className="chat-list-meta">
-                  {when(v.updatedAt)} · {t('histMessages', { n: v.messageCount })}
+              >
+                <span className="chat-list-main">
+                  <span className="chat-tab-label">{v.title}</span>
                 </span>
-              </span>
-            </div>
-          ))}
+                <span className="chat-list-when">{when(v.updatedAt)}</span>
+                <DeleteSavedChat
+                  conv={v}
+                  onDeleted={(id) => setSaved((s) => (s ? s.filter((x) => x.id !== id) : s))}
+                />
+              </div>
+            )}
+          </RecentChats>
           {!items.length && saved !== null && !past.length && (
             <div className="chat-list-empty">{t('chatProjectEmpty')}</div>
           )}
@@ -3678,6 +3731,9 @@ function ChatList({ focusedId }: { focusedId: string }) {
   };
   return (
     <nav className="chat-list" aria-label={t('chatListTitle')}>
+      <button className="chat-list-top-new" onClick={() => newChat()}>
+        <Icon name="edit" size={14} /> {t('chatNewShort')}
+      </button>
       <div className="chat-list-head">{t('chatProjects')}</div>
       <div className="chat-list-scroll">
         {groups.map((g) => (

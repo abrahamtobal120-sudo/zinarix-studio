@@ -172,17 +172,25 @@ function Studio3D() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (
-        el &&
+      const s = get3();
+      const handled = () => (e.preventDefault(), e.stopPropagation());
+      const inField =
+        !!el &&
         (el.tagName === 'INPUT' ||
           el.tagName === 'TEXTAREA' ||
           el.tagName === 'SELECT' ||
-          el.isContentEditable)
-      )
+          el.isContentEditable);
+      // Esc always gets you out, even with the cursor in a field: it closes the open dialog,
+      // or leaves the field so the next Esc closes the editor.
+      if (e.key === 'Escape' && inField) {
+        handled();
+        if (s.genOpen) set3({ genOpen: false });
+        else if (s.dialog) set3({ dialog: false });
+        else el.blur();
         return;
+      }
+      if (inField) return;
       const ctrl = e.ctrlKey || e.metaKey;
-      const s = get3();
-      const handled = () => (e.preventDefault(), e.stopPropagation());
       if (ctrl && e.key.toLowerCase() === 'z') return (handled(), e.shiftKey ? redo3() : undo3());
       if (ctrl && e.key.toLowerCase() === 'y') return (handled(), redo3());
       if (ctrl && e.key.toLowerCase() === 's') return (handled(), void save(false));
@@ -1265,7 +1273,12 @@ function RenderDialog() {
   const blender = engine !== 'viewer';
   const canStart = !blender || !!info?.blender;
   return (
-    <div className="s3-modal" role="dialog" aria-label={t3('renderTitle')}>
+    <div
+      className="s3-modal"
+      role="dialog"
+      aria-label={t3('renderTitle')}
+      onMouseDown={(e) => e.target === e.currentTarget && set3({ dialog: false })}
+    >
       <div className="s3-card">
         <h3>{t3('renderTitle')}</h3>
         <Field label={t3('engine')}>

@@ -59,6 +59,8 @@ export function DesignPanel() {
   });
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [problem, setProblem] = useState<string | null>(null);
+  /** The preview frame: loading, shown (its editor script answered), or too slow. */
+  const [frameState, setFrameState] = useState<'loading' | 'ready' | 'slow'>('loading');
   const [device, setDevice] = useState<Device>('desktop');
   const [zoom, setZoom] = useState(() => Number(localStorage.getItem(ZOOM_KEY)) || 100);
   const [fit, setFit] = useState(true);
@@ -278,6 +280,7 @@ export function DesignPanel() {
       if (!msg || msg.zx !== 1) return;
       switch (msg.type) {
         case 'ready': {
+          setFrameState('ready');
           setTree(msg.tree);
           setTitle(msg.title);
           frame.current?.contentWindow?.postMessage(
@@ -379,6 +382,17 @@ export function DesignPanel() {
 
   useEffect(() => localStorage.setItem(ZOOM_KEY, String(zoom)), [zoom]);
 
+  // Each new page in the frame: "loading" until its editor script answers, "slow" after a
+  // while (a broken page, a dev server that stopped), so the canvas is never just blank.
+  useEffect(() => {
+    setFrameState('loading');
+    const timer = setTimeout(
+      () => setFrameState((s) => (s === 'loading' ? 'slow' : s)),
+      10_000,
+    );
+    return () => clearTimeout(timer);
+  }, [page, frameKey, view?.mode, view?.live]);
+
   // ------------------------------------------------------------ keys outside the preview
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -425,7 +439,7 @@ export function DesignPanel() {
     );
   if (!view)
     return (
-      <Empty icon="palette" title={t('dzLoading')} text="">
+      <Empty icon="palette" title={t('dzLoading')} text={t('dzLoadingText')}>
         {null}
       </Empty>
     );
@@ -454,7 +468,11 @@ export function DesignPanel() {
       <Empty
         icon="palette"
         title={view.kind === 'unknown' ? t('dzNoPages') : t('dzNotYet', { kind: view.label })}
-        text={view.kind === 'unknown' ? t('dzNoPagesText') : t('dzNotYetText')}
+        text={
+          view.kind === 'unknown'
+            ? `${t('dzNoPagesText')} ${t('dzNoPagesHint')}`
+            : t('dzNotYetText')
+        }
       >
         <button
           className="primary"
@@ -843,6 +861,25 @@ export function DesignPanel() {
                   transform: `scale(${scale})`,
                 }}
               />
+              {frameState === 'loading' && (
+                <div className="dz-frame-state" role="status">
+                  <span className="dz-spinner" aria-hidden />
+                  <span>{t('dzFrameLoading')}</span>
+                </div>
+              )}
+              {frameState === 'slow' && (
+                <div className="dz-frame-state slow" role="alert">
+                  <Icon name="warning" size={20} />
+                  <strong>{t('dzFrameSlow')}</strong>
+                  <span>{t('dzFrameSlowText')}</span>
+                  <div className="dz-empty-actions">
+                    <button className="primary" onClick={reload}>
+                      {t('dzFrameReload')}
+                    </button>
+                    <button onClick={() => setFrameState('ready')}>{t('close')}</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>

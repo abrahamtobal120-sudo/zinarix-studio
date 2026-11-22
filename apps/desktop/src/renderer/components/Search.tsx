@@ -105,7 +105,21 @@ function Toggle({
   );
 }
 
-export function SearchView() {
+/** Window event that focuses (and selects) the search box of the mounted search view. */
+export const FOCUS_SEARCH_EVENT = 'zs:focus-search';
+
+export function SearchView({
+  embedded = false,
+  onActive,
+  onClose,
+}: {
+  /** Inside the Explorer: no title bar, and the help text gives way to the file tree. */
+  embedded?: boolean;
+  /** Told whether results are showing (a query is typed, or "meaning" mode). */
+  onActive?: (active: boolean) => void;
+  /** Escape on an empty box (embedded): back to the plain file tree. */
+  onClose?: () => void;
+} = {}) {
   const workspace = useStore((s) => s.workspace);
   const fsVersion = useStore((s) => s.fsVersion);
   const [mode, setMode] = useState<Mode>('content');
@@ -131,6 +145,16 @@ export function SearchView() {
   const list = useRef<HTMLDivElement>(null);
 
   useEffect(() => input.current?.focus(), [mode]);
+  useEffect(() => {
+    const focus = () => {
+      input.current?.focus();
+      input.current?.select();
+    };
+    window.addEventListener(FOCUS_SEARCH_EVENT, focus);
+    return () => window.removeEventListener(FOCUS_SEARCH_EVENT, focus);
+  }, []);
+  const active = !!query || mode === 'meaning';
+  useEffect(() => onActive?.(active), [active, onActive]);
 
   const re = useMemo(
     () => (query ? buildRegex(query, { regex, matchCase, word }) : null),
@@ -304,60 +328,68 @@ export function SearchView() {
     mode === 'name' ? nameMatches.length : grouped.reduce((n, [, l]) => n + l.length, 0);
   const capped = mode === 'content' && hits.length >= 2000;
 
+  const actions = (
+    <span className="sx-actions">
+      {mode === 'content' && grouped.length > 0 && (
+        <button
+          title={collapsed.size ? t('expandAll') : t('collapseAll')}
+          aria-label={collapsed.size ? t('expandAll') : t('collapseAll')}
+          onClick={() =>
+            setCollapsed(collapsed.size ? new Set() : new Set(grouped.map(([p]) => p)))
+          }
+        >
+          <span aria-hidden="true">{collapsed.size ? '⊞' : '⊟'}</span>
+        </button>
+      )}
+      <button
+        title={t('refresh')}
+        aria-label={t('refresh')}
+        onClick={() => setNonce((n) => n + 1)}
+      >
+        <Icon name="refresh" size={14} />
+      </button>
+      <button
+        title={t('clear')}
+        aria-label={t('clear')}
+        onClick={() => {
+          setQuery('');
+          setReplace('');
+          input.current?.focus();
+        }}
+      >
+        <Icon name="x" size={14} />
+      </button>
+    </span>
+  );
+
   let rowIndex = -1;
   return (
-    <div className="search-view">
-      <div className="sidebar-title">
-        <span>{t('search').toUpperCase()}</span>
-        <span className="sx-actions">
-          {mode === 'content' && grouped.length > 0 && (
+    <div className={`search-view${embedded ? ' embedded' : ''}${embedded && !active ? ' idle' : ''}`}>
+      {!embedded && (
+        <div className="sidebar-title">
+          <span>{t('search').toUpperCase()}</span>
+          {actions}
+        </div>
+      )}
+      <div className="sx-head-row">
+        <div className="sx-tabs" role="tablist">
+          {(['content', 'name', 'meaning'] as const).map((m) => (
             <button
-              title={collapsed.size ? t('expandAll') : t('collapseAll')}
-              aria-label={collapsed.size ? t('expandAll') : t('collapseAll')}
-              onClick={() =>
-                setCollapsed(collapsed.size ? new Set() : new Set(grouped.map(([p]) => p)))
-              }
+              key={m}
+              role="tab"
+              aria-selected={mode === m}
+              className={mode === m ? 'on' : ''}
+              onClick={() => setMode(m)}
             >
-              <span aria-hidden="true">{collapsed.size ? '⊞' : '⊟'}</span>
+              {m === 'content'
+                ? t('searchInContent')
+                : m === 'name'
+                  ? t('searchByName')
+                  : t('searchMeaning')}
             </button>
-          )}
-          <button
-            title={t('refresh')}
-            aria-label={t('refresh')}
-            onClick={() => setNonce((n) => n + 1)}
-          >
-            <Icon name="refresh" size={14} />
-          </button>
-          <button
-            title={t('clear')}
-            aria-label={t('clear')}
-            onClick={() => {
-              setQuery('');
-              setReplace('');
-              input.current?.focus();
-            }}
-          >
-            <Icon name="x" size={14} />
-          </button>
-        </span>
-      </div>
-
-      <div className="sx-tabs" role="tablist">
-        {(['content', 'name', 'meaning'] as const).map((m) => (
-          <button
-            key={m}
-            role="tab"
-            aria-selected={mode === m}
-            className={mode === m ? 'on' : ''}
-            onClick={() => setMode(m)}
-          >
-            {m === 'content'
-              ? t('searchInContent')
-              : m === 'name'
-                ? t('searchByName')
-                : t('searchMeaning')}
-          </button>
-        ))}
+          ))}
+        </div>
+        {embedded && actions}
       </div>
 
       <div className="sx-form">
@@ -400,7 +432,10 @@ export function SearchView() {
                 } else if (e.key === 'Enter') {
                   e.preventDefault();
                   activateRow(mode === 'content' && cursor === 0 && rows[1]?.hit ? 1 : cursor);
-                } else if (e.key === 'Escape') setQuery('');
+                } else if (e.key === 'Escape') {
+                  if (query) setQuery('');
+                  else onClose?.();
+                }
               }}
             />
             {mode === 'content' && (
@@ -504,7 +539,7 @@ export function SearchView() {
       </div>
 
       <div className="sx-results" ref={list} hidden={mode === 'meaning'}>
-        {!query && workspace && (
+        {!query && workspace && !embedded && (
           <div className="sx-empty">
             <div className="sx-empty-icon">
               <Icon name={mode === 'content' ? 'search' : 'file'} size={34} />

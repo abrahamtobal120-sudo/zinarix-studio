@@ -2,9 +2,12 @@
   /* Fase 14: the 3D editor (theme variables and tokens only). It sits above Video Studio and
    below the studio's confirmations and toasts. */
 
+  /* Below the window's title bar: whatever sits under − □ × or in its drag area cannot be
+     clicked reliably on Windows, and the editor's ✕ must always work. */
   .s3-root {
     position: fixed;
     inset: 0;
+    top: var(--titlebar-h, 34px);
     z-index: calc(var(--z-studio) + 4);
     display: grid;
     grid-template-rows: auto 1fr auto;
@@ -21,6 +24,10 @@
     border-bottom: 1px solid var(--border);
     background: var(--bg-2);
     min-width: 0;
+  }
+  /* Narrow window: the buttons wrap instead of being pushed out of sight (✕ included). */
+  .s3-top {
+    flex-wrap: wrap;
   }
   .s3-keys {
     border-top: 1px solid var(--border);

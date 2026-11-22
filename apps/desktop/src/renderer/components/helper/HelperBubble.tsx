@@ -334,9 +334,8 @@ export function HelperBubble() {
       <button
         className={`hlp-bubble${open ? ' on' : ''}`}
         style={{ right: pos.right, bottom: pos.bottom }}
-        aria-label={t('hlpOpen')}
+        aria-label={`${t('hlpBubbleTip')} · ${t('hlpOpen')}`}
         aria-expanded={open}
-        title={`${t('hlpOpen')}\n${t('hlpDrag')}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -348,7 +347,13 @@ export function HelperBubble() {
           }
         }}
       >
-        <Icon name={open ? 'close' : 'message'} size={20} />
+        <Icon name={open ? 'close' : 'aiChat'} size={22} />
+        {!open && (
+          <span className="hlp-tip" aria-hidden="true">
+            {t('hlpBubbleTip')}
+            <small>{t('hlpDrag')}</small>
+          </span>
+        )}
       </button>
       {open && (
         <section

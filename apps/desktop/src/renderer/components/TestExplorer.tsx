@@ -18,10 +18,22 @@ import {
   useTests,
   variantsOf,
 } from '../testExplorer';
+import { filesUnder, testFileLabel, testFileTree, type TestFolder } from '../testTree';
+import { folderIcon } from './icons';
 import { Icon } from './Icon';
 import './test-explorer.css';
 
 type Mark = TestStatus | 'running' | 'none';
+
+/** A runner with more test files than this starts collapsed (and so do its folders). */
+const BIG_GROUP = 15;
+
+interface Tally {
+  files: number;
+  tests: number;
+  passed: number;
+  failed: number;
+}
 
 function StatusMark({ st }: { st: Mark }) {
   const label =
@@ -111,6 +123,8 @@ export function TestExplorer() {
   const [filter, setFilter] = useState('');
   const [onlyFailed, setOnlyFailed] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // Runners and folders whose open/closed state the user flipped from the default.
+  const [flipped, setFlipped] = useState<Set<string>>(new Set());
   const [shown, setShown] = useState<string | null>(null);
   const [showOutput, setShowOutput] = useState(false);
 
@@ -164,6 +178,36 @@ export function TestExplorer() {
   const visible = (item: TestItem): boolean =>
     (!q || item.fullName.toLowerCase().includes(q) || item.file.toLowerCase().includes(q)) &&
     (!onlyFailed || markOf(item) === 'failed');
+  const filtering = Boolean(q) || onlyFailed;
+  const pathHit = (file: string) => Boolean(q) && file.toLowerCase().includes(q);
+  const fileShown = (file: string, items: TestItem[]): boolean =>
+    !filtering ||
+    items.some(visible) ||
+    (onlyFailed ? fileErrors(file).length > 0 && (!q || pathHit(file)) : pathHit(file));
+  const tally = (files: string[]): Tally => {
+    const c: Tally = { files: 0, tests: 0, passed: 0, failed: 0 };
+    for (const file of files) {
+      const items = byFile.get(file) ?? [];
+      if (!fileShown(file, items)) continue;
+      c.files++;
+      for (const i of items) {
+        if (i.kind !== 'test' || (filtering && !visible(i))) continue;
+        c.tests++;
+        const m = markOf(i);
+        if (m === 'passed') c.passed++;
+        else if (m === 'failed') c.failed++;
+      }
+    }
+    return c;
+  };
+  const isOpen = (key: string, byDefault: boolean) => filtering || flipped.has(key) !== byDefault;
+  const flip = (key: string) =>
+    setFlipped((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
   const toggle = (key: string) =>
     setOpen((s) => {
       const n = new Set(s);
@@ -307,7 +351,114 @@ export function TestExplorer() {
   };
 
   const projects = discovery?.projects ?? [];
-  const anyVisible = projects.some((p) => p.files.some((f) => (byFile.get(f) ?? []).some(visible)));
+  const anyVisible = projects.some((p) => p.files.some((f) => fileShown(f, byFile.get(f) ?? [])));
+
+  /** Test and pass / fail counts of a runner, folder or file. */
+  const counts = (c: Tally, label?: string) => (
+    <span
+      className="te-counts small"
+      title={[
+        t('teCounts', { files: c.files, tests: c.tests }),
+        c.passed ? `${t('tePassed')}: ${c.passed}` : '',
+        c.failed ? `${t('teFailed')}: ${c.failed}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    >
+      <span className="dim">{label ?? c.tests}</span>
+      {c.passed > 0 && <span className="te-n-pass">✓{c.passed}</span>}
+      {c.failed > 0 && <span className="te-n-fail">✗{c.failed}</span>}
+    </span>
+  );
+
+  const renderFile = (p: TestProject, file: string, depth: number): ReactNode => {
+    const items = byFile.get(file) ?? [];
+    if (!fileShown(file, items)) return null;
+    const errors = fileErrors(file);
+    const expanded = open.has(file) || (filtering && items.some(visible));
+    return (
+      <div key={file}>
+        <div
+          className="te-row te-file"
+          style={{ paddingLeft: 8 + depth * 12 }}
+          title={file}
+          aria-expanded={expanded}
+          {...pressable(() => toggle(file))}
+        >
+          <Icon name="chevron" size={12} className={`te-chev ${expanded ? 'open' : ''}`} />
+          <StatusMark st={fileMark(file, items)} />
+          <span className="te-name">{testFileLabel(file)}</span>
+          {counts(tally([file]))}
+          {actions(p, file)}
+        </div>
+        {expanded && errors.length > 0 && (
+          <div className="te-error" style={{ marginLeft: 28 + depth * 12 }}>
+            <strong>{t('teFileError')}</strong>
+            <pre>{errors[0]!.message}</pre>
+          </div>
+        )}
+        {expanded && treeOf(items).map((n) => renderNode(p, n, depth + 1))}
+      </div>
+    );
+  };
+
+  const renderFolder = (
+    p: TestProject,
+    folder: TestFolder,
+    depth: number,
+    byDefault: boolean,
+  ): ReactNode => {
+    const all = filesUnder(folder);
+    const c = tally(all);
+    if (!c.files) return null;
+    const key = `${p.framework}:${p.cwd}|${folder.path}`;
+    const expanded = isOpen(key, byDefault);
+    const last = folder.name.slice(folder.name.lastIndexOf('/') + 1);
+    return (
+      <div key={key}>
+        <div
+          className="te-row te-folder"
+          style={{ paddingLeft: 8 + depth * 12 }}
+          title={folder.path}
+          aria-expanded={expanded}
+          {...pressable(() => flip(key))}
+        >
+          <Icon name="chevron" size={12} className={`te-chev ${expanded ? 'open' : ''}`} />
+          <span className="te-ficon">{folderIcon(last, expanded)}</span>
+          <span className="te-path">
+            <bdi>{folder.name}</bdi>
+          </span>
+          {counts(c, String(c.files))}
+          <span className="te-actions">
+            <button
+              title={t('teRun')}
+              aria-label={t('teRun')}
+              disabled={running || Boolean(p.problem)}
+              onClick={(e) => {
+                e.stopPropagation();
+                void runTests({ ...requestFor(p), files: all });
+              }}
+            >
+              <Icon name="play" size={13} />
+            </button>
+          </span>
+        </div>
+        {expanded && renderLevel(p, folder, depth + 1, byDefault)}
+      </div>
+    );
+  };
+
+  const renderLevel = (
+    p: TestProject,
+    folder: TestFolder,
+    depth: number,
+    byDefault: boolean,
+  ): ReactNode => (
+    <>
+      {folder.folders.map((f) => renderFolder(p, f, depth, byDefault))}
+      {folder.files.map((f) => renderFile(p, f, depth))}
+    </>
+  );
 
   return (
     <div className="te-panel">
@@ -390,52 +541,33 @@ export function TestExplorer() {
         {discovery && projects.length > 0 && !anyVisible && (
           <p className="dim small">{t('teNoMatch')}</p>
         )}
-        {projects.map((p) => (
-          <div key={`${p.framework}:${p.cwd}`} className="te-project">
-            <div className="te-project-head">
-              <span className="te-fw">{p.framework}</span>
-              <span className="dim small">{p.cwd || '.'}</span>
-              {actions(p)}
+        {projects.map((p) => {
+          const key = `${p.framework}:${p.cwd}`;
+          const big = p.files.length > BIG_GROUP;
+          const expanded = isOpen(key, !big);
+          const c = tally(p.files);
+          if (filtering && !c.files) return null;
+          return (
+            <div key={key} className="te-project">
+              <div
+                className="te-row te-project-head"
+                title={p.cwd || workspace.name}
+                aria-expanded={expanded}
+                {...pressable(() => flip(key))}
+              >
+                <Icon name="chevron" size={12} className={`te-chev ${expanded ? 'open' : ''}`} />
+                <span className="te-fw">{p.framework}</span>
+                <span className="te-path dim small">
+                  <bdi>{p.cwd || '.'}</bdi>
+                </span>
+                {counts(c, t('teCounts', { files: c.files, tests: c.tests }))}
+                {actions(p)}
+              </div>
+              {p.problem && <p className="te-problem small">{p.problem}</p>}
+              {expanded && renderLevel(p, testFileTree(p.files, p.cwd), 1, !big)}
             </div>
-            {p.problem && <p className="te-problem small">{p.problem}</p>}
-            {p.files.map((file) => {
-              const items = byFile.get(file) ?? [];
-              const errors = fileErrors(file);
-              if ((q || onlyFailed) && !items.some(visible) && !(onlyFailed && errors.length))
-                return null;
-              const expanded = open.has(file) || Boolean(q) || onlyFailed;
-              return (
-                <div key={file}>
-                  <div
-                    className="te-row te-file"
-                    title={file}
-                    aria-expanded={expanded}
-                    {...pressable(() => toggle(file))}
-                  >
-                    <Icon
-                      name="chevron"
-                      size={12}
-                      className={`te-chev ${expanded ? 'open' : ''}`}
-                    />
-                    <StatusMark st={fileMark(file, items)} />
-                    <span className="te-name">{file.split('/').pop()}</span>
-                    <span className="te-dir dim small">
-                      {file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : ''}
-                    </span>
-                    {actions(p, file)}
-                  </div>
-                  {expanded && errors.length > 0 && (
-                    <div className="te-error" style={{ marginLeft: 28 }}>
-                      <strong>{t('teFileError')}</strong>
-                      <pre>{errors[0]!.message}</pre>
-                    </div>
-                  )}
-                  {expanded && treeOf(items).map((n) => renderNode(p, n, 1))}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+          );
+        })}
         {output && (
           <div className="te-output">
             <button

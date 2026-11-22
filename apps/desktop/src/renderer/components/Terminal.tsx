@@ -231,6 +231,13 @@ function xtermTheme(dark: boolean) {
 
 /** Sends text to the active terminal (used by "Run in terminal" in chat). */
 export let runInTerminal: (text: string) => Promise<void> = async () => {};
+/**
+ * Run panel: a terminal session of its own for a run (the panel's first session while it is
+ * still opening), with the shell it runs ("PowerShell 7", "Git Bash"…). null = panel not mounted.
+ */
+export let openRunTerminal: (() => Promise<{ id: number; shell: string } | null>) | null = null;
+/** Run panel: shows a session in the panel (its tab becomes the active one). */
+export let showTerminal: (id: number) => void = () => {};
 
 export function TerminalPanel() {
   const theme = useStore((s) => s.settings.theme);
@@ -341,9 +348,18 @@ export function TerminalPanel() {
       if (id === null) return;
       await api().terminal.write(id, text.replace(/\n$/, '') + '\r');
     };
+    openRunTerminal = async () => {
+      const id = await (firstCreate ?? create());
+      return id === null ? null : { id, shell: terms.get(id)?.name ?? '' };
+    };
+    showTerminal = (id: number) => {
+      if (terms.has(id)) setActive(id);
+    };
     return () => {
       if (exitHandler === kill) exitHandler = null;
       runInTerminal = async () => {};
+      openRunTerminal = null;
+      showTerminal = () => {};
     };
   }, [create, kill]);
 

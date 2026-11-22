@@ -2,10 +2,21 @@ import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useSta
 import type { DirEntry } from '../../shared/api';
 import { t } from '../i18n';
 import { confirmDialog } from '../confirm';
-import { api, askText, closeTab, getState, openFile, renamePath, toast, useStore } from '../store';
+import {
+  api,
+  askText,
+  closeTab,
+  getState,
+  openFile,
+  renamePath,
+  setState,
+  toast,
+  useStore,
+} from '../store';
 import { errText } from '../errText';
 import { fileIcon, folderIcon } from './icons';
 import { Icon } from './Icon';
+import { SearchView } from './Search';
 import { isStudioFile } from './video/videoCommands';
 import { openStudio } from './video/videoStore';
 
@@ -19,6 +30,13 @@ export function Explorer() {
   const workspace = useStore((s) => s.workspace);
   const fsVersion = useStore((s) => s.fsVersion);
   const active = useStore((s) => s.active);
+  // Search lives in the Explorer: sidebar 'search' is the Explorer with its search box open.
+  const searching = useStore((s) => s.sidebar === 'search');
+  const [searchActive, setSearchActive] = useState(false);
+  const closeSearch = useCallback(() => {
+    setSearchActive(false);
+    setState({ sidebar: 'explorer' });
+  }, []);
   const [children, setChildren] = useState<Record<string, DirEntry[]>>({});
   const [open, setOpen] = useState<Set<string>>(new Set(['']));
   const [menu, setMenu] = useState<Menu | null>(null);
@@ -343,6 +361,15 @@ export function Explorer() {
         <span>{workspace.name.toUpperCase()}</span>
         <span className="sidebar-actions">
           <button
+            className={searching ? 'on' : ''}
+            title={`${t('searchFiles')} (Ctrl+Shift+F)`}
+            aria-label={t('searchFiles')}
+            aria-pressed={searching}
+            onClick={() => (searching ? closeSearch() : setState({ sidebar: 'search' }))}
+          >
+            <Icon name="search" size={15} />
+          </button>
+          <button
             title={t('newFile')}
             aria-label={t('newFile')}
             onClick={() => void create('file', null)}
@@ -365,7 +392,14 @@ export function Explorer() {
           </button>
         </span>
       </div>
-      <div className="tree" role="tree" aria-label={workspace.name} ref={treeRef}>
+      {searching && <SearchView embedded onActive={setSearchActive} onClose={closeSearch} />}
+      <div
+        className="tree"
+        role="tree"
+        aria-label={workspace.name}
+        ref={treeRef}
+        hidden={searching && searchActive}
+      >
         {renderRows()}
       </div>
       {menu && (

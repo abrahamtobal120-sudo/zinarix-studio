@@ -1,11 +1,12 @@
 import './debug.css';
 import { useEffect, useState } from 'react';
-import type { DebugConfig, DebugVariable } from '../../shared/devtools';
+import type { DebugConfig, DebugFrame, DebugVariable } from '../../shared/devtools';
 import { pressable } from '../a11y';
 import {
   addWatch,
   children,
   cont,
+  getDebug,
   loadConfigs,
   pause,
   refreshWatches,
@@ -26,57 +27,170 @@ import {
   useDebug,
   useWatchValues,
 } from '../debug';
-import { td } from '../i18nDebug';
-import { api, askText, openFile, toast, useStore } from '../store';
+import { td, type DebugKey } from '../i18nDebug';
+import { api, askText, attachToChat, openFile, toast, useStore } from '../store';
 import { Icon, type IconName } from './Icon';
 
-/** The toolbar shown while a session runs (also used at the top of the editor). */
-export function DebugToolbar() {
+/**
+ * The toolbar shown while a session runs: compact icons over the editor, or (labelled) big
+ * buttons with their name and shortcut in the Debug panel.
+ */
+export function DebugToolbar({ labelled = false }: { labelled?: boolean }) {
   const state = useDebug((v) => v.state);
   if (state === 'idle') return null;
-  const btn = (icon: IconName, label: string, keys: string, run: () => void, disabled = false) => (
-    <button title={`${label} (${keys})`} aria-label={label} disabled={disabled} onClick={run}>
-      <Icon name={icon} size={15} />
+  const btn = (
+    cls: string,
+    icon: IconName,
+    label: string,
+    keys: string,
+    tip: string,
+    run: () => void,
+    disabled = false,
+  ) => (
+    <button
+      className={`dbg-tb-${cls}`}
+      title={`${label} (${keys})\n${tip}`}
+      aria-label={`${label} (${keys})`}
+      disabled={disabled}
+      onClick={run}
+    >
+      <Icon name={icon} size={labelled ? 16 : 15} />
+      {labelled && (
+        <>
+          <span className="dbg-tb-label">{label}</span>
+          <kbd className="dbg-tb-keys">{keys}</kbd>
+        </>
+      )}
     </button>
   );
   const stopped = state === 'stopped';
   return (
-    <div className="dbg-toolbar" role="toolbar" aria-label={td('dbgTitle')}>
+    <div
+      className={`dbg-toolbar ${labelled ? 'labelled' : ''}`}
+      role="toolbar"
+      aria-label={td('dbgTitle')}
+    >
       {stopped
-        ? btn('continue', td('dbgContinue'), 'F5', cont)
-        : btn('pause', td('dbgPause'), 'F6', pause, state !== 'running')}
-      {btn('stepOver', td('dbgStepOver'), 'F10', stepOver, !stopped)}
-      {btn('stepInto', td('dbgStepInto'), 'F11', stepInto, !stopped)}
-      {btn('stepOut', td('dbgStepOut'), 'Shift+F11', stepOut, !stopped)}
-      {btn('refresh', td('dbgRestart'), 'Ctrl+Shift+F5', restartDebug)}
-      {btn('stop', td('dbgStop'), 'Shift+F5', stopDebug)}
+        ? btn('go', 'continue', td('dbgContinue'), 'F5', td('dbgTipContinue'), cont)
+        : btn('go', 'pause', td('dbgPause'), 'F6', td('dbgTipPause'), pause, state !== 'running')}
+      {btn('step', 'stepOver', td('dbgStepOver'), 'F10', td('dbgTipStepOver'), stepOver, !stopped)}
+      {btn('step', 'stepInto', td('dbgStepIntoShort'), 'F11', td('dbgTipStepInto'), stepInto, !stopped)}
+      {btn('step', 'stepOut', td('dbgStepOutShort'), 'Shift+F11', td('dbgTipStepOut'), stepOut, !stopped)}
+      {btn('restart', 'refresh', td('dbgRestart'), 'Ctrl+Shift+F5', td('dbgTipRestart'), restartDebug)}
+      {btn('stop', 'stop', td('dbgStop'), 'Shift+F5', td('dbgTipStop'), stopDebug)}
     </div>
   );
 }
 
 function Section({
   title,
+  help,
+  count,
   actions,
   children: body,
   initial = true,
 }: {
   title: string;
+  /** One line on what the section is for, shown under the heading while it is open. */
+  help?: string;
+  count?: number;
   actions?: React.ReactNode;
   children: React.ReactNode;
   initial?: boolean;
 }) {
   const [open, setOpen] = useState(initial);
   return (
-    <section className="dbg-section">
+    <section className={`dbg-section ${open ? 'open' : ''}`}>
       <div className="dbg-section-head">
         <span className="dbg-section-title" {...pressable(() => setOpen(!open))} aria-expanded={open}>
-          <Icon name={open ? 'chevronDown' : 'chevron'} size={12} /> {title.toUpperCase()}
+          <Icon name={open ? 'chevronDown' : 'chevron'} size={12} /> {title}
+          {count ? <span className="dbg-count">{count}</span> : null}
         </span>
         {open && actions && <span className="sidebar-actions">{actions}</span>}
       </div>
+      {open && help && <p className="dbg-help">{help}</p>}
       {open && <div className="dbg-section-body">{body}</div>}
     </section>
   );
+}
+
+/** "app.py:42" for a frame. */
+function frameLoc(f: DebugFrame | undefined): string {
+  if (!f) return '';
+  const file = (f.path ?? f.absPath ?? '').split(/[\\/]/).pop() ?? '';
+  return file ? `${file}${f.line ? `:${f.line}` : ''}` : f.name;
+}
+
+const REASONS: Record<string, DebugKey> = {
+  breakpoint: 'dbgReasonBreakpoint',
+  'function breakpoint': 'dbgReasonBreakpoint',
+  'data breakpoint': 'dbgReasonBreakpoint',
+  step: 'dbgReasonStep',
+  exception: 'dbgReasonException',
+  pause: 'dbgReasonPause',
+  entry: 'dbgReasonEntry',
+  goto: 'dbgReasonStep',
+};
+
+/** Why the program stopped, in plain words. */
+function reasonText(reason: string | undefined): string {
+  if (!reason) return td('dbgReasonPause');
+  const key = REASONS[reason.toLowerCase()];
+  return key ? td(key) : reason;
+}
+
+/**
+ * Attaches where the program is paused (location, code around it, call stack, variables of
+ * the innermost scope) to the chat, asking the AI to explain it.
+ */
+async function askAiWherePaused(): Promise<void> {
+  const v = getDebug();
+  const frame = v.frames.find((f) => f.id === v.frameId) ?? v.frames[0];
+  if (v.state !== 'stopped' || !frame) return;
+  const parts: string[] = [td('dbgAiPrompt')];
+  parts.push(
+    `${td('dbgAiWhere')}: ${frame.path ?? frame.absPath ?? '?'}:${frame.line} (${frame.name}) — ${reasonText(v.reason)}${v.description ? `: ${v.description}` : ''}`,
+  );
+  if (frame.path) {
+    try {
+      const f = await api().workspace.readFile(frame.path);
+      if (!f.binary && !f.tooLarge) {
+        const lines = f.content.split(/\r?\n/);
+        const from = Math.max(0, frame.line - 8);
+        const to = Math.min(lines.length, frame.line + 7);
+        const code = lines
+          .slice(from, to)
+          .map((l, i) => `${from + i + 1 === frame.line ? '>' : ' '} ${String(from + i + 1).padStart(4)} | ${l}`)
+          .join('\n');
+        parts.push(`${td('dbgAiCode')}:\n\`\`\`\n${code}\n\`\`\``);
+      }
+    } catch {
+      // the code is optional context
+    }
+  }
+  parts.push(
+    `${td('dbgCallStack')}:\n${v.frames
+      .slice(0, 12)
+      .map((f) => `- ${f.name} (${frameLoc(f)})`)
+      .join('\n')}`,
+  );
+  try {
+    const sc = await scopes(frame.id);
+    const first = sc[0];
+    if (first?.ref) {
+      const vars = (await children(first.ref)).slice(0, 40);
+      if (vars.length)
+        parts.push(
+          `${td('dbgVariables')} (${first.name}):\n${vars
+            .map((x) => `- ${x.name}${x.type ? `: ${x.type}` : ''} = ${x.value.slice(0, 200)}`)
+            .join('\n')}`,
+        );
+    }
+  } catch {
+    // variables are optional context
+  }
+  attachToChat({ source: 'debug:paused', content: parts.join('\n\n') });
+  toast(td('dbgAiAttached'));
 }
 
 /** One variable; children load when it is expanded. */
@@ -184,6 +298,7 @@ function Watches() {
   useEffect(() => {
     void refreshWatches();
   }, [watches.length]);
+  if (!values.length) return <p className="dim small dbg-empty">{td('dbgNoWatches')}</p>;
   return (
     <div className="dbg-tree">
       {values.map((w) => (
@@ -321,26 +436,47 @@ export function DebugPanel() {
   const state = useDebug((v) => v.state);
   const name = useDebug((v) => v.name);
   const reason = useDebug((v) => v.reason);
+  const description = useDebug((v) => v.description);
+  const frames = useDebug((v) => v.frames);
+  const frameId = useDebug((v) => v.frameId);
   const configIndex = useDebug((v) => v.configIndex);
-  const hasBps = useDebug((v) => Object.keys(v.breakpoints).length > 0);
+  const bpCount = useDebug((v) => Object.values(v.breakpoints).reduce((n, l) => n + l.length, 0));
+  const watchCount = useDebug((v) => v.watches.length);
   const active = useStore((s) => s.active);
   const workspace = useStore((s) => s.workspace);
   const fsVersion = useStore((s) => s.fsVersion);
   const [configs, setConfigs] = useState<{ configs: DebugConfig[]; file?: string }>({ configs: [] });
+  const [asking, setAsking] = useState(false);
 
   useEffect(() => {
     void loadConfigs().then(setConfigs);
   }, [active, workspace?.root, fsVersion]);
 
   const fromLaunch = Boolean(configs.file);
-  const label =
+  const activeFile = active && !active.startsWith('::') ? active : null;
+  const current = frames.find((f) => f.id === frameId) ?? frames[0];
+  const where = frameLoc(current);
+
+  const title =
     state === 'idle'
-      ? td('dbgIdle')
+      ? td('dbgHeadIdle')
       : state === 'starting'
         ? td('dbgStarting')
         : state === 'running'
           ? td('dbgRunning')
-          : td('dbgStopped', { reason: reason ?? '' });
+          : where
+            ? td('dbgHeadPaused', { loc: where })
+            : td('dbgHeadPausedNoLoc');
+  const subtitle =
+    state === 'idle'
+      ? td('dbgHeadIdleHint')
+      : state === 'starting'
+        ? td('dbgHeadStartingHint')
+        : state === 'running'
+          ? td('dbgHeadRunningHint')
+          : `${reasonText(reason)}${description ? `: ${description}` : ''}`;
+
+  const startLabel = fromLaunch ? td('dbgStart') : td('dbgStartFile');
 
   return (
     <div className="run-panel dbg-panel">
@@ -357,57 +493,123 @@ export function DebugPanel() {
           </button>
         </span>
       </div>
+
+      <div className={`dbg-head dbg-head-${state}`} role="status" aria-live="polite">
+        <span className="dbg-head-dot" aria-hidden="true" />
+        <div className="dbg-head-text">
+          <div className="dbg-head-title">
+            {state === 'stopped' && current?.path ? (
+              <span
+                className="dbg-head-loc"
+                title={td('dbgGoToLine')}
+                {...pressable(() => void selectFrame(current))}
+              >
+                {title}
+              </span>
+            ) : (
+              title
+            )}
+          </div>
+          <div className="dbg-head-sub">
+            {name && state !== 'idle' ? <strong>{name} · </strong> : null}
+            {subtitle}
+          </div>
+        </div>
+      </div>
+
       <div className="dbg-start">
         {state === 'idle' ? (
           <>
+            <ol className="dbg-steps">
+              <li className={bpCount > 0 ? 'done' : ''}>
+                <span className="dbg-step-n">{bpCount > 0 ? <Icon name="check" size={11} /> : 1}</span>
+                <span>
+                  {td('dbgStep1')}
+                  {bpCount > 0 && (
+                    <span className="dbg-step-ok"> {td('dbgStep1Done', { n: bpCount })}</span>
+                  )}
+                </span>
+              </li>
+              <li>
+                <span className="dbg-step-n">2</span>
+                <span>{td('dbgStep2', { start: startLabel })}</span>
+              </li>
+              <li>
+                <span className="dbg-step-n">3</span>
+                <span>{td('dbgStep3')}</span>
+              </li>
+            </ol>
             <button
               className="primary dbg-start-btn"
               disabled={!workspace}
-              title={`${td('dbgStart')} (F5)`}
+              title={`${startLabel} (F5)`}
               onClick={() => void startDebug()}
             >
-              <Icon name="play" size={14} /> {fromLaunch ? td('dbgStart') : td('dbgStartFile')}
+              <Icon name="play" size={14} /> {startLabel}
+              <kbd className="dbg-tb-keys">F5</kbd>
             </button>
             {fromLaunch && configs.configs.length > 0 && (
-              <select
-                className="dbg-config"
-                aria-label={td('dbgConfig')}
-                value={Math.max(0, configIndex)}
-                onChange={(e) => setConfigIndex(Number(e.target.value))}
-              >
-                {configs.configs.map((c, i) => (
-                  <option key={`${c.name}:${i}`} value={i}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <label className="dbg-config-row">
+                <span className="dim small">{td('dbgConfig')}</span>
+                <select
+                  className="dbg-config"
+                  aria-label={td('dbgConfig')}
+                  value={Math.max(0, configIndex)}
+                  onChange={(e) => setConfigIndex(Number(e.target.value))}
+                >
+                  {configs.configs.map((c, i) => (
+                    <option key={`${c.name}:${i}`} value={i}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
-            {!fromLaunch && configs.configs[0] && (
-              <p className="dim small">{td('dbgAutoConfig')}: {configs.configs[0].type}</p>
+            {!fromLaunch && (
+              <p className="dim small dbg-target">
+                {activeFile
+                  ? td('dbgWillDebug', { file: activeFile.split('/').pop() ?? activeFile })
+                  : td('dbgOpenFileFirst')}
+                {activeFile && configs.configs[0] ? ` (${configs.configs[0].type})` : ''}
+              </p>
             )}
           </>
         ) : (
           <>
-            <DebugToolbar />
-            <p className="dim small dbg-status">
-              {name ? <strong>{name}</strong> : null} {label}
-            </p>
+            <DebugToolbar labelled />
+            {state === 'stopped' && (
+              <button
+                className="dbg-ai"
+                disabled={asking}
+                onClick={() => {
+                  setAsking(true);
+                  void askAiWherePaused().finally(() => setAsking(false));
+                }}
+              >
+                <Icon name="sparkle" size={14} /> {td('dbgAiExplain')}
+              </button>
+            )}
           </>
         )}
-        {state === 'idle' && <p className="dim small">{label}</p>}
       </div>
+
       <div className="dbg-sections">
-        <Section title={td('dbgVariables')}>
-          <Variables />
-        </Section>
+        {state !== 'idle' && (
+          <Section title={td('dbgVariables')} help={td('dbgHelpVariables')}>
+            <Variables />
+          </Section>
+        )}
         <Section
           title={td('dbgWatch')}
+          help={td('dbgHelpWatch')}
+          count={watchCount}
+          initial={state !== 'idle' || watchCount > 0}
           actions={
             <button
               title={td('dbgWatchAdd')}
               aria-label={td('dbgWatchAdd')}
               onClick={() =>
-                void askText(td('dbgWatchPrompt')).then((e) => e !== null && addWatch(e))
+                void askText(td('dbgWatchPrompt')).then((e) => e !== null && e.trim() && addWatch(e.trim()))
               }
             >
               <Icon name="plus" size={13} />
@@ -416,13 +618,17 @@ export function DebugPanel() {
         >
           <Watches />
         </Section>
-        <Section title={td('dbgCallStack')}>
-          <CallStack />
-        </Section>
+        {state !== 'idle' && (
+          <Section title={td('dbgCallStack')} help={td('dbgHelpCallStack')}>
+            <CallStack />
+          </Section>
+        )}
         <Section
           title={td('dbgBreakpoints')}
+          help={td('dbgHelpBreakpoints')}
+          count={bpCount}
           actions={
-            hasBps ? (
+            bpCount > 0 ? (
               <button
                 title={td('dbgRemoveAll')}
                 aria-label={td('dbgRemoveAll')}

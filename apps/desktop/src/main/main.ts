@@ -82,6 +82,18 @@ import type { PairRequest, PhoneRepos, PhoneTerm, PhoneTools } from './phone.js'
 import { ChatBots } from './bots.js';
 import { WhatsApp } from './whatsapp.js';
 import { Watcher } from './watch.js';
+import { Automations } from './automations.js';
+import {
+  BOT_FILE_EXT,
+  botAgentMarkdown,
+  botFromFile,
+  botSlug,
+  botToFile,
+  widgetApi,
+  widgetFiles,
+  widgetUrlIssue,
+  type WidgetTarget,
+} from '../shared/automations.js';
 import { LspHost } from './lsp.js';
 import { Knowledge } from './knowledge.js';
 import type { RemoteNotice } from '../shared/plans.js';
@@ -126,7 +138,7 @@ import { MobileService } from './mobile.js';
 import { projectCommand, type MobileInput } from '../shared/mobile.js';
 import type { PioEvent, PioResult } from '../shared/platformio.js';
 import { Computer } from './computer.js';
-import { BAR_LABELS, ComputerControlRun } from './computerMode.js';
+import { barLabelsFor, ComputerControlRun } from './computerMode.js';
 import { BuildService } from './build.js';
 import { rulesPrompt } from '../shared/rules.js';
 import { redact } from '@omni/security';
@@ -134,6 +146,7 @@ import { cliRunsWithoutTools } from '@omni/providers';
 import type { ChatMessage } from '@omni/shared';
 import { DesignSession, EDITOR_SCRIPT_PATH } from './design/session.js';
 import { EditError } from './design/htmlSource.js';
+import { page as previewPage } from './design/live.js';
 import { IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_B64 } from './chatImages.js';
 import { McpManager } from './mcp.js';
 import { HookTrust } from './hooks.js';
@@ -1893,6 +1906,7 @@ function registerIpc(): void {
 
   const vercel = new Vercel(app.getPath('userData'));
   ai.agent.vercel = vercel;
+  registerAutomationsIpc(vercel);
   const vid = z.string().min(1).max(128);
   const team = z.string().max(128).nullable();
   handle('vercel:status', z.tuple([]), () => vercel.status());
@@ -2338,6 +2352,7 @@ function registerIpc(): void {
         reasoning: z.enum(['low', 'medium', 'high']).optional(),
         computer: z.boolean().optional(),
         uiLang: z.enum(['es', 'en']).optional(),
+        bot: z.string().uuid().optional(),
       }),
     ]),
     (w, requestId, { folder, noFolder, ...req }) => {
@@ -2376,7 +2391,8 @@ function registerIpc(): void {
             w.win,
             stop,
             // The bar speaks the language of Zinarix (the window's), else the system's.
-            BAR_LABELS[(req.uiLang ?? (app.getLocale().startsWith('en') ? 'en' : 'es'))],
+            // "Zinarix Studio AI navegando…": the name of this edition of the app.
+            barLabelsFor(req.uiLang ?? (app.getLocale().startsWith('en') ? 'en' : 'es'), APP_NAME),
             pc instanceof Computer ? { cursor: () => pc.rawCursor() } : {},
           );
         };
@@ -3113,6 +3129,198 @@ function registerHelperIpc(): void {
     ),
   );
   handle('helper:abort', z.tuple([reqId]), (w, requestId) => helper.abort(rid(w, requestId)));
+}
+
+/** "Automatizar": scheduled tasks, "Mis bots" and the website widget (see automations.ts). */
+function registerAutomationsIpc(vercel: Vercel): void {
+  const auto = new Automations({
+    dir: ai.core.paths.home,
+    runner: ai,
+    lang: () => (app.getLocale().startsWith('es') ? 'es' : 'en'),
+    onChange: (status) => {
+      for (const w of wins.values()) send(w, { type: 'automations', status });
+    },
+    notify: (title, body) => {
+      if (!Notification.isSupported()) return;
+      const n = new Notification({ title, body });
+      n.on('click', () => {
+        const w = focused() ?? [...wins.values()][0];
+        if (!w) return;
+        if (w.win.isMinimized()) w.win.restore();
+        w.win.focus();
+        send(w, { type: 'command', command: 'view.automations' });
+      });
+      n.show();
+    },
+    deliver: (kind, text) =>
+      bots.notify(kind, text, kind === 'whatsapp' ? whatsapp.status().chats[0]?.id : undefined),
+  });
+  ai.botFor = (id) => auto.bot(id);
+  auto.start();
+  app.on('will-quit', () => auto.stop());
+
+  const id = z.string().uuid();
+  const schedule = z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('daily'),
+      time: z.string().regex(/^\d{2}:\d{2}$/),
+      days: z.array(z.number().int().min(0).max(6)).max(7),
+    }),
+    z.object({ kind: z.literal('every'), minutes: z.number().int().min(1).max(100_000) }),
+    z.object({ kind: z.literal('once'), at: z.number().int().positive() }),
+  ]);
+  const taskInput = z.object({
+    name: z.string().max(200),
+    prompt: z.string().max(20_000),
+    schedule,
+    enabled: z.boolean(),
+    model: z.string().max(300).optional(),
+    bot: id.optional(),
+    tools: z.enum(['none', 'read']),
+    folder: z.string().min(1).max(4096).optional(),
+    deliver: z.array(z.enum(['telegram', 'discord', 'whatsapp'])).max(3),
+  });
+  const botInput = z.object({
+    name: z.string().max(200),
+    icon: z.string().max(32),
+    description: z.string().max(1000),
+    instructions: z.string().max(40_000),
+    knowledge: z.string().max(120_000),
+    model: z.string().max(300).optional(),
+    mode: z.enum(['chat', 'agent']),
+    docs: z.array(z.string().max(100)).max(20),
+    greeting: z.string().max(2000),
+    widget: z
+      .object({
+        title: z.string().max(200),
+        color: z.string().max(20),
+        position: z.enum(['right', 'left']),
+        origins: z.array(z.string().max(300)).max(50),
+        perMinute: z.number().int().min(1).max(1000),
+      })
+      .partial()
+      .optional(),
+  });
+
+  handle('automations:status', z.tuple([]), () => auto.status());
+  handle('automations:createTask', z.tuple([taskInput]), (_w, t) => auto.createTask(t));
+  handle('automations:updateTask', z.tuple([id, taskInput]), (_w, i, t) => auto.updateTask(i, t));
+  handle('automations:setEnabled', z.tuple([id, z.boolean()]), (_w, i, on) => auto.setEnabled(i, on));
+  handle('automations:deleteTask', z.tuple([id]), (_w, i) => auto.deleteTask(i));
+  handle('automations:runNow', z.tuple([id]), (_w, i) => auto.runNow(i));
+  handle('automations:cancel', z.tuple([id]), (_w, i) => auto.cancel(i));
+  handle('automations:clearRuns', z.tuple([id.optional()]), (_w, i) => auto.clearRuns(i));
+  handle('automations:createBot', z.tuple([botInput]), (_w, b) => auto.createBot(b));
+  handle('automations:updateBot', z.tuple([id, botInput]), (_w, i, b) => auto.updateBot(i, b));
+  handle('automations:deleteBot', z.tuple([id]), (_w, i) => auto.deleteBot(i));
+  handle('automations:deliveries', z.tuple([]), () => ({
+    telegram: bots.canNotify('telegram'),
+    discord: bots.canNotify('discord'),
+    whatsapp: bots.canNotify('whatsapp') || (bots.running && whatsapp.status().chats.length > 0),
+  }));
+
+  const mustBot = (i: string) => {
+    const b = auto.bot(i);
+    if (!b) throw new Error('Ese bot ya no existe.');
+    return b;
+  };
+  handle('automations:exportBot', z.tuple([id]), async (w, i) => {
+    const b = mustBot(i);
+    const r = await dialog.showSaveDialog(w.win, {
+      defaultPath: join(app.getPath('documents'), `${botSlug(b.name)}${BOT_FILE_EXT}`),
+      filters: [{ name: 'Bot de Zinarix', extensions: ['json'] }],
+    });
+    if (r.canceled || !r.filePath) return false;
+    writeFileSync(r.filePath, botToFile(b));
+    return true;
+  });
+  handle('automations:importBot', z.tuple([]), async (w) => {
+    const r = await dialog.showOpenDialog(w.win, {
+      properties: ['openFile'],
+      filters: [{ name: 'Bot de Zinarix', extensions: ['json'] }],
+    });
+    const file = r.filePaths[0];
+    if (r.canceled || !file) return null;
+    if (statSync(file).size > 1024 * 1024) throw new Error('El archivo es demasiado grande para ser un bot.');
+    return auto.createBot(botFromFile(readFileSync(file, 'utf8')));
+  });
+  handle('automations:saveAsAgent', z.tuple([id]), (w, i) => {
+    const b = mustBot(i);
+    const root = w.workspace?.root;
+    if (!root) throw new Error('Abre una carpeta para guardar el bot como subagente del proyecto.');
+    const dir = join(root, '.zinarix', 'agents');
+    mkdirSync(dir, { recursive: true });
+    const slug = botSlug(b.name);
+    let rel = `${slug}.md`;
+    for (let n = 2; existsSync(join(dir, rel)); n++) rel = `${slug}-${n}.md`;
+    writeFileSync(join(dir, rel), botAgentMarkdown(b));
+    return `.zinarix/agents/${rel}`;
+  });
+
+  /** Where the widget's server function sends the bot's messages (and the key, if any). */
+  const widgetTarget = async (
+    model?: string,
+  ): Promise<{ target: WidgetTarget; key?: string; name: string }> => {
+    const ref = ai.core.resolveModel(model, 'chat');
+    const entry = ai.core.provider(ref.provider);
+    const api = widgetApi(entry.adapter);
+    if (!api)
+      throw new Error(
+        `El widget todavía no funciona con ${entry.name}. Elige para el bot un modelo de OpenAI, Anthropic, Gemini o un proveedor compatible con OpenAI.`,
+      );
+    const cfg = await ai.core.providerConfig(ref.provider).catch(() => undefined);
+    const baseUrl = cfg?.baseUrl ?? entry.baseUrl;
+    const issue = widgetUrlIssue(baseUrl);
+    if (issue) throw new Error(issue);
+    return {
+      target: { api, baseUrl, model: ref.model, provider: entry.name },
+      key: cfg?.apiKey?.reveal(),
+      name: entry.name,
+    };
+  };
+  handle('automations:exportWidget', z.tuple([id]), async (w, i) => {
+    const b = mustBot(i);
+    const { target } = await widgetTarget(b.model);
+    const r = await dialog.showOpenDialog(w.win, {
+      title: 'Carpeta donde guardar el widget',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    const parent = r.filePaths[0];
+    if (r.canceled || !parent) return null;
+    const dir = join(parent, `${botSlug(b.name)}-widget`);
+    return { dir, files: auto.writeWidget(i, target, dir) };
+  });
+  handle('automations:publishWidget', z.tuple([id, z.boolean()]), async (w, i, sendKey) => {
+    const b = mustBot(i);
+    const { target, key, name } = await widgetTarget(b.model);
+    // The key leaves this computer only after a native confirmation (not just the page's).
+    if (sendKey) {
+      if (!key) throw new Error(`No hay una clave guardada de ${name}.`);
+      const ok = await dialog.showMessageBox(w.win, {
+        type: 'warning',
+        buttons: ['Guardar la clave en Vercel', 'Cancelar'],
+        defaultId: 1,
+        cancelId: 1,
+        title: 'Publicar el widget',
+        message: `¿Guardar tu clave de ${name} en el proyecto de Vercel?`,
+        detail:
+          'Se guarda cifrada como variable BOT_API_KEY y solo la usa la función del bot en el servidor (nunca llega al navegador de los visitantes). Cada mensaje del chat se cobra en tu cuenta: pon un límite de gasto en el proveedor.',
+      });
+      if (ok.response !== 0) throw new Error('Publicación cancelada.');
+    }
+    const files = widgetFiles(b, target).map((f) => ({ file: f.file, data: Buffer.from(f.text) }));
+    const project = `${botSlug(b.name)}-bot`;
+    let d = await vercel.deployFiles(project, files, null, true);
+    let keySet = false;
+    if (sendKey && key && d.projectId) {
+      await vercel.setEnv(d.projectId, null, 'BOT_API_KEY', key, ['production', 'preview']);
+      keySet = true;
+      // Variables reach a deployment when it is built: publish again so this one has it.
+      d = await vercel.deployFiles(project, files, null, true);
+    }
+    const url = `https://${project}.vercel.app`;
+    return { status: auto.setPublished(i, url, d.projectId ?? project), url, keySet };
+  });
 }
 
 /** Fase 5: background tasks in git worktrees (outside the repository, in userData). */
@@ -4830,8 +5038,21 @@ function registerDesignProtocol(): void {
       return new Response(await readFile(abs), {
         headers: headers(MIME[ext] ?? PREVIEW_MIME[ext] ?? 'application/octet-stream'),
       });
-    } catch {
-      return new Response('not found', { status: 404 });
+    } catch (e) {
+      if (!/\.html?$/i.test(file)) return new Response('not found', { status: 404 });
+      // A page that can't be shown: a clear message in the canvas, not a blank frame (the
+      // editor script still answers, so the panel knows the frame loaded).
+      const msg = previewPage(
+        404,
+        e instanceof EditError ? 'Esta página no se puede mostrar' : 'Esta página no existe',
+        e instanceof EditError
+          ? e.message
+          : 'Puede que se haya movido o borrado. Elige otra página en la columna de la izquierda.',
+      );
+      return new Response(`${await msg.text()}<script src="${EDITOR_SCRIPT_PATH}"></script>`, {
+        status: 404,
+        headers: headers('text/html; charset=utf-8'),
+      });
     }
   });
 }

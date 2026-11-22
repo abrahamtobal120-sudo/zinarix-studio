@@ -15,6 +15,7 @@ import type {
   WorkspaceInfo,
 } from '../shared/api';
 import { DEFAULT_PREFS } from '../shared/api';
+import type { AutomationsStatus } from '../shared/automations';
 import type { ChatMode } from '../shared/agentModes';
 import { isChatMode, modeFrom, usesAgent } from '../shared/agentModes';
 import type { LicenseStatus, ProFeature, RemoteNotice } from '../shared/plans';
@@ -159,6 +160,8 @@ export interface State {
     | 'gcloud'
     | 'mail'
     | 'watch'
+    /** "Automatizar": scheduled tasks, "Mis bots" and the website widget. */
+    | 'automations'
     /** "Más": integrations (Vercel, Supabase, Google Cloud, mail...) and tools, as a list. */
     | 'apps'
     /** Run and debug (launch configs, call stack, variables, watch, breakpoints). */
@@ -225,6 +228,8 @@ export interface State {
   whatsapp: WhatsAppStatus | null;
   /** The Watcher (always-on project reviewer). */
   watch: WatchStatus | null;
+  /** "Automatizar": scheduled tasks, their runs and the user's bots. */
+  automations: AutomationsStatus | null;
 }
 
 /** One chat of the panel. Its turns live in its own component; this is what the tabs show. */
@@ -260,6 +265,8 @@ export interface ChatTab {
   resume?: string;
   /** Sent (or put in the box) once the chat opens: a handoff or a task from elsewhere. */
   initial?: { prompt: string; context?: ChatContext[]; send: boolean };
+  /** "Mis bots": the bot this chat talks as (id). */
+  bot?: string;
 }
 
 let state: State = {
@@ -310,6 +317,7 @@ let state: State = {
   phone: { running: false, phones: 0 },
   whatsapp: null,
   watch: null,
+  automations: null,
 };
 
 const listeners = new Set<() => void>();
@@ -949,6 +957,7 @@ function restoreChats(): Pick<State, 'chats' | 'activeChat' | 'chatSplit' | 'cha
             folder: typeof x.folder === 'string' && x.folder ? x.folder : undefined,
             noFolder: x.noFolder === true || undefined,
             resume: typeof x.resume === 'string' && x.resume ? x.resume : undefined,
+            bot: typeof x.bot === 'string' && x.bot ? x.bot : undefined,
           }),
         );
       if (chats.length) {
@@ -987,6 +996,7 @@ function persistChats(): void {
           folder: c.folder,
           noFolder: c.noFolder,
           resume: c.resume,
+          bot: c.bot,
         })),
         active: state.activeChat,
         split: state.chatSplit,

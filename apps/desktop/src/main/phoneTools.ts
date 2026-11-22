@@ -143,9 +143,10 @@ export const TOOLS_ICONS = String.raw`
 
 export const TOOLS_CSS = String.raw`
 /* Drawer: the computer's tools */
-.dtools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 12px 10px}
-.dtools button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;font-size:12.5px;background:var(--bg-3)}
-.dtools svg{color:var(--brand)}
+.dtools{display:flex;flex-direction:column;margin:0 8px}
+.dtools button{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;text-align:left;font-size:14px;background:transparent;color:var(--fg)}
+.dtools button:active{background:var(--hover)}
+.dtools svg{color:var(--fg-dim)}
 /* Files */
 .fbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .fbar button{padding:7px 10px;font-size:13px}

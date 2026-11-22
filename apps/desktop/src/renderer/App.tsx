@@ -12,6 +12,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
 import { MailPanel } from './components/MailPanel';
 import { WatchPanel } from './components/WatchPanel';
+import { AutomationsPanel } from './components/automations/AutomationsPanel';
 import { RunPanel } from './components/RunPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { TestExplorer } from './components/TestExplorer';
@@ -473,6 +474,10 @@ export function App() {
         .watch.status()
         .then((watch) => setState({ watch }));
       void api()
+        .automations.status()
+        .then((automations) => setState({ automations }))
+        .catch(() => undefined);
+      void api()
         .whatsapp.status()
         .then(async (whatsapp) => {
           setState({ whatsapp });
@@ -519,9 +524,11 @@ export function App() {
       if (ev.type === 'browser:show' || ev.type === 'browser:focus') openBrowserTab();
       if (ev.type === 'whatsapp:status') setState({ whatsapp: ev.status });
       if (ev.type === 'watch:status') setState({ watch: ev.status });
+      if (ev.type === 'automations') setState({ automations: ev.status });
       if (ev.type === 'chat:title')
         for (const c of getState().chats)
-          if (c.conversationId === ev.conversationId) updateChat(c.id, { title: ev.title });
+          // A bot chat keeps the bot's name as its title.
+          if (c.conversationId === ev.conversationId && !c.bot) updateChat(c.id, { title: ev.title });
       // Another window changed models, keys, theme or preferences.
       if (ev.type === 'settings:changed')
         void (async () => {
@@ -548,7 +555,7 @@ export function App() {
               className="sidebar"
               style={max === 'side' ? { flex: 1, borderRight: 'none' } : { width: sideShown }}
             >
-              {sidebar === 'explorer' ? (
+              {sidebar === 'explorer' || sidebar === 'search' ? (
                 <Explorer />
               ) : sidebar === 'git' ? (
                 <GitPanel />
@@ -580,6 +587,8 @@ export function App() {
                 <MailPanel />
               ) : sidebar === 'watch' ? (
                 <WatchPanel />
+              ) : sidebar === 'automations' ? (
+                <AutomationsPanel />
               ) : sidebar === 'apps' ? (
                 <AppsPanel />
               ) : (
