@@ -3,7 +3,7 @@ plugins {
 }
 
 // Same version as the desktop app (CI passes -PzxVersion=0.6.3); versionCode grows with it.
-def zxVersion = (project.findProperty('zxVersion') ?: '0.6.2').toString().replaceFirst(/^v/, '')
+def zxVersion = (project.findProperty('zxVersion') ?: '0.6.3').toString().replaceFirst(/^v/, '')
 def parts = zxVersion.tokenize('.-')
 def code = { int i -> parts.size() > i && parts[i].isInteger() ? parts[i].toInteger() : 0 }
 def zxCode = code(0) * 1_000_000 + code(1) * 1_000 + code(2)

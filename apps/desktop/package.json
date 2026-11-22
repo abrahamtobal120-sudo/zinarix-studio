@@ -1,7 +1,7 @@
 {
   "name": "@omni/desktop",
   "productName": "Zinarix Studio",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "description": "Zinarix Studio — editor de código con cualquier modelo de IA",
   "license": "GPL-3.0-or-later",
