@@ -2,6 +2,7 @@ import { readFileSync, statSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, session } from 'electron';
 import { COOKIE_FILE_MAX, parseCookieFile } from '../shared/cookieFile.js';
+import type { ImportCookie } from '../shared/cookieFile.js';
 import { BROWSER_PARTITION } from './browser.js';
 
 /** What the browser settings show about its cookies. */
@@ -43,15 +44,19 @@ export async function cookieInfo(): Promise<CookieInfo> {
   return { count, importedAt: m?.importedAt ?? null, imported: m?.imported ?? 0 };
 }
 
-/** Puts the cookies of an export file in the built-in browser (logins carry over). */
-export async function importCookieFile(file: string): Promise<CookieImportResult> {
-  if (statSync(file).size > COOKIE_FILE_MAX) throw new Error('too-big');
-  const parsed = parseCookieFile(readFileSync(file, 'utf8'));
+/**
+ * Puts a list of cookies (from a file or read straight from an installed browser) in the
+ * built-in browser, counting what it took in and recording the import. `skipped` seeds the
+ * count with entries dropped before this point (bad lines, undecryptable values).
+ */
+export async function injectCookies(
+  cookies: ImportCookie[],
+  skipped = 0,
+): Promise<CookieImportResult> {
   const store = ses().cookies;
   let imported = 0;
-  let skipped = parsed.skipped;
   const sites = new Set<string>();
-  for (const c of parsed.cookies) {
+  for (const c of cookies) {
     try {
       await store.set(c);
       imported++;
@@ -65,6 +70,13 @@ export async function importCookieFile(file: string): Promise<CookieImportResult
     writeFileSync(marker(), JSON.stringify({ importedAt: Date.now(), imported }));
   }
   return { imported, skipped, sites: sites.size };
+}
+
+/** Puts the cookies of an export file in the built-in browser (logins carry over). */
+export async function importCookieFile(file: string): Promise<CookieImportResult> {
+  if (statSync(file).size > COOKIE_FILE_MAX) throw new Error('too-big');
+  const parsed = parseCookieFile(readFileSync(file, 'utf8'));
+  return injectCookies(parsed.cookies, parsed.skipped);
 }
 
 /** Deletes every cookie of the built-in browser (signs out of every site). */

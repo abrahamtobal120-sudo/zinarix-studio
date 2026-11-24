@@ -157,6 +157,15 @@
     background-position: 150% 0;
   }
 }
+.browser-notice {
+  flex-shrink: 0;
+  margin: 4px 10px 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--fg);
+  font-size: 12px;
+}
 .browser-frame {
   flex: 1;
   min-height: 0;

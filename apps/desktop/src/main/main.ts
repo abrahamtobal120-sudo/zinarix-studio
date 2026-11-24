@@ -65,6 +65,7 @@ import {
 } from './git.js';
 import { BrowserController, browserData } from './browser.js';
 import { clearCookies, cookieInfo, importCookieFile } from './browserCookies.js';
+import { importFromBrowser, listBrowserSources } from './browserCookiesDirect.js';
 import { Mail } from './mail.js';
 import { Supabase, linkedSupabase } from './supabase.js';
 import { CloudSync } from './cloudSync.js';
@@ -2716,6 +2717,14 @@ function registerIpc(): void {
     return res;
   });
   handle('browser:clearCookies', z.tuple([]), () => clearCookies());
+  // Cookies read straight from an installed browser (no export file needed). Firefox always
+  // works; Chrome/Edge give up their newer "app-bound" cookies only to their own process.
+  handle('browser:browserSources', z.tuple([]), () => listBrowserSources());
+  handle('browser:importFromBrowser', z.tuple([z.string().max(32)]), async (w, id) => {
+    const res = await importFromBrowser(id);
+    for (const x of wins.values()) x.browser.refresh();
+    return res;
+  });
 
   handle('terminal:profiles', z.tuple([]), () => shellProfiles());
   handle(

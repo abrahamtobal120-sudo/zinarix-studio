@@ -41,6 +41,23 @@ function sameSiteOf(v: unknown): CookieSameSite {
 }
 
 /** Builds one cookie, or null when it is not usable (no name/domain, expired, bad host). */
+export function buildImportCookie(
+  raw: {
+    name: unknown;
+    value: unknown;
+    domain: unknown;
+    path?: unknown;
+    secure?: unknown;
+    httpOnly?: unknown;
+    expires?: unknown;
+    hostOnly?: unknown;
+    sameSite?: unknown;
+  },
+  now = Date.now(),
+): ImportCookie | null {
+  return make(raw, Math.floor(now / 1000));
+}
+
 function make(
   raw: {
     name: unknown;

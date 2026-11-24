@@ -269,6 +269,8 @@ const api: OmniApi = {
     cookieInfo: call('browser:cookieInfo') as OmniApi['browser']['cookieInfo'],
     importCookies: call('browser:importCookies') as OmniApi['browser']['importCookies'],
     clearCookies: call('browser:clearCookies') as OmniApi['browser']['clearCookies'],
+    browserSources: call('browser:browserSources') as OmniApi['browser']['browserSources'],
+    importFromBrowser: call('browser:importFromBrowser') as OmniApi['browser']['importFromBrowser'],
   },
   terminal: {
     create: call('terminal:create') as OmniApi['terminal']['create'],

@@ -1,0 +1,60 @@
+# Zinarix Studio para iPad. El proyecto de Xcode se genera con XcodeGen:
+#   brew install xcodegen && xcodegen generate   (dentro de esta carpeta)
+# GitHub lo hace solo: .github/workflows/ios.yml. Guía completa: LEEME.md.
+name: ZinarixStudioPad
+options:
+  deploymentTarget:
+    iOS: '16.0'
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    MARKETING_VERSION: '0.6.5'
+    CURRENT_PROJECT_VERSION: '1'
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_BITCODE: 'NO'
+targets:
+  ZinarixStudioPad:
+    type: application
+    platform: iOS
+    scheme: {}
+    sources:
+      - path: App
+      - path: ../ios-comun/Fuentes
+        group: Comun
+      - path: ../ios-comun/Recursos
+        group: Comun
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zinarix.studio.ipad
+        PRODUCT_NAME: ZinarixStudioPad
+        TARGETED_DEVICE_FAMILY: '2'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Zinarix Studio
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+          - UIInterfaceOrientationPortraitUpsideDown
+        # Solo usa HTTPS (cifrado estándar del sistema): sin trámite de exportación.
+        ITSAppUsesNonExemptEncryption: false
+        # «Misma Wi-Fi»: el panel de la computadora es http://192.168.x.x. La app solo abre
+        # direcciones privadas por http (Link.swift); todo lo demás va por https.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoadsInWebContent: true
+        NSLocalNetworkUsageDescription: Para conectarse a Zinarix Studio en tu computadora cuando están en la misma red Wi-Fi.
+        NSCameraUsageDescription: Para escanear el código QR que muestra Zinarix Studio y para adjuntar fotos al chat.
+        NSFaceIDUsageDescription: Para desbloquear el panel de Zinarix con Face ID.
+        NSPhotoLibraryUsageDescription: Para adjuntar imágenes al chat.
+        NSMicrophoneUsageDescription: Para grabar video cuando adjuntas uno al chat.

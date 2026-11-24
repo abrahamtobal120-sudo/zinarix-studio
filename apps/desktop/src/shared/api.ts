@@ -1018,6 +1018,8 @@ export interface BrowserStateView {
   bookmarked?: boolean;
   /** Favicon of the site (data: URL), when known. */
   icon?: string;
+  /** Something the page tried that the built-in browser sent elsewhere. */
+  notice?: 'googleSignIn';
 }
 
 /** A page of the browser history (its latest visit) or a bookmark. */
@@ -1059,6 +1061,21 @@ export interface BrowserCookieImport {
   imported: number;
   skipped: number;
   sites: number;
+}
+
+/** An installed browser cookies can be read straight from. */
+export interface BrowserSourceView {
+  id: string;
+  name: string;
+  family: 'chromium' | 'firefox';
+}
+
+/** Result of reading cookies straight from an installed browser. */
+export interface BrowserDirectImport extends BrowserCookieImport {
+  /** Cookies the browser encrypts with a key only it can use (Chrome/Edge app-bound). */
+  appBoundBlocked: number;
+  /** The browser's cookie file was locked: it must be closed first. */
+  locked: boolean;
 }
 
 export interface BrowserTabsView {
@@ -2076,6 +2093,10 @@ export interface OmniApi {
     importCookies(): Promise<BrowserCookieImport | null>;
     /** Deletes every cookie of the built-in browser (signs out of every site). */
     clearCookies(): Promise<void>;
+    /** Installed browsers whose cookies can be read straight (no export file). */
+    browserSources(): Promise<BrowserSourceView[]>;
+    /** Reads cookies straight from an installed browser (by id) and loads them. */
+    importFromBrowser(id: string): Promise<BrowserDirectImport>;
   };
   terminal: {
     /**
@@ -2953,6 +2974,8 @@ export const CHANNELS = [
   'browser:cookieInfo',
   'browser:importCookies',
   'browser:clearCookies',
+  'browser:browserSources',
+  'browser:importFromBrowser',
   'terminal:create',
   'terminal:profiles',
   'terminal:write',

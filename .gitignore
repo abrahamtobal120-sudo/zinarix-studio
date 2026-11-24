@@ -29,3 +29,6 @@ licencia*.txt
 
 # Copia local del código fuente de Blender (no es parte del proyecto)
 /blender/
+
+# ZIP de la fuente de Code - OSS (~100 MB): nunca en git
+vscode-main.zip

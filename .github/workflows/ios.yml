@@ -1,0 +1,103 @@
+name: iOS
+
+# The iPhone app (Zinarix Remote, plataformas/iphone) and the iPad app (Zinarix Studio,
+# plataformas/ipad). They share their code (plataformas/ios-comun).
+#
+# - Every run compiles both apps for the simulator, unsigned: a compile error shows here
+#   without an Apple account.
+# - A tag like v1.2.3 (or a manual run with "subir" checked) also signs them and uploads
+#   them to App Store Connect / TestFlight, when the APPSTORE_* secrets exist. Without the
+#   secrets that step is skipped with a warning. Guide: plataformas/iphone/LEEME.md.
+on:
+  push:
+    tags: ['v*']
+    branches: [main]
+    paths:
+      - 'plataformas/ios-comun/**'
+      - 'plataformas/iphone/**'
+      - 'plataformas/ipad/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+    inputs:
+      subir:
+        description: 'Firmar y subir a TestFlight (necesita los secretos APPSTORE_*)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: iphone
+            scheme: ZinarixRemote
+          - dir: ipad
+            scheme: ZinarixStudioPad
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: plataformas/${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Version
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) v="${GITHUB_REF_NAME#v}" ;;
+            *) v="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$GITHUB_WORKSPACE/package.json" | head -n 1)" ;;
+          esac
+          # App Store versions are numbers and dots only (1.2.3-beta.1 -> 1.2.3).
+          v="${v%%-*}"
+          echo "ZX_VERSION=${v:-0.0.1}" >> "$GITHUB_ENV"
+      - name: Generate the Xcode project
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate
+      - name: Compile (simulator, unsigned)
+        run: |
+          xcodebuild -project "${{ matrix.scheme }}.xcodeproj" -scheme "${{ matrix.scheme }}" \
+            -configuration Debug -destination 'generic/platform=iOS Simulator' \
+            MARKETING_VERSION="$ZX_VERSION" CODE_SIGNING_ALLOWED=NO build
+      - name: Sign and upload to TestFlight
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.subir
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPSTORE_PRIVATE_KEY" ] || [ -z "$APPSTORE_KEY_ID" ] || [ -z "$APPSTORE_ISSUER_ID" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::warning::APPSTORE_ISSUER_ID / APPSTORE_KEY_ID / APPSTORE_PRIVATE_KEY / APPLE_TEAM_ID are not all set: nothing was uploaded (see plataformas/${{ matrix.dir }}/LEEME.md)"
+            exit 0
+          fi
+          umask 077
+          key="$RUNNER_TEMP/AuthKey_$APPSTORE_KEY_ID.p8"
+          printf '%s\n' "$APPSTORE_PRIVATE_KEY" > "$key"
+          auth=(-allowProvisioningUpdates -authenticationKeyPath "$key" -authenticationKeyID "$APPSTORE_KEY_ID" -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID")
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          # The build number must grow with every upload: the number of this run.
+          xcodebuild -project "${{ matrix.scheme }}.xcodeproj" -scheme "${{ matrix.scheme }}" \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            MARKETING_VERSION="$ZX_VERSION" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" "${auth[@]}" archive
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/export" "${auth[@]}"
+          rm -f "$key"

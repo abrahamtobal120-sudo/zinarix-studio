@@ -673,6 +673,11 @@ export function BrowserPane({ visible }: { visible: boolean }) {
         </div>
       </div>
       <div className={`browser-progress ${st.loading ? 'on' : ''}`} />
+      {st.notice === 'googleSignIn' && (
+        <div className="browser-notice" role="status">
+          {t('browserGoogleSignIn')}
+        </div>
+      )}
       <div className={`browser-frame ${aiActive ? 'ai' : ''}`}>
         <div className="browser-host" ref={host}>
           {panel && (

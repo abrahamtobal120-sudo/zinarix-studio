@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { BrowserCookieInfo } from '../../shared/api';
+import type { BrowserCookieInfo, BrowserSourceView } from '../../shared/api';
 import { confirmDialog } from '../confirm';
 import { t } from '../i18n';
 import { api, toast } from '../store';
@@ -32,6 +32,39 @@ export async function importCookies(): Promise<boolean> {
   }
 }
 
+/** Reads cookies straight from an installed browser; reports what came in and what didn't. */
+export async function importFromBrowser(src: BrowserSourceView): Promise<boolean> {
+  try {
+    const r = await api().browser.importFromBrowser(src.id);
+    if (r.appBoundBlocked > 0)
+      toast(t('browserCookiesAppBound', { n: r.appBoundBlocked, name: src.name }));
+    if (r.imported === 0) {
+      if (r.locked) toast(t('browserCookiesLocked', { name: src.name }));
+      else if (r.appBoundBlocked === 0) toast(t('browserCookiesDirectNone', { name: src.name }));
+      return false;
+    }
+    const extra = r.skipped ? ' ' + t('browserCookiesSkipped', { n: r.skipped }) : '';
+    toast(t('browserCookiesDone', { n: r.imported, sites: r.sites }) + extra);
+    window.dispatchEvent(new Event(CHANGED));
+    return true;
+  } catch (e) {
+    toast(e instanceof Error ? e.message : String(e));
+    return false;
+  }
+}
+
+/** Installed browsers whose cookies can be read straight (empty while loading / none). */
+export function useBrowserSources(): BrowserSourceView[] {
+  const [sources, setSources] = useState<BrowserSourceView[]>([]);
+  useEffect(() => {
+    void api()
+      .browser.browserSources()
+      .then(setSources)
+      .catch(() => {});
+  }, []);
+  return sources;
+}
+
 /** Cookie status of the built-in browser (null while loading). */
 export function useCookieInfo(): [BrowserCookieInfo | null, () => void] {
   const [info, setInfo] = useState<BrowserCookieInfo | null>(null);
@@ -51,6 +84,7 @@ export function useCookieInfo(): [BrowserCookieInfo | null, () => void] {
 /** Settings → Navegador: cookie import, cookie status and browsing data. */
 export function BrowserSection() {
   const [info] = useCookieInfo();
+  const sources = useBrowserSources();
   const [busy, setBusy] = useState(false);
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -108,6 +142,24 @@ export function BrowserSection() {
           </button>
         </div>
       </div>
+
+      {sources.length > 0 && (
+        <>
+          <h3>{t('browserCookiesDirectTitle')}</h3>
+          <p className="dim small">{t('browserCookiesDirectHint')}</p>
+          <div className="knowledge-add">
+            {sources.map((s) => (
+              <button
+                key={s.id}
+                disabled={busy}
+                onClick={() => void run(() => importFromBrowser(s))}
+              >
+                <Icon name="download" size={14} /> {t('browserCookiesFrom', { name: s.name })}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <h3>{t('browserDataTitle')}</h3>
       <p className="dim small">{t('browserDataHint')}</p>

@@ -1,4 +1,4 @@
-import { WebContentsView, app, session } from 'electron';
+import { WebContentsView, app, session, shell } from 'electron';
 import type { BrowserWindow, Rectangle, Session } from 'electron';
 import { BrowserData, rememberable } from './browserData.js';
 
@@ -12,6 +12,8 @@ export interface BrowserState {
   bookmarked?: boolean;
   /** Favicon of the site (data: URL), when known. */
   icon?: string;
+  /** Something the page tried that the built-in browser sent elsewhere ("googleSignIn"). */
+  notice?: 'googleSignIn';
 }
 
 export interface PageElement {
@@ -223,6 +225,20 @@ export function normalizeUrl(input: string): string {
 }
 
 /** Host of a URL without "www." (the unit browser approvals are given for). */
+/**
+ * Google refuses to sign in inside embedded browsers ("This browser or app may not be
+ * secure"), whatever the user agent says, so its sign-in pages are opened in the user's
+ * own browser instead of showing that dead end.
+ */
+export function isGoogleSignIn(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && u.hostname.toLowerCase() === 'accounts.google.com';
+  } catch {
+    return false;
+  }
+}
+
 export function siteOf(url: string): string {
   try {
     return new URL(url).host.toLowerCase().replace(/^www\./, '');
@@ -245,6 +261,7 @@ export class BrowserTab {
    */
   private guard: ((site: string) => boolean) | null = null;
   private blockedUrl: string | null = null;
+  private notice: BrowserState['notice'] = undefined;
 
   constructor(
     readonly id: string,
@@ -263,6 +280,18 @@ export class BrowserTab {
     const u = this.blockedUrl;
     this.blockedUrl = null;
     return u;
+  }
+
+  /**
+   * A Google sign-in page: stopped here and, in the user's own tab, opened in the system
+   * browser (an AI's navigation never opens programs on its own). Returns true when stopped.
+   */
+  private divertSignIn(url: string): boolean {
+    if (!isGoogleSignIn(url)) return false;
+    if (this.owner === null) void shell.openExternal(url).catch(() => {});
+    this.notice = 'googleSignIn';
+    this.host.changed(this);
+    return true;
   }
 
   private allowed(url: string): boolean {
@@ -303,16 +332,26 @@ export class BrowserTab {
       // Links that open a new window: a new tab for the user; an AI keeps working in its own
       // tab (the same tab, behind its site guard).
       if (/^https?:/i.test(url)) {
+        if (this.divertSignIn(url)) return { action: 'deny' };
         if (this.owner === null) this.host.openTab(url);
         else if (this.allowed(url)) wc.loadURL(url).catch(() => {});
       }
       return { action: 'deny' };
     });
     wc.on('will-navigate', (e, url) => {
-      if (!/^https?:/i.test(url) || !this.allowed(url)) e.preventDefault();
+      if (!/^https?:/i.test(url) || !this.allowed(url) || this.divertSignIn(url))
+        e.preventDefault();
     });
     wc.on('will-redirect', (e, url, _inPlace, isMainFrame) => {
-      if (isMainFrame && (!/^https?:/i.test(url) || !this.allowed(url))) e.preventDefault();
+      if (
+        isMainFrame &&
+        (!/^https?:/i.test(url) || !this.allowed(url) || this.divertSignIn(url))
+      )
+        e.preventDefault();
+    });
+    // Any other page clears the notice.
+    wc.on('did-navigate', () => {
+      this.notice = undefined;
     });
     const emit = () => this.host.changed(this);
     for (const ev of [
@@ -363,12 +402,20 @@ export class BrowserTab {
       canGoForward: wc.navigationHistory.canGoForward(),
       bookmarked: data.isBookmarked(url),
       icon: data.icon(url),
+      notice: this.notice,
     };
   }
 
   async navigate(input: string): Promise<BrowserState> {
     const url = normalizeUrl(input);
     const wc = this.ensure().webContents;
+    if (this.divertSignIn(url)) {
+      if (this.owner !== null)
+        throw new Error(
+          'Google no permite iniciar sesión en el navegador integrado. Pide al usuario que inicie sesión en su navegador normal.',
+        );
+      return this.state();
+    }
     // The load promise never rejects (a late failure after the timeout won the race would
     // be an unhandled rejection); its error is checked only if it settled in time.
     const load = wc.loadURL(url).then(

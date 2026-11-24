@@ -1800,6 +1800,8 @@ const es = {
   browserBookmarks: 'Favoritos',
   browserBookmarkAdd: 'Guardar en favoritos',
   browserBookmarkRemove: 'Quitar de favoritos',
+  browserGoogleSignIn:
+    'Google no permite iniciar sesión en navegadores integrados, así que se abrió en tu navegador normal.',
   browserHistorySearch: 'Buscar en el historial',
   browserHistoryEmpty: 'Todavía no hay páginas en el historial.',
   browserHistoryNoMatch: 'Ninguna página coincide con la búsqueda.',
@@ -1823,6 +1825,15 @@ const es = {
   browserCookiesCleared: 'Cookies borradas.',
   browserCookiesCard: '¿Ya tienes tus sesiones en Chrome o Edge? Trae tus cookies y entra sin volver a iniciar sesión.',
   browserCookiesMore: 'Más opciones',
+  browserCookiesDirectTitle: 'Traer cookies de tu navegador',
+  browserCookiesDirectHint:
+    'Lee las cookies directamente del navegador instalado, sin exportar nada. Ciérralo antes para que no estén en uso.',
+  browserCookiesFrom: 'Desde {name}',
+  browserCookiesDirectNone: 'No se pudo leer ninguna cookie de {name}.',
+  browserCookiesLocked: 'Cierra {name} por completo y vuelve a intentarlo (su archivo de cookies estaba en uso).',
+  browserCookiesAppBound:
+    '{n} cookies de {name} quedaron fuera: las cifra con una llave que solo él puede usar. Para esas, expórtalas con la extensión Cookie-Editor e impórtalas como archivo.',
+  browserCookiesNoBrowsers: 'No se encontró ningún navegador compatible instalado.',
   browserDataTitle: 'Datos de navegación',
   browserDataHint: 'El historial y los favoritos se guardan solo en esta computadora.',
   browserHistoryClearConfirm: '¿Borrar todo el historial del navegador? Los favoritos y las sesiones iniciadas se conservan.',
@@ -4128,6 +4139,8 @@ const en: Record<Key, string> = {
   browserBookmarks: 'Bookmarks',
   browserBookmarkAdd: 'Bookmark this page',
   browserBookmarkRemove: 'Remove bookmark',
+  browserGoogleSignIn:
+    "Google doesn't allow signing in from built-in browsers, so it opened in your regular browser.",
   browserHistorySearch: 'Search history',
   browserHistoryEmpty: 'No pages in the history yet.',
   browserHistoryNoMatch: 'No page matches the search.',
@@ -4151,6 +4164,15 @@ const en: Record<Key, string> = {
   browserCookiesCleared: 'Cookies deleted.',
   browserCookiesCard: 'Already signed in on Chrome or Edge? Bring your cookies and skip signing in again.',
   browserCookiesMore: 'More options',
+  browserCookiesDirectTitle: 'Bring cookies from your browser',
+  browserCookiesDirectHint:
+    'Reads cookies straight from the installed browser, with no export. Close it first so its file is not in use.',
+  browserCookiesFrom: 'From {name}',
+  browserCookiesDirectNone: 'No cookies could be read from {name}.',
+  browserCookiesLocked: 'Fully close {name} and try again (its cookie file was in use).',
+  browserCookiesAppBound:
+    '{n} cookies from {name} were left out: it encrypts them with a key only it can use. For those, export them with the Cookie-Editor extension and import the file.',
+  browserCookiesNoBrowsers: 'No supported browser was found installed.',
   browserDataTitle: 'Browsing data',
   browserDataHint: 'History and bookmarks are kept only on this computer.',
   browserHistoryClearConfirm: 'Clear the whole browser history? Bookmarks and signed-in sessions are kept.',
