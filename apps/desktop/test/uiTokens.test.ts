@@ -172,7 +172,7 @@ describe('cascade layers (16B)', () => {
 
   it('generic element rules skip the primitives ([data-ui])', () => {
     const css = readFileSync(join(STYLES, '02-app.css'), 'utf8');
-    expect(css).toMatch(/^button:where\(:not\(\[data-ui\]\)\) \{/m);
-    expect(css).not.toMatch(/^button \{/m);
+    expect(css).toMatch(/^\s*button:where\(:not\(\[data-ui\]\)\) \{/m);
+    expect(css).not.toMatch(/^\s*button \{/m);
   });
 });
