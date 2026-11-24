@@ -453,6 +453,8 @@ const api: OmniApi = {
     interruptedRuns: call('app:interruptedRuns') as OmniApi['app']['interruptedRuns'],
     newWindow: call('app:newWindow') as OmniApi['app']['newWindow'],
     installUpdate: call('app:installUpdate') as OmniApi['app']['installUpdate'],
+    logError: call('app:logError') as OmniApi['app']['logError'],
+    exportDiagnostics: call('app:exportDiagnostics') as OmniApi['app']['exportDiagnostics'],
     pathForFile: (file: File) => webUtils.getPathForFile(file),
     platform: process.platform,
     chrome: call('app:chrome') as OmniApi['app']['chrome'],

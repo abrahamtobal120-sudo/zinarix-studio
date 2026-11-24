@@ -1,0 +1,4 @@
+{
+  "title": "Fix an off-by-one in pagination",
+  "prompt": "paginate() in src/paginate.mjs returns the wrong items: page 1 must be the first perPage items. pageCount() is also wrong when the last page is not full. Fix both."
+}

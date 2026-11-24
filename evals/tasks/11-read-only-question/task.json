@@ -1,0 +1,5 @@
+{
+  "title": "Answer a question about the code without changing it",
+  "approve": "read-only",
+  "prompt": "Which function actually writes to the audit log file on disk, and in which file is it defined? Answer with the function name and the file path."
+}

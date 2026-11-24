@@ -1,0 +1,5 @@
+{
+  "title": "Edit a file with Windows line endings and tab indentation",
+  "crlf": ["src/report.mjs"],
+  "prompt": "In src/report.mjs the name column is 12 characters wide; make it 20 (rows, header and total line). Also the last line must be labelled 'Total' instead of 'Sum'. Keep the file's line endings (CRLF) and its tab indentation."
+}

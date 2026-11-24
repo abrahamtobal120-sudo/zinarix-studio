@@ -24,6 +24,10 @@ targets:
         group: Comun
       - path: ../ios-comun/Recursos
         group: Comun
+      # La app independiente (chats, agente, archivos): se copia tal cual como carpeta «Web».
+      - path: Web
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zinarix.studio.ipad
@@ -48,12 +52,15 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
         # Solo usa HTTPS (cifrado estándar del sistema): sin trámite de exportación.
         ITSAppUsesNonExemptEncryption: false
+        # La carpeta de proyectos de la app se ve en Archivos → En mi iPad → Zinarix Studio.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         # «Misma Wi-Fi»: el panel de la computadora es http://192.168.x.x. La app solo abre
         # direcciones privadas por http (Link.swift); todo lo demás va por https.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
           NSAllowsArbitraryLoadsInWebContent: true
-        NSLocalNetworkUsageDescription: Para conectarse a Zinarix Studio en tu computadora cuando están en la misma red Wi-Fi.
+        NSLocalNetworkUsageDescription: Para conectarse a Zinarix Studio en tu computadora, o a tu propio servidor de IA, cuando están en la misma red Wi-Fi.
         NSCameraUsageDescription: Para escanear el código QR que muestra Zinarix Studio y para adjuntar fotos al chat.
         NSFaceIDUsageDescription: Para desbloquear el panel de Zinarix con Face ID.
         NSPhotoLibraryUsageDescription: Para adjuntar imágenes al chat.

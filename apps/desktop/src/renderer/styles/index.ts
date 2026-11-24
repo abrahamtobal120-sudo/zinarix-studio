@@ -24,5 +24,6 @@ import './19-whatsapp.css';
 import './20-a11y.css';
 import './21-side-panel.css';
 import './22-security-tab.css';
+import './23-error-boundary.css';
 // Outside every layer, on purpose: see the comment at the top of the file.
 import './overrides.css';

@@ -31,7 +31,43 @@ declare global {
     omni: OmniApi;
   }
 }
-export const api = (): OmniApi => window.omni;
+
+let rawApi: OmniApi | undefined;
+let guardedApi: OmniApi | undefined;
+/**
+ * The bridge to the main process. B2: the calls that change the window's folder (which closes
+ * every tab) first ask when files have unsaved changes, whichever button or command made them.
+ */
+export const api = (): OmniApi => {
+  const raw = window.omni;
+  if (raw !== rawApi || !guardedApi) {
+    rawApi = raw;
+    guardedApi = raw?.workspace
+      ? {
+          ...raw,
+          workspace: {
+            ...raw.workspace,
+            openDialog: async () => ((await mayLeaveFolder()) ? raw.workspace.openDialog() : null),
+            openPath: async (path) =>
+              path === state.workspace?.root || (await mayLeaveFolder())
+                ? raw.workspace.openPath(path)
+                : null,
+          },
+          github: raw.github && {
+            ...raw.github,
+            clone: async (spec) => ((await mayLeaveFolder()) ? raw.github.clone(spec) : null),
+          },
+        }
+      : raw;
+  }
+  return guardedApi;
+};
+
+/** false when the user chose to stay because of unsaved files. */
+async function mayLeaveFolder(): Promise<boolean> {
+  const n = dirtyCount();
+  return !n || confirmDialog(t('unsavedSwitch', { n }), { danger: true });
+}
 
 export interface Tab {
   path: string;

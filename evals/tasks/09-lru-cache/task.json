@@ -1,0 +1,4 @@
+{
+  "title": "Implement a small data structure from its comments",
+  "prompt": "Implement the LRU class in src/lru.mjs as its comments describe."
+}

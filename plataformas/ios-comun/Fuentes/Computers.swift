@@ -113,7 +113,13 @@ enum Prefs {
         set { d.set(newValue, forKey: "startList") }
     }
 
+    /// The last thing open was Zinarix on this device (not a computer). iPad only.
+    static var local: Bool {
+        get { d.object(forKey: "local") == nil ? true : d.bool(forKey: "local") }
+        set { d.set(newValue, forKey: "local") }
+    }
+
     static func reset() {
-        for k in ["lock", "vibrate", "startList"] { d.removeObject(forKey: k) }
+        for k in ["lock", "vibrate", "startList", "local"] { d.removeObject(forKey: k) }
     }
 }

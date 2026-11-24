@@ -11,6 +11,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { ToolDefinition } from '@omni/shared';
 import type { AgentToolName } from './agentPolicy.js';
+import { applyEdit, editNote } from './editMatch.js';
 
 /**
  * Fase 15 — the tools of the headless agent. Every path is confined to the run's folder
@@ -279,21 +280,18 @@ function editFile(root: string, a: Record<string, unknown>): ToolOutcome {
   if (!oldS) throw new ToolError('old_string is required (use write_file to create a file)');
   if (typeof a.new_string !== 'string') throw new ToolError('new_string is required');
   const text = readFileSync(abs, 'utf8');
-  const count = text.split(oldS).length - 1;
-  if (count === 0) throw new ToolError('old_string was not found in the file');
-  if (count > 1 && a.replace_all !== true)
+  const res = applyEdit(text, oldS, a.new_string, { replaceAll: a.replace_all === true });
+  if (!res.ok)
     throw new ToolError(
-      `old_string appears ${count} times; add more context or set replace_all: true`,
+      res.error.includes(' times;')
+        ? `${res.error.replace(/\.$/, '')} (or set replace_all: true)`
+        : res.error,
     );
-  const next =
-    a.replace_all === true
-      ? text.split(oldS).join(a.new_string)
-      : text.replace(oldS, () => a.new_string as string);
-  writeFileSync(abs, next);
+  writeFileSync(abs, res.text);
   const rel = posix(relative(realpathSync(root), abs));
   return {
     ok: true,
-    content: `Edited ${rel} (${count} replacement${count > 1 ? 's' : ''}).`,
+    content: `Edited ${rel} (${res.count} replacement${res.count > 1 ? 's' : ''}${editNote(res.how)}).`,
     changed: rel,
   };
 }

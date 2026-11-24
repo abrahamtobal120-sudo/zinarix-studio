@@ -6,7 +6,7 @@ import { homedir, tmpdir } from 'node:os';
 import { readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import type { OmniCore } from '@omni/core';
-import { untrusted, UNTRUSTED_NOTE } from '@omni/core';
+import { applyEdit, editNote, untrusted, UNTRUSTED_NOTE } from '@omni/core';
 import type { ChatMessage, ToolCall, ToolDefinition } from '@omni/shared';
 import { StreamRedactor, redact, redactDeep, registerSecret } from '@omni/security';
 import type {
@@ -2990,17 +2990,10 @@ A project hook did not let you finish yet. Address it, then answer.`,
           if (denied) return finish(false, denied, `${path}: protegido`);
           const raw = await readFile(abs);
           const before = raw.toString('utf8');
-          const count = oldS ? before.split(oldS).length - 1 : 0;
-          if (count !== 1) {
-            return finish(
-              false,
-              count === 0
-                ? 'old_string was not found in the file. Read the file again and copy the exact text.'
-                : `old_string appears ${count} times; include more surrounding lines to make it unique.`,
-              `${path}: no aplicado`,
-            );
-          }
-          const after = before.replace(oldS, () => newS);
+          // Shared with the headless agent: tolerates the wrong line endings or indentation.
+          const edited = applyEdit(before, oldS, newS);
+          if (!edited.ok) return finish(false, edited.error, `${path}: no aplicado`);
+          const after = edited.text;
           this.checkpoint(s, opts.conversationId, {
             turn: opts.turn,
             path,
@@ -3011,7 +3004,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
           });
           await writeFile(abs, after, 'utf8');
           opts.emit({ type: 'file_changed', path });
-          return finish(true, `Edited ${path}.`, `${path} editado`);
+          return finish(true, `Edited ${path}${editNote(edited.how)}.`, `${path} editado`);
         }
         case 'write_file': {
           const path = str(a.path, 'path');
@@ -3065,17 +3058,25 @@ A project hook did not let you finish yet. Address it, then answer.`,
             {
               env: { ...s.env, ...task?.env, ...tmpVars },
               admin: !task && a.admin === true,
-              // A task's commands never get tokens or keys, with or without sandbox.
-              strict: !!task,
+              // D6: no command the model writes gets the tokens or keys of the environment
+              // (GITHUB_TOKEN, NPM_TOKEN, DATABASE_URL…): an injected instruction could send
+              // them anywhere. Variables the user approved with set_env_var (s.env) still
+              // arrive. ZINARIX_AGENT_ENV=inherit brings the old behaviour back for chats;
+              // a background task is always strict, with or without sandbox.
+              strict: !!task || process.env.ZINARIX_AGENT_ENV !== 'inherit',
+              // The chat keeps the ssh agent (git over SSH): it signs, it cannot be read out.
+              sshAgent: !task,
               spawnAs,
             },
           );
           const out = redact(truncate(r.output));
-          return finish(
-            r.code === 0,
-            `$ ${command}\nexit code: ${r.code}${r.timedOut ? ' (timed out)' : ''}\n${out}`,
-            `exit ${r.code}${r.timedOut ? ' · timeout' : ''}`,
-          );
+          const report = `$ ${command}\nexit code: ${r.code}${r.timedOut ? ' (timed out)' : ''}\n${out}`;
+          const summary = `exit ${r.code}${r.timedOut ? ' · timeout' : ''}`;
+          if (r.code === 0) return finish(true, report, summary);
+          // D5: what a failed command printed is outside data too (a test log, a build error
+          // quoting a file): it goes to the model marked as untrusted, like a success.
+          opts.emit({ type: 'tool_result', id: call.id, ok: false, summary: redact(summary) });
+          return { ok: false, content: untrusted(`tool:${call.name}`, report) };
         }
         default:
           return finish(false, `Unknown tool ${call.name}.`, 'herramienta desconocida');
@@ -3384,8 +3385,10 @@ export function runCommand(
   extra: {
     env?: Record<string, string>;
     admin?: boolean;
-    /** Removes every variable that may hold a credential (background tasks). */
+    /** Removes every variable that may hold a credential (agent commands, background tasks). */
     strict?: boolean;
+    /** With `strict`: keep SSH_AUTH_SOCK, so git over SSH still works (never for tasks). */
+    sshAgent?: boolean;
     /** Start this instead of the shell (the sandbox wrapping the command). */
     spawnAs?: { file: string; args: string[] };
   } = {},
@@ -3396,6 +3399,9 @@ export function runCommand(
     // variables the user approved with set_env_var (extra.env) do.
     const env: Record<string, string> = {
       ...(extra.strict ? taskEnv(childEnv(process.env)) : childEnv(process.env)),
+      ...(extra.strict && extra.sshAgent && process.env.SSH_AUTH_SOCK
+        ? { SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK }
+        : {}),
       CI: '1',
       GIT_TERMINAL_PROMPT: '0',
       PAGER: 'cat',

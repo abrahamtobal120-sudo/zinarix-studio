@@ -2,3 +2,6 @@ dist
 coverage
 pnpm-lock.yaml
 catalog/providers.json
+# Bench fixtures: some are about tabs and line endings, so they must stay byte for byte.
+evals/tasks
+evals/results

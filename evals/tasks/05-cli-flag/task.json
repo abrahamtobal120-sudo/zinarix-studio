@@ -1,0 +1,4 @@
+{
+  "title": "Add a flag and an error path to a small CLI",
+  "prompt": "src/cli.mjs prints the word count of a file. Add a --json flag (accepted before or after the file name) that prints one line of JSON instead: {\"file\": <the path as given>, \"words\": <n>, \"lines\": <n>}. Lines: a final newline does not start a new line and an empty file has 0 lines. When the file does not exist, print a message starting with \"error:\" to stderr (no stack trace) and exit with code 2. Without --json the output stays exactly as it is."
+}

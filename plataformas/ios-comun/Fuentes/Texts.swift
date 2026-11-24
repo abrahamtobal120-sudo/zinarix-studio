@@ -9,6 +9,10 @@ func T(_ key: String) -> String {
 
 enum Texts {
     static let es: [String: String] = [
+        "this_device": "Este iPad",
+        "local_title": "Zinarix en este iPad",
+        "local_hint": "Trabaja solo, sin computadora: chats, agente y archivos.",
+        "reset_text_local": "Se borran las llaves de API, los chats y la lista de computadoras de este iPad. Los archivos de tus proyectos no se borran.",
         "computers": "Tus computadoras",
         "setup_hint": "En la computadora abre Zinarix Studio → Configuración → Celular. Escanea el código QR o copia el enlace y pégalo aquí.",
         "tip": "Consejo: el enlace de «Desde cualquier lugar» funciona fuera de tu casa y no cambia aunque reinicies la computadora.",
@@ -65,6 +69,10 @@ enum Texts {
     ]
 
     static let en: [String: String] = [
+        "this_device": "This iPad",
+        "local_title": "Zinarix on this iPad",
+        "local_hint": "Works on its own, without a computer: chats, agent and files.",
+        "reset_text_local": "The API keys, the chats and the list of computers of this iPad are erased. Your project files are not erased.",
         "computers": "Your computers",
         "setup_hint": "On the computer open Zinarix Studio → Settings → Phone. Scan the QR code, or copy the link and paste it here.",
         "tip": "Tip: the “From anywhere” link works away from home and does not change when the computer restarts.",

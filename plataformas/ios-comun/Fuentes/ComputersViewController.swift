@@ -4,10 +4,12 @@ protocol ComputersDelegate: AnyObject {
     func computers(_ list: ComputersViewController, didPick link: Link)
     func computers(_ list: ComputersViewController, didForget link: Link)
     func computersWantsOptions(_ list: ComputersViewController)
+    /// "Zinarix on this iPad" (only where the app works on its own).
+    func computersWantsLocal(_ list: ComputersViewController)
 }
 
 /// The saved computers and the ways to add one (QR, paste, type). On the iPhone it is the
-/// first screen; on the iPad it is the side bar.
+/// first screen; on the iPad it is the side bar, with "Zinarix on this iPad" on top.
 final class ComputersViewController: UITableViewController {
     weak var delegate: ComputersDelegate?
     private var saved: [Computers.Saved] = []
@@ -44,23 +46,45 @@ final class ComputersViewController: UITableViewController {
 
     // MARK: - Table
 
-    override func numberOfSections(in tableView: UITableView) -> Int { 2 }
+    /// What a section holds: -1 "on this iPad", 0 the saved computers, 1 the ways to add one.
+    private func part(_ section: Int) -> Int {
+        Variante.independiente ? section - 1 : section
+    }
+
+    override func numberOfSections(in tableView: UITableView) -> Int { Variante.independiente ? 3 : 2 }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        section == 0 ? saved.count : adds.count
+        switch part(section) {
+        case -1: return 1
+        case 0: return saved.count
+        default: return adds.count
+        }
     }
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        if section == 0 { return saved.isEmpty ? nil : T("computers") }
-        return T("add")
+        switch part(section) {
+        case -1: return T("this_device")
+        case 0: return saved.isEmpty ? nil : T("computers")
+        default: return T("add")
+        }
     }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        section == 1 ? T("setup_hint") + "\n\n" + T("tip") : nil
+        part(section) == 1 ? T("setup_hint") + "\n\n" + T("tip") : nil
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if indexPath.section == 0 {
+        if part(indexPath.section) == -1 {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "local") ?? UITableViewCell(style: .subtitle, reuseIdentifier: "local")
+            cell.textLabel?.text = T("local_title")
+            cell.detailTextLabel?.text = T("local_hint")
+            cell.detailTextLabel?.textColor = .secondaryLabel
+            cell.detailTextLabel?.numberOfLines = 0
+            cell.imageView?.image = UIImage(systemName: "ipad")
+            cell.accessoryType = .disclosureIndicator
+            return cell
+        }
+        if part(indexPath.section) == 0 {
             let cell = tableView.dequeueReusableCell(withIdentifier: "pc") ?? UITableViewCell(style: .subtitle, reuseIdentifier: "pc")
             let s = saved[indexPath.row]
             cell.textLabel?.text = s.title
@@ -80,7 +104,11 @@ final class ComputersViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        if indexPath.section == 0 {
+        if part(indexPath.section) == -1 {
+            delegate?.computersWantsLocal(self)
+            return
+        }
+        if part(indexPath.section) == 0 {
             delegate?.computers(self, didPick: saved[indexPath.row].link)
             return
         }
@@ -92,7 +120,7 @@ final class ComputersViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard indexPath.section == 0 else { return nil }
+        guard part(indexPath.section) == 0 else { return nil }
         let s = saved[indexPath.row]
         let forget = UIContextualAction(style: .destructive, title: T("forget")) { [weak self] _, _, done in
             self?.forget(s)

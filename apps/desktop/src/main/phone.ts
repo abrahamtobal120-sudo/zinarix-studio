@@ -26,6 +26,12 @@ import { beaconError, RELAY_PAGE, relayLink, type PhoneBeacon } from './phoneBea
 /** Preferred port (the phone keeps working after a restart); another one if it is taken. */
 const PORT = 47390;
 
+/**
+ * D1: a paired phone that has not been used for this long has to pair again (PIN on the
+ * computer). A token copied from a lost or sold phone stops working by itself.
+ */
+export const DEVICE_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
+
 const Action = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('send'), text: z.string().min(1).max(20_000) }),
   z.object({
@@ -262,7 +268,10 @@ interface Saved {
   fixed?: { host: string; token: string };
   /** Gist that holds the current tunnel address: the permanent link (see phoneBeacon.ts). */
   relay?: string;
-  /** What the phones may use besides the chats (missing = on). */
+  /**
+   * What the phones may use besides the chats. Missing = on, except the terminal (D1): a shell
+   * on the computer is only given to the phones when the user turned it on there.
+   */
   allow?: Partial<PhoneAllow>;
 }
 
@@ -438,7 +447,7 @@ export class PhoneRemote {
     const a = this.state().allow ?? {};
     return {
       files: a.files !== false && !!this.tools.files,
-      terminal: a.terminal !== false && !!this.tools.terminals,
+      terminal: a.terminal === true && !!this.tools.terminals,
       git: a.git !== false && !!this.tools.git,
       config: a.config !== false && !!this.tools.config,
     };
@@ -763,7 +772,14 @@ export class PhoneRemote {
     const token = header ?? url.searchParams.get('token') ?? '';
     if (!/^[0-9a-f]{64}$/.test(token)) return null;
     const hash = sha(token);
-    const device = this.state().devices!.find((d) => same(d.hash, hash)) ?? null;
+    const s = this.state();
+    let device = s.devices!.find((d) => same(d.hash, hash)) ?? null;
+    // D1: unused for too long, the pairing is over (the phone pairs again with the PIN).
+    if (device && Date.now() - (device.seen ?? device.at) > DEVICE_IDLE_MS) {
+      s.devices = s.devices!.filter((d) => d !== device);
+      this.save();
+      device = null;
+    }
     if (device) {
       device.seen = Date.now();
       // Last seen on disk now and then (not on every request).
@@ -923,7 +939,12 @@ export class PhoneRemote {
         return end(res, 200, { v: this.version, snapshot: this.snapshot });
       }
       if (req.method === 'POST' && url.pathname === '/api/action') {
-        this.onAction(Action.parse(await body(req)));
+        const action = Action.parse(await body(req));
+        // D1: "full access" (no approvals at all) is only switched on at the computer; with
+        // it, whoever holds a phone's token could run anything without anyone confirming.
+        if (action.kind === 'mode' && action.mode === 'full')
+          return end(res, 403, { error: 'El acceso total solo se activa desde la computadora.' });
+        this.onAction(action);
         return end(res, 200, { ok: true });
       }
       if (req.method === 'GET' && url.pathname === '/api/models') {

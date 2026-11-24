@@ -2,7 +2,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'coverage/**', '**/release/**', 'vendor/**', 'blender/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', 'coverage/**', '**/release/**', 'vendor/**', 'blender/**', 'evals/tasks/**'] },
   ...tseslint.configs.recommended,
   {
     rules: {
@@ -14,7 +14,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/cli/**', 'scripts/**', 'tests/**', 'apps/*/scripts/**'],
+    files: ['apps/cli/**', 'scripts/**', 'tests/**', 'apps/*/scripts/**', 'evals/**'],
     rules: { 'no-console': 'off' },
   },
   // Security lint for code that runs with full privileges (main process, CLI, core).

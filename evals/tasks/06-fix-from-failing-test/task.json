@@ -1,0 +1,4 @@
+{
+  "title": "Find the cause of a failing test in another module",
+  "prompt": "Running `node test/run.mjs` fails. Find out why and fix the code (do not change the test)."
+}

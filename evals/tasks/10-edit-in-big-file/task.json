@@ -1,0 +1,4 @@
+{
+  "title": "Change one entry in a long file of near-identical lines",
+  "prompt": "In src/routes.mjs the route POST /api/v2/orders/:id/refund is wired to the old handler. It must use the handler refundOrderV2 and require auth 'admin'. Change only that route."
+}

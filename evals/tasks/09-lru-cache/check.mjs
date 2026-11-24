@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { LRU } from './src/lru.mjs';
+
+assert.throws(() => new LRU(0), RangeError);
+assert.throws(() => new LRU(1.5), RangeError);
+const c = new LRU(2);
+assert.equal(c.size, 0);
+c.set('a', 1);
+c.set('b', 2);
+assert.deepEqual(c.keys(), ['a', 'b']);
+assert.equal(c.get('a'), 1);
+assert.deepEqual(c.keys(), ['b', 'a']);
+c.set('c', 3);
+assert.equal(c.has('b'), false);
+assert.equal(c.get('b'), undefined);
+assert.equal(c.size, 2);
+assert.equal(c.has('a'), true);
+assert.deepEqual(c.keys(), ['a', 'c']);
+c.set('d', 4);
+assert.deepEqual(c.keys(), ['c', 'd']);
+c.set('c', 30);
+assert.deepEqual(c.keys(), ['d', 'c']);
+assert.equal(c.get('c'), 30);
+assert.equal(c.delete('d'), true);
+assert.equal(c.delete('d'), false);
+assert.equal(c.size, 1);
+c.set('u', undefined);
+assert.equal(c.has('u'), true);

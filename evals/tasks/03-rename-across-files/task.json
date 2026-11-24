@@ -1,0 +1,4 @@
+{
+  "title": "Rename a function across several files",
+  "prompt": "Rename the function getUsr to getUser everywhere in this project (definition, imports, re-exports, callers and docs). Behaviour must not change and nothing may still be called getUsr."
+}

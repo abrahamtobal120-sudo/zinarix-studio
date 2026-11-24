@@ -2409,6 +2409,13 @@ export interface OmniApi {
     newWindow(): Promise<boolean>;
     /** Restarts into the update already downloaded (see the 'update' event). */
     installUpdate(): Promise<void>;
+    /** Writes an error of the interface to the app's log file (redacted there). */
+    logError(scope: string, text: string): Promise<void>;
+    /**
+     * Saves a diagnostic report (versions and the end of the log) where the user chooses.
+     * Returns the path, or null when cancelled.
+     */
+    exportDiagnostics(): Promise<string | null>;
     /** Absolute path of a File from a drag-and-drop event (Electron webUtils). */
     pathForFile(file: File): string;
     platform: string;
@@ -2992,6 +2999,8 @@ export const CHANNELS = [
   'app:interruptedRuns',
   'app:newWindow',
   'app:installUpdate',
+  'app:logError',
+  'app:exportDiagnostics',
   'license:status',
   'license:activate',
   'license:remove',

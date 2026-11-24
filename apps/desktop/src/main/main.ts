@@ -9,7 +9,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { homedir, release as osRelease, tmpdir } from 'node:os';
 import { mkdtemp, readFile, rm, stat as statAsync, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,6 +76,7 @@ import { licenseStatus, normalizeKey, parseLicense } from './license.js';
 import type { StoredLicense } from './license.js';
 import { LicenseIssuer } from './licenseIssuer.js';
 import { startUpdates } from './updates.js';
+import { diagnosticReport, initLog, logError, logInfo, logWarn } from './log.js';
 import { editionOf } from '../shared/edition.js';
 import { fetchRemote, latestRelease, newer } from './remote.js';
 import { PhoneRemote } from './phone.js';
@@ -229,6 +230,19 @@ protocol.registerSchemesAsPrivileged([
 
 // A separate data folder (OMNI_HOME: portable installs, tests) is a separate app instance.
 if (process.env.OMNI_HOME) app.setPath('userData', join(process.env.OMNI_HOME, 'electron'));
+// E1: failures are written to <userData>/logs/main.log (redacted, never sent anywhere), so a
+// crash leaves a trace the user can export. With these handlers a stray error in the main
+// process no longer opens Electron's raw error dialog: it is logged and the app keeps going.
+initLog(join(app.getPath('userData'), 'logs'));
+process.on('uncaughtException', (err) => logError('main:uncaughtException', err));
+process.on('unhandledRejection', (reason) => logError('main:unhandledRejection', reason));
+app.on('render-process-gone', (_e, wc, d) =>
+  logError('renderer:gone', `${d.reason} (exit ${d.exitCode})`, { url: wc.getURL().slice(0, 200) }),
+);
+app.on('child-process-gone', (_e, d) => {
+  if (d.reason !== 'clean-exit')
+    logWarn('child:gone', `${d.type} ${d.name ?? ''}: ${d.reason} (exit ${d.exitCode})`);
+});
 // A second launch hands its folder to the running app (see 'second-instance') and exits.
 const isPrimary = app.requestSingleInstanceLock();
 if (!isPrimary) app.exit(0);
@@ -2804,6 +2818,36 @@ function registerIpc(): void {
     return true;
   });
   handle('app:installUpdate', z.tuple([]), () => updates?.install());
+  // An error a panel of the interface caught (ErrorBoundary) or a stray one of the window.
+  handle('app:logError', z.tuple([z.string().max(60), z.string().max(16_000)]), (_w, scope, text) =>
+    logError(`renderer:${scope}`, text),
+  );
+  // "Exportar diagnóstico": versions and the end of the log, in a file the user chooses.
+  handle('app:exportDiagnostics', z.tuple([]), async (w) => {
+    const r = await dialog.showSaveDialog(w.win, {
+      defaultPath: join(
+        app.getPath('documents'),
+        `zinarix-diagnostico-${new Date().toISOString().slice(0, 10)}.txt`,
+      ),
+      filters: [{ name: 'Text', extensions: ['txt'] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    await writeFile(
+      r.filePath,
+      diagnosticReport({
+        app: `${APP_NAME} ${app.getVersion()}`,
+        edition: edition.channel,
+        packaged: String(app.isPackaged),
+        platform: `${process.platform} ${process.arch} ${osRelease()}`,
+        electron: process.versions.electron ?? '',
+        chrome: process.versions.chrome ?? '',
+        node: process.versions.node,
+        date: new Date().toISOString(),
+      }),
+      'utf8',
+    );
+    return r.filePath;
+  });
 
   handle('phone:status', z.tuple([]), (w) => {
     // A reloaded window learns again that the phone works on it.
@@ -5714,6 +5758,7 @@ app.whenReady().then(async () => {
   // WhatsApp control left on: its page opens out of sight and keeps listening.
   whatsapp.resume();
   // Installed copies update themselves from the GitHub releases (silently when offline).
+  logInfo('app', `started ${app.getVersion()} (${edition.channel})`);
   updates = startUpdates(edition.channel, (ev) => {
     for (const w of wins.values()) send(w, ev);
   });

@@ -124,7 +124,7 @@ final class OptionsViewController: UITableViewController {
     }
 
     private func askReset() {
-        let a = UIAlertController(title: T("reset_title"), message: T("reset_text"), preferredStyle: .alert)
+        let a = UIAlertController(title: T("reset_title"), message: T(Variante.independiente ? "reset_text_local" : "reset_text"), preferredStyle: .alert)
         a.addAction(UIAlertAction(title: T("cancel"), style: .cancel))
         a.addAction(UIAlertAction(title: T("opt_reset"), style: .destructive) { [weak self] _ in
             // The pairings live in the web storage of each computer's page.
@@ -132,6 +132,9 @@ final class OptionsViewController: UITableViewController {
                 ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
             ) {
                 Prefs.reset()
+                // The app on its own: the API keys and the chats (the project files stay).
+                Keys.deleteAll()
+                LocalStore.wipe()
                 Computers.forgetAll()
                 NotificationCenter.default.post(name: .computersChanged, object: nil)
                 let done = self?.onReset

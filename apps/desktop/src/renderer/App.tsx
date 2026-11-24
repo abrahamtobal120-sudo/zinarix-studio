@@ -9,6 +9,7 @@ import { Icon } from './components/Icon';
 import { comboFromEvent } from './keys';
 import { Modals } from './components/Modals';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
 import { MailPanel } from './components/MailPanel';
 import { WatchPanel } from './components/WatchPanel';
@@ -309,6 +310,8 @@ export function App() {
   const chatSplit = useStore((s) => Boolean(s.chatSplit));
   const chatList = useStore((s) => s.chatList);
   const noTabs = useStore((s) => s.tabs.length === 0);
+  // A dialog that failed is closed; opening another one shows it anew.
+  const modalKind = useStore((s) => s.modal?.kind ?? null);
   const [sideW, setSideW] = useState(initialSideWidth);
   const [chatW, setChatW] = useState(initialChatWidth);
   const [winW, setWinW] = useState(window.innerWidth);
@@ -544,10 +547,16 @@ export function App() {
     <div className={zen ? 'app zen' : 'app'}>
       <TitleBar />
       <div className="main-row">
-        {!zen && <ActivityBar />}
+        {!zen && (
+          <ErrorBoundary scope="activitybar" silent>
+            <ActivityBar />
+          </ErrorBoundary>
+        )}
         {design && (
           <div className="design-host">
-            <DesignPanel />
+            <ErrorBoundary scope="design">
+              <DesignPanel />
+            </ErrorBoundary>
           </div>
         )}
         {sideOn && !design && (!max || max === 'side') && (
@@ -556,47 +565,49 @@ export function App() {
               className="sidebar"
               style={max === 'side' ? { flex: 1, borderRight: 'none' } : { width: sideShown }}
             >
-              {sidebar === 'explorer' || sidebar === 'search' ? (
-                <Explorer />
-              ) : sidebar === 'git' ? (
-                <GitPanel />
-              ) : sidebar === 'run' ? (
-                <RunPanel />
-              ) : sidebar === 'debug' ? (
-                <DebugPanel />
-              ) : sidebar === 'testing' ? (
-                <TestExplorer />
-              ) : sidebar === 'docker' ? (
-                <DockerPanel />
-              ) : sidebar === 'hardware' ? (
-                <HardwarePanel />
-              ) : sidebar === 'mobile' ? (
-                <MobilePanel />
-              ) : sidebar === 'games' ? (
-                <GamesPanel />
-              ) : sidebar === 'cad' ? (
-                <CadPanel />
-              ) : sidebar === 'sketchup' ? (
-                <SketchupPanel />
-              ) : sidebar === 'graphics' ? (
-                <GraphicsPanel />
-              ) : sidebar === 'vercel' ? (
-                <VercelPanel />
-              ) : sidebar === 'supabase' ? (
-                <SupabasePanel />
-              ) : sidebar === 'gcloud' ? (
-                <GCloudPanel />
-              ) : sidebar === 'mail' ? (
-                <MailPanel />
-              ) : sidebar === 'watch' ? (
-                <WatchPanel />
-              ) : sidebar === 'automations' ? (
-                <AutomationsPanel />
-              ) : sidebar === 'apps' ? (
-                <AppsPanel />
-              ) : (
-                <SearchView />
-              )}
+              <ErrorBoundary scope={`sidebar:${sidebar}`} resetKey={sidebar}>
+                {sidebar === 'explorer' || sidebar === 'search' ? (
+                  <Explorer />
+                ) : sidebar === 'git' ? (
+                  <GitPanel />
+                ) : sidebar === 'run' ? (
+                  <RunPanel />
+                ) : sidebar === 'debug' ? (
+                  <DebugPanel />
+                ) : sidebar === 'testing' ? (
+                  <TestExplorer />
+                ) : sidebar === 'docker' ? (
+                  <DockerPanel />
+                ) : sidebar === 'hardware' ? (
+                  <HardwarePanel />
+                ) : sidebar === 'mobile' ? (
+                  <MobilePanel />
+                ) : sidebar === 'games' ? (
+                  <GamesPanel />
+                ) : sidebar === 'cad' ? (
+                  <CadPanel />
+                ) : sidebar === 'sketchup' ? (
+                  <SketchupPanel />
+                ) : sidebar === 'graphics' ? (
+                  <GraphicsPanel />
+                ) : sidebar === 'vercel' ? (
+                  <VercelPanel />
+                ) : sidebar === 'supabase' ? (
+                  <SupabasePanel />
+                ) : sidebar === 'gcloud' ? (
+                  <GCloudPanel />
+                ) : sidebar === 'mail' ? (
+                  <MailPanel />
+                ) : sidebar === 'watch' ? (
+                  <WatchPanel />
+                ) : sidebar === 'automations' ? (
+                  <AutomationsPanel />
+                ) : sidebar === 'apps' ? (
+                  <AppsPanel />
+                ) : (
+                  <SearchView />
+                )}
+              </ErrorBoundary>
             </aside>
             {!max && (
               <Sash
@@ -617,7 +628,9 @@ export function App() {
           }
           style={chatWide || max === 'side' || design ? { display: 'none' } : undefined}
         >
-          <EditorArea />
+          <ErrorBoundary scope="editor">
+            <EditorArea />
+          </ErrorBoundary>
           {terminalMounted && (
             <div
               style={{
@@ -653,7 +666,9 @@ export function App() {
                 }
                 className="panel-wrap"
               >
-                <TerminalPanel />
+                <ErrorBoundary scope="panel">
+                  <TerminalPanel />
+                </ErrorBoundary>
               </div>
             </div>
           )}
@@ -674,13 +689,25 @@ export function App() {
             display: chatOn && !max ? 'flex' : 'none',
           }}
         >
-          <ChatPanel />
+          <ErrorBoundary scope="chat">
+            <ChatPanel />
+          </ErrorBoundary>
         </aside>
       </div>
-      {!zen && <StatusBar />}
-      <Modals />
-      <VideoStudioHost />
-      <HelperBubble />
+      {!zen && (
+        <ErrorBoundary scope="statusbar" silent>
+          <StatusBar />
+        </ErrorBoundary>
+      )}
+      <ErrorBoundary scope="modals" silent resetKey={modalKind}>
+        <Modals />
+      </ErrorBoundary>
+      <ErrorBoundary scope="video" silent>
+        <VideoStudioHost />
+      </ErrorBoundary>
+      <ErrorBoundary scope="helper" silent>
+        <HelperBubble />
+      </ErrorBoundary>
       <ConfirmDialog />
       <div className="app-banners">
         <NoticeBanner />

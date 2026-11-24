@@ -22,13 +22,17 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
 }
 
 /// One window of the app. iPhone: the list of computers, then the panel on top of it.
-/// iPad: a side bar with the computers and the panel next to it; every window is its own
-/// session, so two computers (or two chats of the same one) can be side by side.
-final class SceneDelegate: UIResponder, UIWindowSceneDelegate, PanelDelegate, ComputersDelegate {
+/// iPad: Zinarix working on its own (LocalViewController), with a side bar to change to the
+/// panel of a computer; every window is its own session, so two chats (or two computers)
+/// can be side by side.
+final class SceneDelegate: UIResponder, UIWindowSceneDelegate, PanelDelegate, ComputersDelegate, LocalDelegate {
     var window: UIWindow?
 
     private let list = ComputersViewController()
     private let panel = PanelViewController()
+    /// Zinarix on this device (iPad only), made the first time it is shown.
+    private var local: LocalViewController?
+    private var showingLocal = false
     private var nav: UINavigationController?
     private var split: UISplitViewController?
 
@@ -64,7 +68,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, PanelDelegate, Co
         // A link that opened the app (universal link), else the last computer.
         let opened = connectionOptions.userActivities.compactMap { Link.parse($0.webpageURL?.absoluteString) }.first
         let last = Prefs.startList ? nil : Computers.load().first?.link
-        if let link = opened ?? last {
+        if let link = opened {
+            show(link, animated: false)
+        } else if Variante.independiente, split != nil, Prefs.local || last == nil {
+            showLocal(withList: Prefs.startList)
+        } else if let link = last {
             show(link, animated: false)
         } else if let s = split {
             s.preferredDisplayMode = .oneBesideSecondary
@@ -79,12 +87,32 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, PanelDelegate, Co
 
     private func show(_ link: Link, animated: Bool) {
         panel.open(link)
+        Prefs.local = false
         if let s = split {
+            if showingLocal {
+                s.setViewController(panel, for: .secondary)
+                showingLocal = false
+            }
             s.preferredDisplayMode = .secondaryOnly
             s.show(.secondary)
         } else if let n = nav, !n.viewControllers.contains(panel) {
             n.pushViewController(panel, animated: animated)
         }
+    }
+
+    /// Zinarix on this iPad, without a computer.
+    private func showLocal(withList: Bool = false) {
+        guard let s = split else { return }
+        Prefs.local = true
+        let vc = local ?? LocalViewController()
+        vc.delegate = self
+        local = vc
+        if !showingLocal {
+            s.setViewController(vc, for: .secondary)
+            showingLocal = true
+        }
+        s.preferredDisplayMode = withList ? .oneBesideSecondary : .secondaryOnly
+        s.show(.secondary)
     }
 
     private func showList() {
@@ -101,6 +129,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, PanelDelegate, Co
         let options = OptionsViewController()
         options.onReset = { [weak self] in
             self?.panel.close()
+            self?.local?.reset()
             self?.showList()
         }
         let n = UINavigationController(rootViewController: options)
@@ -123,6 +152,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate, PanelDelegate, Co
 
     func computersWantsOptions(_ list: ComputersViewController) {
         showOptions(from: window?.rootViewController ?? list)
+    }
+
+    func computersWantsLocal(_ list: ComputersViewController) {
+        showLocal()
+    }
+
+    func localWantsOptions(_ local: LocalViewController) {
+        showOptions(from: window?.rootViewController ?? local)
     }
 
     func panelWantsSetup(_ panel: PanelViewController) {

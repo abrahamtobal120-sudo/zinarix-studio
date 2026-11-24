@@ -1,0 +1,4 @@
+{
+  "title": "Fix a comparison bug (strings compared as numbers)",
+  "prompt": "compare() in src/semver.mjs is wrong: compare('1.10.0', '1.9.0') returns -1 but must return 1. Also a pre-release such as 1.0.0-beta must sort before its release 1.0.0. Fix it; sort() must then order versions correctly."
+}

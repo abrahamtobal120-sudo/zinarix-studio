@@ -233,6 +233,14 @@ function baseCommands(): Command[] {
         getState().workspace ? setState({ modal: { kind: 'publish' } }) : toast(t('noFolder')),
     },
     {
+      id: 'app.exportDiagnostics',
+      label: `${t('exportDiagnostics')}…`,
+      run: async () => {
+        const path = await api().app.exportDiagnostics();
+        if (path) toast(t('diagnosticsSaved', { path }));
+      },
+    },
+    {
       id: 'app.settings',
       label: `${t('settings')}…`,
       keys: `${mod}+,`,

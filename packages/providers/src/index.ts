@@ -18,7 +18,7 @@ export * from './sse.js';
 export * from './models.js';
 export { openAiCompatible, toOpenAiMessages, normalizeStop } from './adapters/openai-compatible.js';
 export { openAiResponses, toResponsesInput } from './adapters/openai-responses.js';
-export { anthropic, toAnthropic } from './adapters/anthropic.js';
+export { anthropic, toAnthropic, withCacheBreakpoints } from './adapters/anthropic.js';
 export * from './anthropicRules.js';
 export { awsBedrock, parseAwsCredential, sigV4Headers } from './adapters/aws-bedrock.js';
 export { ibmWatsonx, clearWatsonxTokenCache } from './adapters/ibm-watsonx.js';

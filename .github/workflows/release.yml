@@ -3,7 +3,7 @@ name: Release
 # Push a tag like v0.3.0 to build installers for Windows, macOS and Linux
 # and attach them to a GitHub release.
 #
-# Flow: create-release (draft) -> build x3 (upload to the draft) -> publish (SHA256SUMS +
+# Flow: ci (must pass) -> create-release (draft) -> build x3 (upload to the draft) -> publish (SHA256SUMS +
 # make the release public). The release stays a draft until every installer is uploaded,
 # so `releases/latest`, the website and install.sh / install.ps1 never see a release
 # without assets, and installers.yml (on: release: published) runs against a complete one.
@@ -19,9 +19,18 @@ permissions:
   contents: read
 
 jobs:
+  # E2: nothing is built or published from a commit that does not pass CI. The whole CI
+  # workflow (build, types, lint, licenses, audit, tests on the three systems) runs on the
+  # tagged commit first; a red result stops the release before the draft is even created.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   # Create the release once, before the three builds run in parallel; otherwise each
   # build races to create its own release for the same tag.
   create-release:
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: write

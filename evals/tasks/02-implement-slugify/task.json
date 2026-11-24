@@ -1,0 +1,4 @@
+{
+  "title": "Implement a function from a written spec",
+  "prompt": "Implement slugify() in src/slug.mjs following the rules in docs/slug.md."
+}

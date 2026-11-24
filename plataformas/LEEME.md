@@ -4,7 +4,7 @@ Una carpeta por plataforma. Cada una tiene su `LEEME.md` con **cómo firmar y pu
 
 | Carpeta                        | Qué es                                                  | Dónde está el código                           | Se compila sola en GitHub           |
 | ------------------------------ | ------------------------------------------------------- | ---------------------------------------------- | ----------------------------------- |
-| [`ipad/`](ipad/LEEME.md)       | **Zinarix Studio para iPad** (App Store)                | `plataformas/ipad` + `plataformas/ios-comun`   | Sí: `.github/workflows/ios.yml`     |
+| [`ipad/`](ipad/LEEME.md)       | **Zinarix Studio para iPad**, sesión independiente      | `plataformas/ipad` + `plataformas/ios-comun`   | Sí: `.github/workflows/ios.yml`     |
 | [`iphone/`](iphone/LEEME.md)   | **Zinarix Remote para iPhone** (App Store)              | `plataformas/iphone` + `plataformas/ios-comun` | Sí: `.github/workflows/ios.yml`     |
 | [`android/`](android/LEEME.md) | **Zinarix Remote para Android** (APK y Google Play)     | `apps/remote-android`                          | Sí: `.github/workflows/release.yml` |
 | [`mac/`](mac/LEEME.md)         | **Zinarix Studio para Mac** (.dmg)                      | `apps/desktop`                                 | Sí: `.github/workflows/release.yml` |

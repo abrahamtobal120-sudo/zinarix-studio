@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="dark" />
+    <title>Zinarix Studio</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="side">
+        <div class="side-head">
+          <button id="newChat" class="btn primary wide"></button>
+        </div>
+        <div id="chats" class="chats"></div>
+        <div class="side-foot">
+          <button id="openFiles" class="btn ghost wide"></button>
+          <button id="openSettings" class="btn ghost wide"></button>
+        </div>
+      </aside>
+      <div id="shade"></div>
+
+      <main id="main">
+        <header id="top">
+          <button id="toggleSide" class="icon" aria-label="menu">&#9776;</button>
+          <div id="title" class="title"></div>
+          <button id="modelBtn" class="chip"></button>
+          <label class="chip check"
+            ><input id="agent" type="checkbox" /><span id="agentLabel"></span
+          ></label>
+          <button id="filesBtn" class="icon" aria-label="files">&#128193;</button>
+        </header>
+        <div id="msgs"></div>
+        <footer id="composer">
+          <textarea id="input" rows="1" autocapitalize="sentences"></textarea>
+          <button id="send" class="btn primary"></button>
+        </footer>
+      </main>
+
+      <section id="files" hidden>
+        <header class="files-head">
+          <div id="crumbs" class="crumbs"></div>
+          <button id="newFile" class="icon" aria-label="new file">&#65291;</button>
+          <button id="newFolder" class="icon" aria-label="new folder">&#128194;</button>
+          <button id="closeFiles" class="icon" aria-label="close">&#10005;</button>
+        </header>
+        <div id="entries" class="entries"></div>
+        <div id="editor" class="editor" hidden>
+          <div class="editor-head">
+            <div id="editorName" class="title"></div>
+            <button id="editorSave" class="btn primary small"></button>
+            <button id="editorDelete" class="btn danger small"></button>
+            <button id="editorClose" class="icon" aria-label="close">&#10005;</button>
+          </div>
+          <textarea
+            id="editorText"
+            spellcheck="false"
+            autocapitalize="off"
+            autocomplete="off"
+            autocorrect="off"
+          ></textarea>
+        </div>
+      </section>
+    </div>
+
+    <dialog id="settings" class="sheet">
+      <div class="sheet-head">
+        <h2 id="settingsTitle"></h2>
+        <button class="icon" data-close aria-label="close">&#10005;</button>
+      </div>
+      <p id="settingsHint" class="hint"></p>
+      <div id="providers"></div>
+      <p id="settingsFoot" class="hint"></p>
+    </dialog>
+
+    <dialog id="models" class="sheet">
+      <div class="sheet-head">
+        <h2 id="modelsTitle"></h2>
+        <button class="icon" data-close aria-label="close">&#10005;</button>
+      </div>
+      <input id="modelSearch" type="search" autocapitalize="off" autocomplete="off" />
+      <div id="modelList" class="model-list"></div>
+    </dialog>
+
+    <dialog id="ask" class="sheet small">
+      <h2 id="askTitle"></h2>
+      <p id="askText" class="hint"></p>
+      <input id="askInput" type="text" autocapitalize="off" autocomplete="off" autocorrect="off" />
+      <div class="row end">
+        <button id="askCancel" class="btn ghost"></button>
+        <button id="askOk" class="btn primary"></button>
+      </div>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>

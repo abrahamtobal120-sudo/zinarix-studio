@@ -215,3 +215,55 @@ describe('deviceName', () => {
     expect(deviceName('Mozilla/5.0 (Linux; Android 13; SM-S911B) SamsungBrowser/23.0 Chrome/115')).toBe('SM-S911B · Samsung Internet');
   });
 });
+
+describe.skipIf(!ip)('D1: a stolen phone token is worth less', () => {
+  async function paired(dir: string, tools?: Parameters<typeof make>[1]) {
+    const a = make(dir, tools);
+    const st = await a.start();
+    const base = st.url!;
+    const pair = await get(`${base}/api/pair`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: st.pin }),
+    });
+    const { token } = (await pair.json()) as { token: string };
+    return { a, base, auth: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
+  }
+
+  it('gives no terminal until it is turned on at the computer', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zx-phone-'));
+    dirs.push(dir);
+    const terminals = { list: async () => [] } as never;
+    const { a, base, auth } = await paired(dir, { terminals });
+    const caps = () => get(`${base}/api/caps`, { headers: auth }).then((r) => r.json());
+    expect(((await caps()) as { terminal: boolean }).terminal).toBe(false);
+    a.setAllow({ files: true, terminal: true, git: true });
+    expect(((await caps()) as { terminal: boolean }).terminal).toBe(true);
+  });
+
+  it('cannot switch a chat to full access', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zx-phone-'));
+    dirs.push(dir);
+    const { base, auth } = await paired(dir);
+    const act = (body: unknown) =>
+      get(`${base}/api/action`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
+    expect((await act({ kind: 'mode', mode: 'full' })).status).toBe(403);
+    expect((await act({ kind: 'mode', mode: 'agent' })).status).toBe(200);
+  });
+
+  it('forgets a phone that was not used for 30 days', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zx-phone-'));
+    dirs.push(dir);
+    const { a, base, auth } = await paired(dir);
+    expect((await get(`${base}/api/me`, { headers: auth })).status).toBe(200);
+    const now = Date.now();
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(now + 31 * 24 * 60 * 60 * 1000);
+    try {
+      expect((await get(`${base}/api/me`, { headers: auth })).status).toBe(401);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(a.status().phones).toBe(0);
+    expect((await get(`${base}/api/me`, { headers: auth })).status).toBe(401);
+  });
+});

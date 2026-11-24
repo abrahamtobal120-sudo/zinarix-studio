@@ -96,8 +96,55 @@ export function toAnthropic(messages: ChatMessage[]): {
   return { system: system.length ? system.join('\n\n') : undefined, messages: out };
 }
 
+const CACHE = { cache_control: { type: 'ephemeral' } };
+/** Blocks that cannot carry a cache breakpoint. */
+const NO_CACHE = new Set(['thinking', 'redacted_thinking']);
+
+/**
+ * A1: prompt caching. The prompt is cached as a prefix (tools, then system, then messages),
+ * so two breakpoints cover an agent run: one at the end of the system prompt (tools + system,
+ * the same on every step) and one on the last block of the conversation (each step then
+ * reads everything the previous step sent, at about a tenth of the price, and only pays in
+ * full for what is new). A prefix shorter than the model's minimum is simply not cached.
+ * The blocks are copied: the history (and the raw assistant turns kept in it) is not touched.
+ */
+export function withCacheBreakpoints(
+  system: string | undefined,
+  messages: AnthropicMessage[],
+  tools: Block[] | undefined,
+): { system?: Block[]; messages: AnthropicMessage[]; tools?: Block[] } {
+  const out: AnthropicMessage[] = [...messages];
+  const last = out[out.length - 1];
+  const tail = last?.content[last.content.length - 1];
+  const emptyText = tail?.type === 'text' && !String(tail.text ?? '').trim();
+  if (last && tail && !NO_CACHE.has(String(tail.type)) && !emptyText)
+    out[out.length - 1] = {
+      ...last,
+      content: [...last.content.slice(0, -1), { ...tail, ...CACHE }],
+    };
+  return {
+    messages: out,
+    ...(system ? { system: [{ type: 'text', text: system, ...CACHE }] } : {}),
+    // Without a system prompt the tools still get their own breakpoint.
+    ...(tools?.length
+      ? {
+          tools: system ? tools : [...tools.slice(0, -1), { ...tools[tools.length - 1], ...CACHE }],
+        }
+      : {}),
+  };
+}
+
 function buildBody(req: ChatRequest, maxTokens: number): Record<string, unknown> {
-  const { system, messages } = toAnthropic(req.messages);
+  const plain = toAnthropic(req.messages);
+  const { system, messages, tools } = withCacheBreakpoints(
+    plain.system,
+    plain.messages,
+    req.tools?.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.parameters,
+    })),
+  );
   // Only what this Claude model accepts (anthropicRules.ts): sampling knobs it rejects are
   // left out, older models get budget_tokens thinking, and the schema is made acceptable.
   const knobs = claudeKnobs(req.model, req, maxTokens);
@@ -124,15 +171,7 @@ function buildBody(req: ChatRequest, maxTokens: number): Record<string, unknown>
           },
         }
       : {}),
-    ...(req.tools?.length
-      ? {
-          tools: req.tools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            input_schema: t.parameters,
-          })),
-        }
-      : {}),
+    ...(tools ? { tools } : {}),
   };
 }
 

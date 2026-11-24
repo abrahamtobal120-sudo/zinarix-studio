@@ -339,7 +339,11 @@ describe('anthropic', () => {
     expect(req.headers['x-api-key']).toBe('sk-ant-test-0000000000000000');
     expect(req.headers['anthropic-version']).toBe('2023-06-01');
     const body = JSON.parse(req.body);
-    expect(body.system).toBe('sé breve');
+    // A1: the system prompt carries the cache breakpoint that also covers the tools.
+    expect(body.system).toEqual([
+      { type: 'text', text: 'sé breve', cache_control: { type: 'ephemeral' } },
+    ]);
+    expect(body.messages.at(-1).content.at(-1).cache_control).toEqual({ type: 'ephemeral' });
     expect(body.max_tokens).toBeGreaterThan(0);
     expect(body.tools[0].input_schema).toEqual({ type: 'object' });
   });
@@ -827,5 +831,42 @@ describe('provider-native replay (tool loops keep reasoning)', () => {
     expect(contents[2]!.parts[0]).toEqual({
       functionResponse: { name: 'ls', response: { content: 'ok' } },
     });
+  });
+});
+
+describe('A1: Anthropic prompt caching', () => {
+  it('marks the end of the system prompt and of the conversation, without touching the input', async () => {
+    const { withCacheBreakpoints } = await import('../src/adapters/anthropic.js');
+    const raw = [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }];
+    const messages = [
+      { role: 'user' as const, content: [{ type: 'text', text: 'hola' }] },
+      {
+        role: 'assistant' as const,
+        content: [{ type: 'tool_use', id: 't1', name: 'x', input: {} }],
+      },
+      { role: 'user' as const, content: raw },
+    ];
+    const tools = [{ name: 'a' }, { name: 'b' }];
+    const out = withCacheBreakpoints('sys', messages, tools);
+    const mark = { type: 'ephemeral' };
+    expect(out.system).toEqual([{ type: 'text', text: 'sys', cache_control: mark }]);
+    expect(out.messages[2]!.content[0]).toEqual({ ...raw[0], cache_control: mark });
+    expect(out.messages[0]).toBe(messages[0]);
+    expect(raw[0]).not.toHaveProperty('cache_control');
+    // With a system prompt its breakpoint already covers the tools.
+    expect(out.tools).toBe(tools);
+    expect(JSON.stringify(out).match(/cache_control/g)).toHaveLength(2);
+  });
+
+  it('puts the breakpoint on the last tool when there is no system prompt, never on thinking', async () => {
+    const { withCacheBreakpoints } = await import('../src/adapters/anthropic.js');
+    const out = withCacheBreakpoints(
+      undefined,
+      [{ role: 'assistant', content: [{ type: 'thinking', thinking: '', signature: 's' }] }],
+      [{ name: 'a' }, { name: 'b' }],
+    );
+    expect(out.system).toBeUndefined();
+    expect(out.tools).toEqual([{ name: 'a' }, { name: 'b', cache_control: { type: 'ephemeral' } }]);
+    expect(out.messages[0]!.content[0]).not.toHaveProperty('cache_control');
   });
 });

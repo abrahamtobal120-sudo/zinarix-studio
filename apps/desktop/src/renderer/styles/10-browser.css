@@ -164,7 +164,7 @@
   border-radius: var(--radius-sm, 6px);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--fg);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .browser-frame {
   flex: 1;

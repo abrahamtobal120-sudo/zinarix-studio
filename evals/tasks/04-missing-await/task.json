@@ -1,0 +1,4 @@
+{
+  "title": "Fix an async bug (missing await, swallowed error)",
+  "prompt": "createOrder() in src/service.mjs returns an order whose id is undefined, and when saving fails the caller never finds out. Fix it: the returned order must have its id, and a failed save must reject."
+}

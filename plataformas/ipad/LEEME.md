@@ -1,26 +1,34 @@
 # Zinarix Studio para iPad
 
-Zinarix Studio en el iPad, como **otra sesión** de tu computadora: el iPad muestra y maneja el Zinarix de tu PC o Mac (chats, agentes, aprobaciones, archivos, terminal, Git).
+Zinarix Studio en el iPad, como **sesión independiente**: el iPad trabaja solo, sin computadora. Tiene sus propios chats, sus propias llaves de IA y su propia carpeta de proyectos. Además puede conectarse a tu PC o Mac cuando quieras (panel a distancia).
 
 - **Nombre:** Zinarix Studio
 - **Identificador (bundle ID):** `com.zinarix.studio.ipad`
 - **Funciona en:** solo iPad, con iPadOS 16 o más nuevo
-- **Código:** esta carpeta + [`../ios-comun`](../ios-comun/LEEME.md)
+- **Código:** esta carpeta (`Web/` es la app independiente) + [`../ios-comun`](../ios-comun/LEEME.md)
 - **Compilación automática:** `.github/workflows/ios.yml`
 
-## Qué tiene de especial en iPad
+## Qué hace el iPad solo (sin computadora)
 
-- **Barra lateral** con tus computadoras y el panel al lado.
-- **Varias ventanas** (botón de ventanas, o ⌘N con teclado): dos computadoras, o dos chats de la misma, lado a lado con Split View o Stage Manager. Cada ventana es su propia sesión.
-- Atajos de teclado: **⌘R** recargar, **⌘N** ventana nueva.
-- El chat se centra con un ancho cómodo en pantallas grandes.
-- Escanear el QR, bloqueo con Face ID / Touch ID, avisos y reconexión automática, igual que en iPhone.
+Al abrir la app entras a **Zinarix en este iPad**:
+
+- **Chats con la IA** que tú conectes: OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI, Together, o tu propio servidor (Ollama, LM Studio) en tu red. Toca **Modelos y llaves**, pega tu llave de API y elige el modelo. La lista de modelos se baja del proveedor, así siempre está al día.
+- **Modo Agente**: la IA lee, busca, crea y cambia archivos de tu carpeta de proyectos. Cada escritura te pide permiso (Permitir / Permitir siempre en este chat / Rechazar).
+- **Archivos**: panel con tus carpetas y un editor de texto. La misma carpeta se ve en la app **Archivos → En mi iPad → Zinarix Studio**, así puedes meter y sacar proyectos.
+- **Varias ventanas** (botón de ventanas, o ⌘N): dos chats lado a lado con Split View o Stage Manager. Cada ventana es su propia sesión.
+- **Privacidad**: las llaves se guardan en el llavero del iPad y solo se mandan a su proveedor. Los chats y archivos se quedan en el iPad. Zinarix no tiene servidores en medio.
+- Bloqueo con Face ID / Touch ID (Opciones).
+
+## Conectarse a tu computadora (opcional)
+
+En la barra lateral (botón de arriba a la izquierda) están tus computadoras. Escanea el QR de Configuración → Celular y el iPad maneja el Zinarix de tu PC o Mac: ahí sí hay terminal, Git y todo lo demás. Para volver, toca **Zinarix en este iPad**.
 
 ## Lo que debes saber (límites)
 
-- **El trabajo lo hace tu computadora.** Tiene que estar prendida, con Zinarix Studio abierto y el control a distancia encendido (Configuración → Celular). El iPad es la pantalla y el teclado.
-- El Zinarix Studio de escritorio completo (Electron) no puede instalarse en un iPad: Apple no permite apps que abran una terminal real o instalen programas. Por eso esta app se conecta a tu computadora.
-- "Controlar la compu" y el navegador integrado se quedan solo en la computadora.
+- **No hay terminal en el iPad.** Apple no permite apps que ejecuten programas o instalen cosas. La IA puede escribir el código, pero no correrlo. Para correrlo, conéctate a tu computadora.
+- Tampoco están "Controlar la compu", el navegador integrado, Git ni los estudios (video, 3D): esos viven en la app de escritorio.
+- Los chats del iPad y los de la computadora son separados (todavía no se sincronizan).
+- Usar la IA cuesta lo que cobre tu proveedor por tu llave. Un servidor propio (Ollama) es gratis.
 - La app de escritorio **no se cambió**.
 
 ---
@@ -80,7 +88,7 @@ El mismo workflow sube las dos apps (iPhone y iPad). Si una todavía no tiene su
 
 1. App Store Connect → tu app → **TestFlight** → **Internal Testing** → crea un grupo y agrégate.
 2. En el iPad instala **TestFlight** desde la App Store y entra con tu Apple ID.
-3. Instala Zinarix Studio. En la computadora abre Configuración → Celular y escanea el QR desde el iPad.
+3. Instala Zinarix Studio. Toca **Modelos y llaves**, pega una llave de API y manda un mensaje. Prueba también el modo Agente («crea un archivo hola.txt») y el panel de Archivos.
 
 ### Paso 9. Mandarla a la App Store
 
@@ -88,12 +96,12 @@ App Store Connect → tu app → **Distribution**:
 
 1. **Capturas** de iPad de 13" (2064 × 2752 px, o 2048 × 2732 px). Tómalas en tu iPad desde TestFlight.
 2. **Descripción**, palabras clave, URL de soporte y categoría (**Developer Tools**).
-3. **App Privacy** → **Data Not Collected**, con la URL de tu política de privacidad.
+3. **App Privacy** → **Data Not Collected** (tú no recibes ningún dato: los mensajes van directo del iPad al proveedor de IA que el usuario eligió), con la URL de tu política de privacidad. En la política explica eso mismo.
 4. Elige la **compilación**.
-5. **App Review Information → Notes** (muy importante, el revisor no tiene tu computadora):
-   - explica que la app es la pantalla de Zinarix Studio (programa de escritorio gratis, con la liga de descarga);
-   - deja **un enlace de prueba que funcione** durante la revisión (una computadora con Zinarix abierto: el enlace de "Desde cualquier lugar" y el PIN);
-   - o un video corto de la app funcionando.
+5. **App Review Information → Notes** (muy importante, el revisor no tiene tus llaves):
+   - explica que la app funciona sola y que cada usuario pone su propia llave de API (no hay cuentas ni compras dentro de la app);
+   - deja **una llave de API de prueba** con poco saldo (por ejemplo de OpenRouter o Groq, que tiene plan gratis) y di en qué proveedor pegarla; bórrala cuando aprueben la app;
+   - la conexión a una computadora es opcional; si quieres que la prueben, deja también un enlace de "Desde cualquier lugar" y el PIN.
 6. **Add for Review** → **Submit**. Tarda normalmente de 1 a 3 días.
 
 ### Paso 10. Actualizaciones

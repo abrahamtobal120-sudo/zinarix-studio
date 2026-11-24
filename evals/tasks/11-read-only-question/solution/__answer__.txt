@@ -1,0 +1,1 @@
+recordEvent, defined in src/infra/journal.mjs

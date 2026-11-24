@@ -1,0 +1,4 @@
+{
+  "title": "Add a validated config option in code and in the config file",
+  "prompt": "Add a timeoutMs option to loadConfig() in src/config.mjs: its default is 5000, config.json can override it, and it must be a positive integer (otherwise loadConfig throws an Error whose message mentions timeoutMs). Also set timeoutMs to 8000 in config.json."
+}

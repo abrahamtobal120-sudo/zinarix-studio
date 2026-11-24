@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # release.yml runs this same workflow on the tag before it builds anything (E2).
+  workflow_call:
 
 permissions:
   contents: read
@@ -46,6 +48,14 @@ jobs:
         if: runner.os == 'Linux'
         run: pnpm audit:deps
       - run: pnpm vitest run --coverage
+      # The agent bench (evals/) stays usable: every task fails as shipped and passes with its
+      # reference solution. No model is called here.
+      - run: pnpm evals:check
+      # End to end: the built app opens on a sample project, shows a file in the editor, writes
+      # its log and quits by itself. Windows only for now (the one platform it was verified on).
+      - name: End-to-end (Windows)
+        if: runner.os == 'Windows'
+        run: pnpm e2e
       # The local launcher (pnpm desktop:install) installs and uninstalls cleanly on Windows.
       - name: Local launcher (Windows)
         if: runner.os == 'Windows'
