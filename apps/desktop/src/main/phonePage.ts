@@ -17,7 +17,8 @@ const TEXT = {
     pairWhere: 'Configuración → Celular',
     pin: 'PIN',
     connect: 'Conectar',
-    pairWait: 'Si el PIN es correcto, acepta la conexión en la ventana de Zinarix de la computadora…',
+    pairWait:
+      'Si el PIN es correcto, acepta la conexión en la ventana de Zinarix de la computadora…',
     ask: 'Pregunta o pide un cambio…',
     message: 'Mensaje',
     agent: 'Agente',
@@ -41,8 +42,10 @@ const TEXT = {
     pull: 'Pull',
     close: 'Cerrar',
     loading: 'Cargando…',
-    noRepos: 'No hay repositorios todavía. Abre o clona uno en Zinarix Studio en la computadora y aparecerá aquí.',
-    reposHint: '"Abrir" lo abre en una ventana nueva (como en la computadora); "Aquí" lo cambia en la ventana actual.',
+    noRepos:
+      'No hay repositorios todavía. Abre o clona uno en Zinarix Studio en la computadora y aparecerá aquí.',
+    reposHint:
+      '"Abrir" lo abre en una ventana nueva (como en la computadora); "Aquí" lo cambia en la ventana actual.',
     isOpen: 'Abierto',
     changes: 'cambios',
     pulled: 'Actualizado',
@@ -54,10 +57,13 @@ const TEXT = {
     modeAgent: 'Agente',
     modeAgentHint: 'Lee, edita y usa la terminal; cada cambio pide tu aprobación.',
     modeAuto: 'Auto-aprobar',
-    modeAutoHint: 'Edita archivos del proyecto sin preguntar; los comandos siguen pidiendo permiso.',
+    modeAutoHint:
+      'Edita archivos del proyecto sin preguntar; los comandos siguen pidiendo permiso.',
     modeFull: 'Acceso total',
-    modeFullHint: 'Archivos y comandos sin aprobación. Lo que sale de la computadora sigue preguntando.',
-    fullConfirm: '¿Activar acceso total? La IA editará archivos y ejecutará comandos sin pedirte permiso.',
+    modeFullHint:
+      'Archivos y comandos sin aprobación. Lo que sale de la computadora sigue preguntando.',
+    fullConfirm:
+      '¿Activar acceso total? La IA editará archivos y ejecutará comandos sin pedirte permiso.',
     models: 'Modelos de IA',
     model: 'Modelo',
     modelDefault: 'Predeterminado de la app',
@@ -76,7 +82,8 @@ const TEXT = {
     inChat: 'En este chat',
     local: 'Local',
     free: 'Gratis',
-    noModels: 'No hay modelos conectados. Conecta un proveedor en Zinarix Studio (Configuración → Modelos) o abre Ollama / LM Studio.',
+    noModels:
+      'No hay modelos conectados. Conecta un proveedor en Zinarix Studio (Configuración → Modelos) o abre Ollama / LM Studio.',
     noMatch: 'Ningún modelo coincide.',
     modelsCount: 'modelos',
     ctx: 'contexto',
@@ -106,14 +113,17 @@ const TEXT = {
     save: 'Guardar',
     saved: 'Guardado',
     install: 'Instalar como app',
-    installHint: 'Para tenerlo como app con el mismo enlace: menú del navegador → "Agregar a pantalla de inicio".',
+    installHint:
+      'Para tenerlo como app con el mismo enlace: menú del navegador → "Agregar a pantalla de inicio".',
     unpairMe: 'Desconectar este celular',
     changeComputer: 'Cambiar de computadora',
     appOptions: 'Opciones de la app',
     getApp: 'Descargar la app para Android',
-    getAppHint: 'Con la app recibes avisos aunque el celular esté bloqueado, dictas por voz y el enlace se abre solo desde el QR.',
+    getAppHint:
+      'Con la app recibes avisos aunque el celular esté bloqueado, dictas por voz y el enlace se abre solo desde el QR.',
     unpairConfirm: '¿Desconectar este celular? Tendrás que escribir el PIN otra vez.',
-    stays: 'Este celular queda conectado aunque cierres Zinarix: cuando lo abras otra vez se reconecta solo, con el mismo enlace.',
+    stays:
+      'Este celular queda conectado aunque cierres Zinarix: cuando lo abras otra vez se reconecta solo, con el mismo enlace.',
     voice: 'Dictar',
     listening: 'Escuchando… toca otra vez para terminar',
     searchChats: 'Buscar chat…',
@@ -171,8 +181,10 @@ const TEXT = {
     pull: 'Pull',
     close: 'Close',
     loading: 'Loading…',
-    noRepos: 'No repositories yet. Open or clone one in Zinarix Studio on the computer and it will show up here.',
-    reposHint: '"Open" opens it in a new window (like on the computer); "Here" swaps the folder of the current window.',
+    noRepos:
+      'No repositories yet. Open or clone one in Zinarix Studio on the computer and it will show up here.',
+    reposHint:
+      '"Open" opens it in a new window (like on the computer); "Here" swaps the folder of the current window.',
     isOpen: 'Open',
     changes: 'changes',
     pulled: 'Updated',
@@ -206,7 +218,8 @@ const TEXT = {
     inChat: 'In this chat',
     local: 'Local',
     free: 'Free',
-    noModels: 'No models connected. Connect a provider in Zinarix Studio (Settings → Models) or start Ollama / LM Studio.',
+    noModels:
+      'No models connected. Connect a provider in Zinarix Studio (Settings → Models) or start Ollama / LM Studio.',
     noMatch: 'No model matches.',
     modelsCount: 'models',
     ctx: 'context',
@@ -241,9 +254,11 @@ const TEXT = {
     changeComputer: 'Change computer',
     appOptions: 'App options',
     getApp: 'Get the Android app',
-    getAppHint: 'With the app you get alerts even with the phone locked, dictate by voice, and the QR link opens straight in it.',
+    getAppHint:
+      'With the app you get alerts even with the phone locked, dictate by voice, and the QR link opens straight in it.',
     unpairConfirm: 'Disconnect this phone? You will have to type the PIN again.',
-    stays: 'This phone stays connected even if you close Zinarix: when it opens again it reconnects by itself, with the same link.',
+    stays:
+      'This phone stays connected even if you close Zinarix: when it opens again it reconnects by itself, with the same link.',
     voice: 'Dictate',
     listening: 'Listening… tap again to finish',
     searchChats: 'Search chats…',
@@ -287,7 +302,9 @@ const esc = (s: string) =>
 export function phonePage(
   nonce: string,
   lang: PhoneLang = 'es',
-  opts: { /** Path of the Android app on this computer, when Zinarix ships it. */ localApk?: string } = {},
+  opts: {
+    /** Path of the Android app on this computer, when Zinarix ships it. */ localApk?: string;
+  } = {},
 ): string {
   const T = {
     ...(TEXT[lang] ?? TEXT.es),

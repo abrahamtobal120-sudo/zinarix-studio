@@ -96,7 +96,8 @@ export function openAiEditForm(req: MediaRequest): {
   for (const [k, v] of Object.entries(body)) if (v !== undefined) fields[k] = String(v);
   const files = [];
   const pic = req.edit?.image ?? req.reference;
-  if (pic) files.push({ field: 'image[]', name: `image.${pic.ext}`, type: pic.mediaType, data: pic.data });
+  if (pic)
+    files.push({ field: 'image[]', name: `image.${pic.ext}`, type: pic.mediaType, data: pic.data });
   if (req.edit?.mask)
     files.push({ field: 'mask', name: 'mask.png', type: 'image/png', data: req.edit.mask.data });
   return { fields, files, warnings };

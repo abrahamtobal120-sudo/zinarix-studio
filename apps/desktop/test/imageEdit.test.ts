@@ -31,8 +31,9 @@ function grid(w: number, h: number): Rgba {
     for (let x = 0; x < w; x++) data.set([x, y, x + y, 255], (y * w + x) * 4);
   return { width: w, height: h, data };
 }
-const px = (img: Rgba, x: number, y: number) =>
-  [...img.data.subarray((y * img.width + x) * 4, (y * img.width + x) * 4 + 4)];
+const px = (img: Rgba, x: number, y: number) => [
+  ...img.data.subarray((y * img.width + x) * 4, (y * img.width + x) * 4 + 4),
+];
 const solid = (w: number, h: number, c: number[]): Rgba => {
   const data = new Uint8ClampedArray(w * h * 4);
   for (let i = 0; i < data.length; i += 4) data.set(c, i);
@@ -72,7 +73,8 @@ describe('image editor geometry', () => {
     expect(px(big, 4, 3)).toEqual([200, 100, 50, 255]);
     // Alternating black/white columns shrunk to one pixel per pair: mid grey, not black or white.
     const stripes = solid(8, 2, [0, 0, 0, 255]);
-    for (let x = 1; x < 8; x += 2) for (let y = 0; y < 2; y++) stripes.data.set([255, 255, 255, 255], (y * 8 + x) * 4);
+    for (let x = 1; x < 8; x += 2)
+      for (let y = 0; y < 2; y++) stripes.data.set([255, 255, 255, 255], (y * 8 + x) * 4);
     const small = resizeImage(stripes, 4, 1);
     expect(px(small, 1, 0)[0]).toBeGreaterThan(90);
     expect(px(small, 1, 0)[0]).toBeLessThan(165);
@@ -179,14 +181,23 @@ describe('image edit arguments', () => {
       200,
       100,
     );
-    expect(e).toEqual({ rotate: 270, flipH: true, crop: { x: 0, y: 0, w: 100, h: 10 }, brightness: 100 });
+    expect(e).toEqual({
+      rotate: 270,
+      flipH: true,
+      crop: { x: 0, y: 0, w: 100, h: 10 },
+      brightness: 100,
+    });
     // A crop of the whole picture and a resize to the same size are dropped.
-    expect(cleanEdit({ crop: { x: 0, y: 0, w: 20, h: 10 }, resize: { w: 20, h: 10 } }, 20, 10)).toEqual({});
+    expect(
+      cleanEdit({ crop: { x: 0, y: 0, w: 20, h: 10 }, resize: { w: 20, h: 10 } }, 20, 10),
+    ).toEqual({});
     expect(cleanEdit(null, 1, 1)).toEqual({});
   });
 
   it('describes, names and picks formats', () => {
-    expect(describeEdit({ rotate: 90, brightness: 20, blur: 3 })).toBe('girar 90°, brillo +20, desenfoque 3');
+    expect(describeEdit({ rotate: 90, brightness: 20, blur: 3 })).toBe(
+      'girar 90°, brillo +20, desenfoque 3',
+    );
     expect(describeEdit({})).toBe('sin cambios');
     expect(editedName('fotos/gato.jpg')).toBe('fotos/gato-editada.jpg');
     expect(editedName('fotos/gato.jpg', 'webp')).toBe('fotos/gato-editada.webp');
@@ -219,14 +230,17 @@ describe('image editor: straighten, light, colour and auto', () => {
     const a = orient(applyEdit(g, e), 0, true);
     const b = applyEdit(g, f);
     let diff = 0;
-    for (let i = 0; i < a.data.length; i++) diff = Math.max(diff, Math.abs(a.data[i]! - b.data[i]!));
+    for (let i = 0; i < a.data.length; i++)
+      diff = Math.max(diff, Math.abs(a.data[i]! - b.data[i]!));
     expect(diff).toBeLessThanOrEqual(2);
     // A quarter turn keeps the same straighten.
     expect(rotateEdit(e, 30, 20, 1).straighten).toBe(6);
   });
 
   it('shadows lift only the dark, highlights only the bright', () => {
-    const dark = new Uint8ClampedArray([30, 30, 30, 255, 230, 230, 230, 255, 0, 0, 0, 255, 255, 255, 255, 255]);
+    const dark = new Uint8ClampedArray([
+      30, 30, 30, 255, 230, 230, 230, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+    ]);
     const a = new Uint8ClampedArray(dark);
     colorPixels(a, { shadows: 60 });
     expect(a[0]! - 30).toBeGreaterThan(10);

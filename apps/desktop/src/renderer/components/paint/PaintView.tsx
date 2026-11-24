@@ -80,14 +80,34 @@ interface Layer {
 
 type Step =
   | { kind: 'pixels'; layer: number; x: number; y: number; before: ImageData; after: ImageData }
-  | { kind: 'layers'; before: LayerMeta[]; after: LayerMeta[]; activeBefore: number; activeAfter: number };
+  | {
+      kind: 'layers';
+      before: LayerMeta[];
+      after: LayerMeta[];
+      activeBefore: number;
+      activeAfter: number;
+    };
 
 /** Layer list state (the canvases are shared, not copied). */
 type LayerMeta = Omit<Layer, never>;
 
 const SWATCHES = [
-  '#000000', '#ffffff', '#7f8c8d', '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c',
-  '#3498db', '#2c3e50', '#9b59b6', '#ff6fb5', '#8d6e63', '#ffe0bd', '#c0392b', '#16a085',
+  '#000000',
+  '#ffffff',
+  '#7f8c8d',
+  '#e74c3c',
+  '#e67e22',
+  '#f1c40f',
+  '#2ecc71',
+  '#1abc9c',
+  '#3498db',
+  '#2c3e50',
+  '#9b59b6',
+  '#ff6fb5',
+  '#8d6e63',
+  '#ffe0bd',
+  '#c0392b',
+  '#16a085',
 ];
 const MAX_HISTORY_BYTES = 600 * 1024 * 1024;
 let nextId = 1;
@@ -98,7 +118,8 @@ function makeCanvas(w: number, h: number): HTMLCanvasElement {
   c.height = h;
   return c;
 }
-const ctx = (c: HTMLCanvasElement): CanvasRenderingContext2D => c.getContext('2d', { willReadFrequently: true })!;
+const ctx = (c: HTMLCanvasElement): CanvasRenderingContext2D =>
+  c.getContext('2d', { willReadFrequently: true })!;
 
 async function pngOf(c: HTMLCanvasElement): Promise<Uint8Array> {
   const b = await new Promise<Blob | null>((ok) => c.toBlob(ok, 'image/png'));
@@ -107,7 +128,8 @@ async function pngOf(c: HTMLCanvasElement): Promise<Uint8Array> {
 }
 function b64(bytes: Uint8Array): string {
   let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
 async function imageFrom(url: string): Promise<HTMLImageElement> {
@@ -185,8 +207,32 @@ export function PaintView({
   const [renaming, setRenaming] = useState<number | null>(null);
   /** Opacity of the layer when its slider started moving (for one undo step). */
   const opacityFrom = useRef<number | null>(null);
-  const opts = useRef({ tool, size, flow, hardness, pSize, pFlow, tolerance, sampleAll, color, brushKind, sym });
-  opts.current = { tool, size, flow, hardness, pSize, pFlow, tolerance, sampleAll, color, brushKind, sym };
+  const opts = useRef({
+    tool,
+    size,
+    flow,
+    hardness,
+    pSize,
+    pFlow,
+    tolerance,
+    sampleAll,
+    color,
+    brushKind,
+    sym,
+  });
+  opts.current = {
+    tool,
+    size,
+    flow,
+    hardness,
+    pSize,
+    pFlow,
+    tolerance,
+    sampleAll,
+    color,
+    brushKind,
+    sym,
+  };
 
   // ---------------------------------------------------------------- drawing the view
 
@@ -210,7 +256,8 @@ export function PaintView({
         tg2.clearRect(0, 0, st.w, st.h);
         tg2.drawImage(l.canvas, 0, 0);
         tg2.globalAlpha = opts.current.flow / 100;
-        tg2.globalCompositeOperation = st.stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
+        tg2.globalCompositeOperation =
+          st.stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
         tg2.drawImage(clipped(st.stroke.canvas), 0, 0);
         src = tmp;
       } else if (st.float && st.float.layer === l.id) {
@@ -304,11 +351,26 @@ export function PaintView({
         const img = await imageFrom(source.url);
         w = img.naturalWidth;
         h = img.naturalHeight;
-        if (w > MAX_PAINT_SIDE || h > MAX_PAINT_SIDE) throw new Error(tg('tooBig', { max: MAX_PAINT_SIDE }));
+        if (w > MAX_PAINT_SIDE || h > MAX_PAINT_SIDE)
+          throw new Error(tg('tooBig', { max: MAX_PAINT_SIDE }));
         const base = makeCanvas(w, h);
         ctx(base).drawImage(img, 0, 0);
-        layers.push({ id: nextId++, name: tg('baseLayer'), visible: true, opacity: 1, blend: 'normal', canvas: base });
-        layers.push({ id: nextId++, name: tg('layerName', { n: 1 }), visible: true, opacity: 1, blend: 'normal', canvas: makeCanvas(w, h) });
+        layers.push({
+          id: nextId++,
+          name: tg('baseLayer'),
+          visible: true,
+          opacity: 1,
+          blend: 'normal',
+          canvas: base,
+        });
+        layers.push({
+          id: nextId++,
+          name: tg('layerName', { n: 1 }),
+          visible: true,
+          opacity: 1,
+          blend: 'normal',
+          canvas: makeCanvas(w, h),
+        });
       } else {
         const f = await api().workspace.readFile(path);
         if (f.tooLarge) throw new Error('too large');
@@ -318,7 +380,14 @@ export function PaintView({
         for (const l of doc.layers) {
           const c = makeCanvas(w, h);
           if (l.png) ctx(c).drawImage(await imageFrom(`data:image/png;base64,${l.png}`), 0, 0);
-          layers.push({ id: nextId++, name: l.name, visible: l.visible, opacity: l.opacity, blend: l.blend, canvas: c });
+          layers.push({
+            id: nextId++,
+            name: l.name,
+            visible: l.visible,
+            opacity: l.opacity,
+            blend: l.blend,
+            canvas: c,
+          });
         }
       }
       st.w = w;
@@ -397,7 +466,13 @@ export function PaintView({
     if (!r) return;
     st.layers = r.layers;
     st.active = r.active;
-    push({ kind: 'layers', before, after: r.layers.map((l) => ({ ...l })), activeBefore, activeAfter: r.active });
+    push({
+      kind: 'layers',
+      before,
+      after: r.layers.map((l) => ({ ...l })),
+      activeBefore,
+      activeAfter: r.active,
+    });
     redraw();
   };
 
@@ -420,7 +495,10 @@ export function PaintView({
 
   const toCanvas = (e: { clientX: number; clientY: number }) => {
     const r = view.current!.getBoundingClientRect();
-    return { x: ((e.clientX - r.left) / r.width) * st.w, y: ((e.clientY - r.top) / r.height) * st.h };
+    return {
+      x: ((e.clientX - r.left) / r.width) * st.w,
+      y: ((e.clientY - r.top) / r.height) * st.h,
+    };
   };
 
   const dab = (g: CanvasRenderingContext2D, s: Stamp) => {
@@ -453,7 +531,10 @@ export function PaintView({
       return;
     }
     if (kind === 'spray' || kind === 'chalk') {
-      const n = kind === 'spray' ? Math.min(160, Math.max(4, Math.round(r * 0.8))) : Math.min(320, Math.max(6, Math.round(r * r * 0.22)));
+      const n =
+        kind === 'spray'
+          ? Math.min(160, Math.max(4, Math.round(r * 0.8)))
+          : Math.min(320, Math.max(6, Math.round(r * r * 0.22)));
       g.fillStyle = rgb;
       for (const d of diskPoints(s.x, s.y, r, n, st.rand)) {
         const dr = kind === 'spray' ? 0.6 + st.rand() * 0.7 : 0.5 + st.rand() * 1.1;
@@ -483,7 +564,12 @@ export function PaintView({
     if (!s) return;
     const o = opts.current;
     const spacing = s.tool === 'eraser' ? 0.12 : BRUSH_SPACING[o.brushKind];
-    const r = stampsBetween(s.last, p, { size: o.size, sizePressure: o.pSize, flowPressure: o.pFlow, spacing }, s.carry);
+    const r = stampsBetween(
+      s.last,
+      p,
+      { size: o.size, sizePressure: o.pSize, flowPressure: o.pFlow, spacing },
+      s.carry,
+    );
     const g = ctx(s.canvas);
     for (const d0 of r.stamps)
       for (const m of mirrorPoints(o.sym, d0.x, d0.y, st.w, st.h)) {
@@ -533,7 +619,16 @@ export function PaintView({
     const target = g.getImageData(0, 0, st.w, st.h);
     const sample = o.sampleAll ? ctx(composite()).getImageData(0, 0, st.w, st.h).data : target.data;
     const before = g.getImageData(0, 0, st.w, st.h);
-    const box = floodFill(target.data, sample, st.w, st.h, x, y, hexToRgba(o.color), (o.tolerance / 100) * 255);
+    const box = floodFill(
+      target.data,
+      sample,
+      st.w,
+      st.h,
+      x,
+      y,
+      hexToRgba(o.color),
+      (o.tolerance / 100) * 255,
+    );
     if (!box) return;
     if (st.sel) {
       // Only inside the selection.
@@ -551,7 +646,14 @@ export function PaintView({
       const from = ((box.y + row) * st.w + box.x) * 4;
       b.data.set(before.data.subarray(from, from + box.w * 4), row * box.w * 4);
     }
-    push({ kind: 'pixels', layer: l.id, x: box.x, y: box.y, before: b, after: g.getImageData(box.x, box.y, box.w, box.h) });
+    push({
+      kind: 'pixels',
+      layer: l.id,
+      x: box.x,
+      y: box.y,
+      before: b,
+      after: g.getImageData(box.x, box.y, box.w, box.h),
+    });
     remember(o.color);
     redraw();
   };
@@ -703,7 +805,14 @@ export function PaintView({
       const c = makeCanvas(st.w, st.h);
       ctx(c).drawImage(px.canvas, px.box.x, px.box.y);
       const used = ls.map((x) => Number(/(\d+)$/.exec(x.name)?.[1] ?? 0));
-      ls.splice(st.active + 1, 0, { id: nextId++, name: tg('layerName', { n: Math.max(0, ...used) + 1 }), visible: true, opacity: 1, blend: 'normal', canvas: c });
+      ls.splice(st.active + 1, 0, {
+        id: nextId++,
+        name: tg('layerName', { n: Math.max(0, ...used) + 1 }),
+        visible: true,
+        opacity: 1,
+        blend: 'normal',
+        canvas: c,
+      });
       return { layers: ls, active: st.active + 1 };
     });
   };
@@ -724,7 +833,16 @@ export function PaintView({
     if (!l.visible) setMeta({ visible: true });
     const before = ctx(l.canvas).getImageData(0, 0, st.w, st.h);
     const src = { x: 0, y: 0, w: c.canvas.width, h: c.canvas.height };
-    st.float = { canvas: c.canvas, src, dst: { x: c.x, y: c.y, w: src.w, h: src.h }, flipX: false, flipY: false, layer: l.id, before, carriesSel: false };
+    st.float = {
+      canvas: c.canvas,
+      src,
+      dst: { x: c.x, y: c.y, w: src.w, h: src.h },
+      flipX: false,
+      flipY: false,
+      layer: l.id,
+      before,
+      carriesSel: false,
+    };
     st.sel = null;
     setTool('move');
     toast(tg('pasted'));
@@ -760,7 +878,16 @@ export function PaintView({
       g.drawImage(st.sel.mask, 0, 0);
       g.globalCompositeOperation = 'source-over';
     } else g.clearRect(0, 0, st.w, st.h);
-    st.float = { canvas: px.canvas, src: px.box, dst: { ...px.box }, flipX: false, flipY: false, layer: l.id, before, carriesSel: !!st.sel };
+    st.float = {
+      canvas: px.canvas,
+      src: px.box,
+      dst: { ...px.box },
+      flipX: false,
+      flipY: false,
+      layer: l.id,
+      before,
+      carriesSel: !!st.sel,
+    };
     return true;
   };
 
@@ -798,7 +925,14 @@ export function PaintView({
         const from = ((box.y + row) * st.w + box.x) * 4;
         before.data.set(f.before.data.subarray(from, from + box.w * 4), row * box.w * 4);
       }
-      push({ kind: 'pixels', layer: l.id, x: box.x, y: box.y, before, after: g.getImageData(box.x, box.y, box.w, box.h) });
+      push({
+        kind: 'pixels',
+        layer: l.id,
+        x: box.x,
+        y: box.y,
+        before,
+        after: g.getImageData(box.x, box.y, box.w, box.h),
+      });
     }
     redraw();
     bump();
@@ -875,7 +1009,12 @@ export function PaintView({
         }
       } else if (!lift()) return;
       (e.target as Element).setPointerCapture(e.pointerId);
-      st.fdrag = { kind: corner ? 'scale' : 'move', corner: corner ?? 'se', start: p, r0: { ...st.float!.dst } };
+      st.fdrag = {
+        kind: corner ? 'scale' : 'move',
+        corner: corner ?? 'se',
+        start: p,
+        r0: { ...st.float!.dst },
+      };
       redraw();
       bump();
       return;
@@ -886,7 +1025,13 @@ export function PaintView({
     const sp: StrokePoint = { ...p, pressure: normPressure(e.pointerType, e.pressure) };
     const canvas = scratch2(st.w, st.h);
     ctx(canvas).clearRect(0, 0, st.w, st.h);
-    st.stroke = { canvas, last: sp, carry: 0, box: { x0: p.x, y0: p.y, x1: p.x, y1: p.y }, tool: t };
+    st.stroke = {
+      canvas,
+      last: sp,
+      carry: 0,
+      box: { x0: p.x, y0: p.y, x1: p.x, y1: p.y },
+      tool: t,
+    };
     st.seed = (st.seed + 1) >>> 0;
     st.rand = mulberry32(st.seed);
     // Shift: a straight line from where the last stroke ended.
@@ -927,14 +1072,20 @@ export function PaintView({
       const p = toCanvas(e);
       const d = st.fdrag;
       if (d.kind === 'move') {
-        st.float.dst = { ...d.r0, x: d.r0.x + Math.round(p.x - d.start.x), y: d.r0.y + Math.round(p.y - d.start.y) };
+        st.float.dst = {
+          ...d.r0,
+          x: d.r0.x + Math.round(p.x - d.start.x),
+          y: d.r0.y + Math.round(p.y - d.start.y),
+        };
       } else st.float.dst = scaleRect(d.r0, d.corner, p.x, p.y, !e.shiftKey);
       redraw();
       bump();
       return;
     }
     if (!st.stroke) return;
-    const evs = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [e.nativeEvent as PointerEvent];
+    const evs = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [
+      e.nativeEvent as PointerEvent,
+    ];
     for (const ev of evs.length ? evs : [e.nativeEvent as PointerEvent])
       strokeTo({ ...toCanvas(ev), pressure: normPressure(ev.pointerType, ev.pressure) });
   };
@@ -949,9 +1100,13 @@ export function PaintView({
       const b = L.pts[L.pts.length - 1]!;
       const poly =
         L.kind === 'rect'
-          ? [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }].map((q) => ({ x: Math.round(Math.min(st.w, Math.max(0, q.x))), y: Math.round(Math.min(st.h, Math.max(0, q.y))) }))
+          ? [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }].map((q) => ({
+              x: Math.round(Math.min(st.w, Math.max(0, q.x))),
+              y: Math.round(Math.min(st.h, Math.max(0, q.y))),
+            }))
           : L.pts;
-      const tiny = L.kind === 'rect' ? Math.abs(b.x - a.x) < 1 || Math.abs(b.y - a.y) < 1 : L.pts.length < 3;
+      const tiny =
+        L.kind === 'rect' ? Math.abs(b.x - a.x) < 1 || Math.abs(b.y - a.y) < 1 : L.pts.length < 3;
       if (tiny) {
         if (L.mode === 'new') st.sel = null;
         bump();
@@ -984,7 +1139,8 @@ export function PaintView({
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.0025), e.clientX - r.left, e.clientY - r.top);
+      if (e.ctrlKey || e.metaKey)
+        zoomAt(Math.exp(-e.deltaY * 0.0025), e.clientX - r.left, e.clientY - r.top);
       else {
         st.panX -= e.shiftKey ? e.deltaY : e.deltaX;
         st.panY -= e.shiftKey ? 0 : e.deltaY;
@@ -1017,15 +1173,28 @@ export function PaintView({
     try {
       const layers = [];
       for (const l of st.layers)
-        layers.push({ name: l.name, visible: l.visible, opacity: l.opacity, blend: l.blend, png: b64(await pngOf(l.canvas)) });
+        layers.push({
+          name: l.name,
+          visible: l.visible,
+          opacity: l.opacity,
+          blend: l.blend,
+          png: b64(await pngOf(l.canvas)),
+        });
       let file = st.file;
       if (!file) {
         const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
         const base = path.slice(dir.length).replace(/\.[^.]+$/, '');
-        const files = new Set(await api().workspace.listFiles().catch(() => [] as string[]));
+        const files = new Set(
+          await api()
+            .workspace.listFiles()
+            .catch(() => [] as string[]),
+        );
         file = dir + uniqueName(base, 'zdraw', (n) => files.has(dir + n));
       }
-      await api().workspace.writeFile(file, serializePaintFile({ width: st.w, height: st.h, layers }));
+      await api().workspace.writeFile(
+        file,
+        serializePaintFile({ width: st.w, height: st.h, layers }),
+      );
       st.file = file;
       markDirty(false);
       toast(tg('savedDraw', { name: file }));
@@ -1053,7 +1222,11 @@ export function PaintView({
       const ref = st.file ?? path;
       const dir = ref.includes('/') ? ref.slice(0, ref.lastIndexOf('/') + 1) : '';
       const base = `${ref.slice(dir.length).replace(/\.[^.]+$/, '')}-dibujo`;
-      const files = new Set(await api().workspace.listFiles().catch(() => [] as string[]));
+      const files = new Set(
+        await api()
+          .workspace.listFiles()
+          .catch(() => [] as string[]),
+      );
       const out = dir + uniqueName(base, 'png', (n) => files.has(dir + n));
       await api().workspace.writeBytes(out, bytes);
       toast(tg('exported', { name: out }));
@@ -1071,7 +1244,14 @@ export function PaintView({
       // Next free number: "Capa 2" after "Capa 1", whatever was deleted before.
       const used = ls.map((x) => Number(/(\d+)$/.exec(x.name)?.[1] ?? 0));
       const n = Math.max(0, ...used) + 1;
-      const l: Layer = { id: nextId++, name: tg('layerName', { n }), visible: true, opacity: 1, blend: 'normal', canvas: makeCanvas(st.w, st.h) };
+      const l: Layer = {
+        id: nextId++,
+        name: tg('layerName', { n }),
+        visible: true,
+        opacity: 1,
+        blend: 'normal',
+        canvas: makeCanvas(st.w, st.h),
+      };
       ls.splice(st.active + 1, 0, l);
       return { layers: ls, active: st.active + 1 };
     });
@@ -1102,7 +1282,10 @@ export function PaintView({
       return { layers: ls, active: to };
     });
   };
-  const setMeta = (patch: Partial<Pick<Layer, 'name' | 'visible' | 'opacity' | 'blend'>>, i = st.active) => {
+  const setMeta = (
+    patch: Partial<Pick<Layer, 'name' | 'visible' | 'opacity' | 'blend'>>,
+    i = st.active,
+  ) => {
     layersChange((ls) => {
       ls[i] = { ...ls[i]!, ...patch };
       return { layers: ls, active: st.active };
@@ -1137,19 +1320,19 @@ export function PaintView({
     if (isTypingTarget(e.target, mod)) return;
     const k = e.key.toLowerCase();
     const stop = () => (e.preventDefault(), e.stopPropagation());
-    if (mod && k === 's') return stop(), void saveDraw();
-    if (mod && k === 'a') return stop(), selectAll();
-    if (mod && k === 'd') return stop(), deselect();
-    if (mod && e.shiftKey && k === 'i') return stop(), invertSel();
-    if (mod && k === 'j') return stop(), selToLayer();
-    if (mod && k === 'c') return stop(), copySel(false);
-    if (mod && k === 'x') return stop(), copySel(true);
-    if (mod && k === 'v') return stop(), pasteClip();
-    if (mod && k === 'z') return stop(), e.shiftKey ? redo() : undo();
-    if (mod && k === 'y') return stop(), redo();
-    if (mod && k === '0') return stop(), fit();
-    if (mod && (k === '=' || k === '+')) return stop(), zoomAt(1.25);
-    if (mod && k === '-') return stop(), zoomAt(0.8);
+    if (mod && k === 's') return (stop(), void saveDraw());
+    if (mod && k === 'a') return (stop(), selectAll());
+    if (mod && k === 'd') return (stop(), deselect());
+    if (mod && e.shiftKey && k === 'i') return (stop(), invertSel());
+    if (mod && k === 'j') return (stop(), selToLayer());
+    if (mod && k === 'c') return (stop(), copySel(false));
+    if (mod && k === 'x') return (stop(), copySel(true));
+    if (mod && k === 'v') return (stop(), pasteClip());
+    if (mod && k === 'z') return (stop(), e.shiftKey ? redo() : undo());
+    if (mod && k === 'y') return (stop(), redo());
+    if (mod && k === '0') return (stop(), fit());
+    if (mod && (k === '=' || k === '+')) return (stop(), zoomAt(1.25));
+    if (mod && k === '-') return (stop(), zoomAt(0.8));
     if (mod) return;
     if (e.code === 'Space') {
       stop();
@@ -1157,7 +1340,7 @@ export function PaintView({
       bump();
       return;
     }
-    if (k === 'enter' && st.float) return stop(), commitFloat();
+    if (k === 'enter' && st.float) return (stop(), commitFloat());
     if (k === 'escape') {
       stop();
       if (st.float) return cancelFloat();
@@ -1173,22 +1356,35 @@ export function PaintView({
       }
       return selClear();
     }
-    const arrows: Record<string, [number, number]> = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] };
+    const arrows: Record<string, [number, number]> = {
+      arrowleft: [-1, 0],
+      arrowright: [1, 0],
+      arrowup: [0, -1],
+      arrowdown: [0, 1],
+    };
     if (arrows[k] && opts.current.tool === 'move') {
       stop();
       const n = e.shiftKey ? 10 : 1;
       return nudgeFloat(arrows[k]![0] * n, arrows[k]![1] * n);
     }
-    const tools: Record<string, Tool> = { b: 'brush', e: 'eraser', g: 'bucket', i: 'picker', m: 'rect', l: 'lasso', v: 'move' };
-    if (tools[k]) return stop(), pickTool(tools[k]!);
+    const tools: Record<string, Tool> = {
+      b: 'brush',
+      e: 'eraser',
+      g: 'bucket',
+      i: 'picker',
+      m: 'rect',
+      l: 'lasso',
+      v: 'move',
+    };
+    if (tools[k]) return (stop(), pickTool(tools[k]!));
     if (k === 'x') {
       stop();
       setColor(color2);
       setColor2(color);
       return;
     }
-    if (e.key === '[') return stop(), setSize((s) => Math.max(1, Math.round(s / 1.2)));
-    if (e.key === ']') return stop(), setSize((s) => Math.min(500, Math.round(s * 1.2 + 1)));
+    if (e.key === '[') return (stop(), setSize((s) => Math.max(1, Math.round(s / 1.2))));
+    if (e.key === ']') return (stop(), setSize((s) => Math.min(500, Math.round(s * 1.2 + 1))));
   };
 
   const close = async () => {
@@ -1212,7 +1408,12 @@ export function PaintView({
             ['move', '✥', 'moveTool'],
           ] as [Tool, string, KeyG][]
         ).map(([id, icon, tip]) => (
-          <button key={id} className={showTool === id ? 'on' : ''} title={tg(tip)} onClick={() => pickTool(id)}>
+          <button
+            key={id}
+            className={showTool === id ? 'on' : ''}
+            title={tg(tip)}
+            onClick={() => pickTool(id)}
+          >
             {icon}
           </button>
         ))}
@@ -1259,7 +1460,9 @@ export function PaintView({
         >
           <canvas ref={view} className="pv-canvas" />
           {ready && <PaintOverlay st={st} />}
-          {(showTool === 'brush' || showTool === 'eraser') && !st.space && <div ref={cursor} className="pv-cursor" />}
+          {(showTool === 'brush' || showTool === 'eraser') && !st.space && (
+            <div ref={cursor} className="pv-cursor" />
+          )}
           {!ready && <div className="pv-loading">{tg('loading')}</div>}
         </div>
         <div className="pv-side">
@@ -1274,7 +1477,13 @@ export function PaintView({
             </div>
             <div className="pv-swatches">
               {[...recent, ...SWATCHES.filter((c) => !recent.includes(c))].slice(0, 24).map((c) => (
-                <button key={c} className={c === color ? 'on' : ''} style={{ background: c }} title={c} onClick={() => setColor(c)} />
+                <button
+                  key={c}
+                  className={c === color ? 'on' : ''}
+                  style={{ background: c }}
+                  title={c}
+                  onClick={() => setColor(c)}
+                />
               ))}
             </div>
           </section>
@@ -1284,21 +1493,56 @@ export function PaintView({
               {tool === 'brush' && (
                 <div className="pv-brushes" role="radiogroup" aria-label={tg('brushKind')}>
                   {BRUSH_KINDS.map((b) => (
-                    <button key={b} className={brushKind === b ? 'on' : ''} onClick={() => setBrushKind(b)}>
+                    <button
+                      key={b}
+                      className={brushKind === b ? 'on' : ''}
+                      onClick={() => setBrushKind(b)}
+                    >
                       {tg(`brush_${b}` as KeyG)}
                     </button>
                   ))}
                 </div>
               )}
-              <PvSlider label={tg('size')} min={1} max={500} value={size} onChange={setSize} suffix=" px" />
-              <PvSlider label={tg('flow')} min={1} max={100} value={flow} onChange={setFlow} suffix="%" />
-              <PvSlider label={tg('hardness')} min={0} max={100} value={hardness} onChange={setHardness} suffix="%" />
+              <PvSlider
+                label={tg('size')}
+                min={1}
+                max={500}
+                value={size}
+                onChange={setSize}
+                suffix=" px"
+              />
+              <PvSlider
+                label={tg('flow')}
+                min={1}
+                max={100}
+                value={flow}
+                onChange={setFlow}
+                suffix="%"
+              />
+              <PvSlider
+                label={tg('hardness')}
+                min={0}
+                max={100}
+                value={hardness}
+                onChange={setHardness}
+                suffix="%"
+              />
               <div className="pv-label">{tg('pressure')}</div>
               <label className="pv-check">
-                <input type="checkbox" checked={pSize} onChange={(e) => setPSize(e.target.checked)} /> {tg('pressureSize')}
+                <input
+                  type="checkbox"
+                  checked={pSize}
+                  onChange={(e) => setPSize(e.target.checked)}
+                />{' '}
+                {tg('pressureSize')}
               </label>
               <label className="pv-check">
-                <input type="checkbox" checked={pFlow} onChange={(e) => setPFlow(e.target.checked)} /> {tg('pressureFlow')}
+                <input
+                  type="checkbox"
+                  checked={pFlow}
+                  onChange={(e) => setPFlow(e.target.checked)}
+                />{' '}
+                {tg('pressureFlow')}
               </label>
               <div className="pv-label">{tg('symmetry')}</div>
               <div className="pv-row pv-wrap">
@@ -1316,13 +1560,17 @@ export function PaintView({
               <p className="pv-hint">{st.sel ? tg('selHint') : tg('noSelection')}</p>
               <div className="pv-row pv-wrap">
                 <button onClick={selectAll}>{tg('selAll')}</button>
-                <button disabled={!st.sel} onClick={deselect}>{tg('deselect')}</button>
+                <button disabled={!st.sel} onClick={deselect}>
+                  {tg('deselect')}
+                </button>
                 <button onClick={invertSel}>{tg('invertSel')}</button>
               </div>
               <div className="pv-row pv-wrap">
                 <button onClick={selToLayer}>{tg('selToLayer')}</button>
                 <button onClick={selFill}>{tg('selFill')}</button>
-                <button className="danger" onClick={selClear}>{tg('selClear')}</button>
+                <button className="danger" onClick={selClear}>
+                  {tg('selClear')}
+                </button>
               </div>
             </section>
           )}
@@ -1336,19 +1584,39 @@ export function PaintView({
                 </p>
               )}
               <div className="pv-row pv-wrap">
-                <button title={tg('flipH')} onClick={() => flipFloat('x')}>⇋</button>
-                <button title={tg('flipV')} onClick={() => flipFloat('y')}>⇵</button>
-                <button className="on" disabled={!st.float} onClick={commitFloat}>{tg('apply')}</button>
-                <button disabled={!st.float} onClick={cancelFloat}>{tg('cancel')}</button>
+                <button title={tg('flipH')} onClick={() => flipFloat('x')}>
+                  ⇋
+                </button>
+                <button title={tg('flipV')} onClick={() => flipFloat('y')}>
+                  ⇵
+                </button>
+                <button className="on" disabled={!st.float} onClick={commitFloat}>
+                  {tg('apply')}
+                </button>
+                <button disabled={!st.float} onClick={cancelFloat}>
+                  {tg('cancel')}
+                </button>
               </div>
             </section>
           )}
           {tool === 'bucket' && (
             <section>
               <h4>{tg('bucket')}</h4>
-              <PvSlider label={tg('tolerance')} min={0} max={100} value={tolerance} onChange={setTolerance} suffix="%" />
+              <PvSlider
+                label={tg('tolerance')}
+                min={0}
+                max={100}
+                value={tolerance}
+                onChange={setTolerance}
+                suffix="%"
+              />
               <label className="pv-check">
-                <input type="checkbox" checked={sampleAll} onChange={(e) => setSampleAll(e.target.checked)} /> {tg('sampleAll')}
+                <input
+                  type="checkbox"
+                  checked={sampleAll}
+                  onChange={(e) => setSampleAll(e.target.checked)}
+                />{' '}
+                {tg('sampleAll')}
               </label>
             </section>
           )}
@@ -1378,7 +1646,10 @@ export function PaintView({
                 />
                 <label className="pv-field">
                   <span>{tg('blend')}</span>
-                  <select value={active.blend} onChange={(e) => setMeta({ blend: e.target.value as BlendMode })}>
+                  <select
+                    value={active.blend}
+                    onChange={(e) => setMeta({ blend: e.target.value as BlendMode })}
+                  >
                     {BLEND_MODES.map((b) => (
                       <option key={b} value={b}>
                         {tg(`blend_${b}` as KeyG)}
@@ -1416,7 +1687,8 @@ export function PaintView({
                         defaultValue={l.name}
                         onBlur={(e) => {
                           setRenaming(null);
-                          if (e.target.value.trim() && e.target.value !== l.name) setMeta({ name: e.target.value.trim().slice(0, 60) }, i);
+                          if (e.target.value.trim() && e.target.value !== l.name)
+                            setMeta({ name: e.target.value.trim().slice(0, 60) }, i);
                         }}
                         onKeyDown={(e) => {
                           e.stopPropagation();
@@ -1427,19 +1699,46 @@ export function PaintView({
                     ) : (
                       <span className="pv-layer-name">{l.name}</span>
                     )}
-                    {l.blend !== 'normal' && <span className="pv-tag">{tg(`blend_${l.blend}` as KeyG)}</span>}
-                    {l.opacity < 1 && <span className="pv-tag">{Math.round(l.opacity * 100)}%</span>}
+                    {l.blend !== 'normal' && (
+                      <span className="pv-tag">{tg(`blend_${l.blend}` as KeyG)}</span>
+                    )}
+                    {l.opacity < 1 && (
+                      <span className="pv-tag">{Math.round(l.opacity * 100)}%</span>
+                    )}
                   </div>
                 ))}
             </div>
             <div className="pv-row pv-wrap">
-              <button title={tg('addLayer')} onClick={addLayer}>＋</button>
-              <button title={tg('dupLayer')} onClick={dupLayer}>⧉</button>
-              <button title={tg('mergeDown')} disabled={st.active < 1} onClick={mergeDown}>⤓</button>
-              <button title={tg('forward')} disabled={st.active >= st.layers.length - 1} onClick={() => moveLayer(1)}>↑</button>
-              <button title={tg('backward')} disabled={st.active < 1} onClick={() => moveLayer(-1)}>↓</button>
-              <button title={tg('clearLayer')} onClick={clearLayer}>⌧</button>
-              <button title={tg('delLayer')} className="danger" disabled={st.layers.length <= 1} onClick={delLayer}>🗑</button>
+              <button title={tg('addLayer')} onClick={addLayer}>
+                ＋
+              </button>
+              <button title={tg('dupLayer')} onClick={dupLayer}>
+                ⧉
+              </button>
+              <button title={tg('mergeDown')} disabled={st.active < 1} onClick={mergeDown}>
+                ⤓
+              </button>
+              <button
+                title={tg('forward')}
+                disabled={st.active >= st.layers.length - 1}
+                onClick={() => moveLayer(1)}
+              >
+                ↑
+              </button>
+              <button title={tg('backward')} disabled={st.active < 1} onClick={() => moveLayer(-1)}>
+                ↓
+              </button>
+              <button title={tg('clearLayer')} onClick={clearLayer}>
+                ⌧
+              </button>
+              <button
+                title={tg('delLayer')}
+                className="danger"
+                disabled={st.layers.length <= 1}
+                onClick={delLayer}
+              >
+                🗑
+              </button>
             </div>
           </section>
         </div>
@@ -1486,7 +1785,8 @@ function PaintOverlay({
     out.push(<Tag key={`${key}a`} className="pv-ants-bg" points={d} />);
     out.push(<Tag key={`${key}b`} className="pv-ants" points={d} />);
   };
-  if (st.sel && !st.float?.carriesSel) st.sel.outline.forEach((poly, i) => ants(poly, `s${i}`, true));
+  if (st.sel && !st.float?.carriesSel)
+    st.sel.outline.forEach((poly, i) => ants(poly, `s${i}`, true));
   if (st.lasso) {
     const L = st.lasso;
     if (L.kind === 'rect' && L.pts.length > 1) {
@@ -1508,7 +1808,17 @@ function PaintOverlay({
     for (const [k, p] of c) {
       const x = st.panX + p.x * st.zoom;
       const y = st.panY + p.y * st.zoom;
-      out.push(<rect key={`fh${k}`} className={`pv-fh pv-fh-${k}`} data-fh={k} x={x - 5} y={y - 5} width={10} height={10} />);
+      out.push(
+        <rect
+          key={`fh${k}`}
+          className={`pv-fh pv-fh-${k}`}
+          data-fh={k}
+          x={x - 5}
+          y={y - 5}
+          width={10}
+          height={10}
+        />,
+      );
     }
   }
   return <svg className="pv-overlay">{out}</svg>;
@@ -1567,7 +1877,11 @@ function PvSlider({
 }
 
 /** A new drawing file: a white background layer and an empty one. */
-export async function newPaintFile(w: number, h: number, names: { base: string; layer: string }): Promise<string> {
+export async function newPaintFile(
+  w: number,
+  h: number,
+  names: { base: string; layer: string },
+): Promise<string> {
   const bg = makeCanvas(w, h);
   const g = ctx(bg);
   g.fillStyle = 'white';
@@ -1578,7 +1892,13 @@ export async function newPaintFile(w: number, h: number, names: { base: string; 
     height: h,
     layers: [
       { name: names.base, visible: true, opacity: 1, blend: 'normal', png: b64(await pngOf(bg)) },
-      { name: names.layer, visible: true, opacity: 1, blend: 'normal', png: b64(await pngOf(empty)) },
+      {
+        name: names.layer,
+        visible: true,
+        opacity: 1,
+        blend: 'normal',
+        png: b64(await pngOf(empty)),
+      },
     ],
   });
 }

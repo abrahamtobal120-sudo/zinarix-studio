@@ -113,7 +113,10 @@ export function parseLoudnorm(log: string): LoudMeasure | null {
  * The whole graph from input 0 to [out]: clean, mix with the original by `amount`, then (for
  * "enhance") the loudness pass. `measure` builds the first loudnorm pass instead.
  */
-export function voiceGraph(v: Pick<VoiceFx, 'preset' | 'amount'>, measure?: LoudMeasure | 'measure'): string {
+export function voiceGraph(
+  v: Pick<VoiceFx, 'preset' | 'amount'>,
+  measure?: LoudMeasure | 'measure',
+): string {
   const a = clamp01(v.amount);
   const fmt = 'aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo';
   const clean = cleanChain(v.preset).join(',');

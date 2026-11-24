@@ -15,7 +15,9 @@ function img(w: number, h: number, fill: [number, number, number, number]): Uint
   for (let i = 0; i < w * h; i++) a.set(fill, i * 4);
   return a;
 }
-const px = (a: Uint8ClampedArray, w: number, x: number, y: number) => [...a.subarray((y * w + x) * 4, (y * w + x) * 4 + 4)];
+const px = (a: Uint8ClampedArray, w: number, x: number, y: number) => [
+  ...a.subarray((y * w + x) * 4, (y * w + x) * 4 + 4),
+];
 
 describe('bucket fill', () => {
   it('fills the connected area only, up to a wall, and grows one pixel', () => {
@@ -56,7 +58,12 @@ describe('bucket fill', () => {
     const w = 1500;
     const h = 1500;
     const big = new Uint8ClampedArray(w * h * 4);
-    expect(floodFill(big, big.slice(), w, h, 700, 700, hexToRgba('#00ff00'), 0)).toEqual({ x: 0, y: 0, w, h });
+    expect(floodFill(big, big.slice(), w, h, 700, 700, hexToRgba('#00ff00'), 0)).toEqual({
+      x: 0,
+      y: 0,
+      w,
+      h,
+    });
     expect(px(big, w, w - 1, h - 1)).toEqual([0, 255, 0, 255]);
   });
 });
@@ -66,7 +73,12 @@ describe('brush', () => {
     const o = { size: 10, sizePressure: false, flowPressure: false, spacing: 0.5 };
     const first = stampsBetween({ x: 0, y: 0, pressure: 1 }, { x: 0, y: 0, pressure: 1 }, o, 0);
     expect(first.stamps).toHaveLength(1);
-    const a = stampsBetween({ x: 0, y: 0, pressure: 1 }, { x: 12, y: 0, pressure: 1 }, o, first.carry);
+    const a = stampsBetween(
+      { x: 0, y: 0, pressure: 1 },
+      { x: 12, y: 0, pressure: 1 },
+      o,
+      first.carry,
+    );
     expect(a.stamps.map((s) => s.x)).toEqual([5, 10]);
     const b = stampsBetween({ x: 12, y: 0, pressure: 1 }, { x: 20, y: 0, pressure: 1 }, o, a.carry);
     expect(b.stamps.map((s) => s.x)).toEqual([15, 20]);
@@ -102,15 +114,30 @@ describe('.zdraw files', () => {
       layers: [{ name: 'Fondo', visible: true, opacity: 1, blend: 'normal', png: 'AAAA' }],
     });
     const odd = parsePaintFile(
-      JSON.stringify({ format: 'zinarix-draw', width: 5, height: 5, layers: [{ opacity: 7, blend: 'weird', png: 'data:image/png;base64,QQ==' }] }),
+      JSON.stringify({
+        format: 'zinarix-draw',
+        width: 5,
+        height: 5,
+        layers: [{ opacity: 7, blend: 'weird', png: 'data:image/png;base64,QQ==' }],
+      }),
     );
-    expect(odd.layers[0]).toEqual({ name: 'Capa 1', visible: true, opacity: 1, blend: 'normal', png: 'QQ==' });
+    expect(odd.layers[0]).toEqual({
+      name: 'Capa 1',
+      visible: true,
+      opacity: 1,
+      blend: 'normal',
+      png: 'QQ==',
+    });
   });
 
   it('refuses broken files', () => {
     expect(() => parsePaintFile('{')).toThrow(/damaged/);
     expect(() => parsePaintFile('{"format":"x"}')).toThrow(/not a Zinarix drawing/);
-    expect(() => parsePaintFile('{"format":"zinarix-draw","width":0,"height":5,"layers":[{}]}')).toThrow(/size/);
-    expect(() => parsePaintFile('{"format":"zinarix-draw","width":5,"height":5,"layers":[]}')).toThrow(/no layers/);
+    expect(() =>
+      parsePaintFile('{"format":"zinarix-draw","width":0,"height":5,"layers":[{}]}'),
+    ).toThrow(/size/);
+    expect(() =>
+      parsePaintFile('{"format":"zinarix-draw","width":5,"height":5,"layers":[]}'),
+    ).toThrow(/no layers/);
   });
 });

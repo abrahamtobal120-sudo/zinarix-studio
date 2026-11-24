@@ -75,7 +75,10 @@ export function chunkLines(source: string, text: string, size = 60, overlap = 12
 
 /** Splits prose (a docs page) into chunks of about `max` characters on paragraph breaks. */
 export function chunkProse(source: string, title: string, text: string, max = 1800): Chunk[] {
-  const paras = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const paras = text
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   const out: Chunk[] = [];
   let cur = '';
   const push = () => {
@@ -190,7 +193,10 @@ const ENTITIES: Record<string, string> = {
 /** Readable text of an HTML page (scripts, styles and navigation chrome removed). */
 export function htmlToText(html: string): { title: string; text: string } {
   const title = (/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '').trim();
-  let body = /<main[\s\S]*?<\/main>/i.exec(html)?.[0] ?? /<article[\s\S]*?<\/article>/i.exec(html)?.[0] ?? html;
+  let body =
+    /<main[\s\S]*?<\/main>/i.exec(html)?.[0] ??
+    /<article[\s\S]*?<\/article>/i.exec(html)?.[0] ??
+    html;
   body = body
     .replace(/<(script|style|noscript|svg|nav|footer|header|aside|template)[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')
@@ -199,13 +205,15 @@ export function htmlToText(html: string): { title: string; text: string } {
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<li[^>]*>/gi, '\n- ')
     .replace(/<[^>]+>/g, '')
-    .replace(/&(#?\w+);/g, (m, e: string) =>
-      ENTITIES[e] ??
-      (e.startsWith('#x')
-        ? String.fromCodePoint(parseInt(e.slice(2), 16))
-        : e.startsWith('#')
-          ? String.fromCodePoint(Number(e.slice(1)) || 32)
-          : m),
+    .replace(
+      /&(#?\w+);/g,
+      (m, e: string) =>
+        ENTITIES[e] ??
+        (e.startsWith('#x')
+          ? String.fromCodePoint(parseInt(e.slice(2), 16))
+          : e.startsWith('#')
+            ? String.fromCodePoint(Number(e.slice(1)) || 32)
+            : m),
     )
     .replace(/[ \t]+/g, ' ')
     .replace(/\n[ \t]+/g, '\n')
@@ -223,15 +231,17 @@ function decode(s: string): string {
  */
 export function docLinks(html: string, pageUrl: string, root: string): string[] {
   const base = new URL(root);
-  const prefix = base.pathname.endsWith('/')
-    ? base.pathname
-    : base.pathname.replace(/[^/]*$/, '');
+  const prefix = base.pathname.endsWith('/') ? base.pathname : base.pathname.replace(/[^/]*$/, '');
   const out = new Set<string>();
   for (const m of html.matchAll(/<a\s[^>]*href\s*=\s*["']([^"'#]+)[^"']*["']/gi)) {
     try {
       const u = new URL(m[1]!.replace(/&amp;/g, '&'), pageUrl);
       if (u.origin !== base.origin || !u.pathname.startsWith(prefix)) continue;
-      if (/\.(png|jpe?g|gif|svg|webp|ico|pdf|zip|gz|tgz|mp4|css|js|json|xml|woff2?)$/i.test(u.pathname))
+      if (
+        /\.(png|jpe?g|gif|svg|webp|ico|pdf|zip|gz|tgz|mp4|css|js|json|xml|woff2?)$/i.test(
+          u.pathname,
+        )
+      )
         continue;
       u.hash = '';
       u.search = '';

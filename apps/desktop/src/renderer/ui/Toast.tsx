@@ -46,7 +46,11 @@ export function pushToast(
   }
   emit(kept.slice(-MAX_TOASTS));
   const ms = opts.duration ?? (item.kind === 'error' || item.action ? 6000 : 4000);
-  if (ms > 0 && Number.isFinite(ms)) timers.set(id, setTimeout(() => dismissToast(id), ms));
+  if (ms > 0 && Number.isFinite(ms))
+    timers.set(
+      id,
+      setTimeout(() => dismissToast(id), ms),
+    );
   return id;
 }
 

@@ -281,7 +281,8 @@ const en: Record<keyof typeof es, string> = {
   bridgeCopyUrl: 'Copy URL',
   bridgeCopyToken: 'Copy token',
   bridgeRotateToken: 'Change token',
-  bridgeTokenRotated: 'New token. The old one no longer works: paste the new one into your web apps.',
+  bridgeTokenRotated:
+    'New token. The old one no longer works: paste the new one into your web apps.',
   bridgeUrlCopied: 'Bridge URL copied.',
   bridgeTokenCopied: 'Token copied. Treat it like a password: it gives access to your models.',
   bridgeSites: 'Allowed websites (one per line)',

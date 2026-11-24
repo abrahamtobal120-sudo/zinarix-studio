@@ -34,7 +34,8 @@ const es = {
   reset: 'Restablecer',
   resetAll: 'Quitar corrección',
   curves: 'Curvas RGB',
-  curvesHint: 'Arrastra los puntos. Clic en la línea agrega uno; doble clic o clic derecho lo quita.',
+  curvesHint:
+    'Arrastra los puntos. Clic en la línea agrega uno; doble clic o clic derecho lo quita.',
   cp_sSoft: 'S suave',
   cp_sStrong: 'S fuerte',
   cp_fade: 'Negros lavados',

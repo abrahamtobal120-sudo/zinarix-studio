@@ -19,7 +19,8 @@ const es = {
   flipH: 'Voltear horizontal',
   flipV: 'Voltear vertical',
   crop: 'Recortar',
-  cropHint: 'Arrastra sobre la imagen para elegir el área, las esquinas y lados para cambiar su tamaño, y dentro del cuadro para moverlo (también con las flechas). Enter aplica, Esc cancela.',
+  cropHint:
+    'Arrastra sobre la imagen para elegir el área, las esquinas y lados para cambiar su tamaño, y dentro del cuadro para moverlo (también con las flechas). Enter aplica, Esc cancela.',
   cropKey: 'Recortar (C)',
   straighten: 'Enderezar',
   cropApply: 'Aplicar recorte',
@@ -84,7 +85,8 @@ const es = {
   jpgNoAlpha: 'JPG no guarda transparencia: el fondo queda blanco.',
   bg: 'Fondo',
   bgRemove: 'Quitar fondo',
-  bgRemoveHint: 'Deja solo a la persona, el animal o el objeto principal. Se hace en esta PC: la foto no se sube.',
+  bgRemoveHint:
+    'Deja solo a la persona, el animal o el objeto principal. Se hace en esta PC: la foto no se sube.',
   bgRestore: 'Poner el fondo otra vez',
   bgWorking: 'Quitando el fondo…',
   bgFast: 'Rápido',
@@ -125,7 +127,8 @@ const en: typeof es = {
   flipH: 'Flip horizontally',
   flipV: 'Flip vertically',
   crop: 'Crop',
-  cropHint: 'Drag over the picture to pick the area, the corners and sides to resize it, and inside the box to move it (arrow keys too). Enter applies, Esc cancels.',
+  cropHint:
+    'Drag over the picture to pick the area, the corners and sides to resize it, and inside the box to move it (arrow keys too). Enter applies, Esc cancels.',
   cropKey: 'Crop (C)',
   straighten: 'Straighten',
   cropApply: 'Apply crop',
@@ -190,7 +193,8 @@ const en: typeof es = {
   jpgNoAlpha: 'JPG keeps no transparency: the background turns white.',
   bg: 'Background',
   bgRemove: 'Remove background',
-  bgRemoveHint: 'Keeps only the main person, animal or object. Done on this PC: the picture is not uploaded.',
+  bgRemoveHint:
+    'Keeps only the main person, animal or object. Done on this PC: the picture is not uploaded.',
   bgRestore: 'Put the background back',
   bgWorking: 'Removing the background…',
   bgFast: 'Fast',

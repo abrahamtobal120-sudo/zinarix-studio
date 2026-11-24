@@ -13,10 +13,23 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 vi.mock('electron', () => ({ desktopCapturer: { getSources: async () => [] } }));
 
 import { VideoService, findFfmpeg } from '../src/main/video.js';
-import { ProxyMaker, parseProgress, proxyArgs, proxyFile, proxyScale } from '../src/main/videoProxy.js';
+import {
+  ProxyMaker,
+  parseProgress,
+  proxyArgs,
+  proxyFile,
+  proxyScale,
+} from '../src/main/videoProxy.js';
 import { Recorder, freeName, recordingName, remux } from '../src/main/recorder.js';
 import type { MediaItem, VideoProject } from '../src/shared/video.js';
-import { clipDur, clipEnd, insertMedia, newProject, projectDuration, validProject } from '../src/shared/video.js';
+import {
+  clipDur,
+  clipEnd,
+  insertMedia,
+  newProject,
+  projectDuration,
+  validProject,
+} from '../src/shared/video.js';
 import {
   RAMP_PRESETS,
   applyRamp,
@@ -55,7 +68,10 @@ const media = (over: Partial<MediaItem> = {}): MediaItem => ({
 
 /** A 4 s clip at 0 and a second clip right after it on the same track. */
 function twoClips(): { p: VideoProject; a: string; b: string } {
-  let p: VideoProject = { ...newProject(), media: [media(), media({ id: 'm2', path: '/x/b.mp4', name: 'b.mp4' })] };
+  let p: VideoProject = {
+    ...newProject(),
+    media: [media(), media({ id: 'm2', path: '/x/b.mp4', name: 'b.mp4' })],
+  };
   const r1 = insertMedia(p, p.media[0]!, { start: 0 });
   p = r1.project;
   const a = r1.clip!.id;
@@ -119,7 +135,10 @@ describe('speed ramps (pure)', () => {
 
   it('keeps fades and transitions at the outer ends', () => {
     const { p, a } = twoClips();
-    const q = { ...p, clips: p.clips.map((c) => (c.id === a ? { ...c, fadeIn: 0.5, fadeOut: 0.4 } : c)) };
+    const q = {
+      ...p,
+      clips: p.clips.map((c) => (c.id === a ? { ...c, fadeIn: 0.5, fadeOut: 0.4 } : c)),
+    };
     const r = applyRamp(q, a, 'montage');
     const steps = r.ids.map((id) => r.project.clips.find((c) => c.id === id)!);
     expect(steps[0]!.fadeIn).toBe(0.5);
@@ -149,7 +168,9 @@ describe('speed ramps (pure)', () => {
       { u: 0, s: 2 },
       { u: 1, s: 2 },
     ]);
-    expect(r2.project.clips.filter((c) => c.ramp).every((c) => c.ramp!.preset === 'custom')).toBe(true);
+    expect(r2.project.clips.filter((c) => c.ramp).every((c) => c.ramp!.preset === 'custom')).toBe(
+      true,
+    );
     // Constant 2× → half as long.
     expect(r2.duration).toBeCloseTo(2, 6);
     const back = removeRamp(r2.project, r2.ids[0]!);
@@ -181,7 +202,13 @@ describe('speed ramps (pure)', () => {
     expect('error' in e).toBe(false);
     if ('error' in e) return;
     expect(e.content).toMatch(/slowEnd/);
-    const custom = speedRamp(p, { clip: a, points: [{ at: 0, speed: 0.5 }, { at: 1, speed: 3 }] });
+    const custom = speedRamp(p, {
+      clip: a,
+      points: [
+        { at: 0, speed: 0.5 },
+        { at: 1, speed: 3 },
+      ],
+    });
     expect('error' in custom).toBe(false);
     const off = speedRamp(e.project, { clip: a, remove: true });
     expect('error' in off).toBe(false);
@@ -196,11 +223,18 @@ describe('proxies (no FFmpeg needed)', () => {
   it('scales the short side and keeps the source timing', () => {
     expect(proxyScale(3840, 2160, 540)).toBe('scale=-2:540:flags=bilinear');
     expect(proxyScale(2160, 3840, 540)).toBe('scale=540:-2:flags=bilinear');
-    const args = proxyArgs('/in.mov', '/out.mp4', { width: 3840, height: 2160, target: 540, hasAudio: false });
+    const args = proxyArgs('/in.mov', '/out.mp4', {
+      width: 3840,
+      height: 2160,
+      target: 540,
+      hasAudio: false,
+    });
     expect(args).toContain('-an');
     expect(args).not.toContain('-r');
     expect(args.slice(-1)[0]).toBe('/out.mp4');
-    expect(parseProgress('frame=10\nout_time_us=2500000\nprogress=continue\n', 10)).toBeCloseTo(0.25);
+    expect(parseProgress('frame=10\nout_time_us=2500000\nprogress=continue\n', 10)).toBeCloseTo(
+      0.25,
+    );
     expect(parseProgress('frame=10\n', 10)).toBeNull();
   });
 
@@ -297,7 +331,12 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
     expect(statSync(out).size).toBeLessThan(statSync(src).size * 2);
     // Second time: the cached file, no encode.
     expect(maker.existing(src)).toBe(out);
-    expect(await maker.make({ path: src, duration: 3, width: 1920, height: 1080, hasAudio: true }, () => undefined)).toBe(out);
+    expect(
+      await maker.make(
+        { path: src, duration: 3, width: 1920, height: 1080, hasAudio: true },
+        () => undefined,
+      ),
+    ).toBe(out);
   }, 120_000);
 
   it('a canceled proxy leaves nothing in the cache', async () => {
@@ -308,7 +347,10 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
       () => svc.cacheDir,
       () => tools.ffmpeg!,
     );
-    const job = maker.make({ path: src, duration: 20, width: 1920, height: 1080, hasAudio: true }, () => undefined);
+    const job = maker.make(
+      { path: src, duration: 20, width: 1920, height: 1080, hasAudio: true },
+      () => undefined,
+    );
     await new Promise((r) => setTimeout(r, 300));
     maker.cancel(src);
     await expect(job).rejects.toThrow();
@@ -317,16 +359,32 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
 
   it('exports a clip with a speed ramp (every step, with sound) to the planned length', async () => {
     const src = join(dir, 'ramp-src.mp4');
-    gen(src, '640x360', 4, ['-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac']);
+    gen(src, '640x360', 4, [
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-pix_fmt',
+      'yuv420p',
+      '-c:a',
+      'aac',
+    ]);
     const svc = new VideoService(appRoot, join(dir, 'data4'), () => undefined);
     const { url: _u, ...item } = await svc.probe(src);
-    let p: VideoProject = { ...newProject({ width: 640, height: 360, fps: 30, name: 'ramp' }), media: [item] };
+    let p: VideoProject = {
+      ...newProject({ width: 640, height: 360, fps: 30, name: 'ramp' }),
+      media: [item],
+    };
     const ins = insertMedia(p, item);
     p = ins.project;
     const r = applyRamp(p, ins.clip!.id, 'bullet');
     expect(r.ids.length).toBeGreaterThan(10);
     const out = join(dir, 'ramp.mp4');
-    const job = svc.enqueue(r.project, { ...defaultExport(r.project), width: 640, height: 360, preset: 'veryfast' }, out);
+    const job = svc.enqueue(
+      r.project,
+      { ...defaultExport(r.project), width: 640, height: 360, preset: 'veryfast' },
+      out,
+    );
     await new Promise<void>((resolve) => {
       const tick = setInterval(() => {
         const j = svc.list().find((x) => x.id === job.id)!;
@@ -345,7 +403,16 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
 
   it('remuxes a recorded WebM so it gets a duration', async () => {
     const raw = join(dir, 'rec.webm.part');
-    gen(raw, '640x360', 2, ['-c:v', 'libvpx', '-deadline', 'realtime', '-c:a', 'libopus', '-f', 'webm']);
+    gen(raw, '640x360', 2, [
+      '-c:v',
+      'libvpx',
+      '-deadline',
+      'realtime',
+      '-c:a',
+      'libopus',
+      '-f',
+      'webm',
+    ]);
     const out = join(dir, 'rec.webm');
     expect(await remux(tools.ffmpeg!, raw, out)).toBe(true);
     const svc = new VideoService(appRoot, join(dir, 'data3'), () => undefined);

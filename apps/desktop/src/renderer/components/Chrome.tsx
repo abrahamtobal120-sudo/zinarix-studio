@@ -364,7 +364,6 @@ export function AppsPanel() {
   );
 }
 
-
 function ProblemStatus() {
   const { errors, warnings } = useProblemCounts();
   return (
@@ -375,7 +374,9 @@ function ProblemStatus() {
       {...pressable(() => setState({ panelOpen: true, panelView: 'problems' }))}
     >
       <span className={errors ? 'status-err' : ''}>⊗ {errors}</span>{' '}
-      <span className={warnings ? 'status-warn' : ''}><Icon name="warning" size={12} /> {warnings}</span>
+      <span className={warnings ? 'status-warn' : ''}>
+        <Icon name="warning" size={12} /> {warnings}
+      </span>
     </span>
   );
 }

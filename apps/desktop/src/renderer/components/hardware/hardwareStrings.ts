@@ -84,7 +84,8 @@ const es = {
   viewText: 'Texto',
   viewPlot: 'Gráfica',
   plot: 'Gráfica de los valores del monitor serie',
-  plotEmpty: 'Aquí se grafican los números que imprime la placa: "23.5 40", "temp:23.5,hum:40" (como el Serial Plotter de Arduino).',
+  plotEmpty:
+    'Aquí se grafican los números que imprime la placa: "23.5 40", "temp:23.5,hum:40" (como el Serial Plotter de Arduino).',
   plotWindow: 'Cuántas muestras se ven',
   plotLast: 'Últimas {n}',
   plotPause: 'Pausar la gráfica',
@@ -115,7 +116,8 @@ const en: Record<keyof typeof es, string> = {
   desc: 'Arduino, ESP32 and STM32 with PlatformIO: build, upload and serial monitor',
   refresh: 'Refresh',
   loading: 'Looking for PlatformIO…',
-  missing: 'PlatformIO is not installed. It is free and is what the PlatformIO extension for VS Code uses.',
+  missing:
+    'PlatformIO is not installed. It is free and is what the PlatformIO extension for VS Code uses.',
   install: 'Install in the terminal',
   installCmd: 'python -m pip install -U platformio',
   docs: 'How to install it',
@@ -193,7 +195,8 @@ const en: Record<keyof typeof es, string> = {
   viewText: 'Text',
   viewPlot: 'Plot',
   plot: 'Plot of the serial monitor values',
-  plotEmpty: 'The numbers the board prints are plotted here: "23.5 40", "temp:23.5,hum:40" (like the Arduino Serial Plotter).',
+  plotEmpty:
+    'The numbers the board prints are plotted here: "23.5 40", "temp:23.5,hum:40" (like the Arduino Serial Plotter).',
   plotWindow: 'How many samples are shown',
   plotLast: 'Last {n}',
   plotPause: 'Pause the plot',
@@ -214,7 +217,8 @@ const en: Record<keyof typeof es, string> = {
   libInstalled: 'Installed: {lib}. It is in lib_deps now.',
   libHave: 'Installed',
   libRemove: 'Remove',
-  libRemoveAsk: 'Remove {lib} from this environment? It is deleted from lib_deps in platformio.ini.',
+  libRemoveAsk:
+    'Remove {lib} from this environment? It is deleted from lib_deps in platformio.ini.',
   libRemoved: 'Removed: {lib}',
   libPage: 'Page {page} of {pages}',
 };

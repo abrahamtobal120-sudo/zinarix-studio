@@ -87,9 +87,9 @@ describe('plans forced from the state file (development builds only)', () => {
       expect(licenseStatus({ codePlan: 'ai', plans }, NOW, PUB, undefined, dev).features).toEqual(
         AI_FEATURES,
       );
-      expect(licenseStatus({ codePlan: 'proai', plans }, NOW, PUB, undefined, dev).features).toEqual(
-        PRO_AI_FEATURES,
-      );
+      expect(
+        licenseStatus({ codePlan: 'proai', plans }, NOW, PUB, undefined, dev).features,
+      ).toEqual(PRO_AI_FEATURES);
     }
   });
 

@@ -25,7 +25,8 @@ import './questionnaire.css';
 const es = {
   label: 'Cuestionario de inicio',
   hello: 'Hagamos Zinarix a tu medida',
-  helloLead: 'Responde 5 preguntas rápidas y la app se acomoda a lo que haces: los paneles que vas a usar, el tema y cuánto te ayuda la IA.',
+  helloLead:
+    'Responde 5 preguntas rápidas y la app se acomoda a lo que haces: los paneles que vas a usar, el tema y cuánto te ayuda la IA.',
   q1: '¿Qué quieres hacer con Zinarix?',
   q1Hint: 'Elige todo lo que aplique.',
   q2: '¿Cuánta experiencia tienes programando?',
@@ -89,7 +90,8 @@ const es = {
 const en: typeof es = {
   label: 'Getting started questionnaire',
   hello: 'Let’s make Zinarix yours',
-  helloLead: 'Answer 5 quick questions and the app adapts to what you do: the panels you will use, the theme and how much the AI helps.',
+  helloLead:
+    'Answer 5 quick questions and the app adapts to what you do: the panels you will use, the theme and how much the AI helps.',
   q1: 'What do you want to do with Zinarix?',
   q1Hint: 'Pick everything that applies.',
   q2: 'How much programming experience do you have?',
@@ -256,7 +258,10 @@ async function apply(a: Answers, then: () => void): Promise<void> {
   const r = recommend(a);
   saveProfile({ answers: a, ...r, at: Date.now() });
   try {
-    localStorage.setItem('zs.chatMode', a.help === 'auto' ? 'auto' : a.help === 'ask' ? 'agent' : 'ask');
+    localStorage.setItem(
+      'zs.chatMode',
+      a.help === 'auto' ? 'auto' : a.help === 'ask' ? 'agent' : 'ask',
+    );
     localStorage.setItem('zs.agentMode', a.help === 'chat' ? 'off' : 'on');
   } catch {
     // storage unavailable: the chat keeps its default mode
@@ -315,122 +320,123 @@ export function Questionnaire({ onDone }: { onDone: () => void }) {
       label={tq('label')}
     >
       <div className="quiz-wrap" onKeyDown={onKey}>
-      {step > 0 && step < steps - 1 && (
-        <div className="quiz-step">{tq('stepOf').replace('{n}', String(step))}</div>
-      )}
-      <div className="onb-dots" aria-hidden="true">
-        {Array.from({ length: steps }, (_, i) => (
-          <span key={i} className={i === step ? 'on' : i < step ? 'done' : ''} />
-        ))}
-      </div>
-      {step === 0 && (
-        <div className="onb-step center">
-          <img className="onb-logo" src="./logo.svg" alt="" />
-          <h1>{tq('hello')}</h1>
-          <p className="onb-lead">{tq('helloLead')}</p>
-        </div>
-      )}
-      {step === 1 && (
-        <div className="onb-step">
-          <h2>{tq('q1')}</h2>
-          <p className="dim">
-            {tq('q1Hint')}
-            {uses.length > 0 && (
-              <span className="quiz-count">{tq('picked').replace('{n}', String(uses.length))}</span>
-            )}
-          </p>
-          <div className="quiz-uses">
-            {USES.map((u) => (
-              <button
-                key={u}
-                role="checkbox"
-                aria-checked={uses.includes(u)}
-                className={`quiz-use${uses.includes(u) ? ' on' : ''}`}
-                onClick={() => toggle(u)}
-              >
-                <Icon name={uses.includes(u) ? 'check' : USE_ICON[u]} size={16} /> {tq(u)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {step === 2 && (
-        <div className="onb-step">
-          <h2>{tq('q2')}</h2>
-          <Choice
-            value={level}
-            onPick={setLevel}
-            options={[
-              { id: 'new', icon: 'lightbulb', hint: 'newHint' },
-              { id: 'some', icon: 'code', hint: 'someHint' },
-              { id: 'pro', icon: 'bolt', hint: 'proHint' },
-            ]}
-          />
-        </div>
-      )}
-      {step === 3 && (
-        <div className="onb-step">
-          <h2>{tq('q3')}</h2>
-          <Choice
-            value={ai}
-            onPick={setAi}
-            options={[
-              { id: 'local', icon: 'cpu', hint: 'localHint' },
-              { id: 'keys', icon: 'key', hint: 'keysHint' },
-              { id: 'cli', icon: 'terminal', hint: 'cliHint' },
-              { id: 'unsure', icon: 'info', hint: 'unsureHint' },
-            ]}
-          />
-        </div>
-      )}
-      {step === 4 && (
-        <div className="onb-step">
-          <h2>{tq('q4')}</h2>
-          <Choice
-            value={help}
-            onPick={setHelp}
-            options={[
-              { id: 'auto', icon: 'agent', hint: 'autoHint' },
-              { id: 'ask', icon: 'check', hint: 'askHint' },
-              { id: 'chat', icon: 'message', hint: 'chatHint' },
-            ]}
-          />
-        </div>
-      )}
-      {step === 5 && (
-        <div className="onb-step">
-          <h2>{tq('q5')}</h2>
-          <Choice
-            value={look}
-            onPick={setLook}
-            options={[
-              { id: 'dark', icon: 'moon' },
-              { id: 'light', icon: 'sun' },
-            ]}
-          />
-        </div>
-      )}
-      {step === 6 && (
-        <div className="onb-step">
-          <h2>{tq('sumTitle')}</h2>
-          <p className="dim">{tq('sumLead')}</p>
-          <Summary a={{ uses, level, ai, help, look }} />
-        </div>
-      )}
-      <div className="onb-nav">
-        {step > 0 ? (
-          <button onClick={() => setStep(step - 1)}>{tq('back')}</button>
-        ) : (
-          <button className="link" onClick={skip}>
-            {tq('skip')}
-          </button>
+        {step > 0 && step < steps - 1 && (
+          <div className="quiz-step">{tq('stepOf').replace('{n}', String(step))}</div>
         )}
-        <button className="primary" disabled={busy} onClick={next}>
-          {step === 0 ? tq('start') : step === steps - 1 ? tq('finish') : tq('next')}
-        </button>
-      </div>
+        <div className="onb-dots" aria-hidden="true">
+          {Array.from({ length: steps }, (_, i) => (
+            <span key={i} className={i === step ? 'on' : i < step ? 'done' : ''} />
+          ))}
+        </div>
+        {step === 0 && (
+          <div className="onb-step center">
+            <img className="onb-logo" src="./logo.svg" alt="" />
+            <h1>{tq('hello')}</h1>
+            <p className="onb-lead">{tq('helloLead')}</p>
+          </div>
+        )}
+        {step === 1 && (
+          <div className="onb-step">
+            <h2>{tq('q1')}</h2>
+            <p className="dim">
+              {tq('q1Hint')}
+              {uses.length > 0 && (
+                <span className="quiz-count">
+                  {tq('picked').replace('{n}', String(uses.length))}
+                </span>
+              )}
+            </p>
+            <div className="quiz-uses">
+              {USES.map((u) => (
+                <button
+                  key={u}
+                  role="checkbox"
+                  aria-checked={uses.includes(u)}
+                  className={`quiz-use${uses.includes(u) ? ' on' : ''}`}
+                  onClick={() => toggle(u)}
+                >
+                  <Icon name={uses.includes(u) ? 'check' : USE_ICON[u]} size={16} /> {tq(u)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 2 && (
+          <div className="onb-step">
+            <h2>{tq('q2')}</h2>
+            <Choice
+              value={level}
+              onPick={setLevel}
+              options={[
+                { id: 'new', icon: 'lightbulb', hint: 'newHint' },
+                { id: 'some', icon: 'code', hint: 'someHint' },
+                { id: 'pro', icon: 'bolt', hint: 'proHint' },
+              ]}
+            />
+          </div>
+        )}
+        {step === 3 && (
+          <div className="onb-step">
+            <h2>{tq('q3')}</h2>
+            <Choice
+              value={ai}
+              onPick={setAi}
+              options={[
+                { id: 'local', icon: 'cpu', hint: 'localHint' },
+                { id: 'keys', icon: 'key', hint: 'keysHint' },
+                { id: 'cli', icon: 'terminal', hint: 'cliHint' },
+                { id: 'unsure', icon: 'info', hint: 'unsureHint' },
+              ]}
+            />
+          </div>
+        )}
+        {step === 4 && (
+          <div className="onb-step">
+            <h2>{tq('q4')}</h2>
+            <Choice
+              value={help}
+              onPick={setHelp}
+              options={[
+                { id: 'auto', icon: 'agent', hint: 'autoHint' },
+                { id: 'ask', icon: 'check', hint: 'askHint' },
+                { id: 'chat', icon: 'message', hint: 'chatHint' },
+              ]}
+            />
+          </div>
+        )}
+        {step === 5 && (
+          <div className="onb-step">
+            <h2>{tq('q5')}</h2>
+            <Choice
+              value={look}
+              onPick={setLook}
+              options={[
+                { id: 'dark', icon: 'moon' },
+                { id: 'light', icon: 'sun' },
+              ]}
+            />
+          </div>
+        )}
+        {step === 6 && (
+          <div className="onb-step">
+            <h2>{tq('sumTitle')}</h2>
+            <p className="dim">{tq('sumLead')}</p>
+            <Summary a={{ uses, level, ai, help, look }} />
+          </div>
+        )}
+        <div className="onb-nav">
+          {step > 0 ? (
+            <button onClick={() => setStep(step - 1)}>{tq('back')}</button>
+          ) : (
+            <button className="link" onClick={skip}>
+              {tq('skip')}
+            </button>
+          )}
+          <button className="primary" disabled={busy} onClick={next}>
+            {step === 0 ? tq('start') : step === steps - 1 ? tq('finish') : tq('next')}
+          </button>
+        </div>
       </div>
     </ModalShell>
   );
 }
-

@@ -131,7 +131,12 @@ export interface FrameStat {
 }
 
 /** Per-frame motion and sharpness of grey frames sampled at `fps`. */
-export function frameStats(frames: readonly Uint8Array[], w: number, h: number, fps: number): FrameStat[] {
+export function frameStats(
+  frames: readonly Uint8Array[],
+  w: number,
+  h: number,
+  fps: number,
+): FrameStat[] {
   return frames.map((f, i) => ({
     t: r3(i / fps),
     motion: i ? r3(frameDiff(frames[i - 1]!, f)) : 0,
@@ -146,7 +151,12 @@ export const BLUR_SHARE = 0.45;
 export const SCENE_MOTION = 0.18;
 
 /** Stretches of at least `minLen` s where `bad` holds for every sample. */
-function runs(stats: readonly FrameStat[], bad: (s: FrameStat) => boolean, step: number, minLen: number): Span[] {
+function runs(
+  stats: readonly FrameStat[],
+  bad: (s: FrameStat) => boolean,
+  step: number,
+  minLen: number,
+): Span[] {
   const out: Span[] = [];
   let from = -1;
   stats.forEach((s, i) => {
@@ -156,13 +166,17 @@ function runs(stats: readonly FrameStat[], bad: (s: FrameStat) => boolean, step:
       if (s.t - from >= minLen) out.push([from, s.t]);
       from = -1;
     }
-    if (i === stats.length - 1 && from >= 0 && s.t + step - from >= minLen) out.push([from, r3(s.t + step)]);
+    if (i === stats.length - 1 && from >= 0 && s.t + step - from >= minLen)
+      out.push([from, r3(s.t + step)]);
   });
   return out;
 }
 
 /** Still and blurry stretches, scenes and the average sharpness, from the frame statistics. */
-export function summarizeFrames(stats: readonly FrameStat[], fps: number): Pick<MediaAnalysis, 'still' | 'blurry' | 'scenes' | 'sharpness'> {
+export function summarizeFrames(
+  stats: readonly FrameStat[],
+  fps: number,
+): Pick<MediaAnalysis, 'still' | 'blurry' | 'scenes' | 'sharpness'> {
   if (!stats.length) return {};
   const step = 1 / fps;
   const best = Math.max(...stats.map((s) => s.sharp));
@@ -241,7 +255,10 @@ export function detectBeats(samples: Float32Array, rate: number, minGap = 0.25):
 /** Tempo of steady beats (median interval), or undefined. */
 export function bpmOf(beats: readonly number[]): number | undefined {
   if (beats.length < 4) return undefined;
-  const d = beats.slice(1).map((b, i) => b - beats[i]!).sort((a, b) => a - b);
+  const d = beats
+    .slice(1)
+    .map((b, i) => b - beats[i]!)
+    .sort((a, b) => a - b);
   const med = d[Math.floor(d.length / 2)]!;
   return med > 0 ? Math.round((60 / med) * 10) / 10 : undefined;
 }
@@ -266,7 +283,9 @@ export function snapCuts(
   for (let i = 0; i < out.length; i++) {
     const c = out[i]!;
     let best: number | undefined;
-    for (const b of beats) if (Math.abs(b - c) <= tol && (best === undefined || Math.abs(b - c) < Math.abs(best - c))) best = b;
+    for (const b of beats)
+      if (Math.abs(b - c) <= tol && (best === undefined || Math.abs(b - c) < Math.abs(best - c)))
+        best = b;
     if (best === undefined) continue;
     const prev = i ? out[i - 1]! : -Infinity;
     const next = i + 1 < cuts.length ? cuts[i + 1]! : Infinity;
@@ -284,7 +303,8 @@ export function segmentScore(a: MediaAnalysis | undefined, from: number, to: num
   if (!a) return 0;
   const len = Math.max(1e-6, to - from);
   const overlap = (list: readonly Span[] | undefined) =>
-    (list ?? []).reduce((s, [x, y]) => s + Math.max(0, Math.min(y, to) - Math.max(x, from)), 0) / len;
+    (list ?? []).reduce((s, [x, y]) => s + Math.max(0, Math.min(y, to) - Math.max(x, from)), 0) /
+    len;
   const scenes = (a.scenes ?? []).filter((t) => t > from + 0.2 && t < to - 0.2).length;
   return -2 * overlap(a.still) - 1.5 * overlap(a.blurry) + 0.3 * Math.min(2, scenes);
 }
@@ -313,10 +333,25 @@ export function bestSegment(a: MediaAnalysis | undefined, duration: number, len:
 export function describeAnalysis(a: MediaAnalysis | undefined): string {
   if (!a) return 'not analysed';
   const f = (list: readonly Span[] | undefined) =>
-    list?.length ? list.slice(0, 12).map(([x, y]) => `${x.toFixed(1)}-${y.toFixed(1)}`).join(' ') : 'none';
+    list?.length
+      ? list
+          .slice(0, 12)
+          .map(([x, y]) => `${x.toFixed(1)}-${y.toFixed(1)}`)
+          .join(' ')
+      : 'none';
   const parts: string[] = [];
   if (a.sharpness !== undefined) parts.push(`sharpness ${a.sharpness.toFixed(2)}`);
-  if (a.scenes) parts.push(`scene changes at ${a.scenes.length ? a.scenes.slice(0, 12).map((t) => t.toFixed(1)).join(' ') : 'none'}`);
+  if (a.scenes)
+    parts.push(
+      `scene changes at ${
+        a.scenes.length
+          ? a.scenes
+              .slice(0, 12)
+              .map((t) => t.toFixed(1))
+              .join(' ')
+          : 'none'
+      }`,
+    );
   if (a.voice) parts.push(`sound ${f(a.voice)}`);
   if (a.still) parts.push(`still ${f(a.still)}`);
   if (a.blurry) parts.push(`blurry ${f(a.blurry)}`);

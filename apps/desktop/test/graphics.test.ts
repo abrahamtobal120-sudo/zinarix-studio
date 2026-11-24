@@ -52,23 +52,34 @@ describe('templates', () => {
         expect(svgSize(svg)).toEqual({ width: t.width, height: t.height });
         // Parts are named for the layers list; texts stay real text.
         for (const el of d.documentElement.children)
-          if (el.localName !== 'defs') expect(el.getAttribute('data-name'), `${t.id} ${el.localName}`).toBeTruthy();
+          if (el.localName !== 'defs')
+            expect(el.getAttribute('data-name'), `${t.id} ${el.localName}`).toBeTruthy();
         if (t.id !== 'blank') expect(d.querySelectorAll('text').length).toBeGreaterThan(0);
       }
   });
 
   it('puts the user texts in, escaped, with line breaks as tspans', () => {
-    const svg = buildTemplate({ template: 'instagram-post', title: 'Café <&> "Luna"\nAbierto', subtitle: 'Hoy' });
+    const svg = buildTemplate({
+      template: 'instagram-post',
+      title: 'Café <&> "Luna"\nAbierto',
+      subtitle: 'Hoy',
+    });
     const d = parse(svg);
     expect(d.querySelector('parsererror')).toBeNull();
     const title = d.querySelector('[data-name="Título"]')!;
-    expect([...title.querySelectorAll('tspan')].map((s) => s.textContent)).toEqual(['Café <&> "Luna"', 'Abierto']);
+    expect([...title.querySelectorAll('tspan')].map((s) => s.textContent)).toEqual([
+      'Café <&> "Luna"',
+      'Abierto',
+    ]);
     expect(svg).toContain('Café &lt;&amp;&gt; &quot;Luna&quot;');
     expect(d.querySelector('[data-name="Subtítulo"]')!.textContent).toBe('Hoy');
   });
 
   it('custom size is clamped; English texts; unknown template is refused', () => {
-    expect(svgSize(buildTemplate({ template: 'blank', width: 5, height: 99999 }))).toEqual({ width: 16, height: 10000 });
+    expect(svgSize(buildTemplate({ template: 'blank', width: 5, height: 99999 }))).toEqual({
+      width: 16,
+      height: 10000,
+    });
     expect(buildTemplate({ template: 'logo', lang: 'en' })).toContain('My Brand');
     expect(() => buildTemplate({ template: 'nope' })).toThrow(/Unknown template/);
   });
@@ -111,14 +122,39 @@ describe('geometry', () => {
 
   it('resize from handles keeps the opposite side, the ratio and the center', () => {
     const b = { x: 0, y: 0, w: 100, h: 50 };
-    expect(resizeBox(b, 'se', { x: 200, y: 80 }, false, false)).toEqual({ x: 0, y: 0, w: 200, h: 80 });
-    expect(resizeBox(b, 'nw', { x: 50, y: 25 }, false, false)).toEqual({ x: 50, y: 25, w: 50, h: 25 });
-    expect(resizeBox(b, 'e', { x: 300, y: 999 }, true, false)).toEqual({ x: 0, y: -50, w: 300, h: 150 });
+    expect(resizeBox(b, 'se', { x: 200, y: 80 }, false, false)).toEqual({
+      x: 0,
+      y: 0,
+      w: 200,
+      h: 80,
+    });
+    expect(resizeBox(b, 'nw', { x: 50, y: 25 }, false, false)).toEqual({
+      x: 50,
+      y: 25,
+      w: 50,
+      h: 25,
+    });
+    expect(resizeBox(b, 'e', { x: 300, y: 999 }, true, false)).toEqual({
+      x: 0,
+      y: -50,
+      w: 300,
+      h: 150,
+    });
     const r = resizeBox(b, 'se', { x: 300, y: 60 }, true, false);
     expect(r.w / r.h).toBeCloseTo(2);
-    expect(resizeBox(b, 'e', { x: 150, y: 0 }, false, true)).toEqual({ x: -50, y: 0, w: 200, h: 50 });
+    expect(resizeBox(b, 'e', { x: 150, y: 0 }, false, true)).toEqual({
+      x: -50,
+      y: 0,
+      w: 200,
+      h: 50,
+    });
     // Dragged past the other side: flipped into place, never a negative size.
-    expect(resizeBox(b, 'e', { x: -40, y: 0 }, false, false)).toEqual({ x: -40, y: 0, w: 40, h: 50 });
+    expect(resizeBox(b, 'e', { x: -40, y: 0 }, false, false)).toEqual({
+      x: -40,
+      y: 0,
+      w: 40,
+      h: 50,
+    });
   });
 
   it('align and distribute', () => {
@@ -154,11 +190,31 @@ describe('geometry', () => {
   });
 
   it('pen paths: corners are lines, handles make curves, closing joins the start', () => {
-    expect(penPath([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], true)).toBe('M 0 0 L 10 0 L 10 10 Z');
-    expect(penPath([{ x: 0, y: 0, hx: 5, hy: -5 }, { x: 10, y: 0 }], false)).toBe('M 0 0 C 5 -5 10 0 10 0');
-    const d = parse(`<svg xmlns="http://www.w3.org/2000/svg"><path d="${shapePath('heart', { x: 0, y: 0, w: 10, h: 10 })}"/></svg>`);
+    expect(
+      penPath(
+        [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+          { x: 10, y: 10 },
+        ],
+        true,
+      ),
+    ).toBe('M 0 0 L 10 0 L 10 10 Z');
+    expect(
+      penPath(
+        [
+          { x: 0, y: 0, hx: 5, hy: -5 },
+          { x: 10, y: 0 },
+        ],
+        false,
+      ),
+    ).toBe('M 0 0 C 5 -5 10 0 10 0');
+    const d = parse(
+      `<svg xmlns="http://www.w3.org/2000/svg"><path d="${shapePath('heart', { x: 0, y: 0, w: 10, h: 10 })}"/></svg>`,
+    );
     expect(d.querySelector('parsererror')).toBeNull();
-    for (const k of ['star', 'triangle', 'hexagon', 'arrow', 'speech'] as const) expect(shapePath(k, { x: 0, y: 0, w: 10, h: 10 })).toMatch(/^M .* Z$/);
+    for (const k of ['star', 'triangle', 'hexagon', 'arrow', 'speech'] as const)
+      expect(shapePath(k, { x: 0, y: 0, w: 10, h: 10 })).toMatch(/^M .* Z$/);
   });
 
   it('colors for the color picker', () => {
@@ -182,10 +238,18 @@ describe('design editor DOM helpers', () => {
   });
 
   it('writes text lines as tspans under each other', () => {
-    const d = parse('<svg xmlns="http://www.w3.org/2000/svg"><text x="40 50" y="9">old</text></svg>');
+    const d = parse(
+      '<svg xmlns="http://www.w3.org/2000/svg"><text x="40 50" y="9">old</text></svg>',
+    );
     const t = d.querySelector('text') as unknown as SVGTextElement;
     setTextLines(t, 'uno\ndos');
-    expect([...t.querySelectorAll('tspan')].map((s) => [s.getAttribute('x'), s.getAttribute('dy'), s.textContent])).toEqual([
+    expect(
+      [...t.querySelectorAll('tspan')].map((s) => [
+        s.getAttribute('x'),
+        s.getAttribute('dy'),
+        s.textContent,
+      ]),
+    ).toEqual([
       ['40', '0', 'uno'],
       ['40', '1.15em', 'dos'],
     ]);
@@ -198,7 +262,10 @@ describe('design editor DOM helpers', () => {
 describe('design tools of the agent', () => {
   const fakePng = Buffer.from('89504e470d0a1a0a', 'hex');
   const calls: { w: number; h: number; mime: string; bg?: string | null }[] = [];
-  const raster = async (_svg: string, o: { width: number; height: number; mime: string; background?: string | null }) => {
+  const raster = async (
+    _svg: string,
+    o: { width: number; height: number; mime: string; background?: string | null },
+  ) => {
     calls.push({ w: o.width, h: o.height, mime: o.mime, bg: o.background });
     return fakePng;
   };
@@ -213,7 +280,12 @@ describe('design tools of the agent', () => {
   it('design_new writes a template into disenos/ with a free name and opens it', async () => {
     const card = graphicsPreview('design_new', { template: 'logo' }, root);
     expect(card && 'action' in card && card.allowKey).toBe('design_new:new');
-    const a = await runGraphicsTool(raster, 'design_new', { template: 'logo', palette: 'forest', title: 'Luna' }, root);
+    const a = await runGraphicsTool(
+      raster,
+      'design_new',
+      { template: 'logo', palette: 'forest', title: 'Luna' },
+      root,
+    );
     const b = await runGraphicsTool(raster, 'design_new', { template: 'logo' }, root);
     expect(a.ok && b.ok).toBe(true);
     expect([a.changed, b.changed]).toEqual(['disenos/logo.svg', 'disenos/logo-2.svg']);
@@ -226,17 +298,26 @@ describe('design tools of the agent', () => {
     expect(graphicsPreview('design_new', { template: 'blank', path: 'mine.svg' }, root)).toEqual({
       error: expect.stringMatching(/already exists/),
     });
-    const card = graphicsPreview('design_new', { template: 'blank', path: 'mine.svg', overwrite: true }, root);
+    const card = graphicsPreview(
+      'design_new',
+      { template: 'blank', path: 'mine.svg', overwrite: true },
+      root,
+    );
     expect(card && 'risk' in card && card.risk).toBe('high');
     expect(card && 'allowKey' in card).toBe(false);
     expect(graphicsPreview('design_new', { template: 'blank', path: '../out.svg' }, root)).toEqual({
       error: expect.stringMatching(/inside the open project/),
     });
-    expect(graphicsPreview('design_new', { template: 'blank', path: 'x.png' }, root)).toEqual({ error: expect.stringMatching(/\.svg/) });
+    expect(graphicsPreview('design_new', { template: 'blank', path: 'x.png' }, root)).toEqual({
+      error: expect.stringMatching(/\.svg/),
+    });
   });
 
   it('svg_render gives the model the picture, fitted to 1024 px, with notes', async () => {
-    writeFileSync(join(root, 'big.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="2000"><script/><image href="https://x/y.png"/></svg>');
+    writeFileSync(
+      join(root, 'big.svg'),
+      '<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="2000"><script/><image href="https://x/y.png"/></svg>',
+    );
     calls.length = 0;
     const r = await runGraphicsTool(raster, 'svg_render', { path: 'big.svg' }, root);
     expect(r.ok).toBe(true);
@@ -262,20 +343,37 @@ describe('design tools of the agent', () => {
     const again = graphicsPreview('svg_export', { path: 'card.svg' }, root);
     expect(again && 'risk' in again && again.risk).toBe('high');
     calls.length = 0;
-    await runGraphicsTool(raster, 'svg_export', { path: 'card.svg', out: 'web/card.jpg', width: 525 }, root);
+    await runGraphicsTool(
+      raster,
+      'svg_export',
+      { path: 'card.svg', out: 'web/card.jpg', width: 525 },
+      root,
+    );
     expect(calls[0]).toMatchObject({ w: 525, h: 300, mime: 'image/jpeg' });
     expect(existsSync(join(root, 'web/card.jpg'))).toBe(true);
-    expect(graphicsPreview('svg_export', { path: 'card.svg', out: 'card.gif' }, root)).toEqual({ error: expect.stringMatching(/png or \.jpg/) });
+    expect(graphicsPreview('svg_export', { path: 'card.svg', out: 'card.gif' }, root)).toEqual({
+      error: expect.stringMatching(/png or \.jpg/),
+    });
   });
 
   it('export size keeps the proportion and the 8192 px limit', () => {
-    expect(exportSize({ width: 1000, height: 500 }, { width: 300 })).toEqual({ width: 300, height: 150 });
-    expect(exportSize({ width: 5000, height: 2500 }, { scale: 4 })).toEqual({ width: 8192, height: 4096 });
+    expect(exportSize({ width: 1000, height: 500 }, { width: 300 })).toEqual({
+      width: 300,
+      height: 150,
+    });
+    expect(exportSize({ width: 5000, height: 2500 }, { scale: 4 })).toEqual({
+      width: 8192,
+      height: 4096,
+    });
   });
 
   it('without a raster or a folder the tools say so', async () => {
     expect((await runGraphicsTool(null, 'svg_render', { path: 'card.svg' }, root)).ok).toBe(false);
-    expect((await runGraphicsTool(raster, 'design_new', { template: 'logo' }, undefined)).content).toMatch(/No folder/);
-    expect((await runGraphicsTool(null, 'design_templates', {}, undefined)).content).toMatch(/instagram-post/);
+    expect(
+      (await runGraphicsTool(raster, 'design_new', { template: 'logo' }, undefined)).content,
+    ).toMatch(/No folder/);
+    expect((await runGraphicsTool(null, 'design_templates', {}, undefined)).content).toMatch(
+      /instagram-post/,
+    );
   });
 });

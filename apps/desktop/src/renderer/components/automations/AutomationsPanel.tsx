@@ -20,10 +20,20 @@ import { ta } from './automationsStrings';
 import './automations.css';
 
 type Tab = 'tasks' | 'bots' | 'widget';
-const DATE_FMT = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const DATE_FMT = new Intl.DateTimeFormat(lang, {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 const when = (ts: number) => DATE_FMT.format(ts);
-const DAY_LETTERS = lang === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
-const DELIVERY_NAMES: Record<Delivery, string> = { telegram: 'Telegram', discord: 'Discord', whatsapp: 'WhatsApp' };
+const DAY_LETTERS =
+  lang === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+const DELIVERY_NAMES: Record<Delivery, string> = {
+  telegram: 'Telegram',
+  discord: 'Discord',
+  whatsapp: 'WhatsApp',
+};
 const ICONS = ['🤖', '💬', '🛍️', '🧑‍💻', '📚', '🧠', '📈', '🛠️', '🎨', '🩺', '⚖️', '🏠'];
 
 /** Runs an API call; errors become a toast. */
@@ -121,7 +131,12 @@ export function AutomationsPanel() {
             <div className="dim small">{ta('loading')}</div>
           )
         ) : tab === 'tasks' ? (
-          <TasksTab tasks={status.tasks} runs={status.runs} bots={status.bots} running={status.running} />
+          <TasksTab
+            tasks={status.tasks}
+            runs={status.runs}
+            bots={status.bots}
+            running={status.running}
+          />
         ) : tab === 'bots' ? (
           <BotsTab bots={status.bots} />
         ) : (
@@ -143,13 +158,39 @@ const blankTask = (): AutoTaskInput => ({
   deliver: [],
 });
 
-function TasksTab({ tasks, runs, bots, running }: { tasks: AutoTask[]; runs: AutoRun[]; bots: BotDef[]; running: string[] }) {
+function TasksTab({
+  tasks,
+  runs,
+  bots,
+  running,
+}: {
+  tasks: AutoTask[];
+  runs: AutoRun[];
+  bots: BotDef[];
+  running: string[];
+}) {
   const [editing, setEditing] = useState<{ id?: string; input: AutoTaskInput } | null>(null);
   const templates: { name: string; prompt: string; schedule: Schedule }[] = [
-    { name: ta('tplMail'), prompt: ta('tplMailPrompt'), schedule: { kind: 'daily', time: '09:00', days: [] } },
-    { name: ta('tplDeps'), prompt: ta('tplDepsPrompt'), schedule: { kind: 'daily', time: '10:00', days: [1] } },
-    { name: ta('tplVercel'), prompt: ta('tplVercelPrompt'), schedule: { kind: 'every', minutes: 60 } },
-    { name: ta('tplNews'), prompt: ta('tplNewsPrompt'), schedule: { kind: 'daily', time: '08:00', days: [1, 2, 3, 4, 5] } },
+    {
+      name: ta('tplMail'),
+      prompt: ta('tplMailPrompt'),
+      schedule: { kind: 'daily', time: '09:00', days: [] },
+    },
+    {
+      name: ta('tplDeps'),
+      prompt: ta('tplDepsPrompt'),
+      schedule: { kind: 'daily', time: '10:00', days: [1] },
+    },
+    {
+      name: ta('tplVercel'),
+      prompt: ta('tplVercelPrompt'),
+      schedule: { kind: 'every', minutes: 60 },
+    },
+    {
+      name: ta('tplNews'),
+      prompt: ta('tplNewsPrompt'),
+      schedule: { kind: 'daily', time: '08:00', days: [1, 2, 3, 4, 5] },
+    },
   ];
   const root = useStore((s) => s.workspace?.root);
   if (editing)
@@ -223,7 +264,17 @@ function TasksTab({ tasks, runs, bots, running }: { tasks: AutoTask[]; runs: Aut
   );
 }
 
-function TaskRow({ task, running, bot, onEdit }: { task: AutoTask; running: boolean; bot?: BotDef; onEdit: () => void }) {
+function TaskRow({
+  task,
+  running,
+  bot,
+  onEdit,
+}: {
+  task: AutoTask;
+  running: boolean;
+  bot?: BotDef;
+  onEdit: () => void;
+}) {
   const set = (p: Promise<unknown>) => void act(() => p);
   return (
     <div className={`auto-card${task.enabled ? '' : ' off'}`}>
@@ -280,7 +331,8 @@ function TaskRow({ task, running, bot, onEdit }: { task: AutoTask; running: bool
         <button
           className="link small"
           onClick={async () => {
-            if (!(await confirmDialog(ta('removeTaskAsk', { name: task.name }), { danger: true }))) return;
+            if (!(await confirmDialog(ta('removeTaskAsk', { name: task.name }), { danger: true })))
+              return;
             const s = await act(() => api().automations.deleteTask(task.id));
             if (s) setState({ automations: s });
           }}
@@ -297,13 +349,30 @@ function toLocalInput(ms: number): string {
   return d.toISOString().slice(0, 16);
 }
 
-function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: string; bots: BotDef[]; onDone: () => void }) {
+function TaskForm({
+  initial,
+  id,
+  bots,
+  onDone,
+}: {
+  initial: AutoTaskInput;
+  id?: string;
+  bots: BotDef[];
+  onDone: () => void;
+}) {
   const [f, setF] = useState<AutoTaskInput>(initial);
-  const [can, setCan] = useState<Record<Delivery, boolean>>({ telegram: false, discord: false, whatsapp: false });
+  const [can, setCan] = useState<Record<Delivery, boolean>>({
+    telegram: false,
+    discord: false,
+    whatsapp: false,
+  });
   const models = useModels();
   const root = useStore((s) => s.workspace?.root);
   useEffect(() => {
-    void api().automations.deliveries().then(setCan).catch(() => undefined);
+    void api()
+      .automations.deliveries()
+      .then(setCan)
+      .catch(() => undefined);
   }, []);
   const patch = (p: Partial<AutoTaskInput>) => setF((x) => ({ ...x, ...p }));
   const s = f.schedule;
@@ -336,11 +405,21 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
     <div className="auto-form">
       <label className="auto-field">
         <span>{ta('name')}</span>
-        <input value={f.name} maxLength={80} onChange={(e) => patch({ name: e.target.value })} autoFocus />
+        <input
+          value={f.name}
+          maxLength={80}
+          onChange={(e) => patch({ name: e.target.value })}
+          autoFocus
+        />
       </label>
       <label className="auto-field">
         <span>{ta('prompt')}</span>
-        <textarea rows={4} value={f.prompt} placeholder={ta('promptPh')} onChange={(e) => patch({ prompt: e.target.value })} />
+        <textarea
+          rows={4}
+          value={f.prompt}
+          placeholder={ta('promptPh')}
+          onChange={(e) => patch({ prompt: e.target.value })}
+        />
       </label>
       <div className="auto-field">
         <span>{ta('when')}</span>
@@ -353,7 +432,11 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
           <>
             <div className="auto-inline">
               <span className="small">{ta('at')}</span>
-              <input type="time" value={s.time} onChange={(e) => patch({ schedule: { ...s, time: e.target.value } })} />
+              <input
+                type="time"
+                value={s.time}
+                onChange={(e) => patch({ schedule: { ...s, time: e.target.value } })}
+              />
             </div>
             <div className="small dim">{ta('days')}</div>
             <div className="auto-days">
@@ -367,7 +450,10 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
                     className={`auto-day${on ? ' on' : ''}`}
                     onClick={() =>
                       patch({
-                        schedule: { ...s, days: on ? s.days.filter((x) => x !== i) : [...s.days, i].sort() },
+                        schedule: {
+                          ...s,
+                          days: on ? s.days.filter((x) => x !== i) : [...s.days, i].sort(),
+                        },
                       })
                     }
                   >
@@ -396,7 +482,10 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
                 patch({
                   schedule: {
                     kind: 'every',
-                    minutes: e.target.value === 'h' ? Math.max(1, Math.round(s.minutes / 60)) * 60 : Math.max(5, s.minutes),
+                    minutes:
+                      e.target.value === 'h'
+                        ? Math.max(1, Math.round(s.minutes / 60)) * 60
+                        : Math.max(5, s.minutes),
                   },
                 })
               }
@@ -430,7 +519,10 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
       </label>
       <label className="auto-field">
         <span>{ta('model')}</span>
-        <select value={f.model ?? ''} onChange={(e) => patch({ model: e.target.value || undefined })}>
+        <select
+          value={f.model ?? ''}
+          onChange={(e) => patch({ model: e.target.value || undefined })}
+        >
           <option value="">{ta('modelDefault')}</option>
           {[...new Set([...(f.model ? [f.model] : []), ...models])].map((m) => (
             <option key={m} value={m}>
@@ -442,10 +534,20 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
       <div className="auto-field">
         <span>{ta('tools')}</span>
         <label className="auto-radio">
-          <input type="radio" checked={f.tools === 'none'} onChange={() => patch({ tools: 'none' })} /> {ta('toolsNone')}
+          <input
+            type="radio"
+            checked={f.tools === 'none'}
+            onChange={() => patch({ tools: 'none' })}
+          />{' '}
+          {ta('toolsNone')}
         </label>
         <label className="auto-radio">
-          <input type="radio" checked={f.tools === 'read'} onChange={() => patch({ tools: 'read' })} /> {ta('toolsRead')}
+          <input
+            type="radio"
+            checked={f.tools === 'read'}
+            onChange={() => patch({ tools: 'read' })}
+          />{' '}
+          {ta('toolsRead')}
         </label>
         {f.tools === 'read' && <div className="small dim">{ta('toolsReadHint')}</div>}
       </div>
@@ -472,7 +574,11 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
               {ta('folderPick')}
             </button>
             {f.folder && (
-              <button className="link small" aria-label={ta('folderNone')} onClick={() => patch({ folder: undefined })}>
+              <button
+                className="link small"
+                aria-label={ta('folderNone')}
+                onClick={() => patch({ folder: undefined })}
+              >
                 <Icon name="x" size={11} />
               </button>
             )}
@@ -487,7 +593,9 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
               type="checkbox"
               checked={f.deliver.includes(k)}
               onChange={(e) =>
-                patch({ deliver: e.target.checked ? [...f.deliver, k] : f.deliver.filter((x) => x !== k) })
+                patch({
+                  deliver: e.target.checked ? [...f.deliver, k] : f.deliver.filter((x) => x !== k),
+                })
               }
             />{' '}
             {DELIVERY_NAMES[k]} {!can[k] && <span className="dim small">{ta('deliverOff')}</span>}
@@ -496,10 +604,19 @@ function TaskForm({ initial, id, bots, onDone }: { initial: AutoTaskInput; id?: 
         <div className="small dim">{ta('deliverHint')}</div>
       </div>
       <label className="auto-radio">
-        <input type="checkbox" checked={f.enabled} onChange={(e) => patch({ enabled: e.target.checked })} /> {ta('enabled')}
+        <input
+          type="checkbox"
+          checked={f.enabled}
+          onChange={(e) => patch({ enabled: e.target.checked })}
+        />{' '}
+        {ta('enabled')}
       </label>
       <div className="auto-actions">
-        <button className="primary" disabled={!f.name.trim() || !f.prompt.trim()} onClick={() => void save()}>
+        <button
+          className="primary"
+          disabled={!f.name.trim() || !f.prompt.trim()}
+          onClick={() => void save()}
+        >
           {id ? ta('save') : ta('create')}
         </button>
         <button onClick={onDone}>{ta('cancel')}</button>
@@ -532,7 +649,11 @@ function Runs({ runs }: { runs: AutoRun[] }) {
         const isOpen = open === r.id;
         return (
           <div key={r.id} className={`auto-run auto-run-${r.state}`}>
-            <button className="auto-run-head" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.id)}>
+            <button
+              className="auto-run-head"
+              aria-expanded={isOpen}
+              onClick={() => setOpen(isOpen ? null : r.id)}
+            >
               <span className="auto-run-dot" aria-hidden="true" />
               <span className="auto-run-name">{r.taskName}</span>
               <span className="dim small">
@@ -548,7 +669,11 @@ function Runs({ runs }: { runs: AutoRun[] }) {
                 {r.state === 'running' && <div className="small dim">{ta('running')}</div>}
                 {r.error && <div className="small auto-error">{r.error}</div>}
                 {r.text && <div className="small auto-run-text">{r.text}</div>}
-                {r.denied > 0 && <div className="small dim"><Icon name="warning" size={14} /> {ta('denied', { n: r.denied })}</div>}
+                {r.denied > 0 && (
+                  <div className="small dim">
+                    <Icon name="warning" size={14} /> {ta('denied', { n: r.denied })}
+                  </div>
+                )}
                 {r.delivery?.map((d) => (
                   <div key={d} className="small auto-error">
                     {d}
@@ -563,7 +688,10 @@ function Runs({ runs }: { runs: AutoRun[] }) {
                     <button
                       className="link small"
                       onClick={() => {
-                        newChat({ conversationId: r.conversationId, title: r.taskName.slice(0, 60) });
+                        newChat({
+                          conversationId: r.conversationId,
+                          title: r.taskName.slice(0, 60),
+                        });
                         setState({ chatOpen: true });
                       }}
                     >
@@ -573,7 +701,9 @@ function Runs({ runs }: { runs: AutoRun[] }) {
                   {r.text && (
                     <button
                       className="link small"
-                      onClick={() => void navigator.clipboard.writeText(r.text).then(() => toast(ta('copied')))}
+                      onClick={() =>
+                        void navigator.clipboard.writeText(r.text).then(() => toast(ta('copied')))
+                      }
                     >
                       <Icon name="copy" size={12} /> {ta('copy')}
                     </button>
@@ -604,11 +734,33 @@ const blankBot = (): BotInput => ({
 function BotsTab({ bots }: { bots: BotDef[] }) {
   const [editing, setEditing] = useState<{ id?: string; input: BotInput } | null>(null);
   const templates: BotInput[] = [
-    { ...blankBot(), name: ta('tplSupport'), icon: '🛍️', description: ta('tplSupportDesc'), instructions: ta('tplSupportInstr'), knowledge: ta('tplSupportKnow'), greeting: ta('greetingPh') },
-    { ...blankBot(), name: ta('tplReviewer'), icon: '🧑‍💻', description: ta('tplReviewerDesc'), instructions: ta('tplReviewerInstr'), mode: 'agent' },
-    { ...blankBot(), name: ta('tplTutor'), icon: '📚', description: ta('tplTutorDesc'), instructions: ta('tplTutorInstr') },
+    {
+      ...blankBot(),
+      name: ta('tplSupport'),
+      icon: '🛍️',
+      description: ta('tplSupportDesc'),
+      instructions: ta('tplSupportInstr'),
+      knowledge: ta('tplSupportKnow'),
+      greeting: ta('greetingPh'),
+    },
+    {
+      ...blankBot(),
+      name: ta('tplReviewer'),
+      icon: '🧑‍💻',
+      description: ta('tplReviewerDesc'),
+      instructions: ta('tplReviewerInstr'),
+      mode: 'agent',
+    },
+    {
+      ...blankBot(),
+      name: ta('tplTutor'),
+      icon: '📚',
+      description: ta('tplTutorDesc'),
+      instructions: ta('tplTutorInstr'),
+    },
   ];
-  if (editing) return <BotForm initial={editing.input} id={editing.id} onDone={() => setEditing(null)} />;
+  if (editing)
+    return <BotForm initial={editing.input} id={editing.id} onDone={() => setEditing(null)} />;
   return (
     <>
       <p className="dim small">{ta('botsIntro')}</p>
@@ -648,7 +800,9 @@ function BotsTab({ bots }: { bots: BotDef[] }) {
               <strong className="auto-card-title">{b.name}</strong>
               {b.description && <div className="dim small">{b.description}</div>}
               <div className="dim small">
-                {b.mode === 'agent' ? ta('modeAgent').split(' (')[0] : ta('modeChat').split(' (')[0]}
+                {b.mode === 'agent'
+                  ? ta('modeAgent').split(' (')[0]
+                  : ta('modeChat').split(' (')[0]}
                 {b.model ? ` · ${b.model}` : ''}
               </div>
             </div>
@@ -680,7 +834,11 @@ function BotsTab({ bots }: { bots: BotDef[] }) {
             </button>
             <button
               className="link small"
-              onClick={() => void act(() => api().automations.exportBot(b.id)).then((ok) => ok && toast(ta('exported')))}
+              onClick={() =>
+                void act(() => api().automations.exportBot(b.id)).then(
+                  (ok) => ok && toast(ta('exported')),
+                )
+              }
             >
               <Icon name="external" size={12} /> {ta('exportBot')}
             </button>
@@ -697,7 +855,8 @@ function BotsTab({ bots }: { bots: BotDef[] }) {
             <button
               className="link small"
               onClick={async () => {
-                if (!(await confirmDialog(ta('removeBotAsk', { name: b.name }), { danger: true }))) return;
+                if (!(await confirmDialog(ta('removeBotAsk', { name: b.name }), { danger: true })))
+                  return;
                 const s = await act(() => api().automations.deleteBot(b.id));
                 if (s) setState({ automations: s });
               }}
@@ -716,7 +875,10 @@ function BotForm({ initial, id, onDone }: { initial: BotInput; id?: string; onDo
   const [docs, setDocs] = useState<DocSourceView[]>([]);
   const models = useModels();
   useEffect(() => {
-    void api().knowledge.docs().then(setDocs).catch(() => undefined);
+    void api()
+      .knowledge.docs()
+      .then(setDocs)
+      .catch(() => undefined);
   }, []);
   const patch = (p: Partial<BotInput>) => setF((x) => ({ ...x, ...p }));
   const save = async () => {
@@ -753,23 +915,45 @@ function BotForm({ initial, id, onDone }: { initial: BotInput; id?: string; onDo
       </div>
       <label className="auto-field">
         <span>{ta('name')}</span>
-        <input value={f.name} maxLength={60} onChange={(e) => patch({ name: e.target.value })} autoFocus />
+        <input
+          value={f.name}
+          maxLength={60}
+          onChange={(e) => patch({ name: e.target.value })}
+          autoFocus
+        />
       </label>
       <label className="auto-field">
         <span>{ta('description')}</span>
-        <input value={f.description} maxLength={300} onChange={(e) => patch({ description: e.target.value })} />
+        <input
+          value={f.description}
+          maxLength={300}
+          onChange={(e) => patch({ description: e.target.value })}
+        />
       </label>
       <label className="auto-field">
         <span>{ta('instructions')}</span>
-        <textarea rows={6} value={f.instructions} placeholder={ta('instructionsPh')} onChange={(e) => patch({ instructions: e.target.value })} />
+        <textarea
+          rows={6}
+          value={f.instructions}
+          placeholder={ta('instructionsPh')}
+          onChange={(e) => patch({ instructions: e.target.value })}
+        />
       </label>
       <label className="auto-field">
         <span>{ta('knowledge')}</span>
-        <textarea rows={5} value={f.knowledge} placeholder={ta('knowledgePh')} onChange={(e) => patch({ knowledge: e.target.value })} />
+        <textarea
+          rows={5}
+          value={f.knowledge}
+          placeholder={ta('knowledgePh')}
+          onChange={(e) => patch({ knowledge: e.target.value })}
+        />
       </label>
       <label className="auto-field">
         <span>{ta('model')}</span>
-        <select value={f.model ?? ''} onChange={(e) => patch({ model: e.target.value || undefined })}>
+        <select
+          value={f.model ?? ''}
+          onChange={(e) => patch({ model: e.target.value || undefined })}
+        >
           <option value="">{ta('modelDefault')}</option>
           {[...new Set([...(f.model ? [f.model] : []), ...models])].map((m) => (
             <option key={m} value={m}>
@@ -781,10 +965,20 @@ function BotForm({ initial, id, onDone }: { initial: BotInput; id?: string; onDo
       <div className="auto-field">
         <span>{ta('mode')}</span>
         <label className="auto-radio">
-          <input type="radio" checked={f.mode === 'chat'} onChange={() => patch({ mode: 'chat' })} /> {ta('modeChat')}
+          <input
+            type="radio"
+            checked={f.mode === 'chat'}
+            onChange={() => patch({ mode: 'chat' })}
+          />{' '}
+          {ta('modeChat')}
         </label>
         <label className="auto-radio">
-          <input type="radio" checked={f.mode === 'agent'} onChange={() => patch({ mode: 'agent' })} /> {ta('modeAgent')}
+          <input
+            type="radio"
+            checked={f.mode === 'agent'}
+            onChange={() => patch({ mode: 'agent' })}
+          />{' '}
+          {ta('modeAgent')}
         </label>
       </div>
       <div className="auto-field">
@@ -796,7 +990,9 @@ function BotForm({ initial, id, onDone }: { initial: BotInput; id?: string; onDo
               type="checkbox"
               checked={f.docs.includes(d.name)}
               onChange={(e) =>
-                patch({ docs: e.target.checked ? [...f.docs, d.name] : f.docs.filter((x) => x !== d.name) })
+                patch({
+                  docs: e.target.checked ? [...f.docs, d.name] : f.docs.filter((x) => x !== d.name),
+                })
               }
             />{' '}
             {d.name} <span className="dim small">{d.url}</span>
@@ -805,7 +1001,12 @@ function BotForm({ initial, id, onDone }: { initial: BotInput; id?: string; onDo
       </div>
       <label className="auto-field">
         <span>{ta('greeting')}</span>
-        <input value={f.greeting} maxLength={500} placeholder={ta('greetingPh')} onChange={(e) => patch({ greeting: e.target.value })} />
+        <input
+          value={f.greeting}
+          maxLength={500}
+          placeholder={ta('greetingPh')}
+          onChange={(e) => patch({ greeting: e.target.value })}
+        />
       </label>
       <div className="auto-actions">
         <button className="primary" disabled={!f.name.trim()} onClick={() => void save()}>
@@ -856,7 +1057,10 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
       color: w.color,
       position: w.position,
       perMinute: w.perMinute,
-      origins: origins.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),
+      origins: origins
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
     },
   });
   const saveSettings = async (quiet = false) => {
@@ -867,7 +1071,9 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
     }
     return Boolean(s);
   };
-  const snippet = bot.widget.vercelUrl ? `<script src="${bot.widget.vercelUrl}/widget.js" defer></script>` : '';
+  const snippet = bot.widget.vercelUrl
+    ? `<script src="${bot.widget.vercelUrl}/widget.js" defer></script>`
+    : '';
   return (
     <>
       <p className="dim small">{ta('widgetIntro')}</p>
@@ -883,21 +1089,38 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
       </label>
       <label className="auto-field">
         <span>{ta('wTitle')}</span>
-        <input value={w.title} maxLength={60} onChange={(e) => setW({ ...w, title: e.target.value })} />
+        <input
+          value={w.title}
+          maxLength={60}
+          onChange={(e) => setW({ ...w, title: e.target.value })}
+        />
       </label>
       <div className="auto-inline">
         <label className="auto-inline">
           <span className="small">{ta('wColor')}</span>
-          <input type="color" value={w.color} onChange={(e) => setW({ ...w, color: e.target.value })} />
+          <input
+            type="color"
+            value={w.color}
+            onChange={(e) => setW({ ...w, color: e.target.value })}
+          />
         </label>
-        <select value={w.position} aria-label={ta('wPosition')} onChange={(e) => setW({ ...w, position: e.target.value as 'left' | 'right' })}>
+        <select
+          value={w.position}
+          aria-label={ta('wPosition')}
+          onChange={(e) => setW({ ...w, position: e.target.value as 'left' | 'right' })}
+        >
           <option value="right">{ta('wRight')}</option>
           <option value="left">{ta('wLeft')}</option>
         </select>
       </div>
       <label className="auto-field">
         <span>{ta('wOrigins')}</span>
-        <textarea rows={2} value={origins} placeholder={ta('wOriginsPh')} onChange={(e) => setOrigins(e.target.value)} />
+        <textarea
+          rows={2}
+          value={origins}
+          placeholder={ta('wOriginsPh')}
+          onChange={(e) => setOrigins(e.target.value)}
+        />
       </label>
       <label className="auto-field">
         <span>{ta('wPerMinute')}</span>
@@ -906,7 +1129,9 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
           min={1}
           max={60}
           value={w.perMinute}
-          onChange={(e) => setW({ ...w, perMinute: Math.min(60, Math.max(1, Number(e.target.value) || 1)) })}
+          onChange={(e) =>
+            setW({ ...w, perMinute: Math.min(60, Math.max(1, Number(e.target.value) || 1)) })
+          }
         />
       </label>
       <div className="auto-actions">
@@ -923,7 +1148,8 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
       </div>
       <div className="auto-publish">
         <label className="auto-radio">
-          <input type="checkbox" checked={sendKey} onChange={(e) => setSendKey(e.target.checked)} /> {ta('wSendKey')}
+          <input type="checkbox" checked={sendKey} onChange={(e) => setSendKey(e.target.checked)} />{' '}
+          {ta('wSendKey')}
         </label>
         <div className="small dim">{ta('wSendKeyHint')}</div>
         <button
@@ -949,7 +1175,12 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
           <div className="small">{ta('wSnippet')}</div>
           <code>{snippet}</code>
           <div className="auto-actions">
-            <button className="link small" onClick={() => void navigator.clipboard.writeText(snippet).then(() => toast(ta('copied')))}>
+            <button
+              className="link small"
+              onClick={() =>
+                void navigator.clipboard.writeText(snippet).then(() => toast(ta('copied')))
+              }
+            >
               <Icon name="copy" size={12} /> {ta('copy')}
             </button>
             <button className="link small" onClick={(e) => openLink(bot.widget.vercelUrl!, e)}>
@@ -959,9 +1190,13 @@ function WidgetTab({ bots }: { bots: BotDef[] }) {
           {keyMissing && <div className="small auto-error">{ta('wKeyMissing')}</div>}
         </div>
       )}
-      <p className="dim small auto-note">{ta('wModelNote', { model: bot.model ?? ta('modelAppDefault') })}</p>
+      <p className="dim small auto-note">
+        {ta('wModelNote', { model: bot.model ?? ta('modelAppDefault') })}
+      </p>
       {bot.docs.length > 0 && <p className="dim small auto-note">{ta('wDocsNote')}</p>}
-      <p className="dim small auto-note"><Icon name="warning" size={14} /> <span>{ta('wCost')}</span></p>
+      <p className="dim small auto-note">
+        <Icon name="warning" size={14} /> <span>{ta('wCost')}</span>
+      </p>
     </>
   );
 }

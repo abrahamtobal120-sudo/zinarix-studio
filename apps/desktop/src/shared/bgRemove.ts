@@ -169,7 +169,13 @@ export function maskFromOutput(out: Float32Array, side: number, w: number, h: nu
 }
 
 /** A mask of w × h resized to W × H (bilinear), e.g. the full-size mask for the preview. */
-export function resizeMask(mask: Uint8Array, w: number, h: number, W: number, H: number): Uint8Array {
+export function resizeMask(
+  mask: Uint8Array,
+  w: number,
+  h: number,
+  W: number,
+  H: number,
+): Uint8Array {
   if (w === W && h === H) return mask;
   const f = new Float32Array(mask.length);
   for (let i = 0; i < mask.length; i++) f[i] = mask[i]!;
@@ -197,7 +203,8 @@ export function resizeMask(mask: Uint8Array, w: number, h: number, W: number, H:
 
 /** The picture with the mask as its alpha (multiplied with any alpha it already had). */
 export function applyMask(img: Rgba, mask: Uint8Array): Rgba {
-  if (mask.length !== img.width * img.height) throw new Error('The mask does not match the picture.');
+  if (mask.length !== img.width * img.height)
+    throw new Error('The mask does not match the picture.');
   const d = new Uint8ClampedArray(img.data);
   for (let i = 0, p = 3; i < mask.length; i++, p += 4) d[p] = (d[p]! * mask[i]!) / 255;
   return { width: img.width, height: img.height, data: d };

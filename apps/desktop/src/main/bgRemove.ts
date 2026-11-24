@@ -23,7 +23,11 @@ import type { BgRequest, BgResponse } from './bgWorker.js';
 export type BgRunner = (req: BgRequest, signal?: AbortSignal) => Promise<BgResponse>;
 
 /** Runs dist/bgremove/bgWorker.mjs as a Node process (Electron with ELECTRON_RUN_AS_NODE). */
-export function bgViaProcess(exe: string, script: string, env: Record<string, string> = {}): BgRunner {
+export function bgViaProcess(
+  exe: string,
+  script: string,
+  env: Record<string, string> = {},
+): BgRunner {
   return (req, signal) =>
     new Promise((done, fail) => {
       const p = spawn(exe, [script], {
@@ -61,7 +65,10 @@ export function bgViaProcess(exe: string, script: string, env: Record<string, st
 }
 
 export class BgRemoveService {
-  private readonly downloads = new Map<BgModelId, { got: number; ac: AbortController; done: Promise<void> }>();
+  private readonly downloads = new Map<
+    BgModelId,
+    { got: number; ac: AbortController; done: Promise<void> }
+  >();
 
   constructor(
     /** Folder with the models that ship with the app (null in tests without it). */
@@ -127,7 +134,8 @@ export class BgRemoveService {
     const dest = join(this.userDir, m.file);
     const part = `${dest}.part`;
     const res = await fetch(m.url, { signal, redirect: 'follow' });
-    if (!res.ok || !res.body) throw new Error(`No se pudo descargar el modelo (HTTP ${res.status}).`);
+    if (!res.ok || !res.body)
+      throw new Error(`No se pudo descargar el modelo (HTTP ${res.status}).`);
     const hash = createHash('sha256');
     const out = createWriteStream(part);
     let got = 0;
@@ -167,9 +175,14 @@ export class BgRemoveService {
           : 'Falta el modelo rápido de quitar fondo en esta instalación.',
       );
     const side = BG_MODELS[id].side;
-    if (input.length !== 3 * side * side) throw new Error('Entrada del modelo con tamaño incorrecto.');
+    if (input.length !== 3 * side * side)
+      throw new Error('Entrada del modelo con tamaño incorrecto.');
     const res = await this.runner(
-      { model, side, input: Buffer.from(input.buffer, input.byteOffset, input.byteLength).toString('base64') },
+      {
+        model,
+        side,
+        input: Buffer.from(input.buffer, input.byteOffset, input.byteLength).toString('base64'),
+      },
       signal,
     );
     if (res.error || !res.output) throw new Error(res.error ?? 'El modelo no devolvió nada.');

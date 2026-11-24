@@ -4,7 +4,14 @@ import { describeErrorBody, request, requestJson } from '../http.js';
 import { baseModel, catalogModels } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ConnectionTest, ProviderAdapter, ProviderConfig } from '../types.js';
-import { audioFormat, decodeText, isPdf, isTextual, schemaName, unsupportedPart } from '../parts.js';
+import {
+  audioFormat,
+  decodeText,
+  isPdf,
+  isTextual,
+  schemaName,
+  unsupportedPart,
+} from '../parts.js';
 
 type OaiMessage = Record<string, unknown>;
 

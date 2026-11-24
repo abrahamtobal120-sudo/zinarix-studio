@@ -45,6 +45,7 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 ## 3. Funciones (todas obligatorias)
 
 ### 3.1 Proyecto y medios
+
 - Proyecto nuevo con plantillas de formato: 16:9 (YouTube), 9:16 (TikTok/Reels/Shorts), 1:1, 4:5, 21:9 y personalizado; 24/25/30/50/60 fps; 720p, 1080p, 1440p, 4K.
 - Importar video, audio, imágenes (PNG, JPG, WebP, GIF, SVG) y secuencias de imágenes. Carpetas, búsqueda, filtros por tipo, vista de cuadrícula/lista, miniaturas animadas al pasar el ratón.
 - **Proxies automáticos** (versión ligera a 540p) para editar 4K sin lag; se usa el original al exportar.
@@ -53,6 +54,7 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - Guardado automático cada 30 s y recuperación tras cierre inesperado. Formato `.zvproj` (JSON con rutas relativas) + historial de versiones.
 
 ### 3.2 Línea de tiempo
+
 - Pistas ilimitadas de video, audio, texto y efectos; renombrar, bloquear, silenciar, ocultar, solo, cambiar altura y color.
 - Arrastrar y soltar, recortar bordes, **dividir (S)**, eliminar con cierre de huecos (ripple delete), **roll, slip y slide**, mover entre pistas.
 - **Imán** (snap) a cabezal, clips y marcadores; zoom con Ctrl+rueda; navegación con mini-mapa.
@@ -62,6 +64,7 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - Deshacer/rehacer ilimitado con panel de historial.
 
 ### 3.3 Visor
+
 - Reproducción fluida en tiempo real con caché de render; calidad completa / ½ / ¼.
 - Manipular el clip directamente en el visor: mover, escalar, rotar, recortar con asas.
 - Guías de zona segura, cuadrícula de tercios, regla, overlay de UI de TikTok/YouTube para ver dónde tapa.
@@ -69,8 +72,9 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - Avance cuadro a cuadro (← →), J/K/L para velocidad, captura de fotograma a PNG.
 
 ### 3.4 Inspector de clip
+
 - **Transformar:** posición, escala, rotación, opacidad, volteo, recorte, ancla, modos de fusión (multiplicar, pantalla, superponer…).
-- **Fotogramas clave** en *cualquier* propiedad con curvas (lineal, ease in/out, bezier) y editor de curvas.
+- **Fotogramas clave** en _cualquier_ propiedad con curvas (lineal, ease in/out, bezier) y editor de curvas.
 - **Velocidad:** constante 0.1×–100×, **rampas de velocidad** por curva, reversa, congelar fotograma, interpolación óptica (cámara lenta suave).
 - **Estabilización**, corrección de lente, reducción de ruido de video.
 - **Máscaras:** rectángulo, elipse, pluma/bezier, con difuminado, invertir y seguimiento.
@@ -79,6 +83,7 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - **Picture-in-picture** con presets de esquina y bordes/sombra.
 
 ### 3.5 Color
+
 - Básico: exposición, contraste, luces, sombras, blancos, negros, temperatura, tinte, saturación, vibrancia, nitidez, viñeta, grano.
 - Avanzado: **ruedas de color** (sombras/medios/luces), **curvas RGB y HSL**, ajuste por color específico.
 - **LUTs** `.cube` (importar y presets propios), comparar antes/después con divisor.
@@ -86,6 +91,7 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - Igualar color entre dos clips automáticamente.
 
 ### 3.6 Texto, títulos y gráficos
+
 - Texto con cualquier fuente del sistema + fuentes de Google; contorno, sombra, fondo, degradado, espaciado, curvado.
 - **Animaciones de entrada / salida / bucle** (máquina de escribir, rebote, desvanecer, deslizar, zoom, por letra/palabra).
 - Plantillas de títulos, tercios inferiores, créditos con desplazamiento, call-to-action ("Suscríbete").
@@ -93,11 +99,13 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - **Subtítulos** editables con estilos tipo "karaoke" (palabra resaltada), importar/exportar `.srt` y `.vtt`.
 
 ### 3.7 Transiciones y efectos
+
 - Mínimo 60 transiciones (disolver, barrido, zoom, deslizar, glitch, desenfoque, giro, luz…) con duración ajustable arrastrando.
 - Mínimo 80 efectos y filtros (VHS, glitch, desenfoque, pixelar caras, sacudida de cámara, brillo, blanco y negro, cine, retro…).
 - Búsqueda, favoritos, vista previa al pasar el ratón, aplicar arrastrando a clip o a una **capa de ajuste** que afecta todo lo de abajo.
 
 ### 3.8 Audio
+
 - Forma de onda en cada clip, volumen por clip y por pista con fotogramas clave, fundido de entrada/salida arrastrando las esquinas.
 - **Mezclador** con vúmetros, paneo, silenciar/solo y bus maestro con limitador.
 - Ecualizador, compresor, reverb, cambio de tono, voz robot/radio, **reducción de ruido**, **normalizar volumen a −14 LUFS**.
@@ -106,6 +114,7 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - Biblioteca de música y efectos de sonido libres de derechos (con carpeta local para agregar los propios).
 
 ### 3.9 Inteligencia artificial (usando los modelos ya conectados en Zinarix — `ai.ts` / `agent.ts`)
+
 - **Subtítulos automáticos** (Whisper local o en la nube) en el idioma del video, y **traducción** de subtítulos.
 - **Cortar silencios y muletillas** ("eh", "este") con revisión antes de aplicar.
 - **Editar por transcripción:** borrar palabras del texto borra ese trozo del video.
@@ -116,6 +125,7 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 - **Asistente de edición en el chat:** el agente de Zinarix puede controlar el editor con herramientas (`video_add_clip`, `video_split`, `video_add_text`, `video_apply_effect`, `video_export`…) — p. ej. "hazme un short de 30 s con lo mejor de este video y subtítulos amarillos". Cada acción se puede deshacer y requiere aprobación como el resto de herramientas.
 
 ### 3.10 Exportación
+
 - Formatos: **MP4 (H.264 / H.265)**, **MOV (ProRes)**, **WebM (VP9 / AV1)**, **GIF**, **MP3/WAV/AAC** solo audio, secuencia PNG, fotograma actual.
 - Presets: YouTube 1080p/4K, TikTok/Reels/Shorts, Instagram, WhatsApp (≤ 16 MB), Web ligero, Máxima calidad.
 - Opciones: resolución, fps, bitrate (CBR/VBR/CRF), códec de audio, rango (todo / I-O / región), quemar o no subtítulos, exportar `.srt` aparte.
@@ -125,19 +135,19 @@ Quiero que agregues a **Zinarix Studio** un **editor de video profesional comple
 
 ## 4. Atajos de teclado
 
-| Acción | Atajo |
-|---|---|
-| Abrir/cerrar Video Studio | Ctrl+Shift+V |
-| Reproducir / pausa | Espacio |
-| Retroceder / pausa / avanzar | J / K / L |
-| Fotograma anterior / siguiente | ← / → |
-| Dividir en el cabezal | S o Ctrl+B |
-| Marcar entrada / salida | I / O |
-| Eliminar con cierre de hueco | Shift+Supr |
-| Imán on/off | N |
-| Agregar marcador | M |
-| Deshacer / rehacer | Ctrl+Z / Ctrl+Shift+Z |
-| Exportar | Ctrl+E |
+| Acción                         | Atajo                 |
+| ------------------------------ | --------------------- |
+| Abrir/cerrar Video Studio      | Ctrl+Shift+V          |
+| Reproducir / pausa             | Espacio               |
+| Retroceder / pausa / avanzar   | J / K / L             |
+| Fotograma anterior / siguiente | ← / →                 |
+| Dividir en el cabezal          | S o Ctrl+B            |
+| Marcar entrada / salida        | I / O                 |
+| Eliminar con cierre de hueco   | Shift+Supr            |
+| Imán on/off                    | N                     |
+| Agregar marcador               | M                     |
+| Deshacer / rehacer             | Ctrl+Z / Ctrl+Shift+Z |
+| Exportar                       | Ctrl+E                |
 
 Todos se muestran en un panel "Atajos" (tecla `?`) y se pueden personalizar.
 

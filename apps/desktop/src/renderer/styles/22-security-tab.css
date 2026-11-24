@@ -1,103 +1,103 @@
 /* Part of the old styles.css, cut without reordering a rule. Layer `features`; the order of
  * the layers is declared once, at the top of ui/tokens.css. */
 @layer features {
-/* ---------- security tab: fits any width ---------- */
-/* The center can be 360px wide (chat and side bar open): the fixed minimums (menu 190px,
+  /* ---------- security tab: fits any width ---------- */
+  /* The center can be 360px wide (chat and side bar open): the fixed minimums (menu 190px,
    summary 260px, cards 220px, scan fields 180 + 200px, history 44 + 160px) made it scroll
    sideways and look cut. Now they adapt to the tab's own width. */
-.sec-section {
-  container-type: inline-size;
-  min-width: 0;
-}
-.sv-content {
-  overflow-x: hidden;
-}
-.sv-dash-sum {
-  min-width: min(260px, 100%);
-}
-.sv-cards {
-  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
-}
-.sv-scan-row input {
-  min-width: min(180px, 100%);
-}
-.sv-scan-ports {
-  flex: 1 1 160px;
-}
-.sv-hist-row {
-  grid-template-columns: 44px minmax(0, 160px) minmax(0, 1fr) auto;
-}
-.sv-risk-title,
-.sv-bar-label {
-  min-width: 0;
-}
-@container (max-width: 700px) {
-  .sv-nav {
-    width: 54px;
-    padding: 10px 6px;
-    align-items: center;
+  .sec-section {
+    container-type: inline-size;
+    min-width: 0;
+  }
+  .sv-content {
     overflow-x: hidden;
   }
-  .sv-brand {
-    padding: 4px 0 10px;
-    font-size: 0;
-    gap: 0;
+  .sv-dash-sum {
+    min-width: min(260px, 100%);
   }
-  .sv-nav-item {
-    position: relative;
-    flex-shrink: 0;
-    justify-content: center;
-    width: 38px;
-    padding: 9px 0;
+  .sv-cards {
+    grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   }
-  .sv-nav-icon {
-    width: auto;
+  .sv-scan-row input {
+    min-width: min(180px, 100%);
   }
-  .sv-nav-label {
-    display: none;
-  }
-  .sv-nav-count {
-    position: absolute;
-    top: 1px;
-    right: 0;
-    min-width: 15px;
-    padding: 0 3px;
-    font-size: var(--text-2xs);
-    line-height: 13px;
-  }
-  .sv-content {
-    padding: 16px 14px;
-  }
-  .sv-dash-head {
-    gap: 16px;
-  }
-  .sv-score {
-    width: 110px;
-    height: 110px;
-  }
-  .sv-score-inner {
-    width: 86px;
-    height: 86px;
-  }
-  .sv-score-inner strong {
-    font-size: var(--text-display);
-  }
-  .sv-bar-row {
-    grid-template-columns: minmax(0, 96px) 1fr 28px;
+  .sv-scan-ports {
+    flex: 1 1 160px;
   }
   .sv-hist-row {
-    grid-template-columns: 36px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 160px) minmax(0, 1fr) auto;
   }
-  .sv-hist-row > :nth-child(4) {
-    grid-column: 2 / -1;
+  .sv-risk-title,
+  .sv-bar-label {
+    min-width: 0;
   }
-}
-@container (max-width: 420px) {
-  .sv-content {
-    padding: 12px 10px;
+  @container (max-width: 700px) {
+    .sv-nav {
+      width: 54px;
+      padding: 10px 6px;
+      align-items: center;
+      overflow-x: hidden;
+    }
+    .sv-brand {
+      padding: 4px 0 10px;
+      font-size: 0;
+      gap: 0;
+    }
+    .sv-nav-item {
+      position: relative;
+      flex-shrink: 0;
+      justify-content: center;
+      width: 38px;
+      padding: 9px 0;
+    }
+    .sv-nav-icon {
+      width: auto;
+    }
+    .sv-nav-label {
+      display: none;
+    }
+    .sv-nav-count {
+      position: absolute;
+      top: 1px;
+      right: 0;
+      min-width: 15px;
+      padding: 0 3px;
+      font-size: var(--text-2xs);
+      line-height: 13px;
+    }
+    .sv-content {
+      padding: 16px 14px;
+    }
+    .sv-dash-head {
+      gap: 16px;
+    }
+    .sv-score {
+      width: 110px;
+      height: 110px;
+    }
+    .sv-score-inner {
+      width: 86px;
+      height: 86px;
+    }
+    .sv-score-inner strong {
+      font-size: var(--text-display);
+    }
+    .sv-bar-row {
+      grid-template-columns: minmax(0, 96px) 1fr 28px;
+    }
+    .sv-hist-row {
+      grid-template-columns: 36px minmax(0, 1fr) auto;
+    }
+    .sv-hist-row > :nth-child(4) {
+      grid-column: 2 / -1;
+    }
   }
-  .sv-dash-head {
-    justify-content: center;
+  @container (max-width: 420px) {
+    .sv-content {
+      padding: 12px 10px;
+    }
+    .sv-dash-head {
+      justify-content: center;
+    }
   }
-}
 }

@@ -386,10 +386,7 @@ export function DesignPanel() {
   // while (a broken page, a dev server that stopped), so the canvas is never just blank.
   useEffect(() => {
     setFrameState('loading');
-    const timer = setTimeout(
-      () => setFrameState((s) => (s === 'loading' ? 'slow' : s)),
-      10_000,
-    );
+    const timer = setTimeout(() => setFrameState((s) => (s === 'loading' ? 'slow' : s)), 10_000);
     return () => clearTimeout(timer);
   }, [page, frameKey, view?.mode, view?.live]);
 

@@ -1,46 +1,46 @@
 @layer features {
-/* Fase 19: unified palette — the scope row under the list. */
-.palette .pick-list {
-  min-height: 120px;
-}
-.palette-scopes {
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-.palette-scope {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-0-5) var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--fg-dim);
-  font-size: var(--text-xs);
-  cursor: pointer;
-}
-.palette-scope:hover {
-  background: var(--hover);
-  color: var(--fg);
-}
-.palette-scope.on {
-  border-color: var(--border);
-  background: var(--sel-soft);
-  color: var(--fg-strong);
-}
-.palette-scope kbd {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  min-width: 1.4em;
-  text-align: center;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-xs);
-  background: var(--bg-3);
-  color: var(--fg);
-}
-.palette .pick-item mark {
-  background: none;
-  color: var(--accent-text);
-  font-weight: 600;
-}
+  /* Fase 19: unified palette — the scope row under the list. */
+  .palette .pick-list {
+    min-height: 120px;
+  }
+  .palette-scopes {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .palette-scope {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-0-5) var(--space-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--fg-dim);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .palette-scope:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .palette-scope.on {
+    border-color: var(--border);
+    background: var(--sel-soft);
+    color: var(--fg-strong);
+  }
+  .palette-scope kbd {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    min-width: 1.4em;
+    text-align: center;
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-xs);
+    background: var(--bg-3);
+    color: var(--fg);
+  }
+  .palette .pick-item mark {
+    background: none;
+    color: var(--accent-text);
+    font-weight: 600;
+  }
 }

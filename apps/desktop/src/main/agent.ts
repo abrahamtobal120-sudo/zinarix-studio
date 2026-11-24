@@ -112,12 +112,37 @@ import {
   runDockerTool,
 } from './dockerTools.js';
 import type { DockerService } from './docker.js';
-import { PIO_PROMPT_PART, PIO_TOOL_NAMES, PIO_TOOLS, pioPreview, runPioTool } from './platformioTools.js';
+import {
+  PIO_PROMPT_PART,
+  PIO_TOOL_NAMES,
+  PIO_TOOLS,
+  pioPreview,
+  runPioTool,
+} from './platformioTools.js';
 import type { PlatformioService } from './platformio.js';
-import { MOBILE_PROMPT_PART, MOBILE_TOOL_NAMES, MOBILE_TOOLS, mobilePreview, runMobileTool } from './mobileTools.js';
-import { GAME_PROMPT_PART, GAME_TOOL_NAMES, GAME_TOOLS, gamePreview, runGameTool } from './gameTools.js';
+import {
+  MOBILE_PROMPT_PART,
+  MOBILE_TOOL_NAMES,
+  MOBILE_TOOLS,
+  mobilePreview,
+  runMobileTool,
+} from './mobileTools.js';
+import {
+  GAME_PROMPT_PART,
+  GAME_TOOL_NAMES,
+  GAME_TOOLS,
+  gamePreview,
+  runGameTool,
+} from './gameTools.js';
 import { CAD_PROMPT_PART, CAD_TOOL_NAMES, CAD_TOOLS, cadPreview, runCadTool } from './cadTools.js';
-import { SKETCHUP_PROMPT_PART, SKETCHUP_READ_ONLY, SKETCHUP_TOOL_NAMES, SKETCHUP_TOOLS, runSketchupTool, sketchupPreview } from './sketchupTools.js';
+import {
+  SKETCHUP_PROMPT_PART,
+  SKETCHUP_READ_ONLY,
+  SKETCHUP_TOOL_NAMES,
+  SKETCHUP_TOOLS,
+  runSketchupTool,
+  sketchupPreview,
+} from './sketchupTools.js';
 import type { SketchupService } from './sketchup.js';
 import type { CadService } from './cad.js';
 import type { BlenderModelService } from './blenderModel.js';
@@ -2105,11 +2130,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
    * One tool call with the project's hooks around it: PreToolUse may block it (exit 2, the
    * message goes to the model), PostToolUse may send feedback after it ran.
    */
-  private async execute(
-    s: Session,
-    call: ToolCall,
-    opts: LoopOpts,
-  ): Promise<ToolOut> {
+  private async execute(s: Session, call: ToolCall, opts: LoopOpts): Promise<ToolOut> {
     const a = args(call);
     const refuse = (content: string, summary: string) => {
       opts.emit({ type: 'tool_call', id: call.id, name: call.name, args: viewArgs(call.name, a) });
@@ -2161,11 +2182,7 @@ A project hook did not let you finish yet. Address it, then answer.`,
     return rules || extra ? { ...result, content: result.content + extra + rules } : result;
   }
 
-  private async executeTool(
-    s: Session,
-    call: ToolCall,
-    opts: LoopOpts,
-  ): Promise<ToolOut> {
+  private async executeTool(s: Session, call: ToolCall, opts: LoopOpts): Promise<ToolOut> {
     const a = args(call);
     const ws = this.ws(opts);
     // The UI (and the saved turn) never gets a raw credential typed into a tool argument.
@@ -2222,7 +2239,9 @@ A project hook did not let you finish yet. Address it, then answer.`,
       if (gameCard && 'error' in gameCard) return finish(false, gameCard.error, 'no aplica');
       const cadCard = CAD_TOOL_NAMES.has(call.name) ? cadPreview(call.name, a, ws?.root) : null;
       if (cadCard && 'error' in cadCard) return finish(false, cadCard.error, 'no aplica');
-      const skpCard = SKETCHUP_TOOL_NAMES.has(call.name) ? sketchupPreview(this.sketchup, call.name, a, ws?.root) : null;
+      const skpCard = SKETCHUP_TOOL_NAMES.has(call.name)
+        ? sketchupPreview(this.sketchup, call.name, a, ws?.root)
+        : null;
       if (skpCard && 'error' in skpCard) return finish(false, skpCard.error, 'no aplica');
       // Actions beyond the project: risk level + warning, approved per action unless the
       // preview offers an "always" key (low-impact reads such as GET on one site).
@@ -2230,41 +2249,44 @@ A project hook did not let you finish yet. Address it, then answer.`,
         ? video
         : image
           ? image
-        : notebook
-          ? notebook
-        : graphics
-          ? graphics
-        : dockerCard
-          ? dockerCard
-        : pioCard
-          ? pioCard
-        : mobileCard
-          ? mobileCard
-        : gameCard
-          ? gameCard
-        : cadCard
-          ? cadCard
-        : skpCard
-          ? skpCard
-        : SYSTEM_TOOL_NAMES.has(call.name)
-        ? await systemPreview(call.name, a)
-        : SECURITY_APPROVAL.has(call.name)
-          ? securityPreview(call.name, a)
-          : MAIL_TOOL_NAMES.has(call.name)
-            ? mailPreview(call.name, a)
-            : CLOUD_TOOL_NAMES.has(call.name)
-              ? cloudPreview(call.name, a)
-              : MEDIA_TOOL_NAMES.has(call.name) && this.media
-                ? await mediaPreview(this.media, call.name, a)
-                : SCENE3D_TOOL_NAMES.has(call.name)
-                  ? scene3dPreview(call.name, a)
-                : COMPUTER_TOOL_NAMES.has(call.name)
-                  ? computerPreview(call.name, a)
-                : KNOWLEDGE_TOOL_NAMES.has(call.name)
-                  ? knowledgePreview(call.name, a, this.knowledge)
-                  : call.name === 'run_command'
-                    ? commandWarning(opts.scope?.task ? { ...a, cwd: undefined } : a, ws?.root)
-                    : null;
+          : notebook
+            ? notebook
+            : graphics
+              ? graphics
+              : dockerCard
+                ? dockerCard
+                : pioCard
+                  ? pioCard
+                  : mobileCard
+                    ? mobileCard
+                    : gameCard
+                      ? gameCard
+                      : cadCard
+                        ? cadCard
+                        : skpCard
+                          ? skpCard
+                          : SYSTEM_TOOL_NAMES.has(call.name)
+                            ? await systemPreview(call.name, a)
+                            : SECURITY_APPROVAL.has(call.name)
+                              ? securityPreview(call.name, a)
+                              : MAIL_TOOL_NAMES.has(call.name)
+                                ? mailPreview(call.name, a)
+                                : CLOUD_TOOL_NAMES.has(call.name)
+                                  ? cloudPreview(call.name, a)
+                                  : MEDIA_TOOL_NAMES.has(call.name) && this.media
+                                    ? await mediaPreview(this.media, call.name, a)
+                                    : SCENE3D_TOOL_NAMES.has(call.name)
+                                      ? scene3dPreview(call.name, a)
+                                      : COMPUTER_TOOL_NAMES.has(call.name)
+                                        ? computerPreview(call.name, a)
+                                        : KNOWLEDGE_TOOL_NAMES.has(call.name)
+                                          ? knowledgePreview(call.name, a, this.knowledge)
+                                          : call.name === 'run_command'
+                                            ? commandWarning(
+                                                opts.scope?.task ? { ...a, cwd: undefined } : a,
+                                                ws?.root,
+                                              )
+                                            : null;
       // Fase 5: refused before asking (approving it would not make it run anyway).
       if (call.name === 'run_command' && opts.scope?.task) {
         const c = taskCommand(opts.scope.task, a);
@@ -2447,16 +2469,31 @@ A project hook did not let you finish yet. Address it, then answer.`,
         return r.image ? { ...out, image: r.image } : out;
       }
       if (SKETCHUP_TOOL_NAMES.has(call.name)) {
-        const r = await runSketchupTool(this.sketchup, call.name, a, ws?.root, opts.signal, ws ? () => ws.listFiles(50_000) : undefined);
+        const r = await runSketchupTool(
+          this.sketchup,
+          call.name,
+          a,
+          ws?.root,
+          opts.signal,
+          ws ? () => ws.listFiles(50_000) : undefined,
+        );
         if (r.changed) opts.emit({ type: 'file_changed', path: r.changed });
         const out = finish(r.ok, r.content, r.summary);
         return r.image ? { ...out, image: r.image } : out;
       }
       if (CAD_TOOL_NAMES.has(call.name)) {
-        const r = await runCadTool(this.cad, this.blenderModel, call.name, a, ws?.root, opts.signal, {
-          slicer: this.slicer,
-          printers: this.printers,
-        });
+        const r = await runCadTool(
+          this.cad,
+          this.blenderModel,
+          call.name,
+          a,
+          ws?.root,
+          opts.signal,
+          {
+            slicer: this.slicer,
+            printers: this.printers,
+          },
+        );
         if (r.changed) opts.emit({ type: 'file_changed', path: r.changed });
         const out = finish(r.ok, r.content, r.summary);
         return r.image ? { ...out, image: r.image } : out;
@@ -2479,7 +2516,8 @@ A project hook did not let you finish yet. Address it, then answer.`,
       }
       if (GRAPHICS_TOOL_NAMES.has(call.name)) {
         const r = await runGraphicsTool(this.raster ?? null, call.name, a, ws?.root);
-        if (r.changed) opts.emit({ type: 'file_changed', path: r.changed, ...(r.open ? { open: true } : {}) });
+        if (r.changed)
+          opts.emit({ type: 'file_changed', path: r.changed, ...(r.open ? { open: true } : {}) });
         const out = finish(r.ok, r.content, r.summary);
         return r.image ? { ...out, image: r.image } : out;
       }
@@ -3042,7 +3080,9 @@ A project hook did not let you finish yet. Address it, then answer.`,
             if ('error' in c) return finish(false, c.error, 'fuera del worktree');
             cwd = c.cwd;
           } else cwd = typeof a.cwd === 'string' && a.cwd.trim() ? expandPath(a.cwd) : w.root;
-          const spawnAs = confine ? sandboxedSpawn(confine.caps, confine.paths, command) : undefined;
+          const spawnAs = confine
+            ? sandboxedSpawn(confine.caps, confine.paths, command)
+            : undefined;
           // Confined or not at all: never falls back to running the command free.
           if (confine && !spawnAs)
             return finish(false, 'The sandbox of this task is not available.', 'sin sandbox');
@@ -3574,7 +3614,10 @@ export function dropOldShots(messages: ChatMessage[], keep = KEEP_SHOTS - 1): vo
     if (first?.type !== 'text' || !first.text.startsWith(SHOT_TAG)) continue;
     if (!m.content.some((p) => p.type === 'image')) continue;
     if (++seen > keep)
-      messages[i] = { role: 'user', content: `${first.text} [older screenshot removed to save context]` };
+      messages[i] = {
+        role: 'user',
+        content: `${first.text} [older screenshot removed to save context]`,
+      };
   }
 }
 

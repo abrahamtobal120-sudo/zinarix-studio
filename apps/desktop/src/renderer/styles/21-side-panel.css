@@ -1,476 +1,475 @@
 /* Part of the old styles.css, cut without reordering a rule. Layer `features`; the order of
  * the layers is declared once, at the top of ui/tokens.css. */
 @layer features {
-/* ================= side panel redesign (activity bar + side bar) ================= */
-/* One set of rules for the activity bar (it used to have five that fought each other).
+  /* ================= side panel redesign (activity bar + side bar) ================= */
+  /* One set of rules for the activity bar (it used to have five that fought each other).
    Every color comes from the theme variables, so dark, light and custom themes all work. */
-:root {
-  --bar-w: 48px;
-}
-.activity-bar {
-  width: var(--bar-w);
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  padding: 8px 0;
-  background: var(--activity);
-  border-right: 1px solid var(--border);
-  min-height: 0;
-  /* Very short windows: it scrolls instead of cutting its last buttons. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.activity-bar::-webkit-scrollbar {
-  display: none;
-}
-.activity-bar > .spacer {
-  flex: 1 0 10px;
-}
-/* The button takes the whole width of the bar: the selected marker sits on its left edge
+  :root {
+    --bar-w: 48px;
+  }
+  .activity-bar {
+    width: var(--bar-w);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 8px 0;
+    background: var(--activity);
+    border-right: 1px solid var(--border);
+    min-height: 0;
+    /* Very short windows: it scrolls instead of cutting its last buttons. */
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .activity-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .activity-bar > .spacer {
+    flex: 1 0 10px;
+  }
+  /* The button takes the whole width of the bar: the selected marker sits on its left edge
    (no negative offsets that the bar's overflow would cut), and a rounded "pill" behind the
    icon shows hover and selection. */
-.activity {
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 100%;
-  height: 40px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fg-dim);
-  transition: color 0.13s ease;
-}
-.activity::after {
-  content: '';
-  position: absolute;
-  inset: 2px 6px;
-  z-index: -1;
-  border-radius: var(--radius-lg);
-  background: transparent;
-  transition: background 0.13s ease;
-}
-.activity:hover,
-.activity:active {
-  background: transparent;
-  color: var(--fg-strong);
-  transform: none;
-}
-.activity:hover::after {
-  background: var(--hover);
-}
-/* Something that is on (chat, terminal, security tab...): only a brighter icon, no box. */
-.activity.active {
-  color: var(--fg-strong);
-}
-.activity.active::after {
-  background: transparent;
-}
-.activity.active:hover::after {
-  background: var(--hover);
-}
-/* The side panel being shown, the only accented button: accent icon and the marker. */
-.activity.active.is-view {
-  color: var(--brand);
-}
-.activity.active.is-view::after {
-  background: transparent;
-}
-/* The marker is always there for side panels, collapsed: it grows in when the panel opens. */
-.activity.is-view::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 9px;
-  bottom: 9px;
-  width: 3px;
-  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
-  background: var(--brand);
-  transform: scaleY(0);
-  opacity: 0;
-  transition:
-    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 0.12s ease;
-}
-.activity.active.is-view::before {
-  transform: scaleY(1);
-  opacity: 1;
-}
-/* Resting icons a bit softer, so the one that is on stands out; a small press feedback. */
-.activity .icon {
-  opacity: 0.82;
-  transition:
-    opacity 0.13s ease,
-    transform 0.1s ease;
-}
-.activity:hover .icon,
-.activity:focus-visible .icon,
-.activity.active .icon {
-  opacity: 1;
-}
-.activity:active .icon {
-  transform: scale(0.9);
-}
-.activity:focus-visible {
-  outline: none;
-}
-.activity:focus-visible::after {
-  outline: 2px solid var(--focus);
-  outline-offset: -1px;
-}
-.activity .activity-badge {
-  top: 4px;
-  right: 5px;
-  z-index: 1;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: var(--radius-md);
-  /* A quiet count (git changes, new reports): grey, like VS Code. Red is for alerts only. */
-  background: var(--bg-3);
-  color: var(--fg-dim);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  line-height: 14px;
-}
-.activity .activity-badge.alert {
-  background: var(--danger);
-  color: var(--bg);
-  font-weight: 700;
-}
-.activity-sep {
-  flex-shrink: 0;
-  height: 1px;
-  margin: 5px 12px;
-  background: var(--border);
-}
-/* Name of the button, to the right of the bar (fixed: the bar's overflow does not cut it). */
-.activity-tip {
-  position: fixed;
-  left: calc(var(--bar-w) + 6px);
-  z-index: var(--z-tooltip);
-  transform: translateY(-50%);
-  padding: 5px 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg-3);
-  color: var(--fg-strong);
-  box-shadow: var(--elev);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: activity-tip-in 0.12s ease;
-}
-/* The shortcut of the button, next to its name. */
-.activity-tip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.activity-tip-keys {
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  background: var(--bg-2);
-  color: var(--fg-dim);
-  font-family: inherit;
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  line-height: 16px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .activity.is-view::before,
-  .activity .icon {
-    transition: none;
-  }
-  .activity:active .icon {
-    transform: none;
-  }
-}
-@keyframes activity-tip-in {
-  from {
-    opacity: 0;
-    transform: translate(-4px, -50%);
-  }
-}
-@media (max-height: 760px) {
   .activity {
-    height: 35px;
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 100%;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--fg-dim);
+    transition: color 0.13s ease;
   }
   .activity::after {
-    inset: 1px 7px;
+    content: '';
+    position: absolute;
+    inset: 2px 6px;
+    z-index: -1;
+    border-radius: var(--radius-lg);
+    background: transparent;
+    transition: background 0.13s ease;
   }
+  .activity:hover,
+  .activity:active {
+    background: transparent;
+    color: var(--fg-strong);
+    transform: none;
+  }
+  .activity:hover::after {
+    background: var(--hover);
+  }
+  /* Something that is on (chat, terminal, security tab...): only a brighter icon, no box. */
+  .activity.active {
+    color: var(--fg-strong);
+  }
+  .activity.active::after {
+    background: transparent;
+  }
+  .activity.active:hover::after {
+    background: var(--hover);
+  }
+  /* The side panel being shown, the only accented button: accent icon and the marker. */
+  .activity.active.is-view {
+    color: var(--brand);
+  }
+  .activity.active.is-view::after {
+    background: transparent;
+  }
+  /* The marker is always there for side panels, collapsed: it grows in when the panel opens. */
   .activity.is-view::before {
-    top: 8px;
-    bottom: 8px;
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+    background: var(--brand);
+    transform: scaleY(0);
+    opacity: 0;
+    transition:
+      transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 0.12s ease;
+  }
+  .activity.active.is-view::before {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  /* Resting icons a bit softer, so the one that is on stands out; a small press feedback. */
+  .activity .icon {
+    opacity: 0.82;
+    transition:
+      opacity 0.13s ease,
+      transform 0.1s ease;
+  }
+  .activity:hover .icon,
+  .activity:focus-visible .icon,
+  .activity.active .icon {
+    opacity: 1;
+  }
+  .activity:active .icon {
+    transform: scale(0.9);
+  }
+  .activity:focus-visible {
+    outline: none;
+  }
+  .activity:focus-visible::after {
+    outline: 2px solid var(--focus);
+    outline-offset: -1px;
+  }
+  .activity .activity-badge {
+    top: 4px;
+    right: 5px;
+    z-index: 1;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: var(--radius-md);
+    /* A quiet count (git changes, new reports): grey, like VS Code. Red is for alerts only. */
+    background: var(--bg-3);
+    color: var(--fg-dim);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    line-height: 14px;
+  }
+  .activity .activity-badge.alert {
+    background: var(--danger);
+    color: var(--bg);
+    font-weight: 700;
   }
   .activity-sep {
-    margin: 3px 12px;
+    flex-shrink: 0;
+    height: 1px;
+    margin: 5px 12px;
+    background: var(--border);
   }
-}
-@media (max-height: 600px) {
-  .activity {
-    height: 31px;
+  /* Name of the button, to the right of the bar (fixed: the bar's overflow does not cut it). */
+  .activity-tip {
+    position: fixed;
+    left: calc(var(--bar-w) + 6px);
+    z-index: var(--z-tooltip);
+    transform: translateY(-50%);
+    padding: 5px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-3);
+    color: var(--fg-strong);
+    box-shadow: var(--elev);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: activity-tip-in 0.12s ease;
   }
-  .activity .icon {
-    width: 18px;
-    height: 18px;
+  /* The shortcut of the button, next to its name. */
+  .activity-tip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
-}
+  .activity-tip-keys {
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-2);
+    color: var(--fg-dim);
+    font-family: inherit;
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    line-height: 16px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .activity.is-view::before,
+    .activity .icon {
+      transition: none;
+    }
+    .activity:active .icon {
+      transform: none;
+    }
+  }
+  @keyframes activity-tip-in {
+    from {
+      opacity: 0;
+      transform: translate(-4px, -50%);
+    }
+  }
+  @media (max-height: 760px) {
+    .activity {
+      height: 35px;
+    }
+    .activity::after {
+      inset: 1px 7px;
+    }
+    .activity.is-view::before {
+      top: 8px;
+      bottom: 8px;
+    }
+    .activity-sep {
+      margin: 3px 12px;
+    }
+  }
+  @media (max-height: 600px) {
+    .activity {
+      height: 31px;
+    }
+    .activity .icon {
+      width: 18px;
+      height: 18px;
+    }
+  }
 
-/* Side bar: a clear header (title + actions), roomier content, themed form controls. */
-.sidebar {
-  background: var(--bg-2);
-  border-right: 1px solid var(--border);
-  min-height: 0;
-  overflow: hidden;
-}
-.sidebar .sidebar-title {
-  flex-wrap: wrap;
-  column-gap: 6px;
-  row-gap: 2px;
-  height: auto;
-  min-height: 40px;
-  padding: 6px 8px 6px 14px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--fg);
-  border-bottom: 1px solid var(--border);
-}
-/* The title keeps at least ~100px: with many actions (Git) these go to a second row instead
+  /* Side bar: a clear header (title + actions), roomier content, themed form controls. */
+  .sidebar {
+    background: var(--bg-2);
+    border-right: 1px solid var(--border);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .sidebar .sidebar-title {
+    flex-wrap: wrap;
+    column-gap: 6px;
+    row-gap: 2px;
+    height: auto;
+    min-height: 40px;
+    padding: 6px 8px 6px 14px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--fg);
+    border-bottom: 1px solid var(--border);
+  }
+  /* The title keeps at least ~100px: with many actions (Git) these go to a second row instead
    of squeezing the title to "CONTRO…". */
-.sidebar .sidebar-title > span:first-child {
-  flex: 1 1 100px;
-}
-.sidebar .sidebar-actions {
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 1px;
-  margin-left: auto;
-  max-width: 100%;
-  letter-spacing: normal;
-  text-transform: none;
-}
-.sidebar .sidebar-actions button {
-  min-width: 26px;
-  height: 26px;
-  min-height: 26px;
-  padding: 0 5px;
-  border-radius: var(--radius-md);
-  color: var(--fg-dim);
-}
-.sidebar .sidebar-actions button:hover:not(:disabled) {
-  color: var(--fg-strong);
-  background: var(--hover);
-}
-.sidebar .run-body {
-  padding: 12px 12px 16px;
-}
-.sidebar .run-body > p:first-child {
-  margin-top: 0;
-}
-/* Connect screens (Vercel, Supabase, Google Cloud, mail): a column with full-width controls. */
-.sidebar .vc-connect {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 20px 16px;
-  text-align: left;
-  line-height: 1.55;
-  overflow-y: auto;
-  min-height: 0;
-}
-.sidebar .vc-connect p {
-  margin: 0;
-}
-.sidebar .vc-connect input {
-  margin: 0;
-  height: 32px;
-}
-.sidebar .vc-connect button {
-  margin: 0;
-  min-height: 32px;
-}
-.sidebar .vc-connect button.link {
-  align-self: flex-start;
-  min-height: 0;
-  padding: 2px 0;
-  text-align: left;
-}
-.sidebar .vc-connect .vc-hint {
-  margin-top: 8px;
-}
-.sidebar select {
-  font: inherit;
-  font-size: var(--text-sm);
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  height: 28px;
-  padding: 0 6px;
-  min-width: 0;
-  outline: none;
-}
-.sidebar select:focus {
-  border-color: var(--focus);
-  box-shadow: var(--ring);
-}
-.sidebar option {
-  background: var(--bg-2);
-  color: var(--fg);
-}
-.sidebar input[type='checkbox'],
-.sidebar input[type='radio'] {
-  accent-color: var(--accent);
-}
-.sidebar .watch-row {
-  margin: 8px 0;
-}
-.sidebar .watch-row > span {
-  min-width: 0;
-}
-.sidebar .watch-row select {
-  flex-shrink: 0;
-  max-width: 55%;
-}
+  .sidebar .sidebar-title > span:first-child {
+    flex: 1 1 100px;
+  }
+  .sidebar .sidebar-actions {
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 1px;
+    margin-left: auto;
+    max-width: 100%;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .sidebar .sidebar-actions button {
+    min-width: 26px;
+    height: 26px;
+    min-height: 26px;
+    padding: 0 5px;
+    border-radius: var(--radius-md);
+    color: var(--fg-dim);
+  }
+  .sidebar .sidebar-actions button:hover:not(:disabled) {
+    color: var(--fg-strong);
+    background: var(--hover);
+  }
+  .sidebar .run-body {
+    padding: 12px 12px 16px;
+  }
+  .sidebar .run-body > p:first-child {
+    margin-top: 0;
+  }
+  /* Connect screens (Vercel, Supabase, Google Cloud, mail): a column with full-width controls. */
+  .sidebar .vc-connect {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 20px 16px;
+    text-align: left;
+    line-height: 1.55;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .sidebar .vc-connect p {
+    margin: 0;
+  }
+  .sidebar .vc-connect input {
+    margin: 0;
+    height: 32px;
+  }
+  .sidebar .vc-connect button {
+    margin: 0;
+    min-height: 32px;
+  }
+  .sidebar .vc-connect button.link {
+    align-self: flex-start;
+    min-height: 0;
+    padding: 2px 0;
+    text-align: left;
+  }
+  .sidebar .vc-connect .vc-hint {
+    margin-top: 8px;
+  }
+  .sidebar select {
+    font: inherit;
+    font-size: var(--text-sm);
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    height: 28px;
+    padding: 0 6px;
+    min-width: 0;
+    outline: none;
+  }
+  .sidebar select:focus {
+    border-color: var(--focus);
+    box-shadow: var(--ring);
+  }
+  .sidebar option {
+    background: var(--bg-2);
+    color: var(--fg);
+  }
+  .sidebar input[type='checkbox'],
+  .sidebar input[type='radio'] {
+    accent-color: var(--accent);
+  }
+  .sidebar .watch-row {
+    margin: 8px 0;
+  }
+  .sidebar .watch-row > span {
+    min-width: 0;
+  }
+  .sidebar .watch-row select {
+    flex-shrink: 0;
+    max-width: 55%;
+  }
 
-/* "Más" panel: integrations and tools as a list with a description. */
-.apps-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 6px 8px 14px;
-}
-.apps-section {
-  padding: 12px 8px 6px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--fg-dim);
-}
-.apps-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px;
-  border-radius: var(--radius-md);
-  background: transparent;
-  text-align: left;
-}
-.apps-item:hover {
-  background: var(--hover);
-}
-.apps-item.on {
-  background: var(--sel-soft);
-}
-.apps-badge.alert {
-  background: var(--danger);
-  color: var(--bg);
-  font-weight: 700;
-}
-.apps-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--fg);
-}
-.apps-item.on .apps-icon {
-  color: var(--brand);
-  border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
-}
-.apps-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-.apps-name {
-  color: var(--fg-strong);
-  font-weight: 500;
-}
-.apps-desc {
-  font-size: var(--text-sm);
-  line-height: 1.4;
-  color: var(--fg-dim);
-  /* Up to two lines on a narrow side bar, then "…". */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.apps-badge {
-  flex-shrink: 0;
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: var(--radius-lg);
-  background: var(--bg-3);
-  color: var(--fg-dim);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  line-height: 17px;
-  text-align: center;
-}
+  /* "Más" panel: integrations and tools as a list with a description. */
+  .apps-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px 8px 14px;
+  }
+  .apps-section {
+    padding: 12px 8px 6px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--fg-dim);
+  }
+  .apps-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    text-align: left;
+  }
+  .apps-item:hover {
+    background: var(--hover);
+  }
+  .apps-item.on {
+    background: var(--sel-soft);
+  }
+  .apps-badge.alert {
+    background: var(--danger);
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .apps-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+  }
+  .apps-item.on .apps-icon {
+    color: var(--brand);
+    border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
+  }
+  .apps-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+  .apps-name {
+    color: var(--fg-strong);
+    font-weight: 500;
+  }
+  .apps-desc {
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    color: var(--fg-dim);
+    /* Up to two lines on a narrow side bar, then "…". */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .apps-badge {
+    flex-shrink: 0;
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-3);
+    color: var(--fg-dim);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 17px;
+    text-align: center;
+  }
 
-/* Separators: iframes (mail, design) do not swallow the drag. */
-body.dragging iframe,
-body.dragging-y iframe,
-body.dragging webview,
-body.dragging-y webview {
-  pointer-events: none;
-}
+  /* Separators: iframes (mail, design) do not swallow the drag. */
+  body.dragging iframe,
+  body.dragging-y iframe,
+  body.dragging webview,
+  body.dragging-y webview {
+    pointer-events: none;
+  }
 
-/* Chat message box: its buttons go to a second row when they do not fit, instead of pushing
+  /* Chat message box: its buttons go to a second row when they do not fit, instead of pushing
    the send button out of the panel. */
-.chat-input-bar {
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
-.chat-input-bar .reasoning-pick {
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-/* Action buttons of the tool panels and views (Hardware, Celular, Juegos, CAD, Docker…).
+  .chat-input-bar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .chat-input-bar .reasoning-pick {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  /* Action buttons of the tool panels and views (Hardware, Celular, Juegos, CAD, Docker…).
    One size whatever the container's font: .btn is the normal action, .btn.ghost the
    secondary one (outlined), and the panels' *-small classes the compact one. */
-button.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  min-height: 26px;
-  padding: 3px 10px;
-  font-size: var(--text-sm);
-  line-height: 1.3;
-  white-space: nowrap;
-}
-button.btn.ghost {
-  background: transparent;
-  border-color: var(--border);
-}
-button.btn.ghost:hover:not(:disabled) {
-  background: var(--hover);
-  border-color: color-mix(in srgb, var(--border) 60%, var(--fg) 40%);
-}
-button.btn:is(.hw-small, .gm-small, .cad-small) {
-  min-height: 22px;
-  padding: 1px var(--space-2);
-  font-size: var(--text-xs);
-}
-
+  button.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-height: 26px;
+    padding: 3px 10px;
+    font-size: var(--text-sm);
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  button.btn.ghost {
+    background: transparent;
+    border-color: var(--border);
+  }
+  button.btn.ghost:hover:not(:disabled) {
+    background: var(--hover);
+    border-color: color-mix(in srgb, var(--border) 60%, var(--fg) 40%);
+  }
+  button.btn:is(.hw-small, .gm-small, .cad-small) {
+    min-height: 22px;
+    padding: 1px var(--space-2);
+    font-size: var(--text-xs);
+  }
 }

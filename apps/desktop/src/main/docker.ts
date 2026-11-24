@@ -83,7 +83,8 @@ export class DockerService {
   startDesktop(): void {
     const p = desktopPath();
     if (!p) throw new Error('Docker Desktop no está instalado.');
-    if (process.platform === 'darwin') spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' }).unref();
+    if (process.platform === 'darwin')
+      spawn('open', ['-a', 'Docker'], { detached: true, stdio: 'ignore' }).unref();
     else spawn(p, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref();
   }
 
@@ -129,7 +130,8 @@ export class DockerService {
   }
 
   async action(action: DockerAction, target: string): Promise<string> {
-    if (action === 'rmi' ? !validImage(target) : !validName(target)) throw new Error('Nombre no válido.');
+    if (action === 'rmi' ? !validImage(target) : !validName(target))
+      throw new Error('Nombre no válido.');
     const args: Record<DockerAction, string[]> = {
       start: ['start', target],
       stop: ['stop', target],
@@ -150,10 +152,16 @@ export class DockerService {
       execFile(
         'docker',
         ['logs', '--tail', String(Math.max(1, Math.min(5000, tail))), '--timestamps', target],
-        { timeout: 30_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024, env: childEnv(process.env) },
+        {
+          timeout: 30_000,
+          windowsHide: true,
+          maxBuffer: 16 * 1024 * 1024,
+          env: childEnv(process.env),
+        },
         (err, stdout, stderr) => {
           if (err && !stdout && !stderr) return reject(err);
-          if (err && /No such container/i.test(String(stderr))) return reject(new Error(String(stderr).trim()));
+          if (err && /No such container/i.test(String(stderr)))
+            return reject(new Error(String(stderr).trim()));
           resolve(interleave(String(stdout), String(stderr)));
         },
       );
@@ -161,7 +169,12 @@ export class DockerService {
   }
 
   /** Follows a container's log; `onData` gets chunks until stopLogs (or the container ends). */
-  followLogs(key: string, target: string, onData: (chunk: string) => void, onEnd: () => void): void {
+  followLogs(
+    key: string,
+    target: string,
+    onData: (chunk: string) => void,
+    onEnd: () => void,
+  ): void {
     if (!validName(target)) throw new Error('Nombre no válido.');
     this.stopLogs(key);
     const p = spawn('docker', ['logs', '-f', '--tail', '300', target], {
@@ -201,7 +214,11 @@ export class DockerService {
     return findFiles(root, (n) => COMPOSE_NAMES.includes(n.toLowerCase()));
   }
 
-  async compose(root: string, file: string, action: 'up' | 'down' | 'ps' | 'restart' | 'pull'): Promise<string> {
+  async compose(
+    root: string,
+    file: string,
+    action: 'up' | 'down' | 'ps' | 'restart' | 'pull',
+  ): Promise<string> {
     const files = await this.composeFiles(root);
     if (!files.includes(file)) throw new Error('Ese archivo de compose no está en el proyecto.');
     const abs = join(root, file);
@@ -218,7 +235,13 @@ export class DockerService {
       execFile(
         'docker',
         args[action],
-        { timeout: 20 * 60_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024, env: childEnv(process.env), cwd: join(abs, '..') },
+        {
+          timeout: 20 * 60_000,
+          windowsHide: true,
+          maxBuffer: 16 * 1024 * 1024,
+          env: childEnv(process.env),
+          cwd: join(abs, '..'),
+        },
         (err, stdout, stderr) => {
           const text = `${String(stdout)}${String(stderr)}`.trim();
           if (err) reject(new Error(text.split('\n').slice(-8).join('\n') || err.message));
@@ -230,7 +253,9 @@ export class DockerService {
 
   /** CPU, memory, network and disk use of the running containers (takes ~2 s). */
   async stats(): Promise<DockerStats[]> {
-    return parseStats(parseJsonLines(await run(['stats', '--no-stream', '--format', '{{json .}}'], 30_000)));
+    return parseStats(
+      parseJsonLines(await run(['stats', '--no-stream', '--format', '{{json .}}'], 30_000)),
+    );
   }
 
   async inspect(target: string): Promise<DockerDetails> {
@@ -242,7 +267,9 @@ export class DockerService {
 
   /** Disk used by images, containers, volumes and the build cache. */
   async diskUsage(): Promise<DockerDiskRow[]> {
-    return parseDiskUsage(parseJsonLines(await run(['system', 'df', '--format', '{{json .}}'], 60_000)));
+    return parseDiskUsage(
+      parseJsonLines(await run(['system', 'df', '--format', '{{json .}}'], 60_000)),
+    );
   }
 
   /** Removes what nothing uses (one kind at a time); returns docker's summary. */
@@ -262,7 +289,8 @@ export class DockerService {
       return { args: ['pull', job.image] };
     }
     if (!root) throw new Error('No hay carpeta abierta.');
-    if (!validTag(job.tag)) throw new Error('Nombre de imagen no válido (minúsculas, p. ej. mi-app:dev).');
+    if (!validTag(job.tag))
+      throw new Error('Nombre de imagen no válido (minúsculas, p. ej. mi-app:dev).');
     const files = await this.dockerfiles(root);
     if (!files.includes(job.dockerfile)) throw new Error('Ese Dockerfile no está en el proyecto.');
     const abs = join(root, job.dockerfile);
@@ -344,7 +372,8 @@ async function findFiles(root: string, match: (name: string) => boolean): Promis
       return;
     }
     for (const e of entries)
-      if (e.isFile() && match(e.name)) out.push(relative(root, join(dir, e.name)).replace(/\\/g, '/'));
+      if (e.isFile() && match(e.name))
+        out.push(relative(root, join(dir, e.name)).replace(/\\/g, '/'));
     if (depth > 0)
       for (const e of entries)
         if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
@@ -382,7 +411,10 @@ export function runArgs(spec: DockerRunSpec): string[] {
   if (spec.rm) args.push('--rm');
   args.push(spec.image);
   if (spec.command?.length) {
-    if (spec.command.length > 50 || spec.command.some((c) => typeof c !== 'string' || c.length > 2000))
+    if (
+      spec.command.length > 50 ||
+      spec.command.some((c) => typeof c !== 'string' || c.length > 2000)
+    )
       throw new Error('Comando no válido.');
     args.push(...spec.command);
   }
@@ -398,9 +430,15 @@ function interleave(out: string, err: string): string {
 
 function desktopPath(): string | null {
   if (process.platform === 'win32') {
-    const p = join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Docker', 'Docker', 'Docker Desktop.exe');
+    const p = join(
+      process.env.ProgramFiles ?? 'C:\\Program Files',
+      'Docker',
+      'Docker',
+      'Docker Desktop.exe',
+    );
     return existsSync(p) ? p : null;
   }
-  if (process.platform === 'darwin') return existsSync('/Applications/Docker.app') ? '/Applications/Docker.app' : null;
+  if (process.platform === 'darwin')
+    return existsSync('/Applications/Docker.app') ? '/Applications/Docker.app' : null;
   return null;
 }

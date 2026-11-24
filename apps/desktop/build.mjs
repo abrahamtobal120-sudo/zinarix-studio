@@ -21,17 +21,21 @@ async function bundleFastModel(dir) {
   const url = 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx';
   const sha = '309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8';
   const cache = join(root, 'node_modules/.cache/zinarix-models/u2netp.onnx');
-  const ok = (p) => existsSync(p) && createHash('sha256').update(readFileSync(p)).digest('hex') === sha;
+  const ok = (p) =>
+    existsSync(p) && createHash('sha256').update(readFileSync(p)).digest('hex') === sha;
   if (!ok(cache)) {
     try {
       const res = await fetch(url, { redirect: 'follow' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = Buffer.from(await res.arrayBuffer());
-      if (createHash('sha256').update(buf).digest('hex') !== sha) throw new Error('SHA-256 mismatch');
+      if (createHash('sha256').update(buf).digest('hex') !== sha)
+        throw new Error('SHA-256 mismatch');
       mkdirSync(dirname(cache), { recursive: true });
       writeFileSync(cache, buf);
     } catch (e) {
-      console.error(`[build] fast background model not bundled (${e.message}); the app downloads it on first use.`);
+      console.error(
+        `[build] fast background model not bundled (${e.message}); the app downloads it on first use.`,
+      );
       return;
     }
   }
@@ -58,7 +62,10 @@ const googleClient = (() => {
   const j = JSON.parse(readFileSync(file, 'utf8'));
   // Also accepts the JSON Google downloads ({ "installed": { client_id, client_secret } }).
   const c = j.installed ?? j;
-  return { clientId: c.clientId ?? c.client_id ?? '', clientSecret: c.clientSecret ?? c.client_secret ?? '' };
+  return {
+    clientId: c.clientId ?? c.client_id ?? '',
+    clientSecret: c.clientSecret ?? c.client_secret ?? '',
+  };
 })();
 
 const mainBuild = await build({
@@ -125,8 +132,12 @@ await build({
   },
   logLevel: 'warning',
 });
-cpSync(join(root, 'node_modules/openscad-wasm-prebuilt/COPYING'), join(root, 'dist/openscad/COPYING.GPLv2.txt'));
-for (const f of ['OPENSCAD-NOTICE.txt', 'OPENSCAD-SOURCE.txt']) cpSync(join(root, 'build/openscad', f), join(root, 'dist/openscad', f));
+cpSync(
+  join(root, 'node_modules/openscad-wasm-prebuilt/COPYING'),
+  join(root, 'dist/openscad/COPYING.GPLv2.txt'),
+);
+for (const f of ['OPENSCAD-NOTICE.txt', 'OPENSCAD-SOURCE.txt'])
+  cpSync(join(root, 'build/openscad', f), join(root, 'dist/openscad', f));
 
 // Fase 1B: background removal on this PC. ONNX Runtime Web (WebAssembly, MIT) bundled into its
 // own program next to the app (resources/bgremove, outside the app archive so its threads can load
@@ -147,13 +158,19 @@ await build({
   const ortDist = join(root, 'node_modules/onnxruntime-web/dist');
   for (const f of ['ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm'])
     cpSync(join(ortDist, f), join(root, 'dist/bgremove', f));
-  cpSync(join(root, 'build/bgremove/MODELS-NOTICE.txt'), join(root, 'dist/bgremove/MODELS-NOTICE.txt'));
+  cpSync(
+    join(root, 'build/bgremove/MODELS-NOTICE.txt'),
+    join(root, 'dist/bgremove/MODELS-NOTICE.txt'),
+  );
   await bundleFastModel(join(root, 'dist/bgremove'));
 }
 
 // Fase 6: the Phaser build (MIT) for the "web-phaser" game template, so it works offline.
 mkdirSync(join(root, 'dist/vendor'), { recursive: true });
-cpSync(join(root, 'node_modules/phaser/dist/phaser.min.js'), join(root, 'dist/vendor/phaser.min.js'));
+cpSync(
+  join(root, 'node_modules/phaser/dist/phaser.min.js'),
+  join(root, 'dist/vendor/phaser.min.js'),
+);
 
 const catalogDir = dirname(require.resolve('@omni/catalog/providers.json'));
 mkdirSync(join(root, 'dist/catalog/keys'), { recursive: true });

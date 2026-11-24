@@ -138,9 +138,15 @@ describe('renaming a node follows the references', () => {
     ]);
     expect(text).toContain('chase = NodePath("../Hero/Body:modulate")');
     const per = scriptRenames(SCENE, renames);
-    const main = applyScriptRenames(MAIN_GD, per.find((s) => s.res === 'res://main.gd')!);
+    const main = applyScriptRenames(
+      MAIN_GD,
+      per.find((s) => s.res === 'res://main.gd')!,
+    );
     expect(main.code).toContain('get_node("Hero/Body")');
-    const player = applyScriptRenames(PLAYER_GD, per.find((s) => s.res === 'res://player.gd')!);
+    const player = applyScriptRenames(
+      PLAYER_GD,
+      per.find((s) => s.res === 'res://player.gd')!,
+    );
     expect(player.code).toContain('@onready var sprite = $Body');
   });
 });
@@ -165,7 +171,9 @@ describe('godot_scene_edit renames also fix the scripts', () => {
     expect(r.ok, r.content).toBe(true);
     expect(r.content).toContain('juego/main.gd (4)');
     expect(readFileSync(join(root, 'juego/main.gd'), 'utf8')).toContain('$Hero');
-    expect(readFileSync(join(root, 'juego/player.gd'), 'utf8')).toContain('get_node_or_null("../Hero")');
+    expect(readFileSync(join(root, 'juego/player.gd'), 'utf8')).toContain(
+      'get_node_or_null("../Hero")',
+    );
     expect(readFileSync(join(root, 'juego/main.tscn'), 'utf8')).toContain('[node name="Hero"');
   });
 });

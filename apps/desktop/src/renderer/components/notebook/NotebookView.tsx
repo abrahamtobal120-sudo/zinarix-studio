@@ -69,7 +69,10 @@ export function NotebookView({ path }: { path: string }) {
     return (
       <div className="nb-msg">
         <p>{tn('broken', { err: doc.error })}</p>
-        <button className="btn" onClick={() => void openLargeInEditor(path).catch((e: Error) => toast(e.message))}>
+        <button
+          className="btn"
+          onClick={() => void openLargeInEditor(path).catch((e: Error) => toast(e.message))}
+        >
           {tn('openAsText')}
         </button>
       </div>
@@ -100,7 +103,12 @@ function VariablesPanel({ doc }: { doc: NbDoc }) {
   const list = (doc.variables ?? []).filter(
     (v) => !f || v.name.toLowerCase().includes(f) || v.type.toLowerCase().includes(f),
   );
-  const notPython = live && doc.variables === null && !doc.variablesLoading && doc.kernelLabel && !/python/i.test(doc.kernelLabel);
+  const notPython =
+    live &&
+    doc.variables === null &&
+    !doc.variablesLoading &&
+    doc.kernelLabel &&
+    !/python/i.test(doc.kernelLabel);
   return (
     <aside className="nb-vars" aria-label={tn('variables')}>
       <div className="nb-vars-head">
@@ -116,7 +124,12 @@ function VariablesPanel({ doc }: { doc: NbDoc }) {
         >
           <Icon name="refresh" size={12} />
         </button>
-        <button className="nb-mini" title={tn('collapse')} aria-label={tn('collapse')} onClick={() => toggleVariables(doc.path)}>
+        <button
+          className="nb-mini"
+          title={tn('collapse')}
+          aria-label={tn('collapse')}
+          onClick={() => toggleVariables(doc.path)}
+        >
           ✕
         </button>
       </div>
@@ -134,7 +147,9 @@ function VariablesPanel({ doc }: { doc: NbDoc }) {
         ) : notPython ? (
           <div className="nb-vars-empty">{tn('varsNotPython')}</div>
         ) : doc.variables === null ? (
-          <div className="nb-vars-empty">{doc.variablesLoading ? tn('loading') : tn('varsNoKernel')}</div>
+          <div className="nb-vars-empty">
+            {doc.variablesLoading ? tn('loading') : tn('varsNoKernel')}
+          </div>
         ) : !doc.variables.length ? (
           <div className="nb-vars-empty">{tn('varsEmpty')}</div>
         ) : (
@@ -153,14 +168,20 @@ function VariablesPanel({ doc }: { doc: NbDoc }) {
                   <td className="nb-var-name">
                     <button
                       title={tn('varsInsert')}
-                      onClick={() => void navigator.clipboard.writeText(v.name).then(() => toast(tn('copied')))}
+                      onClick={() =>
+                        void navigator.clipboard.writeText(v.name).then(() => toast(tn('copied')))
+                      }
                     >
                       {v.name}
                     </button>
                   </td>
-                  <td className="nb-var-type" title={v.type}>{v.type}</td>
+                  <td className="nb-var-type" title={v.type}>
+                    {v.type}
+                  </td>
                   <td className="nb-var-size">{v.shape || (v.size >= 0 ? String(v.size) : '')}</td>
-                  <td className="nb-var-value" title={v.value}>{v.value}</td>
+                  <td className="nb-var-value" title={v.value}>
+                    {v.value}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -189,17 +210,31 @@ function Toolbar({ doc }: { doc: NbDoc }) {
   const after = doc.selected;
   return (
     <div className="nb-toolbar" role="toolbar">
-      <button className="nb-tb" title={tn('save')} disabled={doc.version === doc.saved} onClick={() => void saveNotebook(path)}>
+      <button
+        className="nb-tb"
+        title={tn('save')}
+        disabled={doc.version === doc.saved}
+        onClick={() => void saveNotebook(path)}
+      >
         <Icon name="download" size={14} />
       </button>
       <span className="nb-sep" />
-      <button className="nb-tb" onClick={() => addCell(path, 'code', after)}>{tn('addCode')}</button>
-      <button className="nb-tb" onClick={() => addCell(path, 'markdown', after)}>{tn('addMarkdown')}</button>
+      <button className="nb-tb" onClick={() => addCell(path, 'code', after)}>
+        {tn('addCode')}
+      </button>
+      <button className="nb-tb" onClick={() => addCell(path, 'markdown', after)}>
+        {tn('addMarkdown')}
+      </button>
       <span className="nb-sep" />
       <button className="nb-tb" title={tn('runAll')} onClick={() => void runAll(path)}>
         <Icon name="play" size={14} /> {tn('runAll')}
       </button>
-      <button className="nb-tb" title={tn('interrupt')} disabled={!running} onClick={() => void interrupt(path)}>
+      <button
+        className="nb-tb"
+        title={tn('interrupt')}
+        disabled={!running}
+        onClick={() => void interrupt(path)}
+      >
         <Icon name="stop" size={14} />
       </button>
       <button
@@ -224,7 +259,9 @@ function Toolbar({ doc }: { doc: NbDoc }) {
         <Icon name="refresh" size={14} />
         <Icon name="play" size={12} />
       </button>
-      <button className="nb-tb" onClick={() => clearOutputs(path)}>{tn('clearAll')}</button>
+      <button className="nb-tb" onClick={() => clearOutputs(path)}>
+        {tn('clearAll')}
+      </button>
       <span className="nb-sep" />
       <VarsToggle path={path} />
       <button
@@ -232,7 +269,9 @@ function Toolbar({ doc }: { doc: NbDoc }) {
         title={tn('exportPy')}
         onClick={async () => {
           try {
-            const out = await exportScript(path, (p) => confirmDialog(tn('exportAsk', { path: p })));
+            const out = await exportScript(path, (p) =>
+              confirmDialog(tn('exportAsk', { path: p })),
+            );
             if (out) {
               toast(tn('exported', { path: out }));
               void openFile(out);
@@ -275,12 +314,19 @@ function VarsToggle({ path }: { path: string }) {
 
 function PythonPicker() {
   const jup = useSyncExternalStore(subscribeJupyter, jupyterState);
-  const [list, setList] = useState<{ cmd: string; label: string; ok: boolean; version?: string }[] | null>(null);
+  const [list, setList] = useState<
+    { cmd: string; label: string; ok: boolean; version?: string }[] | null
+  >(null);
   const load = () => {
-    if (!list) void window.omni.notebook.interpreters().then(setList).catch(() => setList([]));
+    if (!list)
+      void window.omni.notebook
+        .interpreters()
+        .then(setList)
+        .catch(() => setList([]));
   };
   const current = jup?.python ?? '';
-  const options = list ?? (current ? [{ cmd: current, label: current, ok: jup?.status.ok ?? false }] : []);
+  const options =
+    list ?? (current ? [{ cmd: current, label: current, ok: jup?.status.ok ?? false }] : []);
   return (
     <select
       className="nb-python"
@@ -313,8 +359,17 @@ function short(p: string): string {
   return parts.length > 3 ? `…${p.slice(p.length - parts.slice(-3).join('/').length - 1)}` : p;
 }
 
-function MissingJupyter({ reason, python }: { reason: 'no-python' | 'no-jupyter'; python: string | null }) {
-  const cmd = python && reason === 'no-jupyter' ? `"${python}" -m pip install jupyter_server ipykernel` : JUPYTER_INSTALL;
+function MissingJupyter({
+  reason,
+  python,
+}: {
+  reason: 'no-python' | 'no-jupyter';
+  python: string | null;
+}) {
+  const cmd =
+    python && reason === 'no-jupyter'
+      ? `"${python}" -m pip install jupyter_server ipykernel`
+      : JUPYTER_INSTALL;
   return (
     <div className="nb-missing" role="alert">
       <Icon name="warning" size={16} />
@@ -322,14 +377,18 @@ function MissingJupyter({ reason, python }: { reason: 'no-python' | 'no-jupyter'
         <div>{tn(reason === 'no-python' ? 'noPython' : 'noJupyter')}</div>
         <code className="nb-cmd">{cmd}</code>
         <div className="nb-missing-btns">
-          <button className="btn" onClick={() => void runInTerminal(cmd)}>{tn('installTerm')}</button>
+          <button className="btn" onClick={() => void runInTerminal(cmd)}>
+            {tn('installTerm')}
+          </button>
           <button
             className="btn ghost"
             onClick={() => void navigator.clipboard.writeText(cmd).then(() => toast(tn('copied')))}
           >
             {tn('copyCmd')}
           </button>
-          <button className="btn ghost" onClick={() => void checkJupyter(true)}>{tn('recheck')}</button>
+          <button className="btn ghost" onClick={() => void checkJupyter(true)}>
+            {tn('recheck')}
+          </button>
         </div>
       </div>
     </div>
@@ -446,8 +505,12 @@ function Cells({ doc }: { doc: NbDoc }) {
         />
       ))}
       <div className="nb-add-end">
-        <button className="nb-tb" onClick={() => focusCell(addCell(path, 'code', null), true)}>{tn('addCode')}</button>
-        <button className="nb-tb" onClick={() => focusCell(addCell(path, 'markdown', null), true)}>{tn('addMarkdown')}</button>
+        <button className="nb-tb" onClick={() => focusCell(addCell(path, 'code', null), true)}>
+          {tn('addCode')}
+        </button>
+        <button className="nb-tb" onClick={() => focusCell(addCell(path, 'markdown', null), true)}>
+          {tn('addMarkdown')}
+        </button>
       </div>
     </div>
   );
@@ -479,7 +542,11 @@ function Cell({
   const type = c.cell.cell_type;
   const outputs = c.run === 'idle' ? c.cell.outputs : c.out.outputs;
   const count =
-    c.run !== 'idle' ? '*' : type === 'code' && c.cell.execution_count != null ? String(c.cell.execution_count) : ' ';
+    c.run !== 'idle'
+      ? '*'
+      : type === 'code' && c.cell.execution_count != null
+        ? String(c.cell.execution_count)
+        : ' ';
   const showMd = type === 'markdown' && !c.editing;
   return (
     <div
@@ -503,15 +570,37 @@ function Cell({
       <div className="nb-main">
         <div className="nb-actions">
           {!first && (
-            <button className="nb-mini" title={tn('runAboveShort')} onClick={() => void runFrom(path, c.uid, 'above')}>
+            <button
+              className="nb-mini"
+              title={tn('runAboveShort')}
+              onClick={() => void runFrom(path, c.uid, 'above')}
+            >
               <Icon name="arrowDown" size={12} className="nb-flip" />
             </button>
           )}
-          <button className="nb-mini" title={tn('runBelow')} onClick={() => void runFrom(path, c.uid, 'below')}>
+          <button
+            className="nb-mini"
+            title={tn('runBelow')}
+            onClick={() => void runFrom(path, c.uid, 'below')}
+          >
             <Icon name="arrowDown" size={12} />
           </button>
-          <button className="nb-mini" title={tn('moveUp')} disabled={first} onClick={() => moveCell(path, c.uid, -1)}>▲</button>
-          <button className="nb-mini" title={tn('moveDown')} disabled={last} onClick={() => moveCell(path, c.uid, 1)}>▼</button>
+          <button
+            className="nb-mini"
+            title={tn('moveUp')}
+            disabled={first}
+            onClick={() => moveCell(path, c.uid, -1)}
+          >
+            ▲
+          </button>
+          <button
+            className="nb-mini"
+            title={tn('moveDown')}
+            disabled={last}
+            onClick={() => moveCell(path, c.uid, 1)}
+          >
+            ▼
+          </button>
           <button
             className="nb-mini"
             title={type === 'code' ? tn('toMarkdown') : tn('toCode')}
@@ -529,7 +618,11 @@ function Cell({
             title={tn('editMd')}
             onDoubleClick={() => setEditing(path, c.uid, true)}
           >
-            {c.cell.source.trim() ? <Markdown text={c.cell.source} /> : <span className="nb-empty">{tn('emptyMd')}</span>}
+            {c.cell.source.trim() ? (
+              <Markdown text={c.cell.source} />
+            ) : (
+              <span className="nb-empty">{tn('emptyMd')}</span>
+            )}
           </div>
         ) : (
           <CellEditor
@@ -548,8 +641,9 @@ function Cell({
             }}
           />
         )}
-        {type === 'code' && outputs.length > 0 && (
-          c.collapsed ? (
+        {type === 'code' &&
+          outputs.length > 0 &&
+          (c.collapsed ? (
             <button className="nb-collapsed" onClick={() => toggleCollapsed(path, c.uid)}>
               {tn('outputHidden')}
             </button>
@@ -563,12 +657,19 @@ function Cell({
               />
               <div className="nb-out-list">
                 {outputs.map((o, i) => (
-                  <OutputView key={i} o={o} onFix={o.output_type === 'error' && c.run === 'idle' ? () => fixWithAi(path, c) : undefined} />
+                  <OutputView
+                    key={i}
+                    o={o}
+                    onFix={
+                      o.output_type === 'error' && c.run === 'idle'
+                        ? () => fixWithAi(path, c)
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </div>
-          )
-        )}
+          ))}
       </div>
     </div>
   );
@@ -595,7 +696,10 @@ function CellTime({ c }: { c: UiCell }) {
   const ms = running ? Date.now() - c.startedAt! : c.elapsed;
   if (ms === undefined) return null;
   return (
-    <span className={`nb-time ${running ? 'live' : ''}`} title={running ? undefined : tn('took', { t: duration(ms) })}>
+    <span
+      className={`nb-time ${running ? 'live' : ''}`}
+      title={running ? undefined : tn('took', { t: duration(ms) })}
+    >
       {duration(ms)}
     </span>
   );
@@ -727,7 +831,8 @@ function CellEditor({
   }, [visible, path, uid]);
 
   useEffect(() => {
-    for (const [k, ed] of editors) if (k.startsWith(`${path}\u0000`)) ed.updateOptions({ fontSize, fontFamily });
+    for (const [k, ed] of editors)
+      if (k.startsWith(`${path}\u0000`)) ed.updateOptions({ fontSize, fontFamily });
   }, [fontSize, fontFamily, path]);
 
   return (

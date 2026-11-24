@@ -26,9 +26,18 @@ function fakeService(cursor = { x: 500, y: 500 }) {
     scroll: async (x, y, dx, dy) => void log.push(`scroll ${x},${y} ${dx},${dy}`),
     type: async (t) => void log.push(`type ${t}`),
     keys: async (c) => void log.push(`keys ${c.mods.join('+')}|${c.key}`),
-    zoom: async (x, y, w, h) => (log.push(`zoom ${x},${y} ${w}x${h}`), { mediaType: 'image/png', data: 'BBBB', width: w * 2, height: h * 2 }),
-    open: async (t) => void log.push(`open ${t.kind}:${t.kind === 'url' ? t.url : t.kind === 'file' ? t.path : t.name}`),
-    windows: async () => [{ id: '1', app: 'notepad', title: 'Sin título: Bloc de notas' }, { id: '2', app: 'EXCEL', title: 'Ventas.xlsx - Excel' }],
+    zoom: async (x, y, w, h) => (
+      log.push(`zoom ${x},${y} ${w}x${h}`),
+      { mediaType: 'image/png', data: 'BBBB', width: w * 2, height: h * 2 }
+    ),
+    open: async (t) =>
+      void log.push(
+        `open ${t.kind}:${t.kind === 'url' ? t.url : t.kind === 'file' ? t.path : t.name}`,
+      ),
+    windows: async () => [
+      { id: '1', app: 'notepad', title: 'Sin título: Bloc de notas' },
+      { id: '2', app: 'EXCEL', title: 'Ventas.xlsx - Excel' },
+    ],
     focus: async (id) => (log.push(`focus ${id}`), true),
   };
   return { svc, log };

@@ -18,7 +18,9 @@ function cssFiles(dir: string): string[] {
 
 /** Lines outside :root theme blocks, with comments removed, as [file:line, text]. */
 function ruleLines(file: string): [string, string][] {
-  const src = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
+  const src = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, (c) =>
+    c.replace(/[^\n]/g, ' '),
+  );
   const out: [string, string][] = [];
   let inTheme = false;
   src.split(/\r?\n/).forEach((line, i) => {
@@ -36,12 +38,16 @@ const defined = new Set([...tokens.matchAll(/^\s*(--[\w-]+):/gm)].map((m) => m[1
 
 describe('ui tokens', () => {
   it('no hex colors outside tokens.css and the theme blocks', () => {
-    const bad = lines.filter(([, l]) => /#[0-9a-f]{3,8}\b/i.test(l)).map(([w, l]) => `${w} ${l.trim()}`);
+    const bad = lines
+      .filter(([, l]) => /#[0-9a-f]{3,8}\b/i.test(l))
+      .map(([w, l]) => `${w} ${l.trim()}`);
     expect(bad).toEqual([]);
   });
 
   it('font sizes in px come from the type scale', () => {
-    const bad = lines.filter(([, l]) => /font-size:\s*[0-9.]+px/.test(l)).map(([w, l]) => `${w} ${l.trim()}`);
+    const bad = lines
+      .filter(([, l]) => /font-size:\s*[0-9.]+px/.test(l))
+      .map(([w, l]) => `${w} ${l.trim()}`);
     expect(bad).toEqual([]);
   });
 
@@ -57,7 +63,11 @@ describe('ui tokens', () => {
 
   it('every --text-*, --z-*, --space-* and --elevation-* used is defined', () => {
     const used = new Set(
-      lines.flatMap(([, l]) => [...l.matchAll(/var\((--(?:text|z|space|elevation|radius-(?:xs|md|lg|full))[\w-]*)/g)].map((m) => m[1]!)),
+      lines.flatMap(([, l]) =>
+        [...l.matchAll(/var\((--(?:text|z|space|elevation|radius-(?:xs|md|lg|full))[\w-]*)/g)].map(
+          (m) => m[1]!,
+        ),
+      ),
     );
     expect([...used].filter((u) => !defined.has(u))).toEqual([]);
   });
@@ -124,7 +134,10 @@ describe('cascade layers (16B)', () => {
       .filter((f) => f !== OVERRIDES)
       .flatMap((f) =>
         topLevel(readFileSync(f, 'utf8'))
-          .filter((p) => !(p.startsWith('@layer ') && LAYERS.includes(p.slice(7).replace(/[;\s].*$/, ''))))
+          .filter(
+            (p) =>
+              !(p.startsWith('@layer ') && LAYERS.includes(p.slice(7).replace(/[;\s].*$/, ''))),
+          )
           .filter((p) => !(f === TOKENS && p.startsWith('@layer ') && p.endsWith(';')))
           .map((p) => `${relative(ROOT, f)}: ${p.slice(0, 60)}`),
       );
@@ -135,7 +148,9 @@ describe('cascade layers (16B)', () => {
     const css = readFileSync(OVERRIDES, 'utf8');
     const selectors = topLevel(css).flatMap((p) => p.split(','));
     expect(selectors.length).toBeGreaterThan(0);
-    const bad = selectors.map((s) => s.trim()).filter((s) => !/^(\.monaco-editor|\.xterm)\b|::-webkit-scrollbar/.test(s));
+    const bad = selectors
+      .map((s) => s.trim())
+      .filter((s) => !/^(\.monaco-editor|\.xterm)\b|::-webkit-scrollbar/.test(s));
     expect(bad).toEqual([]);
   });
 

@@ -34,7 +34,10 @@ async function readCapped(r: Response, max: number): Promise<Buffer> {
 export function openVsxUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    return u.protocol === 'https:' && (u.hostname === 'open-vsx.org' || u.hostname.endsWith('.open-vsx.org'));
+    return (
+      u.protocol === 'https:' &&
+      (u.hostname === 'open-vsx.org' || u.hostname.endsWith('.open-vsx.org'))
+    );
   } catch {
     return false;
   }
@@ -196,7 +199,9 @@ export class ExtensionStore {
     const out: InstalledExtension[] = [];
     for (const d of await this.dirs()) {
       try {
-        const meta = JSON.parse(await readFile(join(this.dir, d, 'zinarix-meta.json'), 'utf8')) as Meta;
+        const meta = JSON.parse(
+          await readFile(join(this.dir, d, 'zinarix-meta.json'), 'utf8'),
+        ) as Meta;
         const c = JSON.parse(
           await readFile(join(this.dir, d, 'zinarix-contributions.json'), 'utf8'),
         ) as Pick<InstalledExtension, 'themes' | 'languages' | 'snippets' | 'unsupported'>;

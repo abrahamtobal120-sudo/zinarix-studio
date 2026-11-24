@@ -18,7 +18,15 @@ const changed = () => listeners.forEach((l) => l());
 
 function usePrinters(): [Saved[], () => Promise<void>] {
   const [list, setList] = useState<Saved[]>([]);
-  const load = useCallback(async () => setList(await api().printers.list().catch(() => [])), []);
+  const load = useCallback(
+    async () =>
+      setList(
+        await api()
+          .printers.list()
+          .catch(() => []),
+      ),
+    [],
+  );
   useEffect(() => {
     void load();
     const l = () => void load();
@@ -37,7 +45,18 @@ function useStatus(id: string | null): [PrinterStatus | null, () => void] {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      const s = await api().printers.status(id).catch((e: unknown) => ({ online: false, state: 'offline', printing: false, paused: false, error: errText(e) }) as PrinterStatus);
+      const s = await api()
+        .printers.status(id)
+        .catch(
+          (e: unknown) =>
+            ({
+              online: false,
+              state: 'offline',
+              printing: false,
+              paused: false,
+              error: errText(e),
+            }) as PrinterStatus,
+        );
       if (!alive) return;
       setSt(s);
       // Only while the window is visible: no traffic to the printer from a hidden app.
@@ -57,13 +76,20 @@ function useStatus(id: string | null): [PrinterStatus | null, () => void] {
   return [st, () => setTick((n) => n + 1)];
 }
 
-function statusText(st: PrinterStatus | null): { text: string; kind: 'ok' | 'warn' | 'bad' | 'busy' } {
+function statusText(st: PrinterStatus | null): {
+  text: string;
+  kind: 'ok' | 'warn' | 'bad' | 'busy';
+} {
   if (!st) return { text: '…', kind: 'warn' };
-  if (!st.online) return { text: st.error ? `${tc('offline')}: ${st.error}` : tc('offline'), kind: 'bad' };
+  if (!st.online)
+    return { text: st.error ? `${tc('offline')}: ${st.error}` : tc('offline'), kind: 'bad' };
   if (st.paused) return { text: tc('paused'), kind: 'warn' };
   if (st.printing) {
     const pct = st.progress !== undefined ? Math.round(st.progress * 100) : 0;
-    const left = st.timeLeftS !== undefined ? ` · ${tc('timeLeft', { t: formatDuration(st.timeLeftS, lang === 'en' ? 'en' : 'es') })}` : '';
+    const left =
+      st.timeLeftS !== undefined
+        ? ` · ${tc('timeLeft', { t: formatDuration(st.timeLeftS, lang === 'en' ? 'en' : 'es') })}`
+        : '';
     return { text: `${tc('printingPct', { p: pct })}${left}`, kind: 'busy' };
   }
   return { text: `${tc('idle')} (${st.state})`, kind: 'ok' };
@@ -71,14 +97,21 @@ function statusText(st: PrinterStatus | null): { text: string; kind: 'ok' | 'war
 
 const temps = (st: PrinterStatus | null) =>
   st?.nozzle || st?.bed
-    ? tc('tempsVal', { n: st.nozzle ? `${st.nozzle.actual.toFixed(0)}/${st.nozzle.target.toFixed(0)}` : '?', b: st.bed ? `${st.bed.actual.toFixed(0)}/${st.bed.target.toFixed(0)}` : '?' })
+    ? tc('tempsVal', {
+        n: st.nozzle ? `${st.nozzle.actual.toFixed(0)}/${st.nozzle.target.toFixed(0)}` : '?',
+        b: st.bed ? `${st.bed.actual.toFixed(0)}/${st.bed.target.toFixed(0)}` : '?',
+      })
     : '';
 
 function PrinterRow({ p, onEdit }: { p: Saved; onEdit: () => void }) {
   const [st, refresh] = useStatus(p.id);
   const s = statusText(st);
   const act = async (a: 'pause' | 'resume' | 'cancel') => {
-    if (a === 'cancel' && !(await confirmDialog(tc('cancelConfirm', { name: p.name }), { danger: true }))) return;
+    if (
+      a === 'cancel' &&
+      !(await confirmDialog(tc('cancelConfirm', { name: p.name }), { danger: true }))
+    )
+      return;
     try {
       await api().printers.control(p.id, a);
       refresh();
@@ -93,7 +126,12 @@ function PrinterRow({ p, onEdit }: { p: Saved; onEdit: () => void }) {
         <strong>{p.name}</strong>
         <span className="cad-hint">{p.kind === 'octoprint' ? 'OctoPrint' : 'Klipper'}</span>
         <span className="cad-grow" />
-        <button className="icon-btn" title={tc('editPrinter')} aria-label={tc('editPrinter')} onClick={onEdit}>
+        <button
+          className="icon-btn"
+          title={tc('editPrinter')}
+          aria-label={tc('editPrinter')}
+          onClick={onEdit}
+        >
           <Icon name="edit" />
         </button>
       </div>
@@ -102,7 +140,13 @@ function PrinterRow({ p, onEdit }: { p: Saved; onEdit: () => void }) {
         {st?.file && (st.printing || st.paused) ? ` · ${st.file}` : ''}
       </div>
       {st?.printing && st.progress !== undefined && (
-        <div className="cad-bar" role="progressbar" aria-valuenow={Math.round(st.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+        <div
+          className="cad-bar"
+          role="progressbar"
+          aria-valuenow={Math.round(st.progress * 100)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
           <span style={{ width: `${Math.round(st.progress * 100)}%` }} />
         </div>
       )}
@@ -134,7 +178,13 @@ function PrinterForm({ p, onDone }: { p: Saved | null; onDone: () => void }) {
   const [key, setKey] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const input = () => ({ ...(p ? { id: p.id } : {}), name, kind, url, ...(key.trim() ? { key } : {}) });
+  const input = () => ({
+    ...(p ? { id: p.id } : {}),
+    name,
+    kind,
+    url,
+    ...(key.trim() ? { key } : {}),
+  });
 
   const test = async () => {
     setBusy(true);
@@ -160,8 +210,11 @@ function PrinterForm({ p, onDone }: { p: Saved | null; onDone: () => void }) {
     }
   };
   const remove = async () => {
-    if (!p || !(await confirmDialog(tc('removeConfirm', { name: p.name }), { danger: true }))) return;
-    await api().printers.remove(p.id).catch((e: unknown) => toast(errText(e)));
+    if (!p || !(await confirmDialog(tc('removeConfirm', { name: p.name }), { danger: true })))
+      return;
+    await api()
+      .printers.remove(p.id)
+      .catch((e: unknown) => toast(errText(e)));
     changed();
     onDone();
   };
@@ -182,15 +235,31 @@ function PrinterForm({ p, onDone }: { p: Saved | null; onDone: () => void }) {
       </label>
       <label className="cad-field">
         <span>{tc('pName')}</span>
-        <input value={name} maxLength={60} placeholder="Ender 3" onChange={(e) => setName(e.target.value)} />
+        <input
+          value={name}
+          maxLength={60}
+          placeholder="Ender 3"
+          onChange={(e) => setName(e.target.value)}
+        />
       </label>
       <label className="cad-field">
         <span>{tc('pUrl')}</span>
-        <input value={url} required placeholder={kind === 'octoprint' ? 'http://octopi.local' : 'http://192.168.1.50:7125'} onChange={(e) => setUrl(e.target.value)} />
+        <input
+          value={url}
+          required
+          placeholder={kind === 'octoprint' ? 'http://octopi.local' : 'http://192.168.1.50:7125'}
+          onChange={(e) => setUrl(e.target.value)}
+        />
       </label>
       <label className="cad-field">
         <span>{tc('pKey')}</span>
-        <input type="password" autoComplete="off" value={key} placeholder={p?.hasKey ? tc('pKeySaved') : ''} onChange={(e) => setKey(e.target.value)} />
+        <input
+          type="password"
+          autoComplete="off"
+          value={key}
+          placeholder={p?.hasKey ? tc('pKeySaved') : ''}
+          onChange={(e) => setKey(e.target.value)}
+        />
       </label>
       <p className="cad-hint">{kind === 'octoprint' ? tc('pKeyHintOcto') : tc('pKeyHintMoon')}</p>
       {msg && (
@@ -199,7 +268,12 @@ function PrinterForm({ p, onDone }: { p: Saved | null; onDone: () => void }) {
         </p>
       )}
       <div className="cad-row-btns">
-        <button type="button" className="btn ghost cad-small" disabled={busy || !url.trim()} onClick={() => void test()}>
+        <button
+          type="button"
+          className="btn ghost cad-small"
+          disabled={busy || !url.trim()}
+          onClick={() => void test()}
+        >
           {tc('test')}
         </button>
         <button type="submit" className="btn cad-small" disabled={busy || !url.trim()}>
@@ -209,7 +283,11 @@ function PrinterForm({ p, onDone }: { p: Saved | null; onDone: () => void }) {
           {tc('cancelForm')}
         </button>
         {p && (
-          <button type="button" className="btn ghost cad-small danger" onClick={() => void remove()}>
+          <button
+            type="button"
+            className="btn ghost cad-small danger"
+            onClick={() => void remove()}
+          >
             <Icon name="trash" /> {tc('removePrinter')}
           </button>
         )}
@@ -263,7 +341,13 @@ export function SendBox({ path }: { path: string }) {
   const send = async () => {
     if (!chosen) return;
     const file = path.split(/[\\/]/).pop() ?? path;
-    if (start && !(await confirmDialog(tc('sendConfirm', { file, name: chosen.name }), { okLabel: tc('sendBtn') }))) return;
+    if (
+      start &&
+      !(await confirmDialog(tc('sendConfirm', { file, name: chosen.name }), {
+        okLabel: tc('sendBtn'),
+      }))
+    )
+      return;
     setBusy(true);
     try {
       await api().printers.send(chosen.id, path, start);
@@ -300,7 +384,11 @@ export function SendBox({ path }: { path: string }) {
         <input type="checkbox" checked={start} onChange={(e) => setStart(e.target.checked)} />
         {tc('sendStart')}
       </label>
-      <button className="btn cad-small" disabled={busy || !st?.online || (start && (st.printing || st.paused))} onClick={() => void send()}>
+      <button
+        className="btn cad-small"
+        disabled={busy || !st?.online || (start && (st.printing || st.paused))}
+        onClick={() => void send()}
+      >
         <Icon name="send" /> {tc('sendBtn')}
       </button>
     </div>

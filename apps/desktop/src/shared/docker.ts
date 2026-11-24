@@ -44,7 +44,8 @@ export interface DockerNetwork {
   scope: string;
 }
 
-export type DockerAction = 'start' | 'stop' | 'restart' | 'pause' | 'unpause' | 'rm' | 'rmi' | 'volume-rm';
+export type DockerAction =
+  'start' | 'stop' | 'restart' | 'pause' | 'unpause' | 'rm' | 'rmi' | 'volume-rm';
 
 export interface DockerRunSpec {
   image: string;
@@ -160,18 +161,26 @@ export function validImage(s: unknown): s is string {
 
 export function validPort(s: unknown): s is string {
   if (typeof s !== 'string') return false;
-  const m = /^(?:(\d{1,3}(?:\.\d{1,3}){3}):)?(?:(\d{1,5}):)?(\d{1,5})(?:\/(tcp|udp|sctp))?$/.exec(s);
+  const m = /^(?:(\d{1,3}(?:\.\d{1,3}){3}):)?(?:(\d{1,5}):)?(\d{1,5})(?:\/(tcp|udp|sctp))?$/.exec(
+    s,
+  );
   if (!m) return false;
   return [m[2], m[3]].every((p) => p === undefined || (Number(p) >= 1 && Number(p) <= 65535));
 }
 
 export function validEnv(s: unknown): s is string {
-  return typeof s === 'string' && s.length <= 32_768 && /^[A-Za-z_][A-Za-z0-9_.]*=/.test(s) && !/[\r\n\0]/.test(s);
+  return (
+    typeof s === 'string' &&
+    s.length <= 32_768 &&
+    /^[A-Za-z_][A-Za-z0-9_.]*=/.test(s) &&
+    !/[\r\n\0]/.test(s)
+  );
 }
 
 /** "source:/container/path[:ro|rw]"; the source is a named volume or a host path. */
 export function validVolume(s: unknown): s is string {
-  if (typeof s !== 'string' || s.length > 1024 || /[\r\n\0]/.test(s) || s.startsWith('-')) return false;
+  if (typeof s !== 'string' || s.length > 1024 || /[\r\n\0]/.test(s) || s.startsWith('-'))
+    return false;
   // A Windows drive ("C:\…") has a colon of its own.
   const drive = /^[A-Za-z]:[\\/]/.test(s) ? s.slice(0, 2) : '';
   const parts = s.slice(drive.length).split(':');
@@ -199,7 +208,9 @@ export function validTag(s: unknown): s is string {
 
 /** Names whose values look like secrets (hidden from the agent, masked in the panel). */
 export function secretKey(k: string): boolean {
-  return /pass|secret|token|key|pwd|auth|credential|private|cookie|session|dsn|database_url/i.test(k);
+  return /pass|secret|token|key|pwd|auth|credential|private|cookie|session|dsn|database_url/i.test(
+    k,
+  );
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
@@ -220,7 +231,10 @@ export function parseInspect(raw: unknown): DockerDetails {
       for (const b of binds) {
         const bo = obj(b);
         const ip = str(bo.HostIp);
-        ports.push({ container: cport, host: `${ip && ip !== '0.0.0.0' && ip !== '::' ? `${ip}:` : ''}${str(bo.HostPort)}` });
+        ports.push({
+          container: cport,
+          host: `${ip && ip !== '0.0.0.0' && ip !== '::' ? `${ip}:` : ''}${str(bo.HostPort)}`,
+        });
       }
     else ports.push({ container: cport, host: '' });
   }
@@ -237,7 +251,10 @@ export function parseInspect(raw: unknown): DockerDetails {
     const i = s.indexOf('=');
     return i < 0 ? { key: s, value: '' } : { key: s.slice(0, i), value: s.slice(i + 1) };
   });
-  const cmd = [...(Array.isArray(cfg.Entrypoint) ? cfg.Entrypoint : []), ...(Array.isArray(cfg.Cmd) ? cfg.Cmd : [])]
+  const cmd = [
+    ...(Array.isArray(cfg.Entrypoint) ? cfg.Entrypoint : []),
+    ...(Array.isArray(cfg.Cmd) ? cfg.Cmd : []),
+  ]
     .map(str)
     .map((x) => (/\s/.test(x) ? JSON.stringify(x) : x))
     .join(' ');
@@ -266,7 +283,10 @@ export function parseInspect(raw: unknown): DockerDetails {
         rw: mo.RW !== false,
       };
     }),
-    networks: Object.entries(obj(net.Networks)).map(([name, n]) => ({ name, ip: str(obj(n).IPAddress) })),
+    networks: Object.entries(obj(net.Networks)).map(([name, n]) => ({
+      name,
+      ip: str(obj(n).IPAddress),
+    })),
     project: str(labels['com.docker.compose.project']) || null,
     service: str(labels['com.docker.compose.service']) || null,
   };

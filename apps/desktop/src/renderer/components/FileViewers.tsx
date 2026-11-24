@@ -142,7 +142,8 @@ function ImageViewer({ path, size }: { path: string; size: number }) {
   };
 
   if (error) return <div className="notice-pane">{error}</div>;
-  if (painting && url) return <PaintView path={path} source={{ url }} onClose={() => setPainting(false)} />;
+  if (painting && url)
+    return <PaintView path={path} source={{ url }} onClose={() => setPainting(false)} />;
   if (editing && url)
     return (
       <ImageEditor
@@ -159,7 +160,12 @@ function ImageViewer({ path, size }: { path: string; size: number }) {
     <div className="image-viewer">
       <div className="image-tools">
         {editable && (
-          <button className="on" disabled={!url} title={ti('editHint')} onClick={() => setEditing(true)}>
+          <button
+            className="on"
+            disabled={!url}
+            title={ti('editHint')}
+            onClick={() => setEditing(true)}
+          >
             ✎ {ti('edit')}
           </button>
         )}
@@ -469,7 +475,12 @@ function LargeTextViewer({ path, size }: { path: string; size: number }) {
   return (
     <div className="large-viewer">
       <div className="image-tools">
-        <button onClick={() => jump(0)} disabled={busy || offset === 0} title={t('firstPage')} aria-label={t('firstPage')}>
+        <button
+          onClick={() => jump(0)}
+          disabled={busy || offset === 0}
+          title={t('firstPage')}
+          aria-label={t('firstPage')}
+        >
           <Icon name="skipBack" size={14} />
         </button>
         <button onClick={prev} disabled={busy || offset === 0}>

@@ -1,187 +1,187 @@
 @layer features {
-/* Chat message box, bottom bar: "+" menu and options on the left, model and send on the
+  /* Chat message box, bottom bar: "+" menu and options on the left, model and send on the
    right. Every control is the same 26px height, quiet until hovered or switched on.
    Selectors start with .chat-input so they win over the older rules in styles.css. */
-.chat-input {
-  padding: 10px 10px 8px;
-}
-.chat-input textarea {
-  padding: 2px 6px;
-  line-height: 1.5;
-}
-.chat-input textarea::placeholder {
-  color: var(--fg-dim);
-  opacity: 0.75;
-}
-.chat-input .chat-input-bar {
-  gap: 2px;
-  margin-top: 8px;
-  align-items: center;
-}
-.chat-input .chat-input-spacer {
-  flex: 1 1 0;
-  min-width: 4px;
-}
-
-/* Icon buttons and pills share one size, shape and hover. */
-.chat-input .chat-input-bar > .term-pick,
-.chat-input .chat-input-bar > .rules-chip,
-.chat-input .chat-input-bar > .pill,
-.chat-input .chat-input-bar > .model-chip {
-  height: 26px;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--fg-dim);
-  transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    border-color 0.12s ease;
-}
-.chat-input .chat-input-bar > .term-pick {
-  width: 26px;
-  padding: 0;
-}
-.chat-input .chat-input-bar > .rules-chip {
-  min-width: 26px;
-  padding: 0 6px;
-  justify-content: center;
-  gap: 3px;
-}
-.chat-input .chat-input-bar > .pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 8px;
-}
-.chat-input .chat-input-bar > .term-pick:hover,
-.chat-input .chat-input-bar > .rules-chip:hover,
-.chat-input .chat-input-bar > .pill:hover,
-.chat-input .chat-input-bar > .model-chip:hover {
-  background: var(--hover);
-  color: var(--fg);
-}
-.chat-input .chat-input-bar > .term-pick.on,
-.chat-input .chat-input-bar > .rules-chip.on,
-.chat-input .chat-input-bar > .pill.on {
-  background: var(--bg-4);
-  color: var(--fg-strong);
-}
-.chat-input .chat-input-bar > .rules-chip.warn {
-  color: var(--warn);
-}
-.chat-input .chat-input-bar .rules-count {
-  font-size: var(--text-xs);
-  opacity: 0.85;
-}
-
-/* "+" opens the add-context menu: a round button with a hairline, like a chat app. */
-.chat-input .chat-input-bar > .add-menu-btn {
-  border-radius: 50%;
-  border-color: var(--border);
-  margin-right: 4px;
-}
-.chat-input .chat-input-bar > .add-menu-btn .icon {
-  transition: transform 0.15s ease;
-}
-.chat-input .chat-input-bar > .add-menu-btn.on .icon {
-  transform: rotate(45deg);
-}
-
-/* Model: plain text with its logo, no pill border; the chevron shows it is a picker. */
-.chat-input .chat-input-bar > .model-chip {
-  padding: 0 8px;
-  font-size: var(--text-xs);
-  max-width: 190px;
-  margin-left: 0;
-}
-.chat-input .chat-input-bar > .model-chip.own {
-  color: var(--fg);
-}
-.chat-input .chat-input-bar > .model-chip .icon:last-child {
-  opacity: 0.6;
-}
-
-/* The add-context menu: narrower than the box, one row per action with a dimmed hint. */
-.chat-input .term-menu.add-menu {
-  right: auto;
-  width: min(340px, calc(100% - 16px));
-  padding: 5px;
-  border-radius: var(--radius-lg);
-  animation: add-menu-in 0.12s ease-out;
-}
-.chat-input .add-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.chat-input .add-menu-item .icon {
-  color: var(--fg-dim);
-}
-.chat-input .add-menu-label {
-  flex-shrink: 0;
-}
-.chat-input .add-menu-hint {
-  min-width: 0;
-  margin-left: auto;
-  padding-left: 12px;
-  font-size: var(--text-xs);
-  color: var(--fg-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Options that used to be loose buttons in the bar (reasoning, computer, file, tasks, kit,
-   rules) are rows here; the bar only shows a chip for what is switched on. */
-.chat-input .add-menu-row {
-  padding: 4px 8px;
-  border-radius: var(--radius-xs);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.chat-input .add-menu-row:hover {
-  background: var(--bg-4);
-}
-.chat-input .add-menu-row select {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.chat-input .add-menu-item .add-menu-check {
-  margin-left: auto;
-  color: var(--accent-text);
-}
-.chat-input .add-menu .term-menu-head {
-  margin-top: 4px;
-  padding-top: 7px;
-  border-top: 1px solid var(--border);
-}
-@keyframes add-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
+  .chat-input {
+    padding: 10px 10px 8px;
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  .chat-input .term-menu.add-menu,
+  .chat-input textarea {
+    padding: 2px 6px;
+    line-height: 1.5;
+  }
+  .chat-input textarea::placeholder {
+    color: var(--fg-dim);
+    opacity: 0.75;
+  }
+  .chat-input .chat-input-bar {
+    gap: 2px;
+    margin-top: 8px;
+    align-items: center;
+  }
+  .chat-input .chat-input-spacer {
+    flex: 1 1 0;
+    min-width: 4px;
+  }
+
+  /* Icon buttons and pills share one size, shape and hover. */
+  .chat-input .chat-input-bar > .term-pick,
+  .chat-input .chat-input-bar > .rules-chip,
+  .chat-input .chat-input-bar > .pill,
+  .chat-input .chat-input-bar > .model-chip {
+    height: 26px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--fg-dim);
+    transition:
+      background 0.12s ease,
+      color 0.12s ease,
+      border-color 0.12s ease;
+  }
+  .chat-input .chat-input-bar > .term-pick {
+    width: 26px;
+    padding: 0;
+  }
+  .chat-input .chat-input-bar > .rules-chip {
+    min-width: 26px;
+    padding: 0 6px;
+    justify-content: center;
+    gap: 3px;
+  }
+  .chat-input .chat-input-bar > .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+  }
+  .chat-input .chat-input-bar > .term-pick:hover,
+  .chat-input .chat-input-bar > .rules-chip:hover,
+  .chat-input .chat-input-bar > .pill:hover,
+  .chat-input .chat-input-bar > .model-chip:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .chat-input .chat-input-bar > .term-pick.on,
+  .chat-input .chat-input-bar > .rules-chip.on,
+  .chat-input .chat-input-bar > .pill.on {
+    background: var(--bg-4);
+    color: var(--fg-strong);
+  }
+  .chat-input .chat-input-bar > .rules-chip.warn {
+    color: var(--warn);
+  }
+  .chat-input .chat-input-bar .rules-count {
+    font-size: var(--text-xs);
+    opacity: 0.85;
+  }
+
+  /* "+" opens the add-context menu: a round button with a hairline, like a chat app. */
+  .chat-input .chat-input-bar > .add-menu-btn {
+    border-radius: 50%;
+    border-color: var(--border);
+    margin-right: 4px;
+  }
   .chat-input .chat-input-bar > .add-menu-btn .icon {
-    animation: none;
-    transition: none;
+    transition: transform 0.15s ease;
   }
-}
+  .chat-input .chat-input-bar > .add-menu-btn.on .icon {
+    transform: rotate(45deg);
+  }
 
-/* "Controlar la compu" switched on: tinted, so it is clear the AI may use the mouse. */
-.chat-input .chat-input-bar > .computer-pill.on {
-  background: color-mix(in srgb, var(--warn) 18%, transparent);
-  color: var(--warn);
-}
-.chat-input .chat-input-bar > .computer-pill.on:hover {
-  background: color-mix(in srgb, var(--warn) 26%, transparent);
-  color: var(--warn);
-}
+  /* Model: plain text with its logo, no pill border; the chevron shows it is a picker. */
+  .chat-input .chat-input-bar > .model-chip {
+    padding: 0 8px;
+    font-size: var(--text-xs);
+    max-width: 190px;
+    margin-left: 0;
+  }
+  .chat-input .chat-input-bar > .model-chip.own {
+    color: var(--fg);
+  }
+  .chat-input .chat-input-bar > .model-chip .icon:last-child {
+    opacity: 0.6;
+  }
+
+  /* The add-context menu: narrower than the box, one row per action with a dimmed hint. */
+  .chat-input .term-menu.add-menu {
+    right: auto;
+    width: min(340px, calc(100% - 16px));
+    padding: 5px;
+    border-radius: var(--radius-lg);
+    animation: add-menu-in 0.12s ease-out;
+  }
+  .chat-input .add-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .chat-input .add-menu-item .icon {
+    color: var(--fg-dim);
+  }
+  .chat-input .add-menu-label {
+    flex-shrink: 0;
+  }
+  .chat-input .add-menu-hint {
+    min-width: 0;
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: var(--text-xs);
+    color: var(--fg-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Options that used to be loose buttons in the bar (reasoning, computer, file, tasks, kit,
+   rules) are rows here; the bar only shows a chip for what is switched on. */
+  .chat-input .add-menu-row {
+    padding: 4px 8px;
+    border-radius: var(--radius-xs);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .chat-input .add-menu-row:hover {
+    background: var(--bg-4);
+  }
+  .chat-input .add-menu-row select {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .chat-input .add-menu-item .add-menu-check {
+    margin-left: auto;
+    color: var(--accent-text);
+  }
+  .chat-input .add-menu .term-menu-head {
+    margin-top: 4px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border);
+  }
+  @keyframes add-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chat-input .term-menu.add-menu,
+    .chat-input .chat-input-bar > .add-menu-btn .icon {
+      animation: none;
+      transition: none;
+    }
+  }
+
+  /* "Controlar la compu" switched on: tinted, so it is clear the AI may use the mouse. */
+  .chat-input .chat-input-bar > .computer-pill.on {
+    background: color-mix(in srgb, var(--warn) 18%, transparent);
+    color: var(--warn);
+  }
+  .chat-input .chat-input-bar > .computer-pill.on:hover {
+    background: color-mix(in srgb, var(--warn) 26%, transparent);
+    color: var(--warn);
+  }
 }

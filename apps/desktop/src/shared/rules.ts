@@ -286,9 +286,10 @@ export function selectRules(rules: Rule[], paths: string[], mentions: string[] =
     let reason: string | null = null;
     // A sub-folder AGENTS.md / CLAUDE.md / .cursor/rules / copilot-instructions.md only
     // speaks for the files inside that folder (its globs are relative to it).
-    const base = r.kind === 'instructions' || r.kind === 'cursor' || r.kind === 'copilot'
-      ? ruleBase(r.path)
-      : '';
+    const base =
+      r.kind === 'instructions' || r.kind === 'cursor' || r.kind === 'copilot'
+        ? ruleBase(r.path)
+        : '';
     const dir = base ? `${base}/`.toLowerCase() : '';
     const scoped = dir
       ? paths.filter((p) => p.toLowerCase().startsWith(dir)).map((p) => p.slice(dir.length))

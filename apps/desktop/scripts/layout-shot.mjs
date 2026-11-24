@@ -23,7 +23,14 @@ const report = (win) =>
   win.evaluate(() => {
     const box = (s) => {
       const r = document.querySelector(s)?.getBoundingClientRect();
-      return r ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } : null;
+      return r
+        ? {
+            x: Math.round(r.x),
+            y: Math.round(r.y),
+            w: Math.round(r.width),
+            h: Math.round(r.height),
+          }
+        : null;
     };
     return {
       panel: box('.panel-wrap'),

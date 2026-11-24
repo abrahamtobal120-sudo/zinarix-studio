@@ -74,9 +74,32 @@ export function DebugToolbar({ labelled = false }: { labelled?: boolean }) {
         ? btn('go', 'continue', td('dbgContinue'), 'F5', td('dbgTipContinue'), cont)
         : btn('go', 'pause', td('dbgPause'), 'F6', td('dbgTipPause'), pause, state !== 'running')}
       {btn('step', 'stepOver', td('dbgStepOver'), 'F10', td('dbgTipStepOver'), stepOver, !stopped)}
-      {btn('step', 'stepInto', td('dbgStepIntoShort'), 'F11', td('dbgTipStepInto'), stepInto, !stopped)}
-      {btn('step', 'stepOut', td('dbgStepOutShort'), 'Shift+F11', td('dbgTipStepOut'), stepOut, !stopped)}
-      {btn('restart', 'refresh', td('dbgRestart'), 'Ctrl+Shift+F5', td('dbgTipRestart'), restartDebug)}
+      {btn(
+        'step',
+        'stepInto',
+        td('dbgStepIntoShort'),
+        'F11',
+        td('dbgTipStepInto'),
+        stepInto,
+        !stopped,
+      )}
+      {btn(
+        'step',
+        'stepOut',
+        td('dbgStepOutShort'),
+        'Shift+F11',
+        td('dbgTipStepOut'),
+        stepOut,
+        !stopped,
+      )}
+      {btn(
+        'restart',
+        'refresh',
+        td('dbgRestart'),
+        'Ctrl+Shift+F5',
+        td('dbgTipRestart'),
+        restartDebug,
+      )}
       {btn('stop', 'stop', td('dbgStop'), 'Shift+F5', td('dbgTipStop'), stopDebug)}
     </div>
   );
@@ -102,7 +125,11 @@ function Section({
   return (
     <section className={`dbg-section ${open ? 'open' : ''}`}>
       <div className="dbg-section-head">
-        <span className="dbg-section-title" {...pressable(() => setOpen(!open))} aria-expanded={open}>
+        <span
+          className="dbg-section-title"
+          {...pressable(() => setOpen(!open))}
+          aria-expanded={open}
+        >
           <Icon name={open ? 'chevronDown' : 'chevron'} size={12} /> {title}
           {count ? <span className="dbg-count">{count}</span> : null}
         </span>
@@ -160,7 +187,10 @@ async function askAiWherePaused(): Promise<void> {
         const to = Math.min(lines.length, frame.line + 7);
         const code = lines
           .slice(from, to)
-          .map((l, i) => `${from + i + 1 === frame.line ? '>' : ' '} ${String(from + i + 1).padStart(4)} | ${l}`)
+          .map(
+            (l, i) =>
+              `${from + i + 1 === frame.line ? '>' : ' '} ${String(from + i + 1).padStart(4)} | ${l}`,
+          )
           .join('\n');
         parts.push(`${td('dbgAiCode')}:\n\`\`\`\n${code}\n\`\`\``);
       }
@@ -211,7 +241,9 @@ function VarRow({ v, depth }: { v: DebugVariable; depth: number }) {
         title={v.type ? `${v.name}: ${v.type}` : v.name}
         {...(v.ref ? pressable(toggle) : {})}
       >
-        <span className="dbg-twisty">{v.ref ? <Icon name={open ? 'chevronDown' : 'chevron'} size={11} /> : null}</span>
+        <span className="dbg-twisty">
+          {v.ref ? <Icon name={open ? 'chevronDown' : 'chevron'} size={11} /> : null}
+        </span>
         <span className="dbg-var-name">{v.name}</span>
         {v.value !== '' && <span className="dbg-var-sep">:</span>}
         <span className="dbg-var-value">{v.value}</span>
@@ -344,7 +376,9 @@ function Breakpoints() {
             title={`${b.path}:${b.line}${b.condition ? ` — ${b.condition}` : ''}${b.logMessage ? ` — ${td('dbgLogpoint')}: ${b.logMessage}` : ''}`}
             {...pressable(() => void openFile(b.path, { line: b.line, column: 1 }))}
           >
-            <span className={`dbg-bp-dot ${b.logMessage ? 'log' : b.condition ? 'cond' : ''} ${unbound ? 'unbound' : ''}`} />
+            <span
+              className={`dbg-bp-dot ${b.logMessage ? 'log' : b.condition ? 'cond' : ''} ${unbound ? 'unbound' : ''}`}
+            />
             <span className="dbg-bp-file">{b.path.split('/').pop()}</span>
             <span className="dim small dbg-bp-line">
               {b.line}
@@ -445,7 +479,9 @@ export function DebugPanel() {
   const active = useStore((s) => s.active);
   const workspace = useStore((s) => s.workspace);
   const fsVersion = useStore((s) => s.fsVersion);
-  const [configs, setConfigs] = useState<{ configs: DebugConfig[]; file?: string }>({ configs: [] });
+  const [configs, setConfigs] = useState<{ configs: DebugConfig[]; file?: string }>({
+    configs: [],
+  });
   const [asking, setAsking] = useState(false);
 
   useEffect(() => {
@@ -522,7 +558,9 @@ export function DebugPanel() {
           <>
             <ol className="dbg-steps">
               <li className={bpCount > 0 ? 'done' : ''}>
-                <span className="dbg-step-n">{bpCount > 0 ? <Icon name="check" size={11} /> : 1}</span>
+                <span className="dbg-step-n">
+                  {bpCount > 0 ? <Icon name="check" size={11} /> : 1}
+                </span>
                 <span>
                   {td('dbgStep1')}
                   {bpCount > 0 && (
@@ -609,7 +647,9 @@ export function DebugPanel() {
               title={td('dbgWatchAdd')}
               aria-label={td('dbgWatchAdd')}
               onClick={() =>
-                void askText(td('dbgWatchPrompt')).then((e) => e !== null && e.trim() && addWatch(e.trim()))
+                void askText(td('dbgWatchPrompt')).then(
+                  (e) => e !== null && e.trim() && addWatch(e.trim()),
+                )
               }
             >
               <Icon name="plus" size={13} />

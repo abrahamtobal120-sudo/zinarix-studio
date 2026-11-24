@@ -211,13 +211,21 @@ export function EditorArea() {
           {activeTab.path.split('/').join(' › ')}
           {/* Fase 3B: an SVG open as text can go back to the design editor. */}
           {!activeTab.viewer && !activeTab.notice && isSvgPath(activeTab.path) && (
-            <button className="crumb-action" title={tg('designHint')} onClick={() => setTabViewer(activeTab.path, 'design')}>
+            <button
+              className="crumb-action"
+              title={tg('designHint')}
+              onClick={() => setTabViewer(activeTab.path, 'design')}
+            >
               <Icon name="palette" size={12} /> {tg('design')}
             </button>
           )}
           {/* Fase 6: a Godot scene open as text can go back to its node tree. */}
           {!activeTab.viewer && !activeTab.notice && isScenePath(activeTab.path) && (
-            <button className="crumb-action" title={tgm('sceneHint')} onClick={() => setTabViewer(activeTab.path, 'scene')}>
+            <button
+              className="crumb-action"
+              title={tgm('sceneHint')}
+              onClick={() => setTabViewer(activeTab.path, 'scene')}
+            >
               <Icon name="tree" size={12} /> {tgm('sceneTitle')}
             </button>
           )}
@@ -232,7 +240,11 @@ export function EditorArea() {
       <div className="editor-split" style={{ display: showEditor ? 'flex' : 'none' }}>
         <div className="editor-host" ref={host} />
         {isCad && active && !cadHidden.has(active) && (
-          <CadPreview key={active} path={active} onHide={() => setCadHidden((s) => new Set(s).add(active))} />
+          <CadPreview
+            key={active}
+            path={active}
+            onHide={() => setCadHidden((s) => new Set(s).add(active))}
+          />
         )}
         {isCad && active && cadHidden.has(active) && (
           <button

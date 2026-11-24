@@ -485,7 +485,10 @@ function LogsView({ project }: { project: string }) {
 
 /** Compute Engine, Cloud Run, Functions, GKE, Pub/Sub, Secrets, Firestore and IAM: one list. */
 function ResourceView({ project, kind }: { project: string; kind: GCloudResourceKind }) {
-  const rs = useLoad<GCloudResource[]>(() => api().gcloud.resources(project, kind), [project, kind]);
+  const rs = useLoad<GCloudResource[]>(
+    () => api().gcloud.resources(project, kind),
+    [project, kind],
+  );
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const power = async (r: GCloudResource) => {

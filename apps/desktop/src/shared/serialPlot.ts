@@ -107,7 +107,14 @@ export function seriesStats(samples: PlotSample[], series: string[]): SeriesStat
       if (v > max) max = v;
       last = v;
     }
-    return { name, count, last, min: count ? min : Number.NaN, max: count ? max : Number.NaN, avg: count ? sum / count : Number.NaN };
+    return {
+      name,
+      count,
+      last,
+      min: count ? min : Number.NaN,
+      max: count ? max : Number.NaN,
+      avg: count ? sum / count : Number.NaN,
+    };
   });
 }
 
@@ -139,7 +146,8 @@ export function niceTicks(min: number, max: number, count = 5): number[] {
   const mag = 10 ** Math.floor(Math.log10(raw));
   const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= raw) ?? 10 * mag;
   const out: number[] = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) out.push(Number(v.toPrecision(12)));
+  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step)
+    out.push(Number(v.toPrecision(12)));
   return out;
 }
 
@@ -147,6 +155,12 @@ export function niceTicks(min: number, max: number, count = 5): number[] {
 export function plotCsv(samples: PlotSample[], series: string[]): string {
   const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
   const rows = [['n', ...series].map(esc).join(',')];
-  for (const s of samples) rows.push([String(s.n), ...series.map((k) => (s.values[k] === undefined ? '' : String(s.values[k])))].join(','));
+  for (const s of samples)
+    rows.push(
+      [
+        String(s.n),
+        ...series.map((k) => (s.values[k] === undefined ? '' : String(s.values[k]))),
+      ].join(','),
+    );
   return `${rows.join('\n')}\n`;
 }

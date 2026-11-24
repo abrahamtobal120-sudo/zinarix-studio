@@ -82,12 +82,12 @@ describe('insecure code patterns', () => {
       "createHash('md5').update(x); // nosec",
     ].join('\n');
     expect(scanCodeInText('src/a.ts', code)).toEqual([]);
-    const bad = ["execSync(`git ${arg}`);", "spawn(cmd, { shell: true });"].join('\n');
+    const bad = ['execSync(`git ${arg}`);', 'spawn(cmd, { shell: true });'].join('\n');
     expect(scanCodeInText('src/a.ts', bad)).toHaveLength(2);
     expect(scanCodeInText('a.py', 'x = "no os.system here"\nos.system(cmd)')).toHaveLength(1);
-    expect(scanSecretsInText('a.ts', "const k = 'AKIA" + 'A'.repeat(16) + "'; // zinarix-ignore")).toEqual(
-      [],
-    );
+    expect(
+      scanSecretsInText('a.ts', "const k = 'AKIA" + 'A'.repeat(16) + "'; // zinarix-ignore"),
+    ).toEqual([]);
   });
 });
 

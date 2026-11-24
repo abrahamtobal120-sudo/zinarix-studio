@@ -76,19 +76,29 @@ export function filamentGrams(mm: number, diameter = 1.75, density = 1.24): numb
 /** Comments the slicers leave (PrusaSlicer / SuperSlicer / Orca / Bambu / Cura / Simplify3D). */
 function readComment(c: string, st: GcodeStats): void {
   let m: RegExpExecArray | null;
-  if (!st.slicer && (m = /generated (?:by|with) ([A-Za-z][\w .-]*?\d[\w.]*)/i.exec(c))) st.slicer = m[1]!.trim();
+  if (!st.slicer && (m = /generated (?:by|with) ([A-Za-z][\w .-]*?\d[\w.]*)/i.exec(c)))
+    st.slicer = m[1]!.trim();
   else if (!st.slicer && (m = /^FLAVOR:/i.exec(c))) st.slicer = 'Cura';
-  if ((m = /estimated printing time(?: \(normal mode\))?\s*=\s*(.+)$/i.exec(c)) || (m = /total estimated time:\s*([^;]+)/i.exec(c)) || (m = /model printing time:\s*([^;]+)/i.exec(c))) {
+  if (
+    (m = /estimated printing time(?: \(normal mode\))?\s*=\s*(.+)$/i.exec(c)) ||
+    (m = /total estimated time:\s*([^;]+)/i.exec(c)) ||
+    (m = /model printing time:\s*([^;]+)/i.exec(c))
+  ) {
     if (st.slicerTimeS === undefined) st.slicerTimeS = parseDuration(m[1]!);
   } else if ((m = /^TIME:\s*(\d+)/.exec(c))) st.slicerTimeS = Number(m[1]);
-  else if ((m = /Build time:\s*(.+)$/i.exec(c))) st.slicerTimeS ??= parseDuration(m[1]!.replace(/hours?/i, 'h').replace(/minutes?/i, 'm'));
-  if ((m = /total filament used \[g\]\s*=\s*([\d.]+)/i.exec(c)) || (m = /filament used \[g\]\s*=\s*([\d.]+)/i.exec(c))) {
+  else if ((m = /Build time:\s*(.+)$/i.exec(c)))
+    st.slicerTimeS ??= parseDuration(m[1]!.replace(/hours?/i, 'h').replace(/minutes?/i, 'm'));
+  if (
+    (m = /total filament used \[g\]\s*=\s*([\d.]+)/i.exec(c)) ||
+    (m = /filament used \[g\]\s*=\s*([\d.]+)/i.exec(c))
+  ) {
     const g = Number(m[1]);
     if (g > 0) st.slicerFilamentG = g;
   }
   if ((m = /filament used \[mm\]\s*=\s*([\d.]+)/i.exec(c))) st.slicerFilamentMm = Number(m[1]);
   else if ((m = /^Filament used:\s*([\d.]+)m/i.exec(c))) st.slicerFilamentMm = Number(m[1]) * 1000;
-  if ((m = /^\s*layer_height\s*=\s*([\d.]+)/.exec(c)) || (m = /^Layer height:\s*([\d.]+)/i.exec(c))) st.layerHeight ??= Number(m[1]);
+  if ((m = /^\s*layer_height\s*=\s*([\d.]+)/.exec(c)) || (m = /^Layer height:\s*([\d.]+)/i.exec(c)))
+    st.layerHeight ??= Number(m[1]);
 }
 
 const NUM = /([A-Z])\s*(-?\d*\.?\d+(?:[eE][-+]?\d+)?)/g;
@@ -101,7 +111,14 @@ export interface ParseOptions {
 /** Reads G-code text. Never throws on odd lines: unknown commands are skipped. */
 export function parseGcode(text: string, opts: ParseOptions = {}): GcodeParsed {
   const max = opts.maxSegments ?? 4_000_000;
-  const stats: GcodeStats = { layers: 0, bounds: null, filamentMm: 0, estimateS: 0, lines: 0, truncated: false };
+  const stats: GcodeStats = {
+    layers: 0,
+    bounds: null,
+    filamentMm: 0,
+    estimateS: 0,
+    lines: 0,
+    truncated: false,
+  };
   if (text.startsWith('GCDE')) {
     stats.binary = true;
     return { extrude: new Float32Array(0), travel: new Float32Array(0), layers: [], stats };
@@ -110,7 +127,15 @@ export function parseGcode(text: string, opts: ParseOptions = {}): GcodeParsed {
   let tr = new Float32Array(Math.min(max, 65536) * 6);
   let ne = 0;
   let nt = 0;
-  const push = (which: 'e' | 't', a: number, b: number, c: number, d: number, e: number, f: number) => {
+  const push = (
+    which: 'e' | 't',
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => {
     if (which === 'e') {
       if (ne >= max) return void (stats.truncated = true);
       if ((ne + 1) * 6 > ex.length) {
@@ -272,7 +297,12 @@ export function parseGcode(text: string, opts: ParseOptions = {}): GcodeParsed {
         const z0 = z;
         for (let i = 1; i <= n; i++) {
           const a = a0 + (sweep * i) / n;
-          seg(i === n ? nx : cx + r * Math.cos(a), i === n ? ny : cy + r * Math.sin(a), z0 + ((nz - z0) * i) / n, extruding);
+          seg(
+            i === n ? nx : cx + r * Math.cos(a),
+            i === n ? ny : cy + r * Math.sin(a),
+            z0 + ((nz - z0) * i) / n,
+            extruding,
+          );
         }
         break;
       }
@@ -344,30 +374,38 @@ export function parseGcode(text: string, opts: ParseOptions = {}): GcodeParsed {
   // Object bounds; the custom-code ones too when that is all there is.
   const bb = obj[0] !== Infinity ? obj : all;
   stats.bounds = bb[0] === Infinity ? null : (bb as GcodeStats['bounds']);
-  if (stats.layerHeight === undefined && merged.length > 2) stats.layerHeight = Math.round((merged[2]!.z - merged[1]!.z) * 1000) / 1000;
+  if (stats.layerHeight === undefined && merged.length > 2)
+    stats.layerHeight = Math.round((merged[2]!.z - merged[1]!.z) * 1000) / 1000;
   return { extrude: ex.subarray(0, ne * 6), travel: tr.subarray(0, nt * 6), layers: merged, stats };
 }
 
 /** The time to show: the slicer's when it gave one (it counts acceleration), else ours. */
 export const gcodeTime = (s: GcodeStats) => s.slicerTimeS ?? s.estimateS;
-export const gcodeGrams = (s: GcodeStats, diameter = 1.75) => s.slicerFilamentG ?? filamentGrams(s.slicerFilamentMm ?? s.filamentMm, diameter);
+export const gcodeGrams = (s: GcodeStats, diameter = 1.75) =>
+  s.slicerFilamentG ?? filamentGrams(s.slicerFilamentMm ?? s.filamentMm, diameter);
 
 /** Plain words for the AI. */
 export function describeGcode(s: GcodeStats, bed?: [number, number, number]): string {
-  if (s.binary) return 'This is binary G-code (.bgcode); it can be sent to the printer but not read here.';
+  if (s.binary)
+    return 'This is binary G-code (.bgcode); it can be sent to the printer but not read here.';
   const out: string[] = [];
   if (s.slicer) out.push(`Sliced with ${s.slicer}.`);
-  out.push(`${s.layers} layers${s.layerHeight ? ` of ${s.layerHeight} mm` : ''}, ${s.lines.toLocaleString('en')} lines.`);
+  out.push(
+    `${s.layers} layers${s.layerHeight ? ` of ${s.layerHeight} mm` : ''}, ${s.lines.toLocaleString('en')} lines.`,
+  );
   if (s.bounds) {
     const [x0, y0, z0, x1, y1, z1] = s.bounds;
-    out.push(`Printed area X ${x0.toFixed(1)}..${x1.toFixed(1)}, Y ${y0.toFixed(1)}..${y1.toFixed(1)}, height ${(z1 - Math.min(z0, 0)).toFixed(1)} mm.`);
+    out.push(
+      `Printed area X ${x0.toFixed(1)}..${x1.toFixed(1)}, Y ${y0.toFixed(1)}..${y1.toFixed(1)}, height ${(z1 - Math.min(z0, 0)).toFixed(1)} mm.`,
+    );
     if (bed && (x0 < -1 || y0 < -1 || x1 > bed[0] + 1 || y1 > bed[1] + 1 || z1 > bed[2] + 0.5))
       out.push(`WARNING: it goes outside a ${bed.join('×')} mm printer.`);
   } else out.push('It has no extrusion moves: nothing would be printed.');
   out.push(
     `Time: ${formatDuration(gcodeTime(s), 'en')}${s.slicerTimeS === undefined ? ' (rough estimate, no slicer time in the file)' : ''}. Filament: ${((s.slicerFilamentMm ?? s.filamentMm) / 1000).toFixed(2)} m ≈ ${gcodeGrams(s).toFixed(1)} g.`,
   );
-  if (s.nozzleTemp || s.bedTemp) out.push(`Temperatures: nozzle ${s.nozzleTemp ?? '?'} °C, bed ${s.bedTemp ?? '?'} °C.`);
+  if (s.nozzleTemp || s.bedTemp)
+    out.push(`Temperatures: nozzle ${s.nozzleTemp ?? '?'} °C, bed ${s.bedTemp ?? '?'} °C.`);
   if (s.truncated) out.push('The file is very large; only the first part was read.');
   return out.join(' ');
 }
@@ -384,24 +422,41 @@ export function gcodeTris(p: GcodeParsed, maxSegments = 150_000, width = 0.45): 
   const out = new Float32Array(Math.ceil(n / step) * 4 * 9);
   let k = 0;
   const tri = (a: number[], b: number[], c: number[]) => {
-    out[k++] = a[0]!; out[k++] = a[1]!; out[k++] = a[2]!;
-    out[k++] = b[0]!; out[k++] = b[1]!; out[k++] = b[2]!;
-    out[k++] = c[0]!; out[k++] = c[1]!; out[k++] = c[2]!;
+    out[k++] = a[0]!;
+    out[k++] = a[1]!;
+    out[k++] = a[2]!;
+    out[k++] = b[0]!;
+    out[k++] = b[1]!;
+    out[k++] = b[2]!;
+    out[k++] = c[0]!;
+    out[k++] = c[1]!;
+    out[k++] = c[2]!;
   };
   const s = p.extrude;
   for (let i = 0; i < n; i += step) {
     const o = i * 6;
-    const x0 = s[o]!, y0 = s[o + 1]!, z0 = s[o + 2]!, x1 = s[o + 3]!, y1 = s[o + 4]!, z1 = s[o + 5]!;
+    const x0 = s[o]!,
+      y0 = s[o + 1]!,
+      z0 = s[o + 2]!,
+      x1 = s[o + 3]!,
+      y1 = s[o + 4]!,
+      z1 = s[o + 5]!;
     const len = Math.hypot(x1 - x0, y1 - y0);
     if (len < 1e-6) continue;
     const nx = (-(y1 - y0) / len) * (width / 2);
     const ny = ((x1 - x0) / len) * (width / 2);
     // Flat strip on top.
-    const a = [x0 + nx, y0 + ny, z0], b = [x0 - nx, y0 - ny, z0], c = [x1 - nx, y1 - ny, z1], d = [x1 + nx, y1 + ny, z1];
+    const a = [x0 + nx, y0 + ny, z0],
+      b = [x0 - nx, y0 - ny, z0],
+      c = [x1 - nx, y1 - ny, z1],
+      d = [x1 + nx, y1 + ny, z1];
     tri(a, b, c);
     tri(a, c, d);
     // Wall down to the layer below (what the side views see).
-    const e = [x0, y0, z0 - h], f = [x1, y1, z1 - h], g = [x1, y1, z1], q = [x0, y0, z0];
+    const e = [x0, y0, z0 - h],
+      f = [x1, y1, z1 - h],
+      g = [x1, y1, z1],
+      q = [x0, y0, z0];
     tri(e, f, g);
     tri(e, g, q);
   }

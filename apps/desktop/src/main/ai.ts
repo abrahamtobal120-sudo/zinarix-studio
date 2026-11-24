@@ -250,7 +250,8 @@ export class AiService {
       const known = new Set(k.docs().map((d) => d.name.toLowerCase()));
       for (const src of bot.docs.filter((d) => known.has(d.toLowerCase())).slice(0, 4)) {
         const hits = await k.docsSearch(req.prompt.slice(0, 2000), src, 3).catch(() => []);
-        for (const h of hits) passages.push({ title: h.title, source: h.source, text: h.text.slice(0, 2000) });
+        for (const h of hits)
+          passages.push({ title: h.title, source: h.source, text: h.text.slice(0, 2000) });
       }
     }
     return {

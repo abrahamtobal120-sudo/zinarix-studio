@@ -11,8 +11,19 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { taskEnv } from '../shared/sandbox.js';
-import { sketchupYear, type SketchupJob, type SketchupResult, type SketchupStatusView } from '../shared/sketchup.js';
-import { SKETCHUP_EXT_VERSION, SKETCHUP_LOADER_NAME, SKETCHUP_LOADER_RB, SKETCHUP_MAIN_DIR, SKETCHUP_MAIN_RB } from './sketchupRuby.js';
+import {
+  sketchupYear,
+  type SketchupJob,
+  type SketchupResult,
+  type SketchupStatusView,
+} from '../shared/sketchup.js';
+import {
+  SKETCHUP_EXT_VERSION,
+  SKETCHUP_LOADER_NAME,
+  SKETCHUP_LOADER_RB,
+  SKETCHUP_MAIN_DIR,
+  SKETCHUP_MAIN_RB,
+} from './sketchupRuby.js';
 
 export interface SketchupInstall {
   /** SketchUp.exe, or the SketchUp.app bundle on macOS. */
@@ -36,10 +47,14 @@ export function bridgeDir(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /** Every SketchUp under the usual install folders. */
-export function findSketchups(env: NodeJS.ProcessEnv = process.env, platform = process.platform): SketchupInstall[] {
+export function findSketchups(
+  env: NodeJS.ProcessEnv = process.env,
+  platform = process.platform,
+): SketchupInstall[] {
   const out: SketchupInstall[] = [];
   const add = (exe: string) => {
-    if (existsSync(exe) && !out.some((x) => x.exe.toLowerCase() === exe.toLowerCase())) out.push({ exe, year: sketchupYear(exe) });
+    if (existsSync(exe) && !out.some((x) => x.exe.toLowerCase() === exe.toLowerCase()))
+      out.push({ exe, year: sketchupYear(exe) });
   };
   const list = (dir: string) => {
     try {
@@ -49,7 +64,9 @@ export function findSketchups(env: NodeJS.ProcessEnv = process.env, platform = p
     }
   };
   if (platform === 'win32') {
-    const bases = [env.ProgramW6432, env.ProgramFiles, 'C:\\Program Files'].filter((b): b is string => !!b);
+    const bases = [env.ProgramW6432, env.ProgramFiles, 'C:\\Program Files'].filter(
+      (b): b is string => !!b,
+    );
     for (const base of new Set(bases)) {
       const root = join(base, 'SketchUp');
       for (const n of list(root)) {
@@ -64,8 +81,20 @@ export function findSketchups(env: NodeJS.ProcessEnv = process.env, platform = p
 }
 
 /** SketchUp's Plugins folder for one version (where extensions go). */
-export function pluginsDir(year: number, env: NodeJS.ProcessEnv = process.env, platform = process.platform): string {
-  if (platform === 'darwin') return join(homedir(), 'Library', 'Application Support', `SketchUp ${year}`, 'SketchUp', 'Plugins');
+export function pluginsDir(
+  year: number,
+  env: NodeJS.ProcessEnv = process.env,
+  platform = process.platform,
+): string {
+  if (platform === 'darwin')
+    return join(
+      homedir(),
+      'Library',
+      'Application Support',
+      `SketchUp ${year}`,
+      'SketchUp',
+      'Plugins',
+    );
   const appData = env.APPDATA || join(homedir(), 'AppData', 'Roaming');
   return join(appData, 'SketchUp', `SketchUp ${year}`, 'SketchUp', 'Plugins');
 }
@@ -90,8 +119,11 @@ export class SketchupService {
 
   installs(): SketchupInstall[] {
     const all = findSketchups();
-    const extra = [process.env.ZINARIX_SKETCHUP?.trim(), this.picked].filter((p): p is string => !!p && existsSync(p));
-    for (const exe of extra.reverse()) if (!all.some((x) => x.exe === exe)) all.unshift({ exe, year: sketchupYear(exe) });
+    const extra = [process.env.ZINARIX_SKETCHUP?.trim(), this.picked].filter(
+      (p): p is string => !!p && existsSync(p),
+    );
+    for (const exe of extra.reverse())
+      if (!all.some((x) => x.exe === exe)) all.unshift({ exe, year: sketchupYear(exe) });
     return all;
   }
 
@@ -99,7 +131,9 @@ export class SketchupService {
   active(): SketchupInstall | null {
     const env = process.env.ZINARIX_SKETCHUP?.trim();
     const all = this.installs();
-    return all.find((x) => x.exe === env) ?? all.find((x) => x.exe === this.picked) ?? all[0] ?? null;
+    return (
+      all.find((x) => x.exe === env) ?? all.find((x) => x.exe === this.picked) ?? all[0] ?? null
+    );
   }
 
   async pick(exe: string): Promise<boolean> {
@@ -125,13 +159,20 @@ export class SketchupService {
       // unreadable: treat as outdated
     }
     const main = join(dirname(path), SKETCHUP_MAIN_DIR, 'main.rb');
-    return { installed: true, outdated: !text.includes(`'${SKETCHUP_EXT_VERSION}'`) || !existsSync(main), path };
+    return {
+      installed: true,
+      outdated: !text.includes(`'${SKETCHUP_EXT_VERSION}'`) || !existsSync(main),
+      path,
+    };
   }
 
   /** Writes the extension into SketchUp's Plugins folder (SketchUp loads it the next time it starts). */
   async installExtension(year?: number): Promise<string> {
     const y = year ?? this.active()?.year ?? null;
-    if (!y) throw new Error('SketchUp is not installed (or its version is unknown). Pick SketchUp in the SketchUp panel first.');
+    if (!y)
+      throw new Error(
+        'SketchUp is not installed (or its version is unknown). Pick SketchUp in the SketchUp panel first.',
+      );
     const dir = pluginsDir(y);
     await mkdir(join(dir, SKETCHUP_MAIN_DIR), { recursive: true });
     await writeFile(join(dir, SKETCHUP_MAIN_DIR, 'main.rb'), SKETCHUP_MAIN_RB, 'utf8');
@@ -170,12 +211,20 @@ export class SketchupService {
   /** Starts SketchUp (optionally with a model). */
   launch(file?: string): void {
     const s = this.active();
-    if (!s) throw new Error('SketchUp is not installed. Install it from sketchup.com or pick SketchUp.exe in the SketchUp panel.');
+    if (!s)
+      throw new Error(
+        'SketchUp is not installed. Install it from sketchup.com or pick SketchUp.exe in the SketchUp panel.',
+      );
     const args = file && existsSync(file) ? [file] : [];
     const p =
       process.platform === 'darwin'
         ? spawn('open', ['-a', s.exe, ...args], { detached: true, stdio: 'ignore' })
-        : spawn(s.exe, args, { detached: true, stdio: 'ignore', windowsHide: false, env: taskEnv(process.env) });
+        : spawn(s.exe, args, {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: false,
+            env: taskEnv(process.env),
+          });
     p.on('error', () => {});
     p.unref();
   }
@@ -188,7 +237,9 @@ export class SketchupService {
       if (a) return a;
       await sleep(700);
     }
-    throw new Error('SketchUp did not answer. Is the Zinarix extension installed (SketchUp panel → Install extension) and enabled in Extension Manager?');
+    throw new Error(
+      'SketchUp did not answer. Is the Zinarix extension installed (SketchUp panel → Install extension) and enabled in Extension Manager?',
+    );
   }
 
   /** Opens a model in SketchUp (in the running one when it is connected). */
@@ -209,9 +260,13 @@ export class SketchupService {
     opts: { signal?: AbortSignal; launch?: boolean; timeoutMs?: number } = {},
   ): Promise<SketchupResult & { shot?: Buffer }> {
     if (!this.alive()) {
-      if (opts.launch === false) throw new Error('SketchUp is not open with the Zinarix extension.');
+      if (opts.launch === false)
+        throw new Error('SketchUp is not open with the Zinarix extension.');
       const ext = this.extension();
-      if (!ext.installed) throw new Error('The Zinarix extension is not installed in SketchUp. Use sketchup_install_extension (or the SketchUp panel) first.');
+      if (!ext.installed)
+        throw new Error(
+          'The Zinarix extension is not installed in SketchUp. Use sketchup_install_extension (or the SketchUp panel) first.',
+        );
       this.launch(job.path);
       await this.waitAlive(opts.signal);
     }
@@ -222,7 +277,12 @@ export class SketchupService {
     await mkdir(results, { recursive: true });
     const shots = join(this.home, 'shots');
     if (job.shot) await mkdir(shots, { recursive: true });
-    const full: SketchupJob = { ...job, id, created: Date.now(), ...(job.shot ? { shot: { ...job.shot, path: join(shots, `${id}.png`) } } : {}) };
+    const full: SketchupJob = {
+      ...job,
+      id,
+      created: Date.now(),
+      ...(job.shot ? { shot: { ...job.shot, path: join(shots, `${id}.png`) } } : {}),
+    };
     const jobFile = join(jobs, `${Date.now()}-${id}.json`);
     await writeFile(`${jobFile}.tmp`, JSON.stringify(full), 'utf8');
     await rename(`${jobFile}.tmp`, jobFile);
@@ -239,8 +299,10 @@ export class SketchupService {
           if (r.report?.shot) r.report.shot = undefined;
           return { ...r, ...(shot ? { shot } : {}) };
         }
-        if (Date.now() > end) throw new Error('SketchUp did not finish in time (is a dialog open in SketchUp?).');
-        if (existsSync(jobFile) && !this.alive()) throw new Error('SketchUp closed or stopped answering before taking the job.');
+        if (Date.now() > end)
+          throw new Error('SketchUp did not finish in time (is a dialog open in SketchUp?).');
+        if (existsSync(jobFile) && !this.alive())
+          throw new Error('SketchUp closed or stopped answering before taking the job.');
         await sleep(250);
       }
     } finally {

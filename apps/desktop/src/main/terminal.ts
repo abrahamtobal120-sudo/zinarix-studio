@@ -54,7 +54,13 @@ function profiles(env: NodeJS.ProcessEnv = process.env): Profile[] {
     const pwsh = which('pwsh', env) ?? firstExisting([join(pf, 'PowerShell', '7', 'pwsh.exe')]);
     if (pwsh) list.push({ id: 'pwsh', name: 'PowerShell 7', file: pwsh, args: ['-NoLogo'] });
     const preview = firstExisting([join(pf, 'PowerShell', '7-preview', 'pwsh.exe')]);
-    if (preview) list.push({ id: 'pwsh-preview', name: 'PowerShell Preview', file: preview, args: ['-NoLogo'] });
+    if (preview)
+      list.push({
+        id: 'pwsh-preview',
+        name: 'PowerShell Preview',
+        file: preview,
+        args: ['-NoLogo'],
+      });
     const ps = join(sys32, 'WindowsPowerShell', 'v1.0', 'powershell.exe');
     list.push({
       id: 'powershell',
@@ -81,10 +87,14 @@ function profiles(env: NodeJS.ProcessEnv = process.env): Profile[] {
     if (bash) list.push({ id: 'gitbash', name: 'Git Bash', file: bash, args: ['--login', '-i'] });
     const nu = which('nu', env) ?? firstExisting([join(pf, 'nu', 'bin', 'nu.exe')]);
     if (nu) list.push({ id: 'nushell', name: 'Nushell', file: nu, args: [] });
-    const msys = firstExisting(['C:\\msys64\\usr\\bin\\bash.exe', 'C:\\msys32\\usr\\bin\\bash.exe']);
+    const msys = firstExisting([
+      'C:\\msys64\\usr\\bin\\bash.exe',
+      'C:\\msys32\\usr\\bin\\bash.exe',
+    ]);
     if (msys) list.push({ id: 'msys2', name: 'MSYS2 Bash', file: msys, args: ['--login', '-i'] });
     const cygwin = firstExisting(['C:\\cygwin64\\bin\\bash.exe', 'C:\\cygwin\\bin\\bash.exe']);
-    if (cygwin) list.push({ id: 'cygwin', name: 'Cygwin Bash', file: cygwin, args: ['--login', '-i'] });
+    if (cygwin)
+      list.push({ id: 'cygwin', name: 'Cygwin Bash', file: cygwin, args: ['--login', '-i'] });
     const wsl = firstExisting([join(sys32, 'wsl.exe')]);
     if (wsl) list.push({ id: 'wsl', name: 'WSL (Linux)', file: wsl, args: [] });
     return list;

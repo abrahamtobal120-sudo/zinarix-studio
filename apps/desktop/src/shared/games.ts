@@ -77,7 +77,8 @@ export function godotString(v: string): string {
 
 export function parseProjectGodot(text: string): GodotProjectInfo {
   const entries = parseGodotIni(text);
-  const get = (section: string, key: string) => entries.find((e) => e.section === section && e.key === key)?.value;
+  const get = (section: string, key: string) =>
+    entries.find((e) => e.section === section && e.key === key)?.value;
   const features = get('application', 'config/features') ?? '';
   const feats = [...features.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
   const num = (v: string | undefined) => (v && /^\d+$/.test(v.trim()) ? Number(v.trim()) : null);
@@ -163,9 +164,22 @@ const resId = (v: string | undefined): string | undefined => {
 };
 
 export function parseTscn(text: string): TscnScene {
-  const scene: TscnScene = { kind: '', format: null, uid: '', ext: [], sub: [], nodes: [], connections: [] };
+  const scene: TscnScene = {
+    kind: '',
+    format: null,
+    uid: '',
+    ext: [],
+    sub: [],
+    nodes: [],
+    connections: [],
+  };
   const lines = text.split(/\r?\n/);
-  let cur: { kind: string; attrs: Record<string, string>; props: Record<string, string>; line: number } | null = null;
+  let cur: {
+    kind: string;
+    attrs: Record<string, string>;
+    props: Record<string, string>;
+    line: number;
+  } | null = null;
   const flush = () => {
     if (!cur) return;
     const a = cur.attrs;
@@ -212,7 +226,11 @@ export function parseTscn(text: string): TscnScene {
     const line = lines[i]!;
     const t = line.trim();
     if (!t || t.startsWith(';')) continue;
-    if (/^\[(gd_scene|gd_resource|ext_resource|sub_resource|node|connection|editable|resource)\b/.test(t)) {
+    if (
+      /^\[(gd_scene|gd_resource|ext_resource|sub_resource|node|connection|editable|resource)\b/.test(
+        t,
+      )
+    ) {
       flush();
       let header = t;
       while (!balanced(header) && i + 1 < lines.length) header += ` ${lines[++i]!.trim()}`;
@@ -274,15 +292,20 @@ export function describeScene(scene: TscnScene, maxProps = 6): string {
     if (node.script) extra.push(`script=${node.script}`);
     if (node.groups.length) extra.push(`groups=${node.groups.join(',')}`);
     const props = Object.entries(node.props).slice(0, maxProps);
-    for (const [k, v] of props) extra.push(`${k}=${v.length > 80 ? `${v.slice(0, 80)}…` : v.replace(/\n/g, ' ')}`);
-    if (Object.keys(node.props).length > maxProps) extra.push(`(+${Object.keys(node.props).length - maxProps} props)`);
-    lines.push(`${'  '.repeat(depth)}${node.name} (${what})  line ${node.line}${extra.length ? `  ${extra.join('  ')}` : ''}`);
+    for (const [k, v] of props)
+      extra.push(`${k}=${v.length > 80 ? `${v.slice(0, 80)}…` : v.replace(/\n/g, ' ')}`);
+    if (Object.keys(node.props).length > maxProps)
+      extra.push(`(+${Object.keys(node.props).length - maxProps} props)`);
+    lines.push(
+      `${'  '.repeat(depth)}${node.name} (${what})  line ${node.line}${extra.length ? `  ${extra.join('  ')}` : ''}`,
+    );
   }
   if (scene.connections.length) {
     lines.push('Signals:');
     const root = scene.nodes.find((n) => n.parent === null)?.name ?? '.';
     const who = (p: string) => (p === '.' ? root : p);
-    for (const c of scene.connections) lines.push(`  ${who(c.from)}.${c.signal} → ${who(c.to)}.${c.method}()`);
+    for (const c of scene.connections)
+      lines.push(`  ${who(c.from)}.${c.signal} → ${who(c.to)}.${c.method}()`);
   }
   return lines.join('\n');
 }
@@ -360,7 +383,10 @@ export function parseGodotOutput(text: string): (GodotProblem & { count: number 
   };
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i]!;
-    const head = /^\s*(SCRIPT ERROR|USER SCRIPT ERROR|ERROR|USER ERROR|WARNING|USER WARNING|SCRIPT WARNING):\s*(.*)$/.exec(l);
+    const head =
+      /^\s*(SCRIPT ERROR|USER SCRIPT ERROR|ERROR|USER ERROR|WARNING|USER WARNING|SCRIPT WARNING):\s*(.*)$/.exec(
+        l,
+      );
     if (head) {
       const severity = /WARNING/.test(head[1]!) ? 'warning' : 'error';
       let message = head[2]!.trim();
@@ -395,11 +421,14 @@ export function parseGodotOutput(text: string): (GodotProblem & { count: number 
         const named = /"(res:\/\/[^"]+\.(?:gd|tscn|tres|cs))"/.exec(message);
         if (named) file = named[1]!;
       }
-      if (/^Parse Error:\s*/.test(message)) message = message.replace(/^Parse Error:\s*/, 'Parse error: ');
+      if (/^Parse Error:\s*/.test(message))
+        message = message.replace(/^Parse Error:\s*/, 'Parse error: ');
       add({ severity, message, file, line, func });
       continue;
     }
-    const parse = /^\s*(res:\/\/[^\s:]+):(\d+)\s*-\s*(Parse Error|Error|Warning)?:?\s*(.*)$/.exec(l);
+    const parse = /^\s*(res:\/\/[^\s:]+):(\d+)\s*-\s*(Parse Error|Error|Warning)?:?\s*(.*)$/.exec(
+      l,
+    );
     if (parse)
       add({
         severity: /warning/i.test(parse[3] ?? '') ? 'warning' : 'error',
@@ -422,7 +451,9 @@ export function cleanGodotOutput(text: string): string {
 }
 
 /** "4.7.2.stable.official.ed1daf0bf" → { major 4, minor 7, text "4.7.2" }. */
-export function parseGodotVersion(out: string): { major: number; minor: number; text: string; mono: boolean } | null {
+export function parseGodotVersion(
+  out: string,
+): { major: number; minor: number; text: string; mono: boolean } | null {
   const m = /(\d+)\.(\d+)(?:\.(\d+))?\.([a-z0-9]+)/i.exec(out);
   if (!m) return null;
   return {
@@ -435,8 +466,10 @@ export function parseGodotVersion(out: string): { major: number; minor: number; 
 
 /** Width / height of a PNG from its header (null when it isn't one). */
 export function pngSize(b: Uint8Array): { width: number; height: number } | null {
-  if (b.length < 24 || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47) return null;
-  const u32 = (o: number) => ((b[o]! << 24) | (b[o + 1]! << 16) | (b[o + 2]! << 8) | b[o + 3]!) >>> 0;
+  if (b.length < 24 || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47)
+    return null;
+  const u32 = (o: number) =>
+    ((b[o]! << 24) | (b[o + 1]! << 16) | (b[o + 2]! << 8) | b[o + 3]!) >>> 0;
   return { width: u32(16), height: u32(20) };
 }
 
@@ -520,7 +553,10 @@ export function parseUnityVersion(text: string): string {
 export function parseUproject(text: string): { engine: string; modules: string[] } {
   try {
     const j = JSON.parse(text) as { EngineAssociation?: string; Modules?: { Name?: string }[] };
-    return { engine: j.EngineAssociation ?? '', modules: (j.Modules ?? []).map((m) => m.Name ?? '').filter(Boolean) };
+    return {
+      engine: j.EngineAssociation ?? '',
+      modules: (j.Modules ?? []).map((m) => m.Name ?? '').filter(Boolean),
+    };
   } catch {
     return { engine: '', modules: [] };
   }
@@ -553,7 +589,11 @@ export function isGameTemplate(t: unknown): t is GameTemplate {
 
 const q = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
-function projectGodot(name: string, mainScene: string, opts: { w: number; h: number; renderer: string; actions: Record<string, number[]> }): string {
+function projectGodot(
+  name: string,
+  mainScene: string,
+  opts: { w: number; h: number; renderer: string; actions: Record<string, number[]> },
+): string {
   const key = (code: number) =>
     `Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":${code},"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)`;
   const input = Object.entries(opts.actions)
@@ -583,7 +623,17 @@ renderer/rendering_method=${q(opts.renderer === 'Forward Plus' ? 'forward_plus' 
 }
 
 // Physical key codes (Godot's Key enum).
-const K = { left: 4194319, right: 4194321, up: 4194320, down: 4194322, space: 32, a: 65, d: 68, w: 87, s: 83 };
+const K = {
+  left: 4194319,
+  right: 4194321,
+  up: 4194320,
+  down: 4194322,
+  space: 32,
+  a: 65,
+  d: 68,
+  w: 87,
+  s: 83,
+};
 
 const GITIGNORE = '# Godot 4\n.godot/\n/android/\n*.translation\nexport_presets.cfg\n';
 
@@ -592,7 +642,12 @@ export function gameTemplateFiles(t: GameTemplate, name: string): Record<string,
   switch (t) {
     case 'godot-empty':
       return {
-        'project.godot': projectGodot(name, 'res://main.tscn', { w: 1152, h: 648, renderer: 'Forward Plus', actions: {} }),
+        'project.godot': projectGodot(name, 'res://main.tscn', {
+          w: 1152,
+          h: 648,
+          renderer: 'Forward Plus',
+          actions: {},
+        }),
         'main.tscn': `[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
@@ -622,7 +677,11 @@ func _ready() -> void:
           w: 960,
           h: 540,
           renderer: 'GL Compatibility',
-          actions: { move_left: [K.left, K.a], move_right: [K.right, K.d], jump: [K.space, K.up, K.w] },
+          actions: {
+            move_left: [K.left, K.a],
+            move_right: [K.right, K.d],
+            jump: [K.space, K.up, K.w],
+          },
         }),
         'main.tscn': `[gd_scene load_steps=6 format=3]
 
@@ -764,7 +823,12 @@ func _physics_process(delta: float) -> void:
           w: 960,
           h: 540,
           renderer: 'GL Compatibility',
-          actions: { move_left: [K.left, K.a], move_right: [K.right, K.d], move_up: [K.up, K.w], move_down: [K.down, K.s] },
+          actions: {
+            move_left: [K.left, K.a],
+            move_right: [K.right, K.d],
+            move_up: [K.up, K.w],
+            move_down: [K.down, K.s],
+          },
         }),
         'main.tscn': `[gd_scene load_steps=4 format=3]
 
@@ -829,7 +893,13 @@ func _physics_process(_delta: float) -> void:
           w: 1152,
           h: 648,
           renderer: 'Forward Plus',
-          actions: { move_left: [K.left, K.a], move_right: [K.right, K.d], move_forward: [K.up, K.w], move_back: [K.down, K.s], jump: [K.space] },
+          actions: {
+            move_left: [K.left, K.a],
+            move_right: [K.right, K.d],
+            move_forward: [K.up, K.w],
+            move_back: [K.down, K.s],
+            jump: [K.space],
+          },
         }),
         'main.tscn': `[gd_scene load_steps=9 format=3]
 
@@ -1164,10 +1234,17 @@ renderer.setAnimationLoop(() => {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  return s.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!,
+  );
 }
 
 /** Main scene to open after creating a project from a template. */
 export function templateEntry(t: GameTemplate): string {
-  return t.startsWith('web-') ? 'game.js' : t === 'godot-platformer' || t === 'godot-topdown' ? 'player.gd' : 'main.tscn';
+  return t.startsWith('web-')
+    ? 'game.js'
+    : t === 'godot-platformer' || t === 'godot-topdown'
+      ? 'player.gd'
+      : 'main.tscn';
 }

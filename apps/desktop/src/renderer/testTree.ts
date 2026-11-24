@@ -48,9 +48,7 @@ export function testFileTree(files: string[], root: string): TestFolder {
     }
     return {
       ...cur,
-      folders: cur.folders
-        .map((x) => tidy(x, false))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+      folders: cur.folders.map((x) => tidy(x, false)).sort((a, b) => a.name.localeCompare(b.name)),
       files: [...cur.files].sort((a, b) => baseName(a).localeCompare(baseName(b))),
     };
   };

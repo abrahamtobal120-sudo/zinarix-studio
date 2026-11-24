@@ -1,5 +1,12 @@
 // Module worker computing the video scopes off the UI thread (Fase 12C).
-import { histogram, lumaStats, parade, sampling, vectorscope, waveform } from '../../../shared/videoScopes';
+import {
+  histogram,
+  lumaStats,
+  parade,
+  sampling,
+  vectorscope,
+  waveform,
+} from '../../../shared/videoScopes';
 import type { ScopeRequest, ScopeResponse, ScopeResult } from './scopesProtocol';
 
 // The renderer tsconfig has the DOM lib, not WebWorker: type just what we use.
@@ -21,7 +28,10 @@ function compute(req: ScopeRequest): { res: ScopeResult; transfer: ArrayBuffer[]
   switch (kind) {
     case 'waveform': {
       const wf = waveform(px, w, h, maxWidth);
-      return { res: { ...base(), kind, cols: wf.cols, bins: wf.bins, peak: wf.peak }, transfer: [buf(wf.bins)] };
+      return {
+        res: { ...base(), kind, cols: wf.cols, bins: wf.bins, peak: wf.peak },
+        transfer: [buf(wf.bins)],
+      };
     }
     case 'parade': {
       const p = parade(px, w, h, maxWidth);

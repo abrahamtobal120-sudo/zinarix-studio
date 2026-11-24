@@ -124,7 +124,8 @@ function drawHistogram(c: HTMLCanvasElement, h: Uint32Array) {
     g.fillStyle = col[ch]!;
     g.beginPath();
     g.moveTo(0, H);
-    for (let v = 0; v < 256; v++) g.lineTo((v / 255) * W, H - Math.min(1, h[ch * 256 + v]! / top) * H);
+    for (let v = 0; v < 256; v++)
+      g.lineTo((v / 255) * W, H - Math.min(1, h[ch * 256 + v]! / top) * H);
     g.lineTo(W, H);
     g.closePath();
     g.fill();
@@ -182,7 +183,9 @@ export function ImageEditor({
   // ------------------------------------------------------------ worker
   const worker = useRef<Worker | null>(null);
   const seq = useRef(0);
-  const waiters = useRef(new Map<number, { ok: (r: ImageResponse) => void; fail: (e: Error) => void }>());
+  const waiters = useRef(
+    new Map<number, { ok: (r: ImageResponse) => void; fail: (e: Error) => void }>(),
+  );
 
   const call = useCallback((req: Req, transfer: Transferable[] = []): Promise<ImageResponse> => {
     const w = worker.current;
@@ -222,11 +225,18 @@ export function ImageEditor({
         el.src = url;
         await el.decode();
         const bitmap = await createImageBitmap(el);
-        const r = await call({ kind: 'init', bitmap, previewSide: PREVIEW_SIDE, maxSide: MAX_SIDE }, [bitmap]);
+        const r = await call(
+          { kind: 'init', bitmap, previewSide: PREVIEW_SIDE, maxSide: MAX_SIDE },
+          [bitmap],
+        );
         if (alive && r.kind === 'init') setDims({ w: r.width, h: r.height });
       } catch (err) {
         if (!alive) return;
-        setError((err as { code?: string }).code === 'tooBig' ? ti('tooBig', { max: MAX_SIDE }) : ti('broken'));
+        setError(
+          (err as { code?: string }).code === 'tooBig'
+            ? ti('tooBig', { max: MAX_SIDE })
+            : ti('broken'),
+        );
       }
     })();
     return () => {
@@ -286,7 +296,11 @@ export function ImageEditor({
           if (c) {
             c.width = r.width;
             c.height = r.height;
-            c.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(r.data), r.width, r.height), 0, 0);
+            c.getContext('2d')?.putImageData(
+              new ImageData(new Uint8ClampedArray(r.data), r.width, r.height),
+              0,
+              0,
+            );
             setDrawn(true);
           }
           if (!original) setHistogram(new Uint32Array(r.hist));
@@ -561,7 +575,8 @@ export function ImageEditor({
       if (edit.cutout) render(shown, showOriginal);
       else commit({ ...edit, cutout: true });
     } catch (e) {
-      if ((e as Error).message !== 'closed') toast(ti('bgFailed', { err: (e as Error).message ?? String(e) }));
+      if ((e as Error).message !== 'closed')
+        toast(ti('bgFailed', { err: (e as Error).message ?? String(e) }));
     } finally {
       setBgBusy(false);
     }
@@ -612,7 +627,10 @@ export function ImageEditor({
 
   const onKey = (e: KeyboardEvent) => {
     const el = e.target as HTMLElement;
-    if ((el.tagName === 'INPUT' && (el as HTMLInputElement).type !== 'range') || el.tagName === 'SELECT')
+    if (
+      (el.tagName === 'INPUT' && (el as HTMLInputElement).type !== 'range') ||
+      el.tagName === 'SELECT'
+    )
       return;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
@@ -646,7 +664,12 @@ export function ImageEditor({
   const slider = (k: AdjustKey | FilterKey | 'straighten', disabled = !!cropDraft) => {
     const [min, max, step] = RANGES[k];
     const v = edit[k] ?? 0;
-    const shownVal = k === 'exposure' ? v.toFixed(2) : k === 'straighten' ? `${v.toFixed(1)}°` : Math.round(v * 10) / 10;
+    const shownVal =
+      k === 'exposure'
+        ? v.toFixed(2)
+        : k === 'straighten'
+          ? `${v.toFixed(1)}°`
+          : Math.round(v * 10) / 10;
     return (
       <label
         className="ie-slider"
@@ -669,7 +692,8 @@ export function ImageEditor({
       </label>
     );
   };
-  const sectionSet = (keys: readonly (AdjustKey | FilterKey)[]) => keys.some((k) => edit[k] !== undefined);
+  const sectionSet = (keys: readonly (AdjustKey | FilterKey)[]) =>
+    keys.some((k) => edit[k] !== undefined);
   const clearKeys = (keys: readonly (AdjustKey | FilterKey)[]) => {
     const next = { ...edit };
     for (const k of keys) delete next[k];
@@ -754,21 +778,43 @@ export function ImageEditor({
         </div>
         <aside className="ie-side">
           <section>
-            <canvas ref={histRef} className="ie-hist" width={256} height={70} title={ti('histogram')} />
+            <canvas
+              ref={histRef}
+              className="ie-hist"
+              width={256}
+              height={70}
+              title={ti('histogram')}
+            />
           </section>
           <section>
             <h4>{ti('geometry')}</h4>
             <div className="ie-row">
-              <button title={ti('rotateLeft')} disabled={!!cropDraft} onClick={() => commit(rotateEdit(edit, W, H, -1))}>
+              <button
+                title={ti('rotateLeft')}
+                disabled={!!cropDraft}
+                onClick={() => commit(rotateEdit(edit, W, H, -1))}
+              >
                 ⟲
               </button>
-              <button title={ti('rotateRight')} disabled={!!cropDraft} onClick={() => commit(rotateEdit(edit, W, H, 1))}>
+              <button
+                title={ti('rotateRight')}
+                disabled={!!cropDraft}
+                onClick={() => commit(rotateEdit(edit, W, H, 1))}
+              >
                 ⟳
               </button>
-              <button title={ti('flipH')} disabled={!!cropDraft} onClick={() => commit(flipEdit(edit, W, H, 'h'))}>
+              <button
+                title={ti('flipH')}
+                disabled={!!cropDraft}
+                onClick={() => commit(flipEdit(edit, W, H, 'h'))}
+              >
                 ⇋
               </button>
-              <button title={ti('flipV')} disabled={!!cropDraft} onClick={() => commit(flipEdit(edit, W, H, 'v'))}>
+              <button
+                title={ti('flipV')}
+                disabled={!!cropDraft}
+                onClick={() => commit(flipEdit(edit, W, H, 'v'))}
+              >
                 ⇵
               </button>
               {!cropDraft && (
@@ -783,7 +829,11 @@ export function ImageEditor({
                 <p className="ie-hint">{ti('cropHint')}</p>
                 <div className="ie-row ie-wrap">
                   {ASPECTS.map((a) => (
-                    <button key={a.id} className={aspect === a.id ? 'on' : ''} onClick={() => pickAspect(a.id)}>
+                    <button
+                      key={a.id}
+                      className={aspect === a.id ? 'on' : ''}
+                      onClick={() => pickAspect(a.id)}
+                    >
                       {a.ratio ? a.label : ti('free')}
                     </button>
                   ))}
@@ -814,11 +864,23 @@ export function ImageEditor({
             <div className="ie-row">
               <label className="ie-num">
                 {ti('width')}
-                <input type="number" min={1} max={MAX_SIDE} value={sizeW} onChange={(e) => typeW(e.target.value)} />
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_SIDE}
+                  value={sizeW}
+                  onChange={(e) => typeW(e.target.value)}
+                />
               </label>
               <label className="ie-num">
                 {ti('height')}
-                <input type="number" min={1} max={MAX_SIDE} value={sizeH} onChange={(e) => typeH(e.target.value)} />
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_SIDE}
+                  value={sizeH}
+                  onChange={(e) => typeH(e.target.value)}
+                />
               </label>
             </div>
             <div className="ie-row">
@@ -877,7 +939,9 @@ export function ImageEditor({
                         <span className="viewer-dim">
                           {ti('bgDownloading', { pct: Math.floor((dl.got / dl.total) * 100) })}
                         </span>
-                        <button onClick={() => void api().bg.cancelDownload(bgModel)}>{ti('bgCancel')}</button>
+                        <button onClick={() => void api().bg.cancelDownload(bgModel)}>
+                          {ti('bgCancel')}
+                        </button>
                       </>
                     ) : (
                       <button
@@ -902,11 +966,15 @@ export function ImageEditor({
                       disabled={!ready || !!cropDraft || bgBusy || !modelReady(bgModel)}
                       onClick={() => void removeBg()}
                     >
-                      {!bgBusy && <Icon name="scissors" size={14} />} {bgBusy ? ti('bgWorking') : ti('bgRemove')}
+                      {!bgBusy && <Icon name="scissors" size={14} />}{' '}
+                      {bgBusy ? ti('bgWorking') : ti('bgRemove')}
                     </button>
                   ) : (
                     <>
-                      <button disabled={!!cropDraft} onClick={() => commit({ ...withoutCutout(edit) })}>
+                      <button
+                        disabled={!!cropDraft}
+                        onClick={() => commit({ ...withoutCutout(edit) })}
+                      >
                         {ti('bgRestore')}
                       </button>
                       {maskModel !== bgModel && (
@@ -921,7 +989,11 @@ export function ImageEditor({
                   )}
                 </div>
                 {edit.cutout && (
-                  <div className="ie-row ie-wrap ie-backdrops" role="radiogroup" aria-label={ti('bgBehind')}>
+                  <div
+                    className="ie-row ie-wrap ie-backdrops"
+                    role="radiogroup"
+                    aria-label={ti('bgBehind')}
+                  >
                     <span className="viewer-dim">{ti('bgBehind')}</span>
                     {[
                       { c: null, label: ti('bgTransparent') },
@@ -959,7 +1031,11 @@ export function ImageEditor({
             <h4>{ti('presets')}</h4>
             <div className="ie-row ie-wrap">
               {IMAGE_PRESETS.map((p) => (
-                <button key={p.id} disabled={!!cropDraft} onClick={() => commit({ ...geometryOnly(edit), ...p.edit })}>
+                <button
+                  key={p.id}
+                  disabled={!!cropDraft}
+                  onClick={() => commit({ ...geometryOnly(edit), ...p.edit })}
+                >
                   {ti(`p_${p.id}` as KeyImg)}
                 </button>
               ))}
@@ -998,7 +1074,9 @@ export function ImageEditor({
                     min={1}
                     max={100}
                     value={quality}
-                    onChange={(e) => setQuality(Math.max(1, Math.min(100, Number(e.target.value) || 92)))}
+                    onChange={(e) =>
+                      setQuality(Math.max(1, Math.min(100, Number(e.target.value) || 92)))
+                    }
                   />
                 </label>
               )}
@@ -1008,7 +1086,9 @@ export function ImageEditor({
               <button
                 className="on"
                 disabled={busy || !ready || !!cropDraft}
-                title={ti('saveCopyHint', { name: editedName(path.split(/[\\/]/).pop() ?? path, format) })}
+                title={ti('saveCopyHint', {
+                  name: editedName(path.split(/[\\/]/).pop() ?? path, format),
+                })}
                 onClick={() => void save(false)}
               >
                 {ti('saveCopy')}

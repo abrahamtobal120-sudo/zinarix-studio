@@ -45,10 +45,18 @@ export const GRAPHICS_TOOLS: ToolDefinition[] = [
         palette: { type: 'string', enum: PALETTES.map((p) => p.id) },
         title: { type: 'string', description: 'Main text ("\\n" breaks the line)' },
         subtitle: { type: 'string', description: 'Second text' },
-        width: { type: 'integer', minimum: 16, maximum: MAX_DESIGN_SIDE, description: 'Only to change the template size' },
+        width: {
+          type: 'integer',
+          minimum: 16,
+          maximum: MAX_DESIGN_SIDE,
+          description: 'Only to change the template size',
+        },
         height: { type: 'integer', minimum: 16, maximum: MAX_DESIGN_SIDE },
         path: { type: 'string', description: 'Where to save it (.svg, inside the project)' },
-        overwrite: { type: 'boolean', description: 'Replace the file if it exists (asked to the user)' },
+        overwrite: {
+          type: 'boolean',
+          description: 'Replace the file if it exists (asked to the user)',
+        },
       },
       required: ['template'],
     },
@@ -61,7 +69,12 @@ export const GRAPHICS_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         path: { type: 'string' },
-        width: { type: 'integer', minimum: 16, maximum: VIEW_SIDE, description: 'Width of the picture you get (default: fit 1024)' },
+        width: {
+          type: 'integer',
+          minimum: 16,
+          maximum: VIEW_SIDE,
+          description: 'Width of the picture you get (default: fit 1024)',
+        },
       },
       required: ['path'],
     },
@@ -76,8 +89,16 @@ export const GRAPHICS_TOOLS: ToolDefinition[] = [
         path: { type: 'string' },
         out: { type: 'string', description: 'Output file (.png / .jpg) inside the project' },
         scale: { type: 'number', minimum: 0.1, maximum: 8, description: 'Size × this (default 1)' },
-        width: { type: 'integer', minimum: 1, maximum: 8192, description: 'Exact width (the height keeps the proportion)' },
-        background: { type: 'string', description: 'Background color like "#ffffff" (PNG is transparent by default)' },
+        width: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 8192,
+          description: 'Exact width (the height keeps the proportion)',
+        },
+        background: {
+          type: 'string',
+          description: 'Background color like "#ffffff" (PNG is transparent by default)',
+        },
       },
       required: ['path'],
     },
@@ -95,7 +116,8 @@ function projectFile(root: string, p: unknown, what = '"path"'): string {
   if (typeof p !== 'string' || !p.trim()) throw new Error(`${what} is required.`);
   const abs = isAbsolute(p) ? resolve(p) : resolve(root, p);
   const r = relative(root, abs);
-  if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error('The file must be inside the open project.');
+  if (!r || r.startsWith('..') || isAbsolute(r))
+    throw new Error('The file must be inside the open project.');
   return abs;
 }
 
@@ -108,15 +130,22 @@ function newTarget(root: string, a: Record<string, unknown>): { out: string; rep
     if (!/\.svg$/i.test(out)) throw new Error('"path" must end in .svg.');
     const replaces = existsSync(out);
     if (replaces && a.overwrite !== true)
-      throw new Error(`${rel(root, out)} already exists. Pick another path or pass overwrite: true.`);
+      throw new Error(
+        `${rel(root, out)} already exists. Pick another path or pass overwrite: true.`,
+      );
     return { out, replaces };
   }
   const dir = resolve(root, DESIGN_DIR);
-  const name = uniqueName(slugify(String(a.template ?? 'diseno')), 'svg', (n) => existsSync(resolve(dir, n)));
+  const name = uniqueName(slugify(String(a.template ?? 'diseno')), 'svg', (n) =>
+    existsSync(resolve(dir, n)),
+  );
   return { out: resolve(dir, name), replaces: false };
 }
 
-function exportTarget(root: string, a: Record<string, unknown>): { src: string; out: string; mime: 'image/png' | 'image/jpeg'; replaces: boolean } {
+function exportTarget(
+  root: string,
+  a: Record<string, unknown>,
+): { src: string; out: string; mime: 'image/png' | 'image/jpeg'; replaces: boolean } {
   const src = projectFile(root, a.path);
   if (!/\.svg$/i.test(src)) throw new Error('Only .svg files can be exported.');
   const out =
@@ -161,7 +190,10 @@ export function graphicsPreview(
   try {
     if (name === 'design_new') {
       const t = newTarget(root, a);
-      buildTemplate({ template: String(a.template ?? ''), palette: a.palette as string | undefined });
+      buildTemplate({
+        template: String(a.template ?? ''),
+        palette: a.palette as string | undefined,
+      });
       return {
         risk: t.replaces ? 'high' : 'medium',
         action: `crear diseño ${rel(root, t.out)}`,
@@ -177,7 +209,10 @@ export function graphicsPreview(
         risk: t.replaces ? 'high' : 'medium',
         action: `exportar ${rel(root, t.src)} → ${rel(root, t.out)}`,
         warning: t.replaces ? `Se reemplaza ${rel(root, t.out)}.` : 'Se crea una imagen nueva.',
-        command: typeof a.width === 'number' ? `ancho ${a.width} px` : `escala ×${typeof a.scale === 'number' ? a.scale : 1}`,
+        command:
+          typeof a.width === 'number'
+            ? `ancho ${a.width} px`
+            : `escala ×${typeof a.scale === 'number' ? a.scale : 1}`,
         path: rel(root, t.out),
         ...(t.replaces ? {} : { allowKey: 'svg_export:new' }),
       };
@@ -215,10 +250,17 @@ export async function runGraphicsTool(
   try {
     if (name === 'design_templates') {
       const lines = TEMPLATES.map((t) => `- ${t.id}: ${t.name.en} (${t.width} × ${t.height} px)`);
-      const pals = PALETTES.map((p) => `- ${p.id}: ${p.name.en} (${p.bg1}, ${p.bg2}, accent ${p.accent})`);
-      return { ok: true, content: `Templates:\n${lines.join('\n')}\n\nPalettes:\n${pals.join('\n')}`, summary: `${TEMPLATES.length} plantillas` };
+      const pals = PALETTES.map(
+        (p) => `- ${p.id}: ${p.name.en} (${p.bg1}, ${p.bg2}, accent ${p.accent})`,
+      );
+      return {
+        ok: true,
+        content: `Templates:\n${lines.join('\n')}\n\nPalettes:\n${pals.join('\n')}`,
+        summary: `${TEMPLATES.length} plantillas`,
+      };
     }
-    if (!root) return { ok: false, content: 'No folder is open in the editor.', summary: 'sin carpeta' };
+    if (!root)
+      return { ok: false, content: 'No folder is open in the editor.', summary: 'sin carpeta' };
     if (name === 'design_new') {
       const t = newTarget(root, a);
       const svg = buildTemplate({
@@ -241,20 +283,28 @@ export async function runGraphicsTool(
         open: r,
       };
     }
-    if (!raster) return { ok: false, content: 'Drawing SVG files is not available here.', summary: 'no disponible' };
+    if (!raster)
+      return {
+        ok: false,
+        content: 'Drawing SVG files is not available here.',
+        summary: 'no disponible',
+      };
     if (name === 'svg_render') {
       const abs = projectFile(root, a.path);
       const svg = await readSvg(abs);
       const nat = svgSize(svg);
       const fit = Math.min(1, VIEW_SIDE / Math.max(nat.width, nat.height));
-      const want = typeof a.width === 'number' && a.width > 0 ? Math.min(VIEW_SIDE, a.width) / nat.width : fit;
+      const want =
+        typeof a.width === 'number' && a.width > 0 ? Math.min(VIEW_SIDE, a.width) / nat.width : fit;
       const s = Math.min(fit, want);
       const w = Math.max(1, Math.round(nat.width * s));
       const h = Math.max(1, Math.round(nat.height * s));
       const png = await raster(svg, { width: w, height: h, mime: 'image/png' });
       const notes: string[] = [];
-      if (/<script\b/i.test(svg) || /\son[a-z]+\s*=/i.test(svg)) notes.push('It has scripts or event handlers: the design editor removes them.');
-      if (/(?:href|xlink:href)\s*=\s*["']https?:/i.test(svg)) notes.push('It links images from the internet: they are not drawn.');
+      if (/<script\b/i.test(svg) || /\son[a-z]+\s*=/i.test(svg))
+        notes.push('It has scripts or event handlers: the design editor removes them.');
+      if (/(?:href|xlink:href)\s*=\s*["']https?:/i.test(svg))
+        notes.push('It links images from the internet: they are not drawn.');
       if (!/viewBox\s*=/i.test(svg)) notes.push('It has no viewBox: add one so it scales well.');
       return {
         ok: true,
@@ -267,12 +317,20 @@ export async function runGraphicsTool(
       const t = exportTarget(root, a);
       const svg = await readSvg(t.src);
       const size = exportSize(svgSize(svg), a);
-      const bg = typeof a.background === 'string' && /^#[0-9a-f]{3,8}$|^[a-z]+$/i.test(a.background) ? a.background : null;
+      const bg =
+        typeof a.background === 'string' && /^#[0-9a-f]{3,8}$|^[a-z]+$/i.test(a.background)
+          ? a.background
+          : null;
       const buf = await raster(svg, { ...size, mime: t.mime, background: bg });
       await mkdir(dirname(t.out), { recursive: true });
       await writeFile(t.out, buf);
       const r = rel(root, t.out);
-      return { ok: true, content: `Exported ${r} (${size.width} × ${size.height} px).`, summary: `exportado ${r}`, changed: r };
+      return {
+        ok: true,
+        content: `Exported ${r} (${size.width} × ${size.height} px).`,
+        summary: `exportado ${r}`,
+        changed: r,
+      };
     }
     return { ok: false, content: `Unknown tool ${name}.`, summary: 'desconocida' };
   } catch (e) {

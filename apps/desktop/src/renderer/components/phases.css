@@ -1,268 +1,268 @@
 @layer features {
-/* Modo Fases: the phases of a .md of changes, above the message box. */
+  /* Modo Fases: the phases of a .md of changes, above the message box. */
 
-.phases-panel {
-  margin: 0 0 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
-  font-size: var(--text-sm);
-}
-.phases-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  color: var(--fg);
-}
-.phases-title {
-  font-weight: 600;
-  color: var(--fg-strong);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 45%;
-}
-.phases-note,
-.phases-count {
-  color: var(--fg-dim);
-  white-space: nowrap;
-}
-.phases-note {
-  flex: 1;
-}
-.phases-bar {
-  flex: 1;
-  height: 4px;
-  border-radius: var(--radius-xs);
-  background: var(--bg-4);
-  overflow: hidden;
-}
-.phases-bar div {
-  height: 100%;
-  background: var(--ok);
-  transition: width 0.25s ease;
-}
-.phases-x {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: var(--radius-xs);
-  color: var(--fg-dim);
-}
-.phases-x:hover:not(:disabled) {
-  background: var(--bg-4);
-  color: var(--fg);
-}
-.phases-list {
-  max-height: 220px;
-  overflow: auto;
-  padding: 0 6px 4px;
-}
-.phases-phase-head {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 2px;
-  color: var(--fg);
-  text-align: left;
-  border-radius: var(--radius-xs);
-}
-.phases-phase-head:hover {
-  background: var(--bg-3);
-}
-.phases-phase-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.phases-subs {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 2px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.phases-sub {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 2px 4px;
-  border-radius: var(--radius-xs);
-  color: var(--fg);
-}
-.phases-sub:hover {
-  background: var(--bg-3);
-}
-.phases-mark {
-  width: 12px;
-  flex: none;
-  text-align: center;
-  color: var(--fg-dim);
-}
-.phases-sub.is-done .phases-mark {
-  color: var(--ok);
-}
-.phases-sub.is-failed .phases-mark {
-  color: var(--danger);
-  font-weight: 700;
-}
-.phases-sub.is-running .phases-mark {
-  color: var(--accent);
-  animation: phases-spin 1.2s linear infinite;
-}
-.phases-sub.is-done .phases-sub-title,
-.phases-sub.is-skipped .phases-sub-title {
-  color: var(--fg-dim);
-}
-.phases-sub.is-skipped .phases-sub-title {
-  text-decoration: line-through;
-}
-.phases-sub.is-running .phases-sub-title {
-  color: var(--fg-strong);
-  font-weight: 600;
-}
-.phases-sub-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.phases-sub-title,
-.phases-sub-sum {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.phases-sub-sum {
-  color: var(--fg-dim);
-  font-size: var(--text-xs, 11px);
-}
-.phases-sub-actions {
-  display: none;
-  gap: 2px;
-}
-.phases-sub:hover .phases-sub-actions,
-.phases-sub:focus-within .phases-sub-actions {
-  display: inline-flex;
-}
-.phases-sub-actions button {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: var(--radius-xs);
-  color: var(--fg-dim);
-}
-.phases-sub-actions button:hover {
-  background: var(--bg-4);
-  color: var(--fg);
-}
-.phases-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px 6px;
-  border-top: 1px solid var(--border);
-}
-.phases-auto {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--fg-dim);
-}
-.phases-go,
-.phases-pause {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: var(--radius-md);
-}
-.phases-go {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-.phases-go:hover {
-  filter: brightness(1.1);
-}
-.phases-pause {
-  border: 1px solid var(--border);
-  color: var(--fg);
-}
-@keyframes phases-spin {
-  to {
-    transform: rotate(360deg);
+  .phases-panel {
+    margin: 0 0 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-2);
+    font-size: var(--text-sm);
   }
-}
-@media (prefers-reduced-motion: reduce) {
+  .phases-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    color: var(--fg);
+  }
+  .phases-title {
+    font-weight: 600;
+    color: var(--fg-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 45%;
+  }
+  .phases-note,
+  .phases-count {
+    color: var(--fg-dim);
+    white-space: nowrap;
+  }
+  .phases-note {
+    flex: 1;
+  }
+  .phases-bar {
+    flex: 1;
+    height: 4px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-4);
+    overflow: hidden;
+  }
+  .phases-bar div {
+    height: 100%;
+    background: var(--ok);
+    transition: width 0.25s ease;
+  }
+  .phases-x {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: var(--radius-xs);
+    color: var(--fg-dim);
+  }
+  .phases-x:hover:not(:disabled) {
+    background: var(--bg-4);
+    color: var(--fg);
+  }
+  .phases-list {
+    max-height: 220px;
+    overflow: auto;
+    padding: 0 6px 4px;
+  }
+  .phases-phase-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 2px;
+    color: var(--fg);
+    text-align: left;
+    border-radius: var(--radius-xs);
+  }
+  .phases-phase-head:hover {
+    background: var(--bg-3);
+  }
+  .phases-phase-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .phases-subs {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 2px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .phases-sub {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 2px 4px;
+    border-radius: var(--radius-xs);
+    color: var(--fg);
+  }
+  .phases-sub:hover {
+    background: var(--bg-3);
+  }
+  .phases-mark {
+    width: 12px;
+    flex: none;
+    text-align: center;
+    color: var(--fg-dim);
+  }
+  .phases-sub.is-done .phases-mark {
+    color: var(--ok);
+  }
+  .phases-sub.is-failed .phases-mark {
+    color: var(--danger);
+    font-weight: 700;
+  }
   .phases-sub.is-running .phases-mark {
-    animation: none;
+    color: var(--accent);
+    animation: phases-spin 1.2s linear infinite;
   }
-}
+  .phases-sub.is-done .phases-sub-title,
+  .phases-sub.is-skipped .phases-sub-title {
+    color: var(--fg-dim);
+  }
+  .phases-sub.is-skipped .phases-sub-title {
+    text-decoration: line-through;
+  }
+  .phases-sub.is-running .phases-sub-title {
+    color: var(--fg-strong);
+    font-weight: 600;
+  }
+  .phases-sub-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .phases-sub-title,
+  .phases-sub-sum {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .phases-sub-sum {
+    color: var(--fg-dim);
+    font-size: var(--text-xs, 11px);
+  }
+  .phases-sub-actions {
+    display: none;
+    gap: 2px;
+  }
+  .phases-sub:hover .phases-sub-actions,
+  .phases-sub:focus-within .phases-sub-actions {
+    display: inline-flex;
+  }
+  .phases-sub-actions button {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: var(--radius-xs);
+    color: var(--fg-dim);
+  }
+  .phases-sub-actions button:hover {
+    background: var(--bg-4);
+    color: var(--fg);
+  }
+  .phases-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px 6px;
+    border-top: 1px solid var(--border);
+  }
+  .phases-auto {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--fg-dim);
+  }
+  .phases-go,
+  .phases-pause {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: var(--radius-md);
+  }
+  .phases-go {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .phases-go:hover {
+    filter: brightness(1.1);
+  }
+  .phases-pause {
+    border: 1px solid var(--border);
+    color: var(--fg);
+  }
+  @keyframes phases-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .phases-sub.is-running .phases-mark {
+      animation: none;
+    }
+  }
 
-/* The picker of the document. */
-.phases-picker {
-  width: min(560px, 92vw);
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow);
-}
-.phases-picker h3 {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-md);
-  color: var(--fg-strong);
-}
-.phases-picker-hint,
-.phases-picker-none {
-  margin: 0;
-  color: var(--fg-dim);
-  font-size: var(--text-sm);
-}
-.phases-picker-q {
-  padding: 6px 8px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg-1, var(--bg));
-  color: var(--fg);
-}
-.phases-picker-list {
-  flex: 1;
-  min-height: 80px;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-}
-.phases-picker-list button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 6px;
-  border-radius: var(--radius-xs);
-  text-align: left;
-  color: var(--fg);
-}
-.phases-picker-list button:hover,
-.phases-picker-list button:focus-visible {
-  background: var(--bg-3);
-}
-.phases-picker-foot button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--fg);
-}
+  /* The picker of the document. */
+  .phases-picker {
+    width: min(560px, 92vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow);
+  }
+  .phases-picker h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-md);
+    color: var(--fg-strong);
+  }
+  .phases-picker-hint,
+  .phases-picker-none {
+    margin: 0;
+    color: var(--fg-dim);
+    font-size: var(--text-sm);
+  }
+  .phases-picker-q {
+    padding: 6px 8px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-1, var(--bg));
+    color: var(--fg);
+  }
+  .phases-picker-list {
+    flex: 1;
+    min-height: 80px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .phases-picker-list button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: var(--radius-xs);
+    text-align: left;
+    color: var(--fg);
+  }
+  .phases-picker-list button:hover,
+  .phases-picker-list button:focus-visible {
+    background: var(--bg-3);
+  }
+  .phases-picker-foot button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--fg);
+  }
 }

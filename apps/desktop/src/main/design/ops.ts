@@ -74,7 +74,11 @@ export function applyOp(content: string, op: DesignOp): string {
   if (!lastBefore || after[at.index]?.tag !== lastBefore.tag)
     throw new EditError('El cambio movería otros elementos de la página.');
   // Only setText may change the node's own children (inline formatting).
-  if (op.kind === 'setStyle' ? shift !== 0 : shapeAround(content, at.index) !== shapeAround(next, at.index))
+  if (
+    op.kind === 'setStyle'
+      ? shift !== 0
+      : shapeAround(content, at.index) !== shapeAround(next, at.index)
+  )
     throw new EditError('El cambio movería otros elementos de la página.');
   return next;
 }

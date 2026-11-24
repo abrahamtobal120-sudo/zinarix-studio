@@ -58,7 +58,10 @@ export class MobileService {
       join(home, 'Library', 'Android', 'sdk'),
       join(home, 'Android', 'Sdk'),
     ].filter((x): x is string => !!x);
-    const sdk = sdkCandidates.find((p) => existsSync(join(p, 'platform-tools'))) ?? sdkCandidates.find((p) => existsSync(p)) ?? null;
+    const sdk =
+      sdkCandidates.find((p) => existsSync(join(p, 'platform-tools'))) ??
+      sdkCandidates.find((p) => existsSync(p)) ??
+      null;
     const inSdk = (...parts: string[]) => {
       if (!sdk) return null;
       const p = join(sdk, ...parts);
@@ -104,7 +107,12 @@ export class MobileService {
     const t = await this.tools();
     if (!t.emulator) throw new Error('No se encontró el emulador del Android SDK.');
     if (!(await this.avds()).includes(avd)) throw new Error(`No existe el emulador ${avd}.`);
-    spawn(t.emulator, ['-avd', avd], { detached: true, stdio: 'ignore', windowsHide: false, env: childEnv(process.env) }).unref();
+    spawn(t.emulator, ['-avd', avd], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: false,
+      env: childEnv(process.env),
+    }).unref();
   }
 
   /** The phone's screen in its own window (scrcpy), with mouse and keyboard. */
@@ -113,13 +121,21 @@ export class MobileService {
     const t = await this.tools();
     if (!t.scrcpy) throw new Error('scrcpy no está instalado.');
     const env = { ...childEnv(process.env), ...(t.adb ? { ADB: t.adb } : {}) };
-    spawn(t.scrcpy, ['-s', serial, '--window-title', `Zinarix · ${serial}`], { detached: true, stdio: 'ignore', env }).unref();
+    spawn(t.scrcpy, ['-s', serial, '--window-title', `Zinarix · ${serial}`], {
+      detached: true,
+      stdio: 'ignore',
+      env,
+    }).unref();
   }
 
   /** A PNG of the phone's screen. */
   async screenshot(serial: string): Promise<Buffer> {
     if (!validSerial(serial)) throw new Error('Dispositivo no válido.');
-    return this.runner.buffer(await this.adb(), ['-s', serial, 'exec-out', 'screencap', '-p'], 30_000);
+    return this.runner.buffer(
+      await this.adb(),
+      ['-s', serial, 'exec-out', 'screencap', '-p'],
+      30_000,
+    );
   }
 
   /** The screen size touches are measured in (wm size; cached per device). */
@@ -127,7 +143,9 @@ export class MobileService {
     if (!validSerial(serial)) throw new Error('Dispositivo no válido.');
     const known = this.sizes.get(serial);
     if (known) return known;
-    const out = await this.runner.text(await this.adb(), ['-s', serial, 'shell', 'wm', 'size'], 15_000).catch(() => '');
+    const out = await this.runner
+      .text(await this.adb(), ['-s', serial, 'shell', 'wm', 'size'], 15_000)
+      .catch(() => '');
     const size = parseWmSize(out);
     if (size) this.sizes.set(serial, size);
     return size;
@@ -143,25 +161,35 @@ export class MobileService {
   async packages(serial: string, third = true): Promise<string[]> {
     if (!validSerial(serial)) throw new Error('Dispositivo no válido.');
     return parsePackages(
-      await this.runner.text(await this.adb(), ['-s', serial, 'shell', 'pm', 'list', 'packages', ...(third ? ['-3'] : [])], 30_000),
+      await this.runner.text(
+        await this.adb(),
+        ['-s', serial, 'shell', 'pm', 'list', 'packages', ...(third ? ['-3'] : [])],
+        30_000,
+      ),
     );
   }
 
   /** Opens, stops or clears (data and cache) an app; uninstall removes it. */
-  async app(serial: string, pkg: string, action: 'launch' | 'stop' | 'clear' | 'uninstall'): Promise<string> {
+  async app(
+    serial: string,
+    pkg: string,
+    action: 'launch' | 'stop' | 'clear' | 'uninstall',
+  ): Promise<string> {
     if (!validSerial(serial)) throw new Error('Dispositivo no válido.');
     if (!validPackage(pkg)) throw new Error('Paquete no válido.');
     const adb = await this.adb();
     const sh = (...a: string[]) => this.runner.text(adb, ['-s', serial, 'shell', ...a], 60_000);
     if (action === 'launch') {
       const out = await sh('monkey', '-p', pkg, '-c', 'android.intent.category.LAUNCHER', '1');
-      if (/No activities found|monkey aborted/i.test(out)) throw new Error(`La app ${pkg} no tiene una pantalla de inicio (o no está instalada).`);
+      if (/No activities found|monkey aborted/i.test(out))
+        throw new Error(`La app ${pkg} no tiene una pantalla de inicio (o no está instalada).`);
       return out;
     }
     if (action === 'stop') return sh('am', 'force-stop', pkg);
     if (action === 'clear') return sh('pm', 'clear', pkg);
     const out = await this.runner.text(adb, ['-s', serial, 'uninstall', pkg], 120_000);
-    if (!/Success/i.test(out)) throw new Error(out.trim().split('\n').pop() || 'No se pudo desinstalar.');
+    if (!/Success/i.test(out))
+      throw new Error(out.trim().split('\n').pop() || 'No se pudo desinstalar.');
     return out;
   }
 
@@ -169,15 +197,29 @@ export class MobileService {
   async install(serial: string, apk: string): Promise<string> {
     if (!validSerial(serial)) throw new Error('Dispositivo no válido.');
     if (!/\.apk$/i.test(apk) || !existsSync(apk)) throw new Error('No existe ese archivo .apk.');
-    const out = await this.runner.text(await this.adb(), ['-s', serial, 'install', '-r', apk], 10 * 60_000);
-    if (!/Success/i.test(out)) throw new Error(out.trim().split('\n').pop() || 'No se pudo instalar.');
+    const out = await this.runner.text(
+      await this.adb(),
+      ['-s', serial, 'install', '-r', apk],
+      10 * 60_000,
+    );
+    if (!/Success/i.test(out))
+      throw new Error(out.trim().split('\n').pop() || 'No se pudo instalar.');
     return out;
   }
 
   /** .apk files of the folder (build outputs included), newest first, relative paths. */
   async apks(root: string): Promise<string[]> {
     const found: { rel: string; t: number }[] = [];
-    const skip = new Set(['node_modules', '.git', '.gradle', '.dart_tool', 'Pods', '.cxx', 'intermediates', 'tmp']);
+    const skip = new Set([
+      'node_modules',
+      '.git',
+      '.gradle',
+      '.dart_tool',
+      'Pods',
+      '.cxx',
+      'intermediates',
+      'tmp',
+    ]);
     const look = async (dir: string, depth: number) => {
       if (found.length >= 50) return;
       let entries: import('node:fs').Dirent[];
@@ -189,9 +231,12 @@ export class MobileService {
       for (const e of entries) {
         const p = join(dir, e.name);
         if (e.isFile() && /\.apk$/i.test(e.name)) {
-          const t = await stat(p).then((x) => x.mtimeMs).catch(() => 0);
+          const t = await stat(p)
+            .then((x) => x.mtimeMs)
+            .catch(() => 0);
           found.push({ rel: relative(root, p).replace(/\\/g, '/'), t });
-        } else if (e.isDirectory() && depth > 0 && !skip.has(e.name) && !e.name.startsWith('.')) await look(p, depth - 1);
+        } else if (e.isDirectory() && depth > 0 && !skip.has(e.name) && !e.name.startsWith('.'))
+          await look(p, depth - 1);
       }
     };
     await look(root, 8);
@@ -222,19 +267,30 @@ export class MobileService {
   async logcatDump(serial: string, lines: number): Promise<string> {
     if (!validSerial(serial)) throw new Error('Dispositivo no válido.');
     const n = Math.max(1, Math.min(5000, Math.floor(lines)));
-    return this.runner.text(await this.adb(), ['-s', serial, 'logcat', '-d', '-v', 'threadtime', '-t', String(n)], 30_000);
+    return this.runner.text(
+      await this.adb(),
+      ['-s', serial, 'logcat', '-d', '-v', 'threadtime', '-t', String(n)],
+      30_000,
+    );
   }
 
   /** pid of a running app (adb shell pidof), to keep only its lines. */
   async pidOf(serial: string, pkg: string): Promise<number | null> {
     if (!validSerial(serial) || !/^[\w.]{1,200}$/.test(pkg)) throw new Error('Paquete no válido.');
-    const out = await this.runner.text(await this.adb(), ['-s', serial, 'shell', 'pidof', pkg], 15_000).catch(() => '');
+    const out = await this.runner
+      .text(await this.adb(), ['-s', serial, 'shell', 'pidof', pkg], 15_000)
+      .catch(() => '');
     const n = Number.parseInt(out.trim().split(/\s+/)[0] ?? '', 10);
     return Number.isFinite(n) ? n : null;
   }
 
   /** Follows the device log: chunks to onData until stopLogcat (or the device goes away). */
-  async followLogcat(key: string, serial: string, onData: (chunk: string) => void, onEnd: () => void): Promise<void> {
+  async followLogcat(
+    key: string,
+    serial: string,
+    onData: (chunk: string) => void,
+    onEnd: () => void,
+  ): Promise<void> {
     if (!validSerial(serial)) throw new Error('Dispositivo no válido.');
     const adb = await this.adb();
     this.stopLogcat(key);
@@ -270,8 +326,14 @@ export class MobileService {
       } catch {
         return;
       }
-      const read = (n: string) => (names.includes(n) ? readFile(join(dir, n), 'utf8').catch(() => null) : Promise.resolve(null));
-      const [pubspec, packageJson] = await Promise.all([read('pubspec.yaml'), read('package.json')]);
+      const read = (n: string) =>
+        names.includes(n)
+          ? readFile(join(dir, n), 'utf8').catch(() => null)
+          : Promise.resolve(null);
+      const [pubspec, packageJson] = await Promise.all([
+        read('pubspec.yaml'),
+        read('package.json'),
+      ]);
       const gradle =
         (names.includes('settings.gradle') || names.includes('settings.gradle.kts')) &&
         (names.includes('gradlew') || names.includes('gradlew.bat'));
@@ -292,7 +354,10 @@ export class MobileService {
       }
       if (depth > 0)
         for (const n of names)
-          if (!n.startsWith('.') && !['node_modules', 'build', 'dist', 'ios', 'android', 'Pods'].includes(n))
+          if (
+            !n.startsWith('.') &&
+            !['node_modules', 'build', 'dist', 'ios', 'android', 'Pods'].includes(n)
+          )
             await look(join(dir, n), depth - 1);
     };
     await look(root, 2);
@@ -306,10 +371,18 @@ export class MobileService {
 
 function run(bin: string, args: string[], timeout: number): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(bin, args, { timeout, windowsHide: true, maxBuffer: 32 * 1024 * 1024, env: childEnv(process.env) }, (err, stdout, stderr) => {
-      if (err) reject(new Error((String(stderr).trim() || err.message).split('\n').slice(-4).join('\n')));
-      else resolve(String(stdout));
-    });
+    execFile(
+      bin,
+      args,
+      { timeout, windowsHide: true, maxBuffer: 32 * 1024 * 1024, env: childEnv(process.env) },
+      (err, stdout, stderr) => {
+        if (err)
+          reject(
+            new Error((String(stderr).trim() || err.message).split('\n').slice(-4).join('\n')),
+          );
+        else resolve(String(stdout));
+      },
+    );
   });
 }
 
@@ -318,7 +391,13 @@ function runBuffer(bin: string, args: string[], timeout: number): Promise<Buffer
     execFile(
       bin,
       args,
-      { encoding: 'buffer', timeout, maxBuffer: 64 * 1024 * 1024, windowsHide: true, env: childEnv(process.env) },
+      {
+        encoding: 'buffer',
+        timeout,
+        maxBuffer: 64 * 1024 * 1024,
+        windowsHide: true,
+        env: childEnv(process.env),
+      },
       (err, stdout, stderr) => {
         if (err) reject(new Error(String(stderr).trim() || err.message));
         else resolve(stdout);
@@ -336,7 +415,10 @@ function which(name: string): Promise<string | null> {
       { timeout: 8000, windowsHide: true, env: childEnv(process.env) },
       (err, stdout) => {
         if (err) return resolve(null);
-        const lines = String(stdout).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const lines = String(stdout)
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
         // Windows: prefer the .exe / .bat over an extension-less shell script.
         resolve(lines.find((l) => /\.(exe|bat|cmd)$/i.test(l)) ?? lines[0] ?? null);
       },

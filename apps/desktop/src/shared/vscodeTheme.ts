@@ -163,7 +163,11 @@ export function snippetItems(data: Record<string, unknown>): SnippetItem[] {
   for (const [name, raw] of Object.entries(data)) {
     if (!raw || typeof raw !== 'object') continue;
     const s = raw as { prefix?: unknown; body?: unknown; description?: unknown };
-    const body = Array.isArray(s.body) ? s.body.map(String).join('\n') : typeof s.body === 'string' ? s.body : null;
+    const body = Array.isArray(s.body)
+      ? s.body.map(String).join('\n')
+      : typeof s.body === 'string'
+        ? s.body
+        : null;
     if (body === null) continue;
     const prefixes = Array.isArray(s.prefix)
       ? s.prefix.map(String)

@@ -14,7 +14,7 @@ Zinarix Studio es un editor de código que funciona con cualquier inteligencia a
 
 1. Ve al menú **Archivo > Abrir carpeta…** (o presiona Ctrl+O).
 2. Elige la carpeta de tu proyecto.
-También puedes arrastrar una carpeta a la ventana, o hacer clic en el nombre de la carpeta en la barra de estado. Para cerrarla: **Archivo > Cerrar carpeta**. Para abrir un archivo rápido por nombre: **Archivo > Apertura rápida…** (Ctrl+P).
+   También puedes arrastrar una carpeta a la ventana, o hacer clic en el nombre de la carpeta en la barra de estado. Para cerrarla: **Archivo > Cerrar carpeta**. Para abrir un archivo rápido por nombre: **Archivo > Apertura rápida…** (Ctrl+P).
 
 ## Crear y guardar archivos
 
@@ -26,10 +26,11 @@ También puedes arrastrar una carpeta a la ventana, o hacer clic en el nombre de
 ## Conectar una IA (primer paso)
 
 Para usar el chat necesitas al menos un modelo de IA. Hay tres formas:
+
 1. **En tu computadora (gratis y privado)**: instala Ollama o LM Studio. Zinarix los detecta solo cuando están abiertos.
 2. **Agente de terminal**: Claude Code, Codex o Gemini CLI con tu propia cuenta.
 3. **Llave de API**: ve al menú **IA > Proveedores y llaves…** (o el icono de llave "Proveedores de IA" en la barra de actividad), elige el proveedor (OpenAI, Anthropic, Google, OpenRouter…) y pega tu llave de API.
-Las llaves se guardan en el llavero seguro del sistema, no en texto plano.
+   Las llaves se guardan en el llavero seguro del sistema, no en texto plano.
 
 ## Elegir el modelo de IA
 
@@ -51,6 +52,7 @@ Las llaves se guardan en el llavero seguro del sistema, no en texto plano.
 ## Modo agente
 
 El modo agente deja que la IA trabaje en tu proyecto: lee y busca archivos, edita archivos y ejecuta comandos en la terminal.
+
 - Actívalo con el botón **Agente** del chat.
 - Cada escritura de archivo y cada comando **pide tu aprobación**. Puedes aprobar, rechazar o elegir "Siempre" (aprueba solo ese mismo comando).
 - Las ediciones de archivos se pueden revertir durante la sesión; lo que hace un comando no se puede deshacer.
@@ -60,6 +62,7 @@ El modo agente deja que la IA trabaje en tu proyecto: lee y busca archivos, edit
 ## Controlar la compu (que la IA use tu computadora entera)
 
 Con el modo agente activo, el botón **Compu** (ícono de monitor, junto a "Razonar") le da a la IA el control de toda tu computadora: ve tu pantalla y usa el mouse y el teclado en cualquier programa (Excel, ajustes de Windows, otras apps).
+
 - Al encenderlo te pide confirmar. Luego el botón dice **"Controla la compu"** en color ámbar.
 - Mientras está encendido, la IA no pide permiso en cada clic. Los atajos delicados (cerrar programas con Alt+F4, borrar sin papelera, bloquear la sesión) sí se preguntan.
 - Cuando la IA empieza a mover el mouse, Zinarix se minimiza y arriba aparece una barra: **"Zinarix está controlando tu compu"**, con el paso en que va y los botones **Pausar**, **Ver chat** y **Detener**.
@@ -89,6 +92,7 @@ Abre **Consumo de créditos** desde el botón **Más** de la barra de actividad 
 ## Ajustes
 
 Abre los ajustes con **Archivo > Ajustes…** (Ctrl+,) o el icono de engranaje abajo en la barra de actividad. Secciones:
+
 - **Apariencia**: tema de color (claro u oscuro y otros), tamaño de la interfaz, idioma.
 - **Editor**: tamaño y tipo de letra, tabulación, ajuste de línea, minimapa, números de línea, formatear al guardar, guardado automático.
 - **Inteligencia artificial**: autocompletado con IA, reglas del proyecto, modo 100 % local, y la Ayuda de Zinarix (mostrar el botón redondo y su modelo).
@@ -151,7 +155,7 @@ Editor de video integrado: **Ver > Zinarix Video Studio** (Ctrl+Shift+V) o el ic
 - **Vercel**: despliega tu sitio web.
 - **Supabase**: base de datos, usuarios, funciones y almacenamiento.
 - **Google Cloud**: BigQuery, Storage, Cloud SQL y más.
-Ejecutar tiene su icono en la barra de actividad; Vercel, Supabase y Google Cloud están en el botón **Más**.
+  Ejecutar tiene su icono en la barra de actividad; Vercel, Supabase y Google Cloud están en el botón **Más**.
 
 ## Correo
 
@@ -184,6 +188,7 @@ El icono del escudo abre el **Centro de seguridad**: revisa tu proyecto (secreto
 ## Ayuda de Zinarix (este asistente)
 
 Es el botón redondo de la esquina de abajo a la derecha. Responde preguntas sobre cómo usar Zinarix Studio con un modelo pequeño que corre en tu computadora con Ollama (no gasta créditos y es privado).
+
 - Instalar: descarga Ollama desde https://ollama.com/download, instálalo y ábrelo. Luego, en la Ayuda, pulsa **Descargar modelo** (unos 1 GB).
 - Ocultar el botón o cambiar el modelo: **Ajustes > Inteligencia artificial > Ayuda de Zinarix**.
 - Puedes arrastrar el botón para moverlo.

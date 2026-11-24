@@ -39,11 +39,16 @@ export function parseCursorTrack(text: string): CursorTrack | null {
     return null;
   }
   const o = x as Partial<CursorTrack> | null;
-  if (!o || o.v !== 1 || !(Number(o.w) > 0) || !(Number(o.h) > 0) || !Array.isArray(o.samples)) return null;
+  if (!o || o.v !== 1 || !(Number(o.w) > 0) || !(Number(o.h) > 0) || !Array.isArray(o.samples))
+    return null;
   const samples: [number, number, number][] = [];
   let last = -Infinity;
   for (const s of o.samples) {
-    if (!Array.isArray(s) || s.length !== 3 || !s.every((v) => typeof v === 'number' && Number.isFinite(v)))
+    if (
+      !Array.isArray(s) ||
+      s.length !== 3 ||
+      !s.every((v) => typeof v === 'number' && Number.isFinite(v))
+    )
       return null;
     if (s[0] < last) return null; // in time order
     last = s[0];
@@ -111,7 +116,8 @@ export function findRests(track: CursorTrack, opts: ZoomOptions = {}): Rest[] {
     const x = sx / n;
     const y = sy / n;
     const onScreen = x >= 0 && x <= 1 && y >= 0 && y <= 1;
-    if (onScreen && (end - ta) / 1000 >= o.minRest) out.push({ t0: ta / 1000, t1: end / 1000, x, y });
+    if (onScreen && (end - ta) / 1000 >= o.minRest)
+      out.push({ t0: ta / 1000, t1: end / 1000, x, y });
     i = j;
   }
   return out;
@@ -205,7 +211,10 @@ export function autoZoomKeys(
 }
 
 /** The clip with the auto zoom keys (replacing its scale / x / y keys). */
-export function withAutoZoom(c: Clip, keys: { scale: Keyframe[]; x: Keyframe[]; y: Keyframe[] }): Clip {
+export function withAutoZoom(
+  c: Clip,
+  keys: { scale: Keyframe[]; x: Keyframe[]; y: Keyframe[] },
+): Clip {
   return { ...c, keyframes: { ...c.keyframes, scale: keys.scale, x: keys.x, y: keys.y } };
 }
 

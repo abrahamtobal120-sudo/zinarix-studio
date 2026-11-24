@@ -76,7 +76,9 @@ export function run(
         if (!err) return res(stdout);
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'ENOENT')
-          return rej(new Error(tool === 'git' ? 'Git no está instalado.' : 'gh no está instalado.'));
+          return rej(
+            new Error(tool === 'git' ? 'Git no está instalado.' : 'gh no está instalado.'),
+          );
         rej(new Error((stderr || err.message).trim().split('\n').slice(-6).join('\n')));
       },
     ),
@@ -247,7 +249,15 @@ export class Git {
 
   async show(hash: string): Promise<string> {
     if (!/^[0-9a-f]{4,64}$/i.test(hash)) throw new Error('commit no válido');
-    const out = await this.git(['show', '--stat', '--patch', '--no-color', '--no-ext-diff', '--no-textconv', hash]);
+    const out = await this.git([
+      'show',
+      '--stat',
+      '--patch',
+      '--no-color',
+      '--no-ext-diff',
+      '--no-textconv',
+      hash,
+    ]);
     return out.length > 200_000 ? `${out.slice(0, 200_000)}\n…` : out;
   }
 

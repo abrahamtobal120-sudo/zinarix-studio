@@ -35,7 +35,8 @@ export function parseScadLiteral(src: string): ScadValue | null {
   if (s === 'true') return true;
   if (s === 'false') return false;
   const str = /^"((?:[^"\\]|\\.)*)"$/.exec(s);
-  if (str) return str[1]!.replace(/\\(.)/g, (_, c: string) => (c === 'n' ? '\n' : c === 't' ? '\t' : c));
+  if (str)
+    return str[1]!.replace(/\\(.)/g, (_, c: string) => (c === 'n' ? '\n' : c === 't' ? '\t' : c));
   const vec = /^\[([^\[\]]*)\]$/.exec(s);
   if (vec) {
     const parts = vec[1]!.split(',').map((p) => p.trim());
@@ -55,14 +56,21 @@ export function scadLiteral(v: ScadValue): string {
 }
 
 const typeOf = (v: ScadValue): ScadParam['type'] =>
-  typeof v === 'number' ? 'number' : typeof v === 'boolean' ? 'boolean' : Array.isArray(v) ? 'vector' : 'string';
+  typeof v === 'number'
+    ? 'number'
+    : typeof v === 'boolean'
+      ? 'boolean'
+      : Array.isArray(v)
+        ? 'vector'
+        : 'string';
 
 /** The bracket after an assignment: [max], [min:max], [min:step:max], [a, b, c] or [1:Uno, 2:Dos]. */
 function applyHint(p: ScadParam, hint: string): void {
   const h = hint.trim();
   const range = /^\[\s*(-?[\d.]+)\s*(?::\s*(-?[\d.]+)\s*)?(?::\s*(-?[\d.]+)\s*)?\]$/.exec(h);
   if (range && p.type === 'number') {
-    const a = Number(range[1]), b = range[2] !== undefined ? Number(range[2]) : undefined;
+    const a = Number(range[1]),
+      b = range[2] !== undefined ? Number(range[2]) : undefined;
     const c = range[3] !== undefined ? Number(range[3]) : undefined;
     if (b === undefined) {
       p.min = 0;
@@ -88,7 +96,12 @@ function applyHint(p: ScadParam, hint: string): void {
         const raw = m ? m[1]! : o;
         const label = m ? m[2]!.trim() : o.replace(/^"|"$/g, '');
         const lit = parseScadLiteral(raw);
-        const value: ScadValue = p.type === 'number' ? Number(raw) : typeof lit === 'string' ? lit : raw.replace(/^"|"$/g, '');
+        const value: ScadValue =
+          p.type === 'number'
+            ? Number(raw)
+            : typeof lit === 'string'
+              ? lit
+              : raw.replace(/^"|"$/g, '');
         return { value, label };
       })
       .filter((o) => p.type !== 'number' || Number.isFinite(o.value as number));
@@ -132,7 +145,8 @@ export function parseScadParams(code: string): ScadParam[] {
       comment = c[1]!.trim() || undefined;
       continue;
     }
-    const a = depth === 0 ? /^\s*([A-Za-z_$][\w$]*)\s*=\s*(.+?)\s*;\s*(?:\/\/\s*(.*))?$/.exec(line) : null;
+    const a =
+      depth === 0 ? /^\s*([A-Za-z_$][\w$]*)\s*=\s*(.+?)\s*;\s*(?:\/\/\s*(.*))?$/.exec(line) : null;
     if (a && !a[1]!.startsWith('$') && group?.toLowerCase() !== 'hidden') {
       const value = parseScadLiteral(a[2]!);
       if (value !== null) {
@@ -175,9 +189,11 @@ export function coerceParam(p: ScadParam, v: unknown): ScadValue | null {
     if (p.max !== undefined) x = Math.min(p.max, x);
     return x;
   }
-  if (p.type === 'boolean') return typeof v === 'boolean' ? v : v === 'true' ? true : v === 'false' ? false : null;
+  if (p.type === 'boolean')
+    return typeof v === 'boolean' ? v : v === 'true' ? true : v === 'false' ? false : null;
   if (p.type === 'vector') {
-    if (!Array.isArray(v) || !v.every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
+    if (!Array.isArray(v) || !v.every((n) => typeof n === 'number' && Number.isFinite(n)))
+      return null;
     return v as number[];
   }
   if (typeof v !== 'string') return null;
@@ -220,7 +236,10 @@ export function parseScadLog(log: string): ScadLog {
   const out: ScadLog = { messages: [] };
   for (const raw of log.split(/\r?\n/)) {
     const line = raw.trim();
-    const m = /^(ERROR|WARNING|DEPRECATED|ECHO|TRACE|UI-WARNING|FONT-WARNING|EXPORT-ERROR|EXPORT-WARNING):\s?(.*)$/.exec(line);
+    const m =
+      /^(ERROR|WARNING|DEPRECATED|ECHO|TRACE|UI-WARNING|FONT-WARNING|EXPORT-ERROR|EXPORT-WARNING):\s?(.*)$/.exec(
+        line,
+      );
     if (m) {
       const kind = m[1]!;
       let message = m[2]!;
@@ -230,7 +249,9 @@ export function parseScadLog(log: string): ScadLog {
       if (loc) {
         file = loc[1];
         ln = Number(loc[2]);
-        message = (message.slice(0, loc.index) + ' ' + message.slice(loc.index + loc[0].length)).replace(/\s{2,}/g, ' ').trim();
+        message = (message.slice(0, loc.index) + ' ' + message.slice(loc.index + loc[0].length))
+          .replace(/\s{2,}/g, ' ')
+          .trim();
       } else {
         const at = /\s+at line\s+(\d+)\s*$/.exec(message);
         if (at) ln = Number(at[1]);
@@ -242,14 +263,21 @@ export function parseScadLog(log: string): ScadLog {
           : kind === 'TRACE'
             ? 'trace'
             : 'warning';
-      out.messages.push({ severity, message: message.replace(/:\s*$/, ''), ...(file && { file }), ...(ln && { line: ln }) });
+      out.messages.push({
+        severity,
+        message: message.replace(/:\s*$/, ''),
+        ...(file && { file }),
+        ...(ln && { line: ln }),
+      });
       continue;
     }
-    if (/Current top level object is empty|Top level object is empty/i.test(line)) out.dimension = 'empty';
+    if (/Current top level object is empty|Top level object is empty/i.test(line))
+      out.dimension = 'empty';
     const top = /Top level object is a (2D|3D) object(?:\s*\(([^)]+)\))?/i.exec(line);
     if (top) {
       out.dimension = top[1]!.toLowerCase() as '2d' | '3d';
-      if (top[2]) out.manifold = /manifold/i.test(top[2]) && !/non/i.test(top[2]) ? true : out.manifold;
+      if (top[2])
+        out.manifold = /manifold/i.test(top[2]) && !/non/i.test(top[2]) ? true : out.manifold;
     }
     const simple = /^Simple:\s*(yes|no)/i.exec(line);
     if (simple) out.manifold = simple[1]!.toLowerCase() === 'yes';
@@ -502,5 +530,12 @@ export interface CadEnginesView {
 
 /** What the window gets from cad:render (binary STL on success). */
 export type CadRenderView =
-  | { ok: true; stl: Uint8Array; engine: 'native' | 'builtin'; ms: number; messages: ScadMessage[]; params: ScadParam[] }
+  | {
+      ok: true;
+      stl: Uint8Array;
+      engine: 'native' | 'builtin';
+      ms: number;
+      messages: ScadMessage[];
+      params: ScadParam[];
+    }
   | { ok: false; error: string; messages: ScadMessage[]; params: ScadParam[]; cancelled?: boolean };

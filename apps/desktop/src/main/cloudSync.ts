@@ -365,9 +365,10 @@ export class CloudSync {
   // ------------------------------------------------------------------ local side
 
   private state(kind: Kind): Map<string, string> {
-    const rows = this.core.db
-      .prepare('SELECT id, fp FROM sync_state WHERE kind = ?')
-      .all(kind) as { id: string; fp: string }[];
+    const rows = this.core.db.prepare('SELECT id, fp FROM sync_state WHERE kind = ?').all(kind) as {
+      id: string;
+      fp: string;
+    }[];
     return new Map(rows.map((r) => [r.id, r.fp]));
   }
 
@@ -586,7 +587,14 @@ export class CloudSync {
       }
       for (const id of state.keys()) {
         if (local.has(id)) continue;
-        out.push({ kind, id, updated_at: Date.now(), deleted: true, device: cfg.deviceId, blob: null });
+        out.push({
+          kind,
+          id,
+          updated_at: Date.now(),
+          deleted: true,
+          device: cfg.deviceId,
+          blob: null,
+        });
         done.push([kind, id, null]);
       }
     }

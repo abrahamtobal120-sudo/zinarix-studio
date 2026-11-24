@@ -27,10 +27,14 @@ export function PrintCheck({
   const k = units === 'm' ? 1000 : 1;
   const s = report.bounds.size;
   // The size and the number of pieces are already in the table above: skip those notes.
-  const notes = c.notes.filter((m) => !/^(Mide [^:]*\.$|It measures [^:]*\.$|Son \d+ piezas|It is \d+ separate)/.test(m));
+  const notes = c.notes.filter(
+    (m) => !/^(Mide [^:]*\.$|It measures [^:]*\.$|Son \d+ piezas|It is \d+ separate)/.test(m),
+  );
   return (
     <div className="cad-print" role="group" aria-label={tc('print')}>
-      <div className={`cad-print-head ${c.ok && !c.warnings.length ? 'ok' : c.ok ? 'warn' : 'bad'}`}>
+      <div
+        className={`cad-print-head ${c.ok && !c.warnings.length ? 'ok' : c.ok ? 'warn' : 'bad'}`}
+      >
         {c.ok ? tc('printOk') : tc('printBad')}
       </div>
       <dl className="cad-facts">
@@ -44,13 +48,15 @@ export function PrintCheck({
           {report.shells > 1 ? ` · ${tc('pieces', { n: report.shells })}` : ''}
         </dd>
       </dl>
-      {[...c.errors.map((m) => ['bad', m] as const), ...c.warnings.map((m) => ['warn', m] as const), ...notes.slice(0, 4).map((m) => ['note', m] as const)].map(
-        ([kind, m], i) => (
-          <p key={i} className={`cad-print-line ${kind}`}>
-            {m}
-          </p>
-        ),
-      )}
+      {[
+        ...c.errors.map((m) => ['bad', m] as const),
+        ...c.warnings.map((m) => ['warn', m] as const),
+        ...notes.slice(0, 4).map((m) => ['note', m] as const),
+      ].map(([kind, m], i) => (
+        <p key={i} className={`cad-print-line ${kind}`}>
+          {m}
+        </p>
+      ))}
     </div>
   );
 }

@@ -106,7 +106,8 @@ function loop(
   };
   raf = requestAnimationFrame(frame);
   const kd = (e: KeyboardEvent) => {
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key))
+      e.preventDefault();
     // Auto-repeat is not a new press (it would restart the game the instant you lose).
     if (e.repeat) return;
     held.add(e.key);
@@ -163,7 +164,11 @@ function hud(ctx: CanvasRenderingContext2D, fg: string, score: number, hi: numbe
   ctx.fillStyle = fg;
   ctx.font = '600 13px ui-monospace, Consolas, monospace';
   ctx.textAlign = 'right';
-  ctx.fillText(`HI ${String(Math.floor(hi)).padStart(5, '0')}   ${String(Math.floor(score)).padStart(5, '0')}`, W - 12, 22);
+  ctx.fillText(
+    `HI ${String(Math.floor(hi)).padStart(5, '0')}   ${String(Math.floor(score)).padStart(5, '0')}`,
+    W - 12,
+    22,
+  );
   ctx.textAlign = 'left';
 }
 
@@ -495,7 +500,8 @@ function boardGame(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): ()
 
     // rider on the board
     if (!(hurt > 0 && Math.floor(t0 * 10) % 2)) {
-      const tilt = (up ? -0.25 : down ? 0.25 : 0) + (target !== null ? Math.sign(target - py) * 0.2 : 0);
+      const tilt =
+        (up ? -0.25 : down ? 0.25 : 0) + (target !== null ? Math.sign(target - py) * 0.2 : 0);
       ctx.save();
       ctx.translate(PX, py);
       ctx.rotate(tilt);

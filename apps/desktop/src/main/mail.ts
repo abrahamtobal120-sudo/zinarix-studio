@@ -272,7 +272,10 @@ export class Mail {
   }
 
   /** Keeps the Gmail mailbox of a Google sign-in that granted the mail scope. */
-  addGoogle(g: { email: string; name: string; refresh: string }, name?: string): Promise<MailStatus> {
+  addGoogle(
+    g: { email: string; name: string; refresh: string },
+    name?: string,
+  ): Promise<MailStatus> {
     return this.connect(
       { email: g.email, user: g.email, name: name || g.name, auth: 'google', ...GMAIL },
       g.refresh,

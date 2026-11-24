@@ -103,9 +103,7 @@ export function markerSeverity(sev: number | undefined): number {
 
 type MarkedString = string | { language: string; value: string };
 export type HoverContents =
-  | MarkedString
-  | MarkedString[]
-  | { kind: 'markdown' | 'plaintext'; value: string };
+  MarkedString | MarkedString[] | { kind: 'markdown' | 'plaintext'; value: string };
 
 /** Hover / documentation contents → Markdown strings. */
 export function markdownOf(c: HoverContents | undefined | null): string[] {
@@ -161,7 +159,8 @@ export function locationsOf(v: unknown): { uri: string; range: LspRange }[] {
         uri: x.targetUri,
         range: (x.targetSelectionRange ?? x.targetRange) as LspRange,
       });
-    else if (typeof x.uri === 'string' && x.range) out.push({ uri: x.uri, range: x.range as LspRange });
+    else if (typeof x.uri === 'string' && x.range)
+      out.push({ uri: x.uri, range: x.range as LspRange });
   }
   return out;
 }

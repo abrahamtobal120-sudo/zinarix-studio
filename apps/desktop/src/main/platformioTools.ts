@@ -44,8 +44,15 @@ export const PIO_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        project: { type: 'string', description: 'Project folder relative to the open folder ("" = the folder itself). Optional when there is one.' },
-        env: { type: 'string', description: 'Environment ([env:NAME]); default: default_envs or the first one' },
+        project: {
+          type: 'string',
+          description:
+            'Project folder relative to the open folder ("" = the folder itself). Optional when there is one.',
+        },
+        env: {
+          type: 'string',
+          description: 'Environment ([env:NAME]); default: default_envs or the first one',
+        },
         clean: { type: 'boolean' },
       },
     },
@@ -71,12 +78,25 @@ export const PIO_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['read', 'values', 'open', 'send', 'close'] },
-        port: { type: 'string', description: 'e.g. COM5; default: the open monitor or the only board plugged in' },
+        port: {
+          type: 'string',
+          description: 'e.g. COM5; default: the open monitor or the only board plugged in',
+        },
         baud: { type: 'integer' },
         text: { type: 'string', description: 'What to send (action "send")' },
         ending: { type: 'string', enum: ['nl', 'cr', 'crlf', 'none'] },
-        seconds: { type: 'number', minimum: 0, maximum: 30, description: 'How long to listen (default 3)' },
-        lines: { type: 'integer', minimum: 1, maximum: 2000, description: 'Last lines to return (action "read", default 200)' },
+        seconds: {
+          type: 'number',
+          minimum: 0,
+          maximum: 30,
+          description: 'How long to listen (default 3)',
+        },
+        lines: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 2000,
+          description: 'Last lines to return (action "read", default 200)',
+        },
       },
       required: ['action'],
     },
@@ -91,7 +111,10 @@ export const PIO_TOOLS: ToolDefinition[] = [
         action: { type: 'string', enum: ['list', 'search', 'install', 'uninstall'] },
         query: { type: 'string' },
         page: { type: 'integer', minimum: 1, maximum: 100 },
-        spec: { type: 'string', description: 'owner/name[@version], e.g. "adafruit/DHT sensor library@^1.4.7"' },
+        spec: {
+          type: 'string',
+          description: 'owner/name[@version], e.g. "adafruit/DHT sensor library@^1.4.7"',
+        },
         project: { type: 'string' },
         env: { type: 'string' },
       },
@@ -107,11 +130,17 @@ export const PIO_PROMPT_PART =
 
 const s = (v: unknown) => (typeof v === 'string' ? v : '');
 
-export function pioPreview(name: string, a: Record<string, unknown>): SystemPreview | { error: string } | null {
+export function pioPreview(
+  name: string,
+  a: Record<string, unknown>,
+): SystemPreview | { error: string } | null {
   const project = s(a.project);
-  if (a.project !== undefined && !validProjectDir(project)) return { error: 'Invalid project folder (relative to the open folder).' };
-  if (a.env !== undefined && a.env !== '' && !validEnvName(a.env)) return { error: 'Invalid env name.' };
-  if (a.port !== undefined && a.port !== '' && !validPort(a.port)) return { error: 'Invalid port (COM5, /dev/ttyUSB0…).' };
+  if (a.project !== undefined && !validProjectDir(project))
+    return { error: 'Invalid project folder (relative to the open folder).' };
+  if (a.env !== undefined && a.env !== '' && !validEnvName(a.env))
+    return { error: 'Invalid env name.' };
+  if (a.port !== undefined && a.port !== '' && !validPort(a.port))
+    return { error: 'Invalid port (COM5, /dev/ttyUSB0…).' };
   if (a.baud !== undefined && !validBaud(a.baud)) return { error: 'Invalid baud rate.' };
   const where = `${project || '.'}${s(a.env) ? ` [${s(a.env)}]` : ''}`;
   if (name === 'pio_info') return null;
@@ -119,7 +148,8 @@ export function pioPreview(name: string, a: Record<string, unknown>): SystemPrev
     return {
       risk: 'medium',
       action: a.clean === true ? `PlatformIO: limpiar ${where}` : `PlatformIO: compilar ${where}`,
-      warning: 'Ejecuta la compilación del proyecto (y sus scripts extra) y descarga lo que falte de la plataforma.',
+      warning:
+        'Ejecuta la compilación del proyecto (y sus scripts extra) y descarga lo que falte de la plataforma.',
       command: `pio run${a.clean === true ? ' -t clean' : ''}${s(a.env) ? ` -e ${s(a.env)}` : ''}`,
       allowKey: `pio_build:${project}:${s(a.env)}:${a.clean === true}`,
     };
@@ -156,13 +186,21 @@ export function pioPreview(name: string, a: Record<string, unknown>): SystemPrev
   if (name === 'pio_library') {
     const act = s(a.action);
     if (act === 'list') return null;
-    if (act === 'search') return validLibQuery(a.query) ? null : { error: 'Missing or invalid query.' };
+    if (act === 'search')
+      return validLibQuery(a.query) ? null : { error: 'Missing or invalid query.' };
     if (act === 'install' || act === 'uninstall') {
-      if (!validLibSpec(a.spec)) return { error: 'Invalid spec: use owner/name or owner/name@version (as pio_library search lists it).' };
+      if (!validLibSpec(a.spec))
+        return {
+          error:
+            'Invalid spec: use owner/name or owner/name@version (as pio_library search lists it).',
+        };
       const spec = a.spec.trim();
       return {
         risk: 'medium',
-        action: act === 'install' ? `PlatformIO: instalar la librería ${spec} en ${where}` : `PlatformIO: quitar la librería ${libName(spec)} de ${where}`,
+        action:
+          act === 'install'
+            ? `PlatformIO: instalar la librería ${spec} en ${where}`
+            : `PlatformIO: quitar la librería ${libName(spec)} de ${where}`,
         warning:
           act === 'install'
             ? 'Descarga la librería (y las que necesita) del registro de PlatformIO y la agrega a lib_deps en platformio.ini.'
@@ -181,24 +219,35 @@ const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
 const pct = (u: number, t: number) => (t ? `${((u / t) * 100).toFixed(1)}%` : '?');
 
 /** The project the call means: the given folder, or the only one there is. */
-async function pick(pio: PlatformioService, root: string, a: Record<string, unknown>): Promise<PioProject> {
+async function pick(
+  pio: PlatformioService,
+  root: string,
+  a: Record<string, unknown>,
+): Promise<PioProject> {
   const list = await pio.projects(root);
   if (!list.length) throw new Error('No PlatformIO project (platformio.ini) in the open folder.');
   if (typeof a.project === 'string') {
     const want = a.project;
     const p = list.find((x) => x.dir === want.replace(/\\/g, '/').replace(/\/+$/, ''));
-    if (!p) throw new Error(`No platformio.ini in "${a.project}". Projects: ${list.map((x) => x.dir || '.').join(', ')}`);
+    if (!p)
+      throw new Error(
+        `No platformio.ini in "${a.project}". Projects: ${list.map((x) => x.dir || '.').join(', ')}`,
+      );
     return p;
   }
   if (list.length > 1)
-    throw new Error(`Several PlatformIO projects; pass project: ${list.map((x) => JSON.stringify(x.dir)).join(', ')}`);
+    throw new Error(
+      `Several PlatformIO projects; pass project: ${list.map((x) => JSON.stringify(x.dir)).join(', ')}`,
+    );
   return list[0]!;
 }
 
 function envOf(p: PioProject, env: unknown): string | null {
   if (typeof env === 'string' && env) {
     if (!p.envs.some((e) => e.name === env))
-      throw new Error(`No [env:${env}] in platformio.ini. Envs: ${p.envs.map((e) => e.name).join(', ')}`);
+      throw new Error(
+        `No [env:${env}] in platformio.ini. Envs: ${p.envs.map((e) => e.name).join(', ')}`,
+      );
     return env;
   }
   return p.defaultEnvs[0] ?? p.envs[0]?.name ?? null;
@@ -211,7 +260,9 @@ export function describeResult(r: PioResult, projectDir: string): string {
       `RAM ${kb(r.memory.ramUsed)} of ${kb(r.memory.ramTotal)} (${pct(r.memory.ramUsed, r.memory.ramTotal)}), Flash ${kb(r.memory.flashUsed)} of ${kb(r.memory.flashTotal)} (${pct(r.memory.flashUsed, r.memory.flashTotal)})`,
     );
   for (const p of r.problems.slice(0, 60))
-    lines.push(`${p.severity}: ${problemPath(projectDir, p.file) ?? p.file}:${p.line}:${p.column}: ${p.message}`);
+    lines.push(
+      `${p.severity}: ${problemPath(projectDir, p.file) ?? p.file}:${p.line}:${p.column}: ${p.message}`,
+    );
   if (r.problems.length > 60) lines.push(`… ${r.problems.length - 60} more`);
   return lines.join('\n');
 }
@@ -229,26 +280,35 @@ export async function runPioTool(
   root: string | undefined,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; content: string; summary: string }> {
-  if (!pio) return { ok: false, content: 'PlatformIO is not available here.', summary: 'no disponible' };
+  if (!pio)
+    return { ok: false, content: 'PlatformIO is not available here.', summary: 'no disponible' };
   try {
     const st = await pio.status();
     if (st.state !== 'ready')
       return {
         ok: false,
-        content: 'PlatformIO Core is not installed. Tell the user: pip install platformio (or install the PlatformIO extension), then reopen the Hardware panel.',
+        content:
+          'PlatformIO Core is not installed. Tell the user: pip install platformio (or install the PlatformIO extension), then reopen the Hardware panel.',
         summary: 'sin PlatformIO',
       };
     if (name === 'pio_library') {
       const act = s(a.action);
       if (act === 'search') {
-        if (!validLibQuery(a.query)) return { ok: false, content: 'Missing or invalid query.', summary: 'sin búsqueda' };
+        if (!validLibQuery(a.query))
+          return { ok: false, content: 'Missing or invalid query.', summary: 'sin búsqueda' };
         const r = await pio.searchLibraries(a.query, typeof a.page === 'number' ? a.page : 1);
         return {
           ok: true,
           content:
             (r.libraries
-              .map((l) => `${l.id}@^${l.version}  (${l.published})\n    ${l.description.slice(0, 200)}`)
-              .join('\n') || 'No libraries found.') + (r.pages > 1 ? `\n(page ${typeof a.page === 'number' ? a.page : 1} of ${r.pages}, ${r.total} results)` : ''),
+              .map(
+                (l) =>
+                  `${l.id}@^${l.version}  (${l.published})\n    ${l.description.slice(0, 200)}`,
+              )
+              .join('\n') || 'No libraries found.') +
+            (r.pages > 1
+              ? `\n(page ${typeof a.page === 'number' ? a.page : 1} of ${r.pages}, ${r.total} results)`
+              : ''),
           summary: `${r.libraries.length} librerías`,
         };
       }
@@ -268,12 +328,19 @@ export async function runPioTool(
         };
       }
       if (act === 'install' || act === 'uninstall') {
-        if (!validLibSpec(a.spec)) return { ok: false, content: 'Invalid spec.', summary: 'no válida' };
+        if (!validLibSpec(a.spec))
+          return { ok: false, content: 'Invalid spec.', summary: 'no válida' };
         const out = await pio.changeLibrary(root, p.dir, env, a.spec, act === 'uninstall');
         const r = await pio.libraries(root, p.dir, env);
         return {
           ok: true,
-          content: `${out.split(/\r?\n/).filter((l) => /Library Manager|installed|removed|uninstall|Error/i.test(l)).slice(-12).join('\n') || 'Done.'}\nlib_deps now: ${r.deps.join(', ') || '(none)'}`,
+          content: `${
+            out
+              .split(/\r?\n/)
+              .filter((l) => /Library Manager|installed|removed|uninstall|Error/i.test(l))
+              .slice(-12)
+              .join('\n') || 'Done.'
+          }\nlib_deps now: ${r.deps.join(', ') || '(none)'}`,
           summary: act === 'install' ? 'instalada' : 'quitada',
         };
       }
@@ -287,7 +354,12 @@ export async function runPioTool(
         return {
           ok: true,
           content:
-            list.map((d) => `${d.port}  ${d.description}${d.board ? '  (board)' : ''}${open.some((o) => o.port === d.port) ? '  [monitor open]' : ''}`).join('\n') ||
+            list
+              .map(
+                (d) =>
+                  `${d.port}  ${d.description}${d.board ? '  (board)' : ''}${open.some((o) => o.port === d.port) ? '  [monitor open]' : ''}`,
+              )
+              .join('\n') ||
             'No serial ports. Is the board plugged in (and its USB driver installed, e.g. CH340 / CP210x)?',
           summary: `${list.length} puertos`,
         };
@@ -296,7 +368,13 @@ export async function runPioTool(
         const list = await pio.boards(s(a.query));
         return {
           ok: true,
-          content: list.slice(0, 80).map((b) => `${b.id}  ${b.name}  (${b.platform}, ${b.mcu}; ${b.frameworks.join('/')})`).join('\n') || 'No boards match.',
+          content:
+            list
+              .slice(0, 80)
+              .map(
+                (b) => `${b.id}  ${b.name}  (${b.platform}, ${b.mcu}; ${b.frameworks.join('/')})`,
+              )
+              .join('\n') || 'No boards match.',
           summary: `${list.length} placas`,
         };
       }
@@ -311,7 +389,10 @@ export async function runPioTool(
               (p) =>
                 `project "${p.dir || '.'}"${p.defaultEnvs.length ? ` default_envs=${p.defaultEnvs.join(',')}` : ''}${p.compileDb ? ' (compile_commands.json)' : ''}\n` +
                 p.envs
-                  .map((e) => `  [env:${e.name}] board=${e.board || '?'} platform=${e.platform || '?'} framework=${e.framework || '-'}${e.monitorSpeed ? ` monitor_speed=${e.monitorSpeed}` : ''}${e.uploadPort ? ` upload_port=${e.uploadPort}` : ''}`)
+                  .map(
+                    (e) =>
+                      `  [env:${e.name}] board=${e.board || '?'} platform=${e.platform || '?'} framework=${e.framework || '-'}${e.monitorSpeed ? ` monitor_speed=${e.monitorSpeed}` : ''}${e.uploadPort ? ` upload_port=${e.uploadPort}` : ''}`,
+                  )
                   .join('\n'),
             )
             .join('\n') || 'No platformio.ini in the open folder.'),
@@ -362,34 +443,58 @@ export async function runPioTool(
         } else
           return {
             ok: false,
-            content: open.length ? `Several monitors open: pass port (${open.map((o) => o.port).join(', ')}).` : 'No serial monitor is open. Use action "open".',
+            content: open.length
+              ? `Several monitors open: pass port (${open.map((o) => o.port).join(', ')}).`
+              : 'No serial monitor is open. Use action "open".',
             summary: 'sin monitor',
           };
       }
-      if (!validPort(port)) return { ok: false, content: 'Invalid port.', summary: 'puerto no válido' };
+      if (!validPort(port))
+        return { ok: false, content: 'Invalid port.', summary: 'puerto no válido' };
       const secs = Math.max(0, Math.min(30, typeof a.seconds === 'number' ? a.seconds : 3));
       if (act === 'read') {
         const text = pio.serialText(port);
-        if (text == null) return { ok: false, content: `The monitor of ${port} is not open. Use action "open".`, summary: 'cerrado' };
+        if (text == null)
+          return {
+            ok: false,
+            content: `The monitor of ${port} is not open. Use action "open".`,
+            summary: 'cerrado',
+          };
         const n = typeof a.lines === 'number' ? Math.max(1, Math.min(2000, a.lines)) : 200;
         const lines = text.split(/\r?\n/);
-        return { ok: true, content: cut(lines.slice(-n).join('\n') || '(nothing received yet)'), summary: `${Math.min(n, lines.length)} líneas` };
+        return {
+          ok: true,
+          content: cut(lines.slice(-n).join('\n') || '(nothing received yet)'),
+          summary: `${Math.min(n, lines.length)} líneas`,
+        };
       }
       if (act === 'values') {
         const text = pio.serialText(port);
-        if (text == null) return { ok: false, content: `The monitor of ${port} is not open. Use action "open".`, summary: 'cerrado' };
+        if (text == null)
+          return {
+            ok: false,
+            content: `The monitor of ${port} is not open. Use action "open".`,
+            summary: 'cerrado',
+          };
         const n = typeof a.lines === 'number' ? Math.max(1, Math.min(2000, a.lines)) : 500;
         const plot = new PlotData(n);
         for (const l of text.split(/\r?\n/).slice(-n - 1, -1)) plot.pushLine(l);
         if (!plot.samples.length)
-          return { ok: true, content: 'No lines of numbers in the last lines (the board prints text only).', summary: 'sin números' };
+          return {
+            ok: true,
+            content: 'No lines of numbers in the last lines (the board prints text only).',
+            summary: 'sin números',
+          };
         const f = (v: number) => (Number.isFinite(v) ? String(Number(v.toPrecision(6))) : '?');
         const rows = seriesStats(plot.samples, plot.series).map(
-          (st) => `${st.name}: last ${f(st.last)}, min ${f(st.min)}, max ${f(st.max)}, avg ${f(st.avg)} (${st.count} samples)`,
+          (st) =>
+            `${st.name}: last ${f(st.last)}, min ${f(st.min)}, max ${f(st.max)}, avg ${f(st.avg)} (${st.count} samples)`,
         );
         const tail = plot.samples
           .slice(-10)
-          .map((x) => plot.series.map((k) => (x.values[k] === undefined ? '-' : f(x.values[k]!))).join(' '))
+          .map((x) =>
+            plot.series.map((k) => (x.values[k] === undefined ? '-' : f(x.values[k]!))).join(' '),
+          )
           .join('\n');
         return {
           ok: true,
@@ -412,7 +517,11 @@ export async function runPioTool(
         await pio.openSerial(port, baud);
         await wait(secs * 1000, signal);
         const got = (pio.serialText(port) ?? '').slice(before);
-        return { ok: true, content: `Opened ${port} at ${baud} baud.\n${cut(got) || '(nothing received yet)'}`, summary: `${port} abierto` };
+        return {
+          ok: true,
+          content: `Opened ${port} at ${baud} baud.\n${cut(got) || '(nothing received yet)'}`,
+          summary: `${port} abierto`,
+        };
       }
       if (act === 'send') {
         const ending = (['nl', 'cr', 'crlf', 'none'] as const).find((e) => e === a.ending) ?? 'nl';

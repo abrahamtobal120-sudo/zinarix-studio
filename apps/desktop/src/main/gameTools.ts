@@ -45,7 +45,13 @@ export const GAME_TOOLS: ToolDefinition[] = [
       'Read a Godot scene (.tscn) as a node tree: name, class or instanced scene, script, groups, main properties and the line of each node, plus its signal connections. Use it before editing a .tscn by hand (keep the text format: [ext_resource], [sub_resource], [node name= type= parent=], [connection]).',
     parameters: {
       type: 'object',
-      properties: { path: { type: 'string', description: 'The .tscn, relative to the open folder (or res://… with project)' }, project: { type: 'string' } },
+      properties: {
+        path: {
+          type: 'string',
+          description: 'The .tscn, relative to the open folder (or res://… with project)',
+        },
+        project: { type: 'string' },
+      },
       required: ['path'],
     },
   },
@@ -56,9 +62,21 @@ export const GAME_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        project: { type: 'string', description: 'Folder with project.godot relative to the open folder ("" = the folder). Optional when there is one.' },
-        scene: { type: 'string', description: 'A .tscn to run instead of the main scene (relative or res://)' },
-        seconds: { type: 'number', minimum: 0.5, maximum: 120, description: 'Game seconds to run (default 5)' },
+        project: {
+          type: 'string',
+          description:
+            'Folder with project.godot relative to the open folder ("" = the folder). Optional when there is one.',
+        },
+        scene: {
+          type: 'string',
+          description: 'A .tscn to run instead of the main scene (relative or res://)',
+        },
+        seconds: {
+          type: 'number',
+          minimum: 0.5,
+          maximum: 120,
+          description: 'Game seconds to run (default 5)',
+        },
         headless: { type: 'boolean' },
       },
     },
@@ -66,13 +84,18 @@ export const GAME_TOOLS: ToolDefinition[] = [
   {
     name: 'godot_screenshot',
     description:
-      'See the game: render it with Godot\'s movie writer and return the frame at the given second of play (default 2) as an image, plus the errors it printed. It opens the game window for a moment and needs a GPU. Use it to check how a scene looks after changing it. The user approves it.',
+      "See the game: render it with Godot's movie writer and return the frame at the given second of play (default 2) as an image, plus the errors it printed. It opens the game window for a moment and needs a GPU. Use it to check how a scene looks after changing it. The user approves it.",
     parameters: {
       type: 'object',
       properties: {
         project: { type: 'string' },
         scene: { type: 'string' },
-        at: { type: 'number', minimum: 0, maximum: 30, description: 'Second of play to capture (default 2)' },
+        at: {
+          type: 'number',
+          minimum: 0,
+          maximum: 30,
+          description: 'Second of play to capture (default 2)',
+        },
       },
     },
   },
@@ -85,10 +108,24 @@ export const GAME_TOOLS: ToolDefinition[] = [
       properties: {
         project: { type: 'string' },
         scene: { type: 'string', description: 'A .tscn to play instead of the main scene' },
-        steps: { type: 'array', items: { type: 'object' }, description: 'Timed steps, see the description' },
-        watch: { type: 'array', items: { type: 'string' }, description: 'Properties to sample over time, like "Player:position" or "/root/Game:score"' },
+        steps: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Timed steps, see the description',
+        },
+        watch: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Properties to sample over time, like "Player:position" or "/root/Game:score"',
+        },
         every: { type: 'number', minimum: 0.1, maximum: 10 },
-        seconds: { type: 'number', minimum: 0.5, maximum: 120, description: 'Game seconds to play (default: last step + 0.5)' },
+        seconds: {
+          type: 'number',
+          minimum: 0.5,
+          maximum: 120,
+          description: 'Game seconds to play (default: last step + 0.5)',
+        },
       },
       required: ['steps'],
     },
@@ -112,7 +149,10 @@ export const GAME_TOOLS: ToolDefinition[] = [
       'Check GDScript files for parse and type errors without running the game (godot --check-only). files: .gd files relative to the open folder or res://; default every script of the project. The user approves it.',
     parameters: {
       type: 'object',
-      properties: { project: { type: 'string' }, files: { type: 'array', items: { type: 'string' } } },
+      properties: {
+        project: { type: 'string' },
+        files: { type: 'array', items: { type: 'string' } },
+      },
     },
   },
   {
@@ -121,7 +161,11 @@ export const GAME_TOOLS: ToolDefinition[] = [
       'Export (build) a Godot game with an export preset from export_presets.cfg ("Windows Desktop", "Web", "Linux"…, see game_info). Needs Godot\'s export templates installed. debug=true makes a debug build. The user approves it.',
     parameters: {
       type: 'object',
-      properties: { project: { type: 'string' }, preset: { type: 'string' }, debug: { type: 'boolean' } },
+      properties: {
+        project: { type: 'string' },
+        preset: { type: 'string' },
+        debug: { type: 'boolean' },
+      },
       required: ['preset'],
     },
   },
@@ -132,7 +176,18 @@ export const GAME_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        template: { type: 'string', enum: ['godot-platformer', 'godot-topdown', 'godot-3d', 'godot-empty', 'web-canvas', 'web-phaser', 'web-three'] },
+        template: {
+          type: 'string',
+          enum: [
+            'godot-platformer',
+            'godot-topdown',
+            'godot-3d',
+            'godot-empty',
+            'web-canvas',
+            'web-phaser',
+            'web-three',
+          ],
+        },
         folder: { type: 'string', description: 'New folder name (letters, numbers, - _ .)' },
         name: { type: 'string', description: 'Game title' },
       },
@@ -145,7 +200,12 @@ export const GAME_TOOLS: ToolDefinition[] = [
       'Local address to play a web game of the open folder (an index.html with its scripts and assets) in the built-in browser: returns an http://127.0.0.1 URL; then call browser_open with it and browser_read to check it runs. ES modules, import maps and assets work there (they do not from file://).',
     parameters: {
       type: 'object',
-      properties: { path: { type: 'string', description: 'index.html (or its folder) relative to the open folder' } },
+      properties: {
+        path: {
+          type: 'string',
+          description: 'index.html (or its folder) relative to the open folder',
+        },
+      },
       required: ['path'],
     },
   },
@@ -158,9 +218,14 @@ export const GAME_PROMPT_PART =
 
 const s = (v: unknown) => (typeof v === 'string' ? v : '');
 
-export function gamePreview(name: string, a: Record<string, unknown>): SystemPreview | { error: string } | null {
-  if (a.project !== undefined && !validProjectDir(a.project)) return { error: 'Invalid project folder (relative to the open folder).' };
-  if (a.scene !== undefined && a.scene !== '' && !validScene(a.scene)) return { error: 'Invalid scene (a .tscn of the project).' };
+export function gamePreview(
+  name: string,
+  a: Record<string, unknown>,
+): SystemPreview | { error: string } | null {
+  if (a.project !== undefined && !validProjectDir(a.project))
+    return { error: 'Invalid project folder (relative to the open folder).' };
+  if (a.scene !== undefined && a.scene !== '' && !validScene(a.scene))
+    return { error: 'Invalid scene (a .tscn of the project).' };
   const where = s(a.project) || '.';
   const scene = s(a.scene) ? ` (${s(a.scene)})` : '';
   switch (name) {
@@ -189,11 +254,14 @@ export function gamePreview(name: string, a: Record<string, unknown>): SystemPre
       } catch (e) {
         return { error: (e as Error).message };
       }
-      const inputs = plan.events.filter((e) => e.type === 'action' || e.type === 'key' || e.type === 'mouse').length;
+      const inputs = plan.events.filter(
+        (e) => e.type === 'action' || e.type === 'key' || e.type === 'mouse',
+      ).length;
       return {
         risk: 'medium',
         action: `Godot: jugar ${where}${scene} ${plan.seconds} s (${inputs} entradas${plan.shots ? `, ${plan.shots} capturas con ventana` : ', sin ventana'})`,
-        warning: 'Godot ejecuta el código del proyecto. Zinarix añade un override.cfg temporal y lo deja como estaba al terminar.',
+        warning:
+          'Godot ejecuta el código del proyecto. Zinarix añade un override.cfg temporal y lo deja como estaba al terminar.',
         allowKey: `godot_run:${s(a.project)}`,
       };
     }
@@ -230,7 +298,8 @@ export function gamePreview(name: string, a: Record<string, unknown>): SystemPre
       };
     case 'game_new':
       if (!isGameTemplate(a.template)) return { error: 'Unknown template.' };
-      if (!validNewFolder(a.folder)) return { error: 'Invalid folder name (letters, numbers, - _ .).' };
+      if (!validNewFolder(a.folder))
+        return { error: 'Invalid folder name (letters, numbers, - _ .).' };
       return {
         risk: 'medium',
         action: `Crear el juego "${s(a.name) || a.folder}" (${a.template}) en la carpeta ${a.folder}/`,
@@ -244,7 +313,9 @@ const cut = (t: string, n = 12_000) => (t.length > n ? `… (start cut)\n${t.sli
 
 function problemLines(list: (GodotProblem & { count: number })[], dir: string): string[] {
   return list.slice(0, 60).map((p) => {
-    const where = p.file ? `${resToRel(p.file, dir) ?? p.file}${p.line ? `:${p.line}` : ''}${p.func ? ` in ${p.func}()` : ''}: ` : '';
+    const where = p.file
+      ? `${resToRel(p.file, dir) ?? p.file}${p.line ? `:${p.line}` : ''}${p.func ? ` in ${p.func}()` : ''}: `
+      : '';
     return `${p.severity}: ${where}${p.message}${p.count > 1 ? ` (×${p.count})` : ''}`;
   });
 }
@@ -255,19 +326,38 @@ export function describeRun(r: GodotRunResult, dir: string): string {
     : r.exitCode === 0 || r.timedOut
       ? 'RAN WITHOUT ERRORS'
       : `EXITED WITH CODE ${r.exitCode ?? '?'}`;
-  return [`${head} in ${r.seconds}s`, ...problemLines(r.problems, dir), '', '--- output ---', cut(r.output.trim()) || '(nothing printed)'].join('\n');
+  return [
+    `${head} in ${r.seconds}s`,
+    ...problemLines(r.problems, dir),
+    '',
+    '--- output ---',
+    cut(r.output.trim()) || '(nothing printed)',
+  ].join('\n');
 }
 
-async function pick(g: GodotService, root: string, a: Record<string, unknown>): Promise<GodotProject> {
+async function pick(
+  g: GodotService,
+  root: string,
+  a: Record<string, unknown>,
+): Promise<GodotProject> {
   const list = (await g.scan(root)).godot;
-  if (!list.length) throw new Error('No Godot project (project.godot) in the open folder. Create one with game_new.');
+  if (!list.length)
+    throw new Error(
+      'No Godot project (project.godot) in the open folder. Create one with game_new.',
+    );
   if (typeof a.project === 'string') {
     const want = a.project.replace(/\\/g, '/').replace(/\/+$/, '');
     const p = list.find((x) => x.dir === want);
-    if (!p) throw new Error(`No project.godot in "${a.project}". Projects: ${list.map((x) => x.dir || '.').join(', ')}`);
+    if (!p)
+      throw new Error(
+        `No project.godot in "${a.project}". Projects: ${list.map((x) => x.dir || '.').join(', ')}`,
+      );
     return p;
   }
-  if (list.length > 1) throw new Error(`Several Godot projects; pass project: ${list.map((x) => JSON.stringify(x.dir)).join(', ')}`);
+  if (list.length > 1)
+    throw new Error(
+      `Several Godot projects; pass project: ${list.map((x) => JSON.stringify(x.dir)).join(', ')}`,
+    );
   return list[0]!;
 }
 
@@ -278,35 +368,62 @@ export async function runGameTool(
   a: Record<string, unknown>,
   root: string | undefined,
   signal?: AbortSignal,
-): Promise<{ ok: boolean; content: string; summary: string; image?: ComputerShot; changed?: string }> {
-  if (!g) return { ok: false, content: 'Game tools are not available here.', summary: 'no disponible' };
+): Promise<{
+  ok: boolean;
+  content: string;
+  summary: string;
+  image?: ComputerShot;
+  changed?: string;
+}> {
+  if (!g)
+    return { ok: false, content: 'Game tools are not available here.', summary: 'no disponible' };
   if (!root) return { ok: false, content: 'No folder is open.', summary: 'sin carpeta' };
   try {
     if (name === 'game_info') {
       const [st, scan] = await Promise.all([g.status(), g.scan(root)]);
-      const lines = [st.state === 'ready' ? `Godot ${st.version}${st.mono ? ' (.NET)' : ''} installed: ${st.exe}` : 'Godot 4 is NOT installed (or not found). The user can download it from godotengine.org and pick it in Más → Juegos.'];
+      const lines = [
+        st.state === 'ready'
+          ? `Godot ${st.version}${st.mono ? ' (.NET)' : ''} installed: ${st.exe}`
+          : 'Godot 4 is NOT installed (or not found). The user can download it from godotengine.org and pick it in Más → Juegos.',
+      ];
       for (const p of scan.godot) {
         const i = p.info;
         lines.push(
           `\nGodot project "${i.name}" in "${p.dir || '.'}" (Godot ${i.version || '?'}, ${i.renderer || '?'}${i.width ? `, ${i.width}×${i.height}` : ''})`,
           `  main scene: ${i.mainScene || '(none)'}`,
-          ...(i.autoloads.length ? [`  autoloads: ${i.autoloads.map((x) => `${x.name}=${x.path}`).join(', ')}`] : []),
+          ...(i.autoloads.length
+            ? [`  autoloads: ${i.autoloads.map((x) => `${x.name}=${x.path}`).join(', ')}`]
+            : []),
           ...(i.actions.length ? [`  input actions: ${i.actions.join(', ')}`] : []),
           `  ${p.scripts} scripts; scenes: ${p.scenes.slice(0, 40).join(', ')}${p.scenes.length > 40 ? ` … (+${p.scenes.length - 40})` : ''}`,
           `  export presets: ${p.presets.length ? p.presets.map((x) => `"${x.name}" (${x.platform})`).join(', ') : '(none; create them in Godot: Project → Export)'}`,
         );
       }
       for (const o of scan.others)
-        lines.push(`\n${o.kind === 'unity' ? 'Unity' : 'Unreal'} project "${o.name}" in "${o.dir || '.'}" (${o.version || 'version ?'}). Zinarix can open it in its editor; edit its C# / C++ as text.`);
-      for (const w of scan.web) lines.push(`\nWeb game (${w.lib}) at ${w.entry}: play it with web_game_url.`);
-      if (!scan.godot.length && !scan.others.length && !scan.web.length) lines.push('\nNo game projects in the open folder. Create one with game_new.');
-      return { ok: true, content: lines.join('\n'), summary: `${scan.godot.length + scan.others.length + scan.web.length} proyectos` };
+        lines.push(
+          `\n${o.kind === 'unity' ? 'Unity' : 'Unreal'} project "${o.name}" in "${o.dir || '.'}" (${o.version || 'version ?'}). Zinarix can open it in its editor; edit its C# / C++ as text.`,
+        );
+      for (const w of scan.web)
+        lines.push(`\nWeb game (${w.lib}) at ${w.entry}: play it with web_game_url.`);
+      if (!scan.godot.length && !scan.others.length && !scan.web.length)
+        lines.push('\nNo game projects in the open folder. Create one with game_new.');
+      return {
+        ok: true,
+        content: lines.join('\n'),
+        summary: `${scan.godot.length + scan.others.length + scan.web.length} proyectos`,
+      };
     }
     if (name === 'web_game_url') {
       if (!web) return { ok: false, content: 'Not available here.', summary: 'no disponible' };
-      const rel = s(a.path).replace(/\\/g, '/').replace(/\/index\.html?$/i, '');
+      const rel = s(a.path)
+        .replace(/\\/g, '/')
+        .replace(/\/index\.html?$/i, '');
       const url = await web.url(root, rel ? `${rel}/` : '');
-      return { ok: true, content: `${url}\nOpen it with browser_open.`, summary: 'dirección lista' };
+      return {
+        ok: true,
+        content: `${url}\nOpen it with browser_open.`,
+        summary: 'dirección lista',
+      };
     }
     if (name === 'godot_scene' || name === 'godot_scene_edit') {
       let rel = s(a.path).replace(/\\/g, '/');
@@ -314,13 +431,27 @@ export async function runGameTool(
         const p = await pick(g, root, a);
         rel = resToRel(rel, p.dir) ?? '';
       }
-      if (!rel || !/\.(tscn|tres)$/i.test(rel) || rel.split('/').includes('..') || /^([a-z]:)?\//i.test(rel))
-        return { ok: false, content: 'Pass a .tscn relative to the open folder.', summary: 'no válida' };
+      if (
+        !rel ||
+        !/\.(tscn|tres)$/i.test(rel) ||
+        rel.split('/').includes('..') ||
+        /^([a-z]:)?\//i.test(rel)
+      )
+        return {
+          ok: false,
+          content: 'Pass a .tscn relative to the open folder.',
+          summary: 'no válida',
+        };
       const text = await readFile(join(root, rel), 'utf8');
       if (name === 'godot_scene_edit') {
         const ops = parseSceneOps(a.ops);
         const { text: next, renames } = applySceneOpsFull(text, ops);
-        if (next === text) return { ok: true, content: 'Nothing changed (the scene already was like that).', summary: 'sin cambios' };
+        if (next === text)
+          return {
+            ok: true,
+            content: 'Nothing changed (the scene already was like that).',
+            summary: 'sin cambios',
+          };
         // Renamed nodes: the $Paths / get_node("…") of the scene's scripts follow (read all first,
         // so a failure writes nothing).
         const dir = godotDirOf(root, rel);
@@ -353,7 +484,8 @@ export async function runGameTool(
       };
     }
     if (name === 'game_new') {
-      if (!isGameTemplate(a.template) || !validNewFolder(a.folder)) return { ok: false, content: 'Invalid template or folder.', summary: 'no válido' };
+      if (!isGameTemplate(a.template) || !validNewFolder(a.folder))
+        return { ok: false, content: 'Invalid template or folder.', summary: 'no válido' };
       const files = await g.create(root, a.folder, a.template, s(a.name) || a.folder);
       return {
         ok: true,
@@ -366,44 +498,69 @@ export async function runGameTool(
     if (st.state !== 'ready')
       return {
         ok: false,
-        content: 'Godot 4 is not installed (or not found). Tell the user to download it from https://godotengine.org/download and pick the executable in Más → Juegos.',
+        content:
+          'Godot 4 is not installed (or not found). Tell the user to download it from https://godotengine.org/download and pick the executable in Más → Juegos.',
         summary: 'sin Godot',
       };
     const p = await pick(g, root, a);
     const scene = s(a.scene) || null;
     if (name === 'godot_run') {
-      const r = await g.runFor(root, p.dir, { scene, seconds: typeof a.seconds === 'number' ? a.seconds : 5, headless: a.headless !== false }, signal);
+      const r = await g.runFor(
+        root,
+        p.dir,
+        {
+          scene,
+          seconds: typeof a.seconds === 'number' ? a.seconds : 5,
+          headless: a.headless !== false,
+        },
+        signal,
+      );
       const errors = r.problems.filter((x) => x.severity === 'error').length;
-      return { ok: true, content: describeRun(r, p.dir), summary: errors ? `${errors} errores` : 'sin errores' };
+      return {
+        ok: true,
+        content: describeRun(r, p.dir),
+        summary: errors ? `${errors} errores` : 'sin errores',
+      };
     }
     if (name === 'godot_screenshot') {
       const at = typeof a.at === 'number' ? a.at : 2;
-      const { frames, run } = await g.frames(
-        root,
-        p.dir,
-        { scene, at: [at] },
-        signal,
-      );
+      const { frames, run } = await g.frames(root, p.dir, { scene, at: [at] }, signal);
       const f = frames[0];
-      if (!f) return { ok: false, content: `No frame was rendered.\n${describeRun(run, p.dir)}`, summary: 'sin imagen' };
+      if (!f)
+        return {
+          ok: false,
+          content: `No frame was rendered.\n${describeRun(run, p.dir)}`,
+          summary: 'sin imagen',
+        };
       return {
         ok: true,
         content: `Frame at ${f.at}s (${f.width}×${f.height}).\n${describeRun(run, p.dir)}`,
         summary: `captura ${f.width}×${f.height}`,
-        image: { mediaType: 'image/png', data: f.png.toString('base64'), width: f.width, height: f.height },
+        image: {
+          mediaType: 'image/png',
+          data: f.png.toString('base64'),
+          width: f.width,
+          height: f.height,
+        },
       };
     }
     if (name === 'godot_playtest') {
       const plan = buildPlaytestPlan(a);
       const { run, play, frames } = await g.playtest(root, p.dir, { scene, plan }, signal);
-      const inputs = plan.events.filter((e) => e.type === 'action' || e.type === 'key' || e.type === 'mouse').length;
+      const inputs = plan.events.filter(
+        (e) => e.type === 'action' || e.type === 'key' || e.type === 'mouse',
+      ).length;
       const parts = [
         play.ready
           ? `PLAYED ${plan.seconds} game seconds (${inputs} inputs).`
           : 'The play test driver did NOT start (the game crashed first, or the scene failed to load).',
         ...(play.badKeys.length ? [`Unknown key names: ${play.badKeys.join(', ')}`] : []),
         ...(play.probes.length ? ['--- probes ---', describeProbes(play.probes)] : []),
-        ...(frames.length ? [`--- screenshots: ${frames.map((f) => `t=${f.at}s ${f.width}×${f.height}`).join(', ')} (the last one is attached) ---`] : []),
+        ...(frames.length
+          ? [
+              `--- screenshots: ${frames.map((f) => `t=${f.at}s ${f.width}×${f.height}`).join(', ')} (the last one is attached) ---`,
+            ]
+          : []),
         ...play.shots.filter((x) => x.error).map((x) => `screenshot at ${x.t}s failed: ${x.error}`),
         describeRun(run, p.dir),
       ];
@@ -413,22 +570,40 @@ export async function runGameTool(
         ok: play.ready,
         content: parts.join('\n'),
         summary: `${play.probes.length} lecturas${frames.length ? `, ${frames.length} capturas` : ''}${errors ? `, ${errors} errores` : ''}`,
-        ...(last ? { image: { mediaType: 'image/png' as const, data: last.png.toString('base64'), width: last.width, height: last.height } } : {}),
+        ...(last
+          ? {
+              image: {
+                mediaType: 'image/png' as const,
+                data: last.png.toString('base64'),
+                width: last.width,
+                height: last.height,
+              },
+            }
+          : {}),
       };
     }
     if (name === 'godot_check') {
-      const files = Array.isArray(a.files) ? a.files.filter((x): x is string => typeof x === 'string').slice(0, 200) : undefined;
+      const files = Array.isArray(a.files)
+        ? a.files.filter((x): x is string => typeof x === 'string').slice(0, 200)
+        : undefined;
       const r = await g.check(root, p.dir, files, signal);
       return {
         ok: true,
-        content: r.problems.length ? `${r.checked} scripts checked:\n${problemLines(r.problems, p.dir).join('\n')}` : `${r.checked} scripts checked: no errors.`,
+        content: r.problems.length
+          ? `${r.checked} scripts checked:\n${problemLines(r.problems, p.dir).join('\n')}`
+          : `${r.checked} scripts checked: no errors.`,
         summary: r.problems.length ? `${r.problems.length} problemas` : 'sin errores',
       };
     }
     if (name === 'godot_export') {
-      if (!validPresetName(a.preset)) return { ok: false, content: 'Invalid preset.', summary: 'no válido' };
+      if (!validPresetName(a.preset))
+        return { ok: false, content: 'Invalid preset.', summary: 'no válido' };
       const r = await g.exportGame(root, p.dir, a.preset, a.debug === true, signal);
-      return { ok: r.ok, content: `${r.ok ? `Exported to ${r.path}` : 'Export FAILED'}\n${describeRun(r, p.dir)}`, summary: r.ok ? 'exportado' : 'falló' };
+      return {
+        ok: r.ok,
+        content: `${r.ok ? `Exported to ${r.path}` : 'Export FAILED'}\n${describeRun(r, p.dir)}`,
+        summary: r.ok ? 'exportado' : 'falló',
+      };
     }
     return { ok: false, content: `Unknown tool ${name}.`, summary: 'desconocida' };
   } catch (e) {

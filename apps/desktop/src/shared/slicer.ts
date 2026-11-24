@@ -16,12 +16,54 @@ export interface PrinterPreset {
 }
 
 export const PRINTER_PRESETS: PrinterPreset[] = [
-  { id: 'generic220', es: 'Genérica 220×220 (Ender 3 y parecidas)', en: 'Generic 220×220 (Ender 3 and similar)', bed: [220, 220, 250], nozzle: 0.4, flavor: 'marlin2' },
-  { id: 'prusa_mk4', es: 'Prusa MK4 / MK3S (250×210)', en: 'Prusa MK4 / MK3S (250×210)', bed: [250, 210, 220], nozzle: 0.4, flavor: 'marlin2' },
-  { id: 'generic256', es: 'Genérica 256×256', en: 'Generic 256×256', bed: [256, 256, 256], nozzle: 0.4, flavor: 'marlin2' },
-  { id: 'klipper235', es: 'Klipper 235×235 (Voron, Ender 3 con Klipper…)', en: 'Klipper 235×235 (Voron, Ender 3 with Klipper…)', bed: [235, 235, 250], nozzle: 0.4, flavor: 'klipper' },
-  { id: 'generic300', es: 'Grande 300×300', en: 'Large 300×300', bed: [300, 300, 400], nozzle: 0.4, flavor: 'marlin2' },
-  { id: 'mini180', es: 'Pequeña 180×180 (Prusa Mini y parecidas)', en: 'Small 180×180 (Prusa Mini and similar)', bed: [180, 180, 180], nozzle: 0.4, flavor: 'marlin2' },
+  {
+    id: 'generic220',
+    es: 'Genérica 220×220 (Ender 3 y parecidas)',
+    en: 'Generic 220×220 (Ender 3 and similar)',
+    bed: [220, 220, 250],
+    nozzle: 0.4,
+    flavor: 'marlin2',
+  },
+  {
+    id: 'prusa_mk4',
+    es: 'Prusa MK4 / MK3S (250×210)',
+    en: 'Prusa MK4 / MK3S (250×210)',
+    bed: [250, 210, 220],
+    nozzle: 0.4,
+    flavor: 'marlin2',
+  },
+  {
+    id: 'generic256',
+    es: 'Genérica 256×256',
+    en: 'Generic 256×256',
+    bed: [256, 256, 256],
+    nozzle: 0.4,
+    flavor: 'marlin2',
+  },
+  {
+    id: 'klipper235',
+    es: 'Klipper 235×235 (Voron, Ender 3 con Klipper…)',
+    en: 'Klipper 235×235 (Voron, Ender 3 with Klipper…)',
+    bed: [235, 235, 250],
+    nozzle: 0.4,
+    flavor: 'klipper',
+  },
+  {
+    id: 'generic300',
+    es: 'Grande 300×300',
+    en: 'Large 300×300',
+    bed: [300, 300, 400],
+    nozzle: 0.4,
+    flavor: 'marlin2',
+  },
+  {
+    id: 'mini180',
+    es: 'Pequeña 180×180 (Prusa Mini y parecidas)',
+    en: 'Small 180×180 (Prusa Mini and similar)',
+    bed: [180, 180, 180],
+    nozzle: 0.4,
+    flavor: 'marlin2',
+  },
 ];
 
 export interface MaterialPreset {
@@ -41,12 +83,27 @@ export const MATERIALS: MaterialPreset[] = [
   { id: 'petg', name: 'PETG', nozzle: 240, bed: 80, density: 1.27, fan: true, type: 'PETG' },
   { id: 'abs', name: 'ABS', nozzle: 250, bed: 100, density: 1.04, fan: false, type: 'ABS' },
   { id: 'asa', name: 'ASA', nozzle: 255, bed: 100, density: 1.07, fan: false, type: 'ASA' },
-  { id: 'tpu', name: 'TPU (flexible)', nozzle: 225, bed: 50, density: 1.21, fan: true, type: 'FLEX' },
+  {
+    id: 'tpu',
+    name: 'TPU (flexible)',
+    nozzle: 225,
+    bed: 50,
+    density: 1.21,
+    fan: true,
+    type: 'FLEX',
+  },
 ];
 
 export type SupportMode = 'none' | 'buildplate' | 'everywhere';
 export const SUPPORT_MODES: SupportMode[] = ['none', 'buildplate', 'everywhere'];
-export const INFILL_PATTERNS = ['gyroid', 'grid', 'rectilinear', 'cubic', 'honeycomb', 'lightning'] as const;
+export const INFILL_PATTERNS = [
+  'gyroid',
+  'grid',
+  'rectilinear',
+  'cubic',
+  'honeycomb',
+  'lightning',
+] as const;
 export type InfillPattern = (typeof INFILL_PATTERNS)[number];
 
 export interface SliceSettings {
@@ -90,44 +147,65 @@ const num = (v: unknown, lo: number, hi: number, name: string): number => {
 };
 
 /** Settings from the UI or the AI, checked (missing ones take the defaults). */
-export function validateSlice(input: Partial<Record<keyof SliceSettings, unknown>>, base: SliceSettings = DEFAULT_SLICE): SliceSettings {
+export function validateSlice(
+  input: Partial<Record<keyof SliceSettings, unknown>>,
+  base: SliceSettings = DEFAULT_SLICE,
+): SliceSettings {
   const out: SliceSettings = { ...base };
   if (input.printer !== undefined) {
     if (typeof input.printer !== 'string' || !PRINTER_PRESETS.some((p) => p.id === input.printer))
-      throw new Error(`Unknown printer "${String(input.printer)}". Use one of: ${PRINTER_PRESETS.map((p) => p.id).join(', ')}.`);
+      throw new Error(
+        `Unknown printer "${String(input.printer)}". Use one of: ${PRINTER_PRESETS.map((p) => p.id).join(', ')}.`,
+      );
     out.printer = input.printer;
   }
   if (input.material !== undefined) {
     const m = typeof input.material === 'string' ? input.material.toLowerCase() : '';
-    if (!MATERIALS.some((x) => x.id === m)) throw new Error(`Unknown material "${String(input.material)}". Use one of: ${MATERIALS.map((x) => x.id).join(', ')}.`);
+    if (!MATERIALS.some((x) => x.id === m))
+      throw new Error(
+        `Unknown material "${String(input.material)}". Use one of: ${MATERIALS.map((x) => x.id).join(', ')}.`,
+      );
     out.material = m;
   }
-  if (input.layerHeight !== undefined) out.layerHeight = num(input.layerHeight, 0.05, 0.4, 'layer_height');
+  if (input.layerHeight !== undefined)
+    out.layerHeight = num(input.layerHeight, 0.05, 0.4, 'layer_height');
   if (input.infill !== undefined) out.infill = Math.round(num(input.infill, 0, 100, 'infill'));
   if (input.pattern !== undefined) {
-    if (!(INFILL_PATTERNS as readonly unknown[]).includes(input.pattern)) throw new Error(`"pattern" must be one of: ${INFILL_PATTERNS.join(', ')}.`);
+    if (!(INFILL_PATTERNS as readonly unknown[]).includes(input.pattern))
+      throw new Error(`"pattern" must be one of: ${INFILL_PATTERNS.join(', ')}.`);
     out.pattern = input.pattern as InfillPattern;
   }
   if (input.walls !== undefined) out.walls = Math.round(num(input.walls, 1, 10, 'walls'));
   if (input.supports !== undefined) {
-    if (!(SUPPORT_MODES as unknown[]).includes(input.supports)) throw new Error(`"supports" must be one of: ${SUPPORT_MODES.join(', ')}.`);
+    if (!(SUPPORT_MODES as unknown[]).includes(input.supports))
+      throw new Error(`"supports" must be one of: ${SUPPORT_MODES.join(', ')}.`);
     out.supports = input.supports as SupportMode;
   }
   if (input.brim !== undefined) out.brim = num(input.brim, 0, 20, 'brim');
   if (input.bed !== undefined) {
     const b = input.bed;
     if (!Array.isArray(b) || b.length !== 3) throw new Error('"bed" must be [x, y, z] in mm.');
-    out.bed = [num(b[0], 50, 1000, 'bed x'), num(b[1], 50, 1000, 'bed y'), num(b[2], 20, 1000, 'bed z')];
+    out.bed = [
+      num(b[0], 50, 1000, 'bed x'),
+      num(b[1], 50, 1000, 'bed y'),
+      num(b[2], 20, 1000, 'bed z'),
+    ];
   }
-  if (input.nozzleTemp !== undefined) out.nozzleTemp = Math.round(num(input.nozzleTemp, 150, 320, 'nozzle_temp'));
+  if (input.nozzleTemp !== undefined)
+    out.nozzleTemp = Math.round(num(input.nozzleTemp, 150, 320, 'nozzle_temp'));
   if (input.bedTemp !== undefined) out.bedTemp = Math.round(num(input.bedTemp, 0, 130, 'bed_temp'));
   const p = presetOf(out);
-  if (out.layerHeight > p.nozzle * 0.8 + 1e-9) throw new Error(`A layer of ${out.layerHeight} mm is too thick for a ${p.nozzle} mm nozzle (at most ${(p.nozzle * 0.8).toFixed(2)}).`);
+  if (out.layerHeight > p.nozzle * 0.8 + 1e-9)
+    throw new Error(
+      `A layer of ${out.layerHeight} mm is too thick for a ${p.nozzle} mm nozzle (at most ${(p.nozzle * 0.8).toFixed(2)}).`,
+    );
   return out;
 }
 
-export const presetOf = (s: SliceSettings): PrinterPreset => PRINTER_PRESETS.find((p) => p.id === s.printer) ?? PRINTER_PRESETS[0]!;
-export const materialOf = (s: SliceSettings): MaterialPreset => MATERIALS.find((m) => m.id === s.material) ?? MATERIALS[0]!;
+export const presetOf = (s: SliceSettings): PrinterPreset =>
+  PRINTER_PRESETS.find((p) => p.id === s.printer) ?? PRINTER_PRESETS[0]!;
+export const materialOf = (s: SliceSettings): MaterialPreset =>
+  MATERIALS.find((m) => m.id === s.material) ?? MATERIALS[0]!;
 export const bedOf = (s: SliceSettings): [number, number, number] => s.bed ?? presetOf(s).bed;
 
 /** PrusaSlicer .ini values are one line: newlines are written as \n. */
@@ -167,7 +245,17 @@ export function sliceIni(s: SliceSettings, withMachine = true): string {
     const end =
       p.flavor === 'klipper'
         ? 'PRINT_END'
-        : ['G91', 'G1 E-2 F2700', 'G1 Z10 F3000', 'G90', `G1 X0 Y${Math.round(by * 0.9)} F3000 ; presentar la pieza`, 'M104 S0', 'M140 S0', 'M107', 'M84'].join('\n');
+        : [
+            'G91',
+            'G1 E-2 F2700',
+            'G1 Z10 F3000',
+            'G90',
+            `G1 X0 Y${Math.round(by * 0.9)} F3000 ; presentar la pieza`,
+            'M104 S0',
+            'M140 S0',
+            'M107',
+            'M84',
+          ].join('\n');
     kv.push(
       ['bed_shape', `0x0,${bx}x0,${bx}x${by},0x${by}`],
       ['max_print_height', bz],
@@ -215,7 +303,11 @@ export function sliceIni(s: SliceSettings, withMachine = true): string {
 export function describeSlice(s: SliceSettings, lang: 'es' | 'en' = 'es'): string {
   const p = presetOf(s);
   const m = materialOf(s);
-  const sup = { none: lang === 'en' ? 'no supports' : 'sin soportes', buildplate: lang === 'en' ? 'supports from the bed' : 'soportes desde la cama', everywhere: lang === 'en' ? 'supports everywhere' : 'soportes en todo' }[s.supports];
+  const sup = {
+    none: lang === 'en' ? 'no supports' : 'sin soportes',
+    buildplate: lang === 'en' ? 'supports from the bed' : 'soportes desde la cama',
+    everywhere: lang === 'en' ? 'supports everywhere' : 'soportes en todo',
+  }[s.supports];
   return `${lang === 'en' ? p.en : p.es} · ${m.name} · ${s.layerHeight} mm · ${s.infill} % ${s.pattern} · ${s.walls} ${lang === 'en' ? 'walls' : 'paredes'} · ${sup}${s.brim ? ` · brim ${s.brim} mm` : ''}`;
 }
 
@@ -226,10 +318,18 @@ export function slicerProblems(out: string): { errors: string[]; warnings: strin
   for (const raw of out.split(/\r?\n/)) {
     const l = raw.trim();
     if (!l || /^\d+ => /.test(l)) continue;
-    if (/error|failed|could not|cannot|unable|not fit|outside|empty/i.test(l) && !/^warning/i.test(l)) errors.push(l.replace(/^\[\w+\]\s*/, ''));
-    else if (/warning|detected|requires? support|overhang/i.test(l)) warnings.push(l.replace(/^\[\w+\]\s*/, ''));
+    if (
+      /error|failed|could not|cannot|unable|not fit|outside|empty/i.test(l) &&
+      !/^warning/i.test(l)
+    )
+      errors.push(l.replace(/^\[\w+\]\s*/, ''));
+    else if (/warning|detected|requires? support|overhang/i.test(l))
+      warnings.push(l.replace(/^\[\w+\]\s*/, ''));
   }
-  return { errors: [...new Set(errors)].slice(0, 20), warnings: [...new Set(warnings)].slice(0, 20) };
+  return {
+    errors: [...new Set(errors)].slice(0, 20),
+    warnings: [...new Set(warnings)].slice(0, 20),
+  };
 }
 
 /** What PrusaSlicer can read (3MF keeps several parts and their placement). */

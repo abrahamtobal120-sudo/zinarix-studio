@@ -78,7 +78,9 @@
               <span id="primary-label">Descargar gratis</span>
             </a>
             <div class="cmd cmd-inline">
-              <code id="hero-cmd">curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash</code>
+              <code id="hero-cmd"
+                >curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash</code
+              >
               <button class="copy" type="button">Copiar</button>
             </div>
           </div>
@@ -96,17 +98,30 @@
         </div>
         <figcaption class="mono">
           Captura real de Zinarix Studio: el agente agregó validación de email a
-          <code>validate.js</code>, corrió <code>node --test</code> y dejó listo el botón de revertir.
+          <code>validate.js</code>, corrió <code>node --test</code> y dejó listo el botón de
+          revertir.
         </figcaption>
       </figure>
 
       <!-- FACTS -->
       <section class="facts wrap" aria-label="En cifras">
         <dl>
-          <div><dt>62</dt><dd>proveedores de IA</dd></div>
-          <div><dt>300+</dt><dd>modelos, cada uno con precio y contexto</dd></div>
-          <div><dt>20+</dt><dd>estudios y paneles: web, 3D, video, CAD, juegos…</dd></div>
-          <div><dt>$0</dt><dd>si usas Ollama o LM Studio</dd></div>
+          <div>
+            <dt>62</dt>
+            <dd>proveedores de IA</dd>
+          </div>
+          <div>
+            <dt>300+</dt>
+            <dd>modelos, cada uno con precio y contexto</dd>
+          </div>
+          <div>
+            <dt>20+</dt>
+            <dd>estudios y paneles: web, 3D, video, CAD, juegos…</dd>
+          </div>
+          <div>
+            <dt>$0</dt>
+            <dd>si usas Ollama o LM Studio</dd>
+          </div>
         </dl>
       </section>
 
@@ -137,9 +152,9 @@
           <div class="feature-copy">
             <h3>Nada se escribe sin tu visto bueno.</h3>
             <p>
-              El modo agente lee tu proyecto, busca, edita y corre comandos en la terminal. Antes
-              te enseña la diferencia línea por línea: apruebas, apruebas siempre en esta
-              conversación o rechazas.
+              El modo agente lee tu proyecto, busca, edita y corre comandos en la terminal. Antes te
+              enseña la diferencia línea por línea: apruebas, apruebas siempre en esta conversación
+              o rechazas.
             </p>
             <ul class="ticks">
               <li>Cada edición y cada comando esperan tu aprobación</li>
@@ -148,7 +163,13 @@
             </ul>
           </div>
           <div class="frame feature-shot">
-            <img src="assets/shots/shot-approval.webp" alt="El agente muestra la diferencia y espera que pulses Aprobar" loading="lazy" width="1440" height="900" />
+            <img
+              src="assets/shots/shot-approval.webp"
+              alt="El agente muestra la diferencia y espera que pulses Aprobar"
+              loading="lazy"
+              width="1440"
+              height="900"
+            />
           </div>
         </article>
 
@@ -161,13 +182,28 @@
               debe salir de tu máquina.
             </p>
             <table class="rates">
-              <tr><td>Local (Ollama, LM Studio, vLLM)</td><td>gratis</td></tr>
-              <tr><td>Rápidos (DeepSeek, Groq, Flash)</td><td>centavos</td></tr>
-              <tr><td>Frontera (Claude, GPT, Gemini Pro)</td><td>lo que cobre cada uno</td></tr>
+              <tr>
+                <td>Local (Ollama, LM Studio, vLLM)</td>
+                <td>gratis</td>
+              </tr>
+              <tr>
+                <td>Rápidos (DeepSeek, Groq, Flash)</td>
+                <td>centavos</td>
+              </tr>
+              <tr>
+                <td>Frontera (Claude, GPT, Gemini Pro)</td>
+                <td>lo que cobre cada uno</td>
+              </tr>
             </table>
           </div>
           <div class="frame feature-shot">
-            <img src="assets/shots/shot-models.webp" alt="Selector de modelos agrupado por proveedor" loading="lazy" width="1440" height="900" />
+            <img
+              src="assets/shots/shot-models.webp"
+              alt="Selector de modelos agrupado por proveedor"
+              loading="lazy"
+              width="1440"
+              height="900"
+            />
           </div>
         </article>
 
@@ -181,7 +217,13 @@
             </p>
           </div>
           <div class="frame feature-shot">
-            <img src="assets/shots/shot-split.webp" alt="Dos chats con agentes trabajando lado a lado" loading="lazy" width="1440" height="900" />
+            <img
+              src="assets/shots/shot-split.webp"
+              alt="Dos chats con agentes trabajando lado a lado"
+              loading="lazy"
+              width="1440"
+              height="900"
+            />
           </div>
         </article>
 
@@ -189,12 +231,18 @@
           <div class="feature-copy">
             <h3>Sabes lo que gastas antes de que llegue la factura.</h3>
             <p>
-              Lo de hoy y lo del mes por proveedor, con la gráfica de los últimos 30 días.
-              Ponle un presupuesto a cada uno y te avisa al llegar al 80 %.
+              Lo de hoy y lo del mes por proveedor, con la gráfica de los últimos 30 días. Ponle un
+              presupuesto a cada uno y te avisa al llegar al 80 %.
             </p>
           </div>
           <div class="frame feature-shot">
-            <img src="assets/shots/shot-usage.webp" alt="Consumo de créditos por proveedor con gráfica de 30 días" loading="lazy" width="1440" height="900" />
+            <img
+              src="assets/shots/shot-usage.webp"
+              alt="Consumo de créditos por proveedor con gráfica de 30 días"
+              loading="lazy"
+              width="1440"
+              height="900"
+            />
           </div>
         </article>
       </section>
@@ -205,63 +253,218 @@
           <span class="num mono">03</span>
           <h2>Mucho más que un editor.</h2>
           <p>
-            Estudios completos dentro de la misma app, y la IA puede usarlos todos: ve lo que
-            hace, lo revisa y lo corrige.
+            Estudios completos dentro de la misma app, y la IA puede usarlos todos: ve lo que hace,
+            lo revisa y lo corrige.
           </p>
         </header>
         <div class="gallery" id="gallery">
           <div class="gallery-tabs" role="tablist" aria-label="Funciones"></div>
           <figure class="gal" data-title="A tu medida">
-            <div class="frame"><img src="assets/shots/shot-quiz.webp" alt="Cuestionario de inicio con el resumen de la app" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Una app a tu medida desde el primer día.</strong> Al abrir Zinarix respondes 5 preguntas (qué haces, tu experiencia, cómo usas la IA, cuánto hace sola y el tema) y la app pone en tu barra los paneles que vas a usar. Se repite cuando quieras desde Configuración.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-quiz.webp"
+                alt="Cuestionario de inicio con el resumen de la app"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Una app a tu medida desde el primer día.</strong> Al abrir Zinarix respondes 5
+              preguntas (qué haces, tu experiencia, cómo usas la IA, cuánto hace sola y el tema) y
+              la app pone en tu barra los paneles que vas a usar. Se repite cuando quieras desde
+              Configuración.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Diseño web">
-            <div class="frame"><img src="assets/shots/shot-design.webp" alt="Panel de edición de páginas web" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Edición de páginas web en vivo.</strong> Edita las páginas de tu proyecto como diapositivas: textos, colores, imágenes y secciones. Los cambios se escriben en los archivos y se pueden deshacer.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-design.webp"
+                alt="Panel de edición de páginas web"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Edición de páginas web en vivo.</strong> Edita las páginas de tu proyecto como
+              diapositivas: textos, colores, imágenes y secciones. Los cambios se escriben en los
+              archivos y se pueden deshacer.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Gráficos">
-            <div class="frame"><img src="assets/shots/shot-graphics.webp" alt="Estudio gráfico con plantillas" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Estudio gráfico.</strong> Posts de Instagram, historias, miniaturas de YouTube, logos, tarjetas, carteles y más, con plantillas y paletas. Edición de fotos y quitar fondo gratis, en tu equipo.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-graphics.webp"
+                alt="Estudio gráfico con plantillas"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Estudio gráfico.</strong> Posts de Instagram, historias, miniaturas de
+              YouTube, logos, tarjetas, carteles y más, con plantillas y paletas. Edición de fotos y
+              quitar fondo gratis, en tu equipo.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Estudio 3D">
-            <div class="frame"><img src="assets/shots/shot-studio3d.webp" alt="Estudio 3D" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Estudio 3D.</strong> Escenas con figuras, luces, materiales y cámaras, y modelado en Blender sin escribir Python: la IA agrega objetos, modificadores y materiales y exporta a glb, fbx, obj o stl.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-studio3d.webp"
+                alt="Estudio 3D"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Estudio 3D.</strong> Escenas con figuras, luces, materiales y cámaras, y
+              modelado en Blender sin escribir Python: la IA agrega objetos, modificadores y
+              materiales y exporta a glb, fbx, obj o stl.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="CAD e impresión 3D">
-            <div class="frame"><img src="assets/shots/shot-cad.webp" alt="CAD con OpenSCAD y vista previa 3D" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>CAD e impresión 3D.</strong> OpenSCAD incluido, con parámetros del Customizer y vista previa al guardar. Revisa si la pieza es imprimible, lamínala con PrusaSlicer y mándala a tu impresora OctoPrint o Klipper.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-cad.webp"
+                alt="CAD con OpenSCAD y vista previa 3D"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>CAD e impresión 3D.</strong> OpenSCAD incluido, con parámetros del Customizer
+              y vista previa al guardar. Revisa si la pieza es imprimible, lamínala con PrusaSlicer
+              y mándala a tu impresora OctoPrint o Klipper.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Video">
-            <div class="frame"><img src="assets/shots/shot-video.webp" alt="Editor de video Video Studio" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Video Studio.</strong> Línea de tiempo, inspector y biblioteca. Edita cortando el texto de la transcripción, quita silencios y muletillas, subtítulos automáticos, rampas de velocidad, color, transiciones y exporta para YouTube, Reels o TikTok.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-video.webp"
+                alt="Editor de video Video Studio"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Video Studio.</strong> Línea de tiempo, inspector y biblioteca. Edita cortando
+              el texto de la transcripción, quita silencios y muletillas, subtítulos automáticos,
+              rampas de velocidad, color, transiciones y exporta para YouTube, Reels o TikTok.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Navegador">
-            <div class="frame"><img src="assets/shots/shot-browser.webp" alt="Navegador integrado" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Navegador que maneja la IA.</strong> Un navegador aislado, una pestaña por conversación: el agente abre páginas, las lee, hace clic y escribe mientras tú lo ves. Permiso por sitio.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-browser.webp"
+                alt="Navegador integrado"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Navegador que maneja la IA.</strong> Un navegador aislado, una pestaña por
+              conversación: el agente abre páginas, las lee, hace clic y escribe mientras tú lo ves.
+              Permiso por sitio.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Playground">
-            <div class="frame"><img src="assets/shots/shot-playground.webp" alt="Playground para comparar modelos" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Playground.</strong> Prueba un mismo prompt en varios modelos, ajusta temperatura, razonamiento y salida estructurada (JSON Schema), y copia el código listo para tu app.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-playground.webp"
+                alt="Playground para comparar modelos"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Playground.</strong> Prueba un mismo prompt en varios modelos, ajusta
+              temperatura, razonamiento y salida estructurada (JSON Schema), y copia el código listo
+              para tu app.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Pruebas">
-            <div class="frame"><img src="assets/shots/shot-tests.webp" alt="Panel de pruebas" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Pruebas, ejecución y depuración.</strong> Corre las pruebas, repite las que fallan y depura en el cursor, con terminal integrada, panel de problemas y búsqueda semántica del proyecto.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-tests.webp"
+                alt="Panel de pruebas"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Pruebas, ejecución y depuración.</strong> Corre las pruebas, repite las que
+              fallan y depura en el cursor, con terminal integrada, panel de problemas y búsqueda
+              semántica del proyecto.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Seguridad">
-            <div class="frame"><img src="assets/shots/shot-security.webp" alt="Centro de seguridad con puntaje" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Centro de seguridad (defensivo).</strong> Secretos filtrados, código inseguro, dependencias vulnerables (osv.dev), revisión de tu equipo y de tus sitios web (certificado, TLS, encabezados). Todo local.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-security.webp"
+                alt="Centro de seguridad con puntaje"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Centro de seguridad (defensivo).</strong> Secretos filtrados, código inseguro,
+              dependencias vulnerables (osv.dev), revisión de tu equipo y de tus sitios web
+              (certificado, TLS, encabezados). Todo local.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Escáner de puertos">
-            <div class="frame"><img src="assets/shots/shot-scanner.webp" alt="Escáner de puertos" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Escáner de puertos estilo nmap, con interfaz.</strong> Tu equipo o tu red local, con servicio y versión de cada puerto. Un objetivo público exige confirmar que tienes autorización.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-scanner.webp"
+                alt="Escáner de puertos"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Escáner de puertos estilo nmap, con interfaz.</strong> Tu equipo o tu red
+              local, con servicio y versión de cada puerto. Un objetivo público exige confirmar que
+              tienes autorización.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Proveedores">
-            <div class="frame"><img src="assets/shots/shot-providers.webp" alt="Lista de proveedores de IA" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Proveedores de IA.</strong> Conecta APIs en la nube, agentes de terminal (Claude Code, Codex, Gemini CLI…) y modelos locales desde un solo lugar.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-providers.webp"
+                alt="Lista de proveedores de IA"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Proveedores de IA.</strong> Conecta APIs en la nube, agentes de terminal
+              (Claude Code, Codex, Gemini CLI…) y modelos locales desde un solo lugar.
+            </figcaption>
           </figure>
           <figure class="gal" data-title="Paleta y temas">
-            <div class="frame"><img src="assets/shots/shot-settings.webp" alt="Ajustes de apariencia con temas" loading="lazy" width="1440" height="900" /></div>
-            <figcaption><strong>Temas, paleta de comandos y atajos.</strong> Varios temas claros y oscuros, tamaño de interfaz, fuentes e idioma español o inglés; todo a un Ctrl+Shift+P.</figcaption>
+            <div class="frame">
+              <img
+                src="assets/shots/shot-settings.webp"
+                alt="Ajustes de apariencia con temas"
+                loading="lazy"
+                width="1440"
+                height="900"
+              />
+            </div>
+            <figcaption>
+              <strong>Temas, paleta de comandos y atajos.</strong> Varios temas claros y oscuros,
+              tamaño de interfaz, fuentes e idioma español o inglés; todo a un Ctrl+Shift+P.
+            </figcaption>
           </figure>
         </div>
       </section>
@@ -271,19 +474,138 @@
         <header class="sec-head">
           <span class="num mono">04</span>
           <h2>Conectado a lo que ya usas.</h2>
-          <p>Cada panel trae sus herramientas para la IA: lo conectas una vez y le pides las cosas en el chat.</p>
+          <p>
+            Cada panel trae sus herramientas para la IA: lo conectas una vez y le pides las cosas en
+            el chat.
+          </p>
         </header>
         <div class="cards">
-          <article class="card"><img src="assets/shots/side-games.webp" alt="Panel de juegos" loading="lazy" width="306" height="586" /><h3>Juegos</h3><p>Godot 4, Phaser y three.js. La IA corre el juego, lo juega, toma capturas y arregla errores.</p></article>
-          <article class="card"><img src="assets/shots/side-sketchup.webp" alt="Panel de SketchUp" loading="lazy" width="306" height="586" /><h3>SketchUp</h3><p>Abre tus .skp con miniatura y la IA modela en SketchUp: cajas, caras, empujar/tirar, materiales, componentes, cotas y exportar a STL, OBJ o DAE.</p></article>
-          <article class="card"><img src="assets/shots/side-mobile.webp" alt="Panel de celular" loading="lazy" width="306" height="586" /><h3>Celular</h3><p>Flutter, Expo, React Native y Android: emuladores, logcat y la IA tocando la pantalla para probar tu app.</p></article>
-          <article class="card"><img src="assets/shots/side-hardware.webp" alt="Panel de hardware" loading="lazy" width="306" height="586" /><h3>Hardware</h3><p>Arduino, ESP32 y Pico con PlatformIO: compilar, subir, librerías y monitor serial.</p></article>
-          <article class="card"><img src="assets/shots/side-docker.webp" alt="Panel de Docker" loading="lazy" width="306" height="586" /><h3>Docker</h3><p>Contenedores, imágenes, volúmenes, logs, compose y build, con aprobación en cada cambio.</p></article>
-          <article class="card"><img src="assets/shots/side-mail.webp" alt="Panel de correo" loading="lazy" width="306" height="586" /><h3>Correo</h3><p>Lee, organiza, redacta y envía correos. Enviar siempre pide tu aprobación.</p></article>
-          <article class="card"><img src="assets/shots/side-vercel.webp" alt="Panel de Vercel" loading="lazy" width="306" height="586" /><h3>Vercel</h3><p>Proyectos, deployments, logs de build, redeploy, rollback y variables de entorno.</p></article>
-          <article class="card"><img src="assets/shots/side-supabase.webp" alt="Panel de Supabase" loading="lazy" width="306" height="586" /><h3>Supabase</h3><p>Tablas, columnas, SQL, migraciones y estado del proyecto.</p></article>
-          <article class="card"><img src="assets/shots/side-gcloud.webp" alt="Panel de Google Cloud" loading="lazy" width="306" height="586" /><h3>Google Cloud</h3><p>Vertex AI, BigQuery, Cloud Storage, Cloud SQL, Cloud Run y logs.</p></article>
-          <article class="card"><img src="assets/shots/side-watch.webp" alt="Panel de revisión automática" loading="lazy" width="306" height="586" /><h3>Revisión automática</h3><p>Una IA revisa los cambios de tu proyecto mientras trabajas y te avisa de los errores.</p></article>
+          <article class="card">
+            <img
+              src="assets/shots/side-games.webp"
+              alt="Panel de juegos"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Juegos</h3>
+            <p>
+              Godot 4, Phaser y three.js. La IA corre el juego, lo juega, toma capturas y arregla
+              errores.
+            </p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-sketchup.webp"
+              alt="Panel de SketchUp"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>SketchUp</h3>
+            <p>
+              Abre tus .skp con miniatura y la IA modela en SketchUp: cajas, caras, empujar/tirar,
+              materiales, componentes, cotas y exportar a STL, OBJ o DAE.
+            </p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-mobile.webp"
+              alt="Panel de celular"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Celular</h3>
+            <p>
+              Flutter, Expo, React Native y Android: emuladores, logcat y la IA tocando la pantalla
+              para probar tu app.
+            </p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-hardware.webp"
+              alt="Panel de hardware"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Hardware</h3>
+            <p>
+              Arduino, ESP32 y Pico con PlatformIO: compilar, subir, librerías y monitor serial.
+            </p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-docker.webp"
+              alt="Panel de Docker"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Docker</h3>
+            <p>
+              Contenedores, imágenes, volúmenes, logs, compose y build, con aprobación en cada
+              cambio.
+            </p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-mail.webp"
+              alt="Panel de correo"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Correo</h3>
+            <p>Lee, organiza, redacta y envía correos. Enviar siempre pide tu aprobación.</p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-vercel.webp"
+              alt="Panel de Vercel"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Vercel</h3>
+            <p>Proyectos, deployments, logs de build, redeploy, rollback y variables de entorno.</p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-supabase.webp"
+              alt="Panel de Supabase"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Supabase</h3>
+            <p>Tablas, columnas, SQL, migraciones y estado del proyecto.</p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-gcloud.webp"
+              alt="Panel de Google Cloud"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Google Cloud</h3>
+            <p>Vertex AI, BigQuery, Cloud Storage, Cloud SQL, Cloud Run y logs.</p>
+          </article>
+          <article class="card">
+            <img
+              src="assets/shots/side-watch.webp"
+              alt="Panel de revisión automática"
+              loading="lazy"
+              width="306"
+              height="586"
+            />
+            <h3>Revisión automática</h3>
+            <p>
+              Una IA revisa los cambios de tu proyecto mientras trabajas y te avisa de los errores.
+            </p>
+          </article>
         </div>
       </section>
 
@@ -292,19 +614,75 @@
         <div class="more">
           <h3 class="mono">Y además</h3>
           <dl>
-            <div><dt>Cuestionario de inicio</dt><dd>Cinco preguntas al empezar y la app se acomoda a lo que haces: paneles, tema y cuánto ayuda la IA.</dd></div>
-            <div><dt>Control de la compu</dt><dd>La IA ve tu pantalla y usa el mouse y el teclado en cualquier programa, con tu permiso. Mover el mouse la pausa.</dd></div>
-            <div><dt>Zinarix Remote</dt><dd>App de Android incluida: maneja Zinarix y sus chats desde tu celular.</dd></div>
-            <div><dt>WhatsApp</dt><dd>Controla Zinarix desde los chats que tú permitas.</dd></div>
-            <div><dt>Git y GitHub</dt><dd>Diferencias, commit con mensaje de IA, ramas, stash, pull/push, clonar y publicar repos.</dd></div>
-            <div><dt>Notebooks Jupyter</dt><dd>La IA lee, edita y corre celdas, y ve tus gráficas y variables.</dd></div>
-            <div><dt>Memorias y @Docs</dt><dd>Recuerda tus preferencias entre conversaciones e indexa documentación externa.</dd></div>
-            <div><dt>Imágenes, video y voz</dt><dd>Genera imágenes, clips y locuciones con el modelo que tengas conectado.</dd></div>
-            <div><dt>MCP</dt><dd>Conecta servidores MCP: Slack, Figma, bases de datos y más.</dd></div>
-            <div><dt>Más allá del proyecto</dt><dd>Red, APIs, bases de datos SQLite, PostgreSQL y MySQL y archivos del sistema, con nivel de riesgo y respaldo.</dd></div>
-            <div><dt>Modo 100 % local</dt><dd>Bloquea cualquier llamada a la nube. Funciona en un avión.</dd></div>
-            <div><dt>Llaves seguras</dt><dd>En el llavero del sistema o en una bóveda cifrada; los secretos se tapan antes de enviarse.</dd></div>
-            <div><dt>CLI <code>omni</code></dt><dd>Los mismos modelos y el agente desde la terminal, para scripts y CI.</dd></div>
+            <div>
+              <dt>Cuestionario de inicio</dt>
+              <dd>
+                Cinco preguntas al empezar y la app se acomoda a lo que haces: paneles, tema y
+                cuánto ayuda la IA.
+              </dd>
+            </div>
+            <div>
+              <dt>Control de la compu</dt>
+              <dd>
+                La IA ve tu pantalla y usa el mouse y el teclado en cualquier programa, con tu
+                permiso. Mover el mouse la pausa.
+              </dd>
+            </div>
+            <div>
+              <dt>Zinarix Remote</dt>
+              <dd>App de Android incluida: maneja Zinarix y sus chats desde tu celular.</dd>
+            </div>
+            <div>
+              <dt>WhatsApp</dt>
+              <dd>Controla Zinarix desde los chats que tú permitas.</dd>
+            </div>
+            <div>
+              <dt>Git y GitHub</dt>
+              <dd>
+                Diferencias, commit con mensaje de IA, ramas, stash, pull/push, clonar y publicar
+                repos.
+              </dd>
+            </div>
+            <div>
+              <dt>Notebooks Jupyter</dt>
+              <dd>La IA lee, edita y corre celdas, y ve tus gráficas y variables.</dd>
+            </div>
+            <div>
+              <dt>Memorias y @Docs</dt>
+              <dd>
+                Recuerda tus preferencias entre conversaciones e indexa documentación externa.
+              </dd>
+            </div>
+            <div>
+              <dt>Imágenes, video y voz</dt>
+              <dd>Genera imágenes, clips y locuciones con el modelo que tengas conectado.</dd>
+            </div>
+            <div>
+              <dt>MCP</dt>
+              <dd>Conecta servidores MCP: Slack, Figma, bases de datos y más.</dd>
+            </div>
+            <div>
+              <dt>Más allá del proyecto</dt>
+              <dd>
+                Red, APIs, bases de datos SQLite, PostgreSQL y MySQL y archivos del sistema, con
+                nivel de riesgo y respaldo.
+              </dd>
+            </div>
+            <div>
+              <dt>Modo 100 % local</dt>
+              <dd>Bloquea cualquier llamada a la nube. Funciona en un avión.</dd>
+            </div>
+            <div>
+              <dt>Llaves seguras</dt>
+              <dd>
+                En el llavero del sistema o en una bóveda cifrada; los secretos se tapan antes de
+                enviarse.
+              </dd>
+            </div>
+            <div>
+              <dt>CLI <code>omni</code></dt>
+              <dd>Los mismos modelos y el agente desde la terminal, para scripts y CI.</dd>
+            </div>
           </dl>
         </div>
       </section>
@@ -403,7 +781,10 @@
                 paquete pacman; Fedora, openSUSE y el resto, el AppImage en tu carpeta personal.
               </p>
               <div class="cmd">
-                <code>curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s -- --appimage</code>
+                <code
+                  >curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s --
+                  --appimage</code
+                >
                 <button class="copy" type="button">Copiar</button>
               </div>
               <p class="term-note"># Forzar el AppImage, sin sudo.</p>
@@ -423,7 +804,9 @@
                 <code>irm https://zinarix-studio.vercel.app/install.ps1 | iex</code>
                 <button class="copy" type="button">Copiar</button>
               </div>
-              <p class="term-note"># Pégalo en PowerShell. Instala para tu usuario, sin ventanas.</p>
+              <p class="term-note">
+                # Pégalo en PowerShell. Instala para tu usuario, sin ventanas.
+              </p>
             </div>
             <p class="term-note">
               # El script comprueba la suma SHA-256 antes de instalar; si no puede, se detiene.
@@ -472,15 +855,24 @@
 
               <h4>Desinstalar u otra versión</h4>
               <div class="cmd">
-                <code>curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s -- --uninstall</code>
+                <code
+                  >curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s --
+                  --uninstall</code
+                >
                 <button class="copy" type="button">Copiar</button>
               </div>
               <div class="cmd">
-                <code>$env:ZINARIX_UNINSTALL='1'; irm https://zinarix-studio.vercel.app/install.ps1 | iex</code>
+                <code
+                  >$env:ZINARIX_UNINSTALL='1'; irm https://zinarix-studio.vercel.app/install.ps1 |
+                  iex</code
+                >
                 <button class="copy" type="button">Copiar</button>
               </div>
               <div class="cmd">
-                <code>curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s -- --version 0.3.2</code>
+                <code
+                  >curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash -s -- --version
+                  0.3.2</code
+                >
                 <button class="copy" type="button">Copiar</button>
               </div>
               <p class="muted small">
@@ -506,8 +898,8 @@
           <div>
             <dt>¿De verdad es gratis?</dt>
             <dd>
-              Sí. Es software libre con licencia GPL-3.0. Le pagas directamente al proveedor de IA que
-              elijas, con tu propia llave, o nada si usas modelos locales.
+              Sí. Es software libre con licencia GPL-3.0. Le pagas directamente al proveedor de IA
+              que elijas, con tu propia llave, o nada si usas modelos locales.
             </dd>
           </div>
           <div>
@@ -520,8 +912,8 @@
           <div>
             <dt>¿El agente puede romper algo?</dt>
             <dd>
-              Ves cada edición y cada comando antes de que pase, y nada corre sin tu aprobación.
-              Los comandos peligrosos se bloquean siempre y puedes revertir todo con un clic.
+              Ves cada edición y cada comando antes de que pase, y nada corre sin tu aprobación. Los
+              comandos peligrosos se bloquean siempre y puedes revertir todo con un clic.
             </dd>
           </div>
           <div>

@@ -19,7 +19,11 @@ import { runArgs } from './docker.js';
  * that changes containers is approved by the user (removing, running and compose every time).
  */
 
-const strings = (description: string) => ({ type: 'array', items: { type: 'string' }, description });
+const strings = (description: string) => ({
+  type: 'array',
+  items: { type: 'string' },
+  description,
+});
 
 export const DOCKER_TOOLS: ToolDefinition[] = [
   {
@@ -31,7 +35,16 @@ export const DOCKER_TOOLS: ToolDefinition[] = [
       properties: {
         what: {
           type: 'string',
-          enum: ['containers', 'images', 'volumes', 'networks', 'compose', 'dockerfiles', 'stats', 'disk'],
+          enum: [
+            'containers',
+            'images',
+            'volumes',
+            'networks',
+            'compose',
+            'dockerfiles',
+            'stats',
+            'disk',
+          ],
         },
       },
     },
@@ -65,7 +78,10 @@ export const DOCKER_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'stop', 'restart', 'pause', 'unpause', 'rm', 'rmi', 'volume-rm'] },
+        action: {
+          type: 'string',
+          enum: ['start', 'stop', 'restart', 'pause', 'unpause', 'rm', 'rmi', 'volume-rm'],
+        },
         target: { type: 'string', description: 'Container name / id, image, or volume' },
       },
       required: ['action', 'target'],
@@ -97,7 +113,10 @@ export const DOCKER_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        file: { type: 'string', description: 'Compose file, relative to the project (e.g. docker-compose.yml)' },
+        file: {
+          type: 'string',
+          description: 'Compose file, relative to the project (e.g. docker-compose.yml)',
+        },
         action: { type: 'string', enum: ['up', 'down', 'restart', 'pull', 'ps'] },
       },
       required: ['file', 'action'],
@@ -105,10 +124,13 @@ export const DOCKER_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'docker_pull',
-    description: 'Download (pull) an image from its registry, e.g. postgres:16. The user approves it.',
+    description:
+      'Download (pull) an image from its registry, e.g. postgres:16. The user approves it.',
     parameters: {
       type: 'object',
-      properties: { image: { type: 'string', description: 'Image reference, e.g. redis:7-alpine' } },
+      properties: {
+        image: { type: 'string', description: 'Image reference, e.g. redis:7-alpine' },
+      },
       required: ['image'],
     },
   },
@@ -119,7 +141,10 @@ export const DOCKER_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        dockerfile: { type: 'string', description: 'Dockerfile path relative to the project, e.g. Dockerfile or api/Dockerfile' },
+        dockerfile: {
+          type: 'string',
+          description: 'Dockerfile path relative to the project, e.g. Dockerfile or api/Dockerfile',
+        },
         tag: { type: 'string', description: 'Name of the image, lowercase, e.g. my-app:dev' },
       },
       required: ['dockerfile', 'tag'],
@@ -140,7 +165,7 @@ export const DOCKER_TOOLS: ToolDefinition[] = [
 export const DOCKER_TOOL_NAMES = new Set(DOCKER_TOOLS.map((t) => t.name));
 
 export const DOCKER_PROMPT_PART =
-  '- docker_ps, docker_inspect, docker_logs, docker_action, docker_run, docker_compose, docker_pull, docker_build and docker_prune: the user\'s Docker (containers, images, volumes, compose files and Dockerfiles of the project, resource use). Read state and logs freely; changes are approved. When Docker is not running, tell the user to open Docker Desktop (the Docker panel has a button).';
+  "- docker_ps, docker_inspect, docker_logs, docker_action, docker_run, docker_compose, docker_pull, docker_build and docker_prune: the user's Docker (containers, images, volumes, compose files and Dockerfiles of the project, resource use). Read state and logs freely; changes are approved. When Docker is not running, tell the user to open Docker Desktop (the Docker panel has a button).";
 
 const ACTION_ES: Record<DockerAction, string> = {
   start: 'iniciar',
@@ -180,11 +205,16 @@ export function specFrom(a: Record<string, unknown>): DockerRunSpec {
 function shownArgs(args: string[]): string {
   return [
     'docker',
-    ...args.map((x, i) => (args[i - 1] === '-e' ? `${x.split('=')[0]}=…` : /\s/.test(x) ? JSON.stringify(x) : x)),
+    ...args.map((x, i) =>
+      args[i - 1] === '-e' ? `${x.split('=')[0]}=…` : /\s/.test(x) ? JSON.stringify(x) : x,
+    ),
   ].join(' ');
 }
 
-export function dockerPreview(name: string, a: Record<string, unknown>): SystemPreview | { error: string } | null {
+export function dockerPreview(
+  name: string,
+  a: Record<string, unknown>,
+): SystemPreview | { error: string } | null {
   try {
     if (name === 'docker_ps' || name === 'docker_logs' || name === 'docker_inspect') return null;
     if (name === 'docker_pull') {
@@ -279,7 +309,8 @@ export async function runDockerTool(
   a: Record<string, unknown>,
   root: string | undefined,
 ): Promise<{ ok: boolean; content: string; summary: string }> {
-  if (!docker) return { ok: false, content: 'Docker is not available here.', summary: 'no disponible' };
+  if (!docker)
+    return { ok: false, content: 'Docker is not available here.', summary: 'no disponible' };
   try {
     if (name === 'docker_ps' && a.what === 'dockerfiles') {
       if (!root) return { ok: false, content: 'No folder is open.', summary: 'sin carpeta' };
@@ -301,7 +332,11 @@ export async function runDockerTool(
     }
     const st = await docker.status();
     if (st.state === 'missing')
-      return { ok: false, content: 'Docker is not installed (no "docker" command).', summary: 'sin Docker' };
+      return {
+        ok: false,
+        content: 'Docker is not installed (no "docker" command).',
+        summary: 'sin Docker',
+      };
     if (st.state === 'stopped')
       return {
         ok: false,
@@ -314,7 +349,10 @@ export async function runDockerTool(
         const list = await docker.images();
         return {
           ok: true,
-          content: list.map((i) => `${i.repository}:${i.tag}  ${i.id}  ${i.size}  ${i.created}`).join('\n') || 'No images.',
+          content:
+            list
+              .map((i) => `${i.repository}:${i.tag}  ${i.id}  ${i.size}  ${i.created}`)
+              .join('\n') || 'No images.',
           summary: `${list.length} imágenes`,
         };
       }
@@ -323,8 +361,12 @@ export async function runDockerTool(
         return {
           ok: true,
           content:
-            list.map((x) => `${x.name}  cpu=${x.cpu}  mem=${x.mem} (${x.memPerc})  net=${x.net}  disk=${x.block}  pids=${x.pids}`).join('\n') ||
-            'No running containers.',
+            list
+              .map(
+                (x) =>
+                  `${x.name}  cpu=${x.cpu}  mem=${x.mem} (${x.memPerc})  net=${x.net}  disk=${x.block}  pids=${x.pids}`,
+              )
+              .join('\n') || 'No running containers.',
           summary: `${list.length} en marcha`,
         };
       }
@@ -332,17 +374,30 @@ export async function runDockerTool(
         const rows = await docker.diskUsage();
         return {
           ok: true,
-          content: rows.map((r) => `${r.type}: ${r.total} (active ${r.active}), size ${r.size}, reclaimable ${r.reclaimable}`).join('\n'),
+          content: rows
+            .map(
+              (r) =>
+                `${r.type}: ${r.total} (active ${r.active}), size ${r.size}, reclaimable ${r.reclaimable}`,
+            )
+            .join('\n'),
           summary: 'espacio en disco',
         };
       }
       if (what === 'volumes') {
         const list = await docker.volumes();
-        return { ok: true, content: list.map((v) => `${v.name} (${v.driver})`).join('\n') || 'No volumes.', summary: `${list.length} volúmenes` };
+        return {
+          ok: true,
+          content: list.map((v) => `${v.name} (${v.driver})`).join('\n') || 'No volumes.',
+          summary: `${list.length} volúmenes`,
+        };
       }
       if (what === 'networks') {
         const list = await docker.networks();
-        return { ok: true, content: list.map((n) => `${n.name} (${n.driver}, ${n.scope})`).join('\n'), summary: `${list.length} redes` };
+        return {
+          ok: true,
+          content: list.map((n) => `${n.name} (${n.driver}, ${n.scope})`).join('\n'),
+          summary: `${list.length} redes`,
+        };
       }
       const list = await docker.containers();
       return {
@@ -350,14 +405,19 @@ export async function runDockerTool(
         content:
           `Docker ${st.server}\n` +
           (list
-            .map((c) => `${c.name}  [${c.state}] ${c.status}  image=${c.image}${c.ports ? `  ports=${c.ports}` : ''}${c.project ? `  compose=${c.project}` : ''}`)
+            .map(
+              (c) =>
+                `${c.name}  [${c.state}] ${c.status}  image=${c.image}${c.ports ? `  ports=${c.ports}` : ''}${c.project ? `  compose=${c.project}` : ''}`,
+            )
             .join('\n') || 'No containers.'),
         summary: `${list.length} contenedores`,
       };
     }
     if (name === 'docker_inspect') {
       const d = await docker.inspect(String(a.container ?? ''));
-      const env = d.env.map((e) => `${e.key}=${secretKey(e.key) ? '(hidden)' : e.value.slice(0, 200)}`);
+      const env = d.env.map(
+        (e) => `${e.key}=${secretKey(e.key) ? '(hidden)' : e.value.slice(0, 200)}`,
+      );
       const lines = [
         `${d.name} (${d.id})  image=${d.image}`,
         `state=${d.state}${d.exitCode != null && d.state !== 'running' ? ` exit=${d.exitCode}` : ''}${d.health ? ` health=${d.health}` : ''}  started=${d.startedAt}`,
@@ -377,23 +437,46 @@ export async function runDockerTool(
           ? { kind: 'pull', image: String(a.image ?? '') }
           : { kind: 'build', dockerfile: String(a.dockerfile ?? ''), tag: String(a.tag ?? '') };
       const out = await docker.runJob(root ?? null, job);
-      return { ok: true, content: cut(out || 'Done.'), summary: name === 'docker_pull' ? 'descargada' : 'construida' };
+      return {
+        ok: true,
+        content: cut(out || 'Done.'),
+        summary: name === 'docker_pull' ? 'descargada' : 'construida',
+      };
     }
     if (name === 'docker_prune') {
       const out = await docker.prune(a.kind as DockerPrune);
-      return { ok: true, content: out || 'Nothing to remove.', summary: `limpieza: ${String(a.kind)}` };
+      return {
+        ok: true,
+        content: out || 'Nothing to remove.',
+        summary: `limpieza: ${String(a.kind)}`,
+      };
     }
     if (name === 'docker_logs') {
-      const log = await docker.logs(String(a.container ?? ''), typeof a.tail === 'number' ? a.tail : 200);
-      return { ok: true, content: cut(log || '(empty log)'), summary: `${log.split('\n').length} líneas` };
+      const log = await docker.logs(
+        String(a.container ?? ''),
+        typeof a.tail === 'number' ? a.tail : 200,
+      );
+      return {
+        ok: true,
+        content: cut(log || '(empty log)'),
+        summary: `${log.split('\n').length} líneas`,
+      };
     }
     if (name === 'docker_action') {
       const out = await docker.action(a.action as DockerAction, String(a.target ?? ''));
-      return { ok: true, content: out || 'Done.', summary: ACTION_ES[a.action as DockerAction] ?? 'hecho' };
+      return {
+        ok: true,
+        content: out || 'Done.',
+        summary: ACTION_ES[a.action as DockerAction] ?? 'hecho',
+      };
     }
     if (name === 'docker_run') {
       const id = await docker.runContainer(specFrom(a));
-      return { ok: true, content: `Started container ${id.slice(0, 12)}.`, summary: id.slice(0, 12) };
+      return {
+        ok: true,
+        content: `Started container ${id.slice(0, 12)}.`,
+        summary: id.slice(0, 12),
+      };
     }
     if (name === 'docker_compose') {
       if (!root) return { ok: false, content: 'No folder is open.', summary: 'sin carpeta' };

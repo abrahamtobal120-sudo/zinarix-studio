@@ -1,7 +1,13 @@
 import { OmniError } from '@omni/shared';
 import { abortError, request, requestJson } from '../http.js';
 import { base64ToBytes, extFor, styledPrompt } from './types.js';
-import type { MediaAspect, MediaFile, MediaGenProvider, MediaRequest, MediaResult } from './types.js';
+import type {
+  MediaAspect,
+  MediaFile,
+  MediaGenProvider,
+  MediaRequest,
+  MediaResult,
+} from './types.js';
 
 /**
  * Fase 10C: local generators the user already runs. Zinarix installs nothing; it connects to
@@ -55,7 +61,8 @@ export function seedFor(req: MediaRequest): number {
 function noEdits(req: MediaRequest, warnings: string[]): void {
   if (req.edit || req.reference)
     warnings.push('El servidor local recibe solo texto desde Zinarix: la imagen no se envió.');
-  if (req.transparent) warnings.push('Fondo transparente no disponible en local: se generó con fondo.');
+  if (req.transparent)
+    warnings.push('Fondo transparente no disponible en local: se generó con fondo.');
 }
 
 // ---------------------------------------------------------------------------- ComfyUI
@@ -124,16 +131,19 @@ export const comfyMedia: MediaGenProvider = {
     const warnings: string[] = [];
     noEdits(req, warnings);
     onProgress?.({ stage: 'sending' });
-    const info = await requestJson<Record<string, { input?: { required?: { ckpt_name?: unknown[] } } }>>(
-      cfg,
-      { path: '/object_info/CheckpointLoaderSimple', signal },
-    );
+    const info = await requestJson<
+      Record<string, { input?: { required?: { ckpt_name?: unknown[] } } }>
+    >(cfg, { path: '/object_info/CheckpointLoaderSimple', signal });
     const ckpt = comfyCheckpoint(info.CheckpointLoaderSimple?.input?.required?.ckpt_name);
     if (!ckpt)
-      throw new OmniError('config', 'ComfyUI no tiene ningún checkpoint instalado (models/checkpoints).', {
-        provider: cfg.entry.id,
-        retryable: false,
-      });
+      throw new OmniError(
+        'config',
+        'ComfyUI no tiene ningún checkpoint instalado (models/checkpoints).',
+        {
+          provider: cfg.entry.id,
+          retryable: false,
+        },
+      );
     const seed = seedFor(req);
     const queued = await requestJson<{ prompt_id?: string }>(
       { ...cfg, timeoutMs: Math.max(cfg.timeoutMs ?? 0, LONG) },
@@ -145,7 +155,8 @@ export const comfyMedia: MediaGenProvider = {
       },
     );
     const id = queued.prompt_id;
-    if (!id) throw new OmniError('server', 'ComfyUI no aceptó el trabajo.', { provider: cfg.entry.id });
+    if (!id)
+      throw new OmniError('server', 'ComfyUI no aceptó el trabajo.', { provider: cfg.entry.id });
     const started = Date.now();
     let images: ComfyImage[] = [];
     for (;;) {
@@ -170,7 +181,9 @@ export const comfyMedia: MediaGenProvider = {
         if (images.length || job.status?.completed) break;
       }
       if (Date.now() - started > LONG)
-        throw new OmniError('timeout', 'ComfyUI tardó más de 30 minutos.', { provider: cfg.entry.id });
+        throw new OmniError('timeout', 'ComfyUI tardó más de 30 minutos.', {
+          provider: cfg.entry.id,
+        });
       await sleep(POLL_MS, signal);
     }
     onProgress?.({ stage: 'downloading' });
@@ -178,15 +191,25 @@ export const comfyMedia: MediaGenProvider = {
     for (const img of images) {
       const res = await request(cfg, {
         path: '/view',
-        query: { filename: img.filename, subfolder: img.subfolder ?? '', type: img.type ?? 'output' },
+        query: {
+          filename: img.filename,
+          subfolder: img.subfolder ?? '',
+          type: img.type ?? 'output',
+        },
         signal,
         headers: { accept: 'image/*' },
       });
       const mediaType = res.headers.get('content-type')?.split(';')[0] || 'image/png';
-      files.push({ data: new Uint8Array(await res.arrayBuffer()), mediaType, ext: extFor(mediaType, 'png') });
+      files.push({
+        data: new Uint8Array(await res.arrayBuffer()),
+        mediaType,
+        ext: extFor(mediaType, 'png'),
+      });
     }
     if (!files.length)
-      throw new OmniError('server', 'ComfyUI no devolvió ninguna imagen.', { provider: cfg.entry.id });
+      throw new OmniError('server', 'ComfyUI no devolvió ninguna imagen.', {
+        provider: cfg.entry.id,
+      });
     return { kind: 'image', model: req.model, files, warnings, seed };
   },
 };
@@ -236,7 +259,9 @@ export const a1111Media: MediaGenProvider = {
       ext: 'png',
     }));
     if (!files.length)
-      throw new OmniError('server', 'AUTOMATIC1111 no devolvió ninguna imagen.', { provider: cfg.entry.id });
+      throw new OmniError('server', 'AUTOMATIC1111 no devolvió ninguna imagen.', {
+        provider: cfg.entry.id,
+      });
     return { kind: 'image', model: req.model, files, warnings, seed: used };
   },
 };
@@ -271,9 +296,16 @@ export const localSpeechMedia: MediaGenProvider = {
     const mediaType = res.headers.get('content-type')?.split(';')[0] || 'audio/mpeg';
     const data = new Uint8Array(await res.arrayBuffer());
     if (!data.length)
-      throw new OmniError('server', 'El servidor de voz devolvió un audio vacío.', { provider: cfg.entry.id });
+      throw new OmniError('server', 'El servidor de voz devolvió un audio vacío.', {
+        provider: cfg.entry.id,
+      });
     const warnings = req.style?.trim() ? ['El servidor local no recibe estilo: no se envió.'] : [];
-    return { kind: 'speech', model: req.model, files: [{ data, mediaType, ext: extFor(mediaType, 'mp3') }], warnings };
+    return {
+      kind: 'speech',
+      model: req.model,
+      files: [{ data, mediaType, ext: extFor(mediaType, 'mp3') }],
+      warnings,
+    };
   },
 };
 
@@ -293,7 +325,11 @@ export async function probeLocal(
   timeoutMs = 1500,
 ): Promise<LocalStatus> {
   const path =
-    provider === 'comfyui' ? '/system_stats' : provider === 'a1111' ? '/sdapi/v1/sd-models' : '/models';
+    provider === 'comfyui'
+      ? '/system_stats'
+      : provider === 'a1111'
+        ? '/sdapi/v1/sd-models'
+        : '/models';
   const url = baseUrl.replace(/\/+$/, '') + path;
   try {
     const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });

@@ -10,7 +10,15 @@ const f1 = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2));
  * Fase 7 (mejora): measure between two points of the model and cut it at a height to see
  * inside. `version` changes when a new model is shown (the cut range and the points reset).
  */
-export function ViewTools({ viewer, version, units = 'mm' }: { viewer: RefObject<MeshViewer | null>; version: unknown; units?: 'mm' | 'm' }) {
+export function ViewTools({
+  viewer,
+  version,
+  units = 'mm',
+}: {
+  viewer: RefObject<MeshViewer | null>;
+  version: unknown;
+  units?: 'mm' | 'm';
+}) {
   const [measuring, setMeasuring] = useState(false);
   const [m, setM] = useState<Measure | null>(null);
   const [cutOn, setCutOn] = useState(false);
@@ -46,13 +54,22 @@ export function ViewTools({ viewer, version, units = 'mm' }: { viewer: RefObject
   const step = Math.max((range[1] - range[0]) / 200, 1e-4);
   return (
     <div className="cad-tools">
-      <button className={`btn ghost cad-small ${measuring ? 'on' : ''}`} aria-pressed={measuring} onClick={() => setMeasuring((v) => !v)}>
+      <button
+        className={`btn ghost cad-small ${measuring ? 'on' : ''}`}
+        aria-pressed={measuring}
+        onClick={() => setMeasuring((v) => !v)}
+      >
         <Icon name="ruler" size={14} /> {tc('measure')}
       </button>
       {measuring && (
         <span className="cad-tools-val" aria-live="polite">
           {d && m?.distance !== undefined
-            ? tc('measureVal', { d: f1(m.distance * k), x: f1(Math.abs(d.x) * k), y: f1(Math.abs(d.y) * k), z: f1(Math.abs(d.z) * k) })
+            ? tc('measureVal', {
+                d: f1(m.distance * k),
+                x: f1(Math.abs(d.x) * k),
+                y: f1(Math.abs(d.y) * k),
+                z: f1(Math.abs(d.z) * k),
+              })
             : tc('measureHint')}
         </span>
       )}

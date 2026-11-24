@@ -10,7 +10,10 @@ describe('questionnaire recommend', () => {
     expect(r.start).toBe('sketchup');
   });
   it('never pins more than the limit and no duplicates', () => {
-    const r = recommend({ ...base, uses: ['web', 'graphics', 'cloud', 'arch3d', 'print3d', 'office'] });
+    const r = recommend({
+      ...base,
+      uses: ['web', 'graphics', 'cloud', 'arch3d', 'print3d', 'office'],
+    });
     expect(r.pinned.length).toBe(MAX_PINNED);
     expect(new Set(r.pinned).size).toBe(r.pinned.length);
   });

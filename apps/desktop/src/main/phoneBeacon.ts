@@ -53,7 +53,10 @@ export const githubBeacon: PhoneBeacon = async (url, id) => {
   const files = { [BEACON_FILE]: { content } };
   if (id && /^[0-9a-f]{20,40}$/.test(id)) {
     try {
-      await gh(['api', '--method', 'PATCH', `gists/${id}`, '--input', '-'], JSON.stringify({ files }));
+      await gh(
+        ['api', '--method', 'PATCH', `gists/${id}`, '--input', '-'],
+        JSON.stringify({ files }),
+      );
       return id;
     } catch (e) {
       // Deleted by hand: a new one is made (the link changes only this once).

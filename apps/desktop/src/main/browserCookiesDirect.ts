@@ -56,7 +56,8 @@ function openCopy(path: string): { db: DatabaseSync; dir: string } {
   const dir = mkdtempSync(join(tmpdir(), 'zx-cookies-'));
   const copy = join(dir, 'db.sqlite');
   copyFileSync(path, copy);
-  for (const ext of ['-wal', '-shm']) if (existsSync(path + ext)) copyFileSync(path + ext, copy + ext);
+  for (const ext of ['-wal', '-shm'])
+    if (existsSync(path + ext)) copyFileSync(path + ext, copy + ext);
   // A read-only open on the copy, never on the browser's live file.
   const db = new DatabaseSync(copy, { readOnly: true });
   return { db, dir };

@@ -31,12 +31,14 @@ const es = {
   design: 'Diseño',
   designHint: 'Abrir en el editor de diseño',
   broken: 'Este SVG tiene un error y no se puede editar como diseño:',
-  removedScripts: 'Se quitaron scripts y eventos del SVG por seguridad; al guardar no se conservan.',
+  removedScripts:
+    'Se quitaron scripts y eventos del SVG por seguridad; al guardar no se conservan.',
   toolSelect: 'Seleccionar (V)',
   toolRect: 'Rectángulo (R)',
   toolEllipse: 'Elipse (O)',
   toolLine: 'Línea (L)',
-  toolPen: 'Plumilla (P): clic para esquinas, arrastra para curvas; Enter termina, clic en el primer punto cierra',
+  toolPen:
+    'Plumilla (P): clic para esquinas, arrastra para curvas; Enter termina, clic en el primer punto cierra',
   toolText: 'Texto (T)',
   toolHand: 'Mover la vista (H o Espacio)',
   shapes: 'Formas',
@@ -207,7 +209,8 @@ const es = {
   noSelection: 'Sin selección: lo que hagas va a toda la capa.',
   apply: 'Aplicar (Enter)',
   cancel: 'Cancelar (Esc)',
-  transformHint: 'Arrastra para mover; las esquinas cambian el tamaño (Shift: sin proporción). Enter aplica, Esc cancela.',
+  transformHint:
+    'Arrastra para mover; las esquinas cambian el tamaño (Shift: sin proporción). Enter aplica, Esc cancela.',
   transform: 'Transformar',
   brushKind: 'Tipo de pincel',
   brush_round: 'Redondo',
@@ -253,12 +256,14 @@ const en: typeof es = {
   design: 'Design',
   designHint: 'Open in the design editor',
   broken: 'This SVG has an error and cannot be edited as a design:',
-  removedScripts: 'Scripts and event handlers were removed from the SVG for safety; saving drops them.',
+  removedScripts:
+    'Scripts and event handlers were removed from the SVG for safety; saving drops them.',
   toolSelect: 'Select (V)',
   toolRect: 'Rectangle (R)',
   toolEllipse: 'Ellipse (O)',
   toolLine: 'Line (L)',
-  toolPen: 'Pen (P): click for corners, drag for curves; Enter ends, click the first point to close',
+  toolPen:
+    'Pen (P): click for corners, drag for curves; Enter ends, click the first point to close',
   toolText: 'Text (T)',
   toolHand: 'Pan the view (H or Space)',
   shapes: 'Shapes',
@@ -428,7 +433,8 @@ const en: typeof es = {
   noSelection: 'No selection: what you do goes to the whole layer.',
   apply: 'Apply (Enter)',
   cancel: 'Cancel (Esc)',
-  transformHint: 'Drag to move; the corners change the size (Shift: free). Enter applies, Esc cancels.',
+  transformHint:
+    'Drag to move; the corners change the size (Shift: free). Enter applies, Esc cancels.',
   transform: 'Transform',
   brushKind: 'Brush',
   brush_round: 'Round',

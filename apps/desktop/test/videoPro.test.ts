@@ -60,11 +60,7 @@ function cube(size: number, f: (r: number, g: number, b: number) => number[], ex
         lines.push(f(r / (size - 1), g / (size - 1), b / (size - 1)).join(' '));
   return lines.join('\n');
 }
-const warm = (r: number, g: number, b: number) => [
-  Math.min(1, r * 1.1 + 0.03),
-  g * 0.98,
-  b * 0.8,
-];
+const warm = (r: number, g: number, b: number) => [Math.min(1, r * 1.1 + 0.03), g * 0.98, b * 0.8];
 
 // ---------------- grade ----------------
 
@@ -128,7 +124,7 @@ describe('colour grade', () => {
   });
 
   it('the export filter is numbers only and names the LUT by its file', () => {
-    const f = ffmpegGrade({ gain: { m: 0.2 }, lut: 'C:/evil\':x.cube' }, 'lut0.cube');
+    const f = ffmpegGrade({ gain: { m: 0.2 }, lut: "C:/evil':x.cube" }, 'lut0.cube');
     expect(f[0]).toMatch(/^lutrgb=r='[^']+':g='[^']+':b='[^']+'$/);
     expect(f[1]).toBe('lut3d=file=lut0.cube:interp=trilinear');
     // A bad file name is never put in the graph.
@@ -157,9 +153,7 @@ describe('.cube LUTs', () => {
   });
 
   it('honours DOMAIN_MIN / DOMAIN_MAX and survives a round trip', () => {
-    const l = parseCube(
-      cube(2, (r, g, b) => [r, g, b], 'DOMAIN_MIN 0 0 0\nDOMAIN_MAX 2 2 2'),
-    );
+    const l = parseCube(cube(2, (r, g, b) => [r, g, b], 'DOMAIN_MIN 0 0 0\nDOMAIN_MAX 2 2 2'));
     // Input 1 is half way through a 0…2 domain: the 2-point identity gives 0.5.
     expect(applyLut(l, 1, 1, 1)[0]).toBeCloseTo(0.5, 6);
     const again = parseCube(serializeCube(l));
@@ -378,12 +372,19 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 12 with FFmpeg', () => {
       ...newProject({ width: 160, height: 90, fps: 30, name: 'grade' }),
       media: [{ ...m, hasAudio: false }],
     };
-    p = insertMedia(p, p.media[0]!, { trackId: p.tracks.find((t) => t.name === 'V1')!.id, start: 0 })
-      .project;
+    p = insertMedia(p, p.media[0]!, {
+      trackId: p.tracks.find((t) => t.name === 'V1')!.id,
+      start: 0,
+    }).project;
     const grade = { lift: { m: 0.1 }, gamma: { r: 0.2 }, gain: { b: -0.2 }, temperature: 0.3 };
     p = setGrade(p, new Set([p.clips[0]!.id]), { ...grade, lut: lutPath, lutMix: 0.7 });
     const out = join(dir, 'grade.mp4');
-    const job = await exportJob(svc, p, { width: 160, height: 90, crf: 0, preset: 'veryfast' }, out);
+    const job = await exportJob(
+      svc,
+      p,
+      { width: 160, height: 90, crf: 0, preset: 'veryfast' },
+      out,
+    );
     expect(job.state, job.error).toBe('done');
     const frame = (file: string) =>
       sh(['-ss', '0.5', '-i', file, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-']);
@@ -418,15 +419,22 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 12 with FFmpeg', () => {
       ...newProject({ width: 320, height: 180, fps: 30, name: 'acc' }),
       media: [m],
     };
-    p = insertMedia(p, p.media[0]!, { trackId: p.tracks.find((t) => t.name === 'V1')!.id, start: 0 })
-      .project;
+    p = insertMedia(p, p.media[0]!, {
+      trackId: p.tracks.find((t) => t.name === 'V1')!.id,
+      start: 0,
+    }).project;
     const id = p.clips[0]!.id;
     p = setKey(p, id, 'scale', 0, 1);
     p = setKey(p, id, 'scale', 5, 1.5);
     p = setGrade(p, new Set([id]), { lut: lutPath });
     expect(Object.keys(await prepareLuts(p, dir))).toEqual([`1|${lutPath}`]);
     const out = join(dir, 'acc.mp4');
-    const job = await exportJob(svc, p, { width: 320, height: 180, preset: 'veryfast', loudness: -14 }, out);
+    const job = await exportJob(
+      svc,
+      p,
+      { width: 320, height: 180, preset: 'veryfast', loudness: -14 },
+      out,
+    );
     expect(job.state, job.error).toBe('done');
     const r = spawnSync(tools.ffmpeg!, [
       ...['-hide_banner', '-nostats', '-i', out, '-af', 'ebur128', '-f', 'null', '-'],

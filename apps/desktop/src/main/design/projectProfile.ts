@@ -33,7 +33,10 @@ export const MAX_PAGES = 100;
 
 /** Friendly name of a page from its file ("acerca-de.html" → "Acerca de"). */
 export function pageName(file: string): string {
-  const base = file.split('/').pop()!.replace(/\.html?$/i, '');
+  const base = file
+    .split('/')
+    .pop()!
+    .replace(/\.html?$/i, '');
   if (base.toLowerCase() === 'index') {
     const dir = file.split('/').slice(-2, -1)[0];
     return dir ? pageName(`${dir}.html`) : 'Inicio';
@@ -178,10 +181,14 @@ export function builtPages(files: string[], dir: string): DesignPage[] {
  * changes nothing that shows.
  */
 export function isBundlerEntry(html: string): boolean {
-  return /<script\b[^>]*\btype\s*=\s*["']?module["']?[^>]*\bsrc\s*=\s*["']?[^"'\s>]*\.(tsx?|jsx|vue|svelte)\b/i.test(
-    html,
-  ) ||
-    /<script\b[^>]*\bsrc\s*=\s*["']?[^"'\s>]*\.(tsx?|jsx|vue|svelte)\b[^>]*\btype\s*=\s*["']?module/i.test(html);
+  return (
+    /<script\b[^>]*\btype\s*=\s*["']?module["']?[^>]*\bsrc\s*=\s*["']?[^"'\s>]*\.(tsx?|jsx|vue|svelte)\b/i.test(
+      html,
+    ) ||
+    /<script\b[^>]*\bsrc\s*=\s*["']?[^"'\s>]*\.(tsx?|jsx|vue|svelte)\b[^>]*\btype\s*=\s*["']?module/i.test(
+      html,
+    )
+  );
 }
 
 type Framework = Omit<DesignApp, 'dir' | 'built'>;
@@ -264,13 +271,22 @@ export function detectProfile(
       return f ? appOf(dir, f) : null;
     })
     .filter((a): a is DesignApp => a !== null)
-    .sort((a, b) => a.dir.split('/').length - b.dir.split('/').length || a.dir.localeCompare(b.dir));
+    .sort(
+      (a, b) => a.dir.split('/').length - b.dir.split('/').length || a.dir.localeCompare(b.dir),
+    );
   const web = (a: DesignApp) => a.kind !== 'desktop';
 
   if (root) {
     const app = appOf('', root);
     const apps = [app, ...nested].filter(web);
-    return { kind: root.kind, label: root.label, editable: false, devUrl: root.devUrl ?? undefined, pages: [], apps };
+    return {
+      kind: root.kind,
+      label: root.label,
+      editable: false,
+      devUrl: root.devUrl ?? undefined,
+      pages: [],
+      apps,
+    };
   }
 
   // Pages inside an app of a monorepo belong to that app (its entry or its public/ folder).

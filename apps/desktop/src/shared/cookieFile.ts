@@ -88,7 +88,8 @@ function make(
   // "__Secure-" and "__Host-" cookies are only taken when Secure (and __Host- host-only on "/").
   if (/^__(Secure|Host)-/.test(raw.name)) secure = true;
   const hostCookie = raw.name.startsWith('__Host-');
-  const hostOnly = hostCookie || raw.hostOnly === true || (raw.hostOnly == null && !domainRaw.startsWith('.'));
+  const hostOnly =
+    hostCookie || raw.hostOnly === true || (raw.hostOnly == null && !domainRaw.startsWith('.'));
   const cookie: ImportCookie = {
     url: `${secure ? 'https' : 'http'}://${host}${hostCookie ? '/' : path}`,
     name: raw.name,

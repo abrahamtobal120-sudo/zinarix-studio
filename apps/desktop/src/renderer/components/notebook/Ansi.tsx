@@ -12,7 +12,13 @@ const MAX_STYLED = 300_000;
 export const AnsiText = memo(function AnsiText({ text }: { text: string }) {
   if (!text.includes('\u001b')) return <>{text}</>;
   if (text.length > MAX_STYLED)
-    return <>{ansiSpans(text).map((s) => s.text).join('')}</>;
+    return (
+      <>
+        {ansiSpans(text)
+          .map((s) => s.text)
+          .join('')}
+      </>
+    );
   return (
     <>
       {ansiSpans(text).map((s, i) => {
@@ -28,7 +34,11 @@ export const AnsiText = memo(function AnsiText({ text }: { text: string }) {
         if (s.underline) cls.push('ansi-u');
         if (!cls.length && !style.color && !style.background) return s.text;
         return (
-          <span key={i} className={cls.join(' ') || undefined} style={style.color || style.background ? style : undefined}>
+          <span
+            key={i}
+            className={cls.join(' ') || undefined}
+            style={style.color || style.background ? style : undefined}
+          >
             {s.text}
           </span>
         );

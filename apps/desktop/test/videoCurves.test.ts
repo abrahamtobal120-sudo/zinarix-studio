@@ -25,16 +25,43 @@ const tools = findFfmpeg(appRoot);
 
 describe('RGB curves', () => {
   it('a straight curve is dropped; ends are added and points sorted', () => {
-    expect(cleanCurve([[0, 0], [0.5, 0.5], [1, 1]])).toBeUndefined();
-    expect(cleanGrade({ curves: { m: [[0, 0], [1, 1]] } })).toBeUndefined();
-    expect(cleanCurve([[0.7, 0.8], [0.3, 0.2]])).toEqual([
+    expect(
+      cleanCurve([
+        [0, 0],
+        [0.5, 0.5],
+        [1, 1],
+      ]),
+    ).toBeUndefined();
+    expect(
+      cleanGrade({
+        curves: {
+          m: [
+            [0, 0],
+            [1, 1],
+          ],
+        },
+      }),
+    ).toBeUndefined();
+    expect(
+      cleanCurve([
+        [0.7, 0.8],
+        [0.3, 0.2],
+      ]),
+    ).toEqual([
       [0, 0.2],
       [0.3, 0.2],
       [0.7, 0.8],
       [1, 0.8],
     ]);
     // Out of range, too close together, junk.
-    expect(cleanCurve([[-1, 2], [0.005, 0.5], [0.5, 'x'], [1, 1]])).toEqual([
+    expect(
+      cleanCurve([
+        [-1, 2],
+        [0.005, 0.5],
+        [0.5, 'x'],
+        [1, 1],
+      ]),
+    ).toEqual([
       [0, 1],
       [1, 1],
     ]);
@@ -43,7 +70,13 @@ describe('RGB curves', () => {
   });
 
   it('the spline goes through its points and never overshoots', () => {
-    const pts = cleanCurve([[0, 0], [0.25, 0.1], [0.5, 0.9], [0.75, 0.92], [1, 1]])!;
+    const pts = cleanCurve([
+      [0, 0],
+      [0.25, 0.1],
+      [0.5, 0.9],
+      [0.75, 0.92],
+      [1, 1],
+    ])!;
     const segs = curveSegments(pts);
     for (const [x, y] of pts) expect(splineAt(segs, x)).toBeCloseTo(y, 5);
     let prev = -1;
@@ -62,7 +95,15 @@ describe('RGB curves', () => {
     expect(r[50]!).toBeLessThan(50);
     expect(r[200]!).toBeGreaterThan(200);
     expect(Array.from(g)).toEqual(Array.from(r));
-    const [r2, g2, b2] = gradeTables({ curves: { b: [[0, 0], [0.5, 0.7], [1, 1]] } });
+    const [r2, g2, b2] = gradeTables({
+      curves: {
+        b: [
+          [0, 0],
+          [0.5, 0.7],
+          [1, 1],
+        ],
+      },
+    });
     expect(b2[128]!).toBeGreaterThan(160);
     expect(r2[128]).toBe(128);
     expect(g2[128]).toBe(128);
@@ -70,12 +111,26 @@ describe('RGB curves', () => {
   });
 
   it('curves count as a grade, are checked when loading and kept by cleanGrade', () => {
-    const g: ColorGrade = { curves: { m: [[0, 0.1], [1, 1]] } };
+    const g: ColorGrade = {
+      curves: {
+        m: [
+          [0, 0.1],
+          [1, 1],
+        ],
+      },
+    };
     expect(gradeHasCurves(g)).toBe(true);
     expect(validGrade(g)).toBe(true);
     expect(validGrade({ curves: { m: [[0, 'x']] } })).toBe(false);
     expect(validGrade({ curves: [] })).toBe(false);
-    expect(cleanGrade(g)).toEqual({ curves: { m: [[0, 0.1], [1, 1]] } });
+    expect(cleanGrade(g)).toEqual({
+      curves: {
+        m: [
+          [0, 0.1],
+          [1, 1],
+        ],
+      },
+    });
     // Without curves the export expression is exactly the old one.
     expect(ffmpegGrade({ gain: { m: 0.2 } })[0]).not.toContain('ld(0)');
     expect(ffmpegGrade(g)[0]).toMatch(/^lutrgb=r='[^']+':g='[^']+':b='[^']+'$/);
@@ -95,10 +150,26 @@ describe.skipIf(!tools.ffmpeg)('RGB curves with FFmpeg', () => {
     const r = spawnSync(
       tools.ffmpeg!,
       [
-        '-v', 'error', '-y',
-        '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', '256x1', '-i', 'in.raw',
-        '-filter_complex_script', 'graph.txt', '-map', '[o]',
-        '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'out.raw',
+        '-v',
+        'error',
+        '-y',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        '-s',
+        '256x1',
+        '-i',
+        'in.raw',
+        '-filter_complex_script',
+        'graph.txt',
+        '-map',
+        '[o]',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        'out.raw',
       ],
       { cwd: dir, encoding: 'utf8' },
     );
@@ -110,8 +181,40 @@ describe.skipIf(!tools.ffmpeg)('RGB curves with FFmpeg', () => {
 
   it.each([
     ['S curve', { curves: { m: CURVE_PRESETS[1]!.pts } }],
-    ['faded blacks + blue channel', { curves: { m: CURVE_PRESETS[2]!.pts, b: [[0, 0.05], [0.4, 0.55], [1, 0.9]] } }],
-    ['wheels + curves', { lift: { m: 0.1 }, gamma: { r: 0.2 }, temperature: 0.3, curves: { m: [[0, 0], [0.3, 0.2], [0.6, 0.75], [1, 1]], g: [[0, 0], [0.5, 0.45], [1, 1]] } }],
+    [
+      'faded blacks + blue channel',
+      {
+        curves: {
+          m: CURVE_PRESETS[2]!.pts,
+          b: [
+            [0, 0.05],
+            [0.4, 0.55],
+            [1, 0.9],
+          ],
+        },
+      },
+    ],
+    [
+      'wheels + curves',
+      {
+        lift: { m: 0.1 },
+        gamma: { r: 0.2 },
+        temperature: 0.3,
+        curves: {
+          m: [
+            [0, 0],
+            [0.3, 0.2],
+            [0.6, 0.75],
+            [1, 1],
+          ],
+          g: [
+            [0, 0],
+            [0.5, 0.45],
+            [1, 1],
+          ],
+        },
+      },
+    ],
   ] as [string, ColorGrade][])('preview = export: %s', (_, g) => {
     const want = gradeTables(g).map((t) => Array.from(t));
     const got = render(g);
@@ -125,7 +228,16 @@ describe('video_color (AI tool)', async () => {
   const { VIDEO_TOOLS } = await import('../src/main/videoTools.js');
   const mk = () => {
     let p = newProject({ name: 'c' });
-    const m = { id: 'm1', name: 'a.mp4', path: 'C:/a.mp4', kind: 'video', duration: 10, width: 1920, height: 1080, hasAudio: true } as never;
+    const m = {
+      id: 'm1',
+      name: 'a.mp4',
+      path: 'C:/a.mp4',
+      kind: 'video',
+      duration: 10,
+      width: 1920,
+      height: 1080,
+      hasAudio: true,
+    } as never;
     p = { ...p, media: [m] };
     return insertMedia(p, m, { trackId: p.tracks[0]!.id, start: 0 }).project;
   };
@@ -138,12 +250,24 @@ describe('video_color (AI tool)', async () => {
     const g1 = a.project.clips[0]!.color!;
     expect(g1.temperature).toBeGreaterThan(0);
     expect(g1.curves?.m).toBeDefined();
-    const b = colorGrade(a.project, { clips: [id], gain: { r: 0.1 }, curves: { b: [[0, 0.05], [1, 1]] } });
+    const b = colorGrade(a.project, {
+      clips: [id],
+      gain: { r: 0.1 },
+      curves: {
+        b: [
+          [0, 0.05],
+          [1, 1],
+        ],
+      },
+    });
     if (!('project' in b)) throw new Error(b.error);
     const g2 = b.project.clips[0]!.color!;
     expect(g2.temperature).toBe(g1.temperature);
     expect(g2.gain?.r).toBe(0.1);
-    expect(g2.curves?.b).toEqual([[0, 0.05], [1, 1]]);
+    expect(g2.curves?.b).toEqual([
+      [0, 0.05],
+      [1, 1],
+    ]);
     expect(g2.curves?.m).toEqual(g1.curves?.m);
     expect(validProject(b.project)).toBe(true);
     const c = colorGrade(b.project, { curves: { m: [] } });

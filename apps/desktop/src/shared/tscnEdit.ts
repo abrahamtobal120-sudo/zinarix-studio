@@ -8,7 +8,8 @@ import { balanced, godotString, headerAttrs } from './games.js';
  * and the AI edit the same document the user sees and can undo it. Bad input throws.
  */
 
-const HEAD = /^\[(gd_scene|gd_resource|ext_resource|sub_resource|node|connection|editable|resource)\b/;
+const HEAD =
+  /^\[(gd_scene|gd_resource|ext_resource|sub_resource|node|connection|editable|resource)\b/;
 
 interface Sec {
   kind: string;
@@ -102,7 +103,10 @@ function normPath(path: string): string {
 
 /** Rewrites one attribute of a header (adds it before "]" when missing). */
 function setAttr(d: Doc, s: Sec, key: string, raw: string): void {
-  let header = d.lines.slice(s.start, s.body).map((l) => l.trim()).join(' ');
+  let header = d.lines
+    .slice(s.start, s.body)
+    .map((l) => l.trim())
+    .join(' ');
   const re = new RegExp(`(\\b${key}\\s*=\\s*)("(?:[^"\\\\]|\\\\.)*"|[^\\s\\]]+)`);
   if (re.test(header)) header = header.replace(re, (_m, a: string) => `${a}${raw}`);
   else header = header.replace(/\]\s*$/, ` ${key}=${raw}]`);
@@ -145,7 +149,13 @@ export function validGodotValue(v: unknown): v is string {
 
 /** Godot forbids . : @ / " % in node names. */
 export function validNodeName(n: unknown): n is string {
-  return typeof n === 'string' && n.trim() === n && n.length > 0 && n.length <= 100 && !/[.:@/"%\[\]\r\n\\]/.test(n);
+  return (
+    typeof n === 'string' &&
+    n.trim() === n &&
+    n.length > 0 &&
+    n.length <= 100 &&
+    !/[.:@/"%\[\]\r\n\\]/.test(n)
+  );
 }
 
 export function validNodeType(t: unknown): t is string {
@@ -156,7 +166,8 @@ export function validSignalName(s: unknown): s is string {
   return typeof s === 'string' && /^[A-Za-z_]\w{0,99}$/.test(s);
 }
 
-export type ValueKind = 'bool' | 'int' | 'float' | 'string' | 'color' | 'vector2' | 'vector3' | 'other';
+export type ValueKind =
+  'bool' | 'int' | 'float' | 'string' | 'color' | 'vector2' | 'vector3' | 'other';
 
 export function valueKind(v: string): ValueKind {
   const t = v.trim();
@@ -195,7 +206,10 @@ export function colorFromHex(hex: string, alpha = 1): string {
 
 export function hexFromColor(v: string): { hex: string; alpha: number } {
   const [r = 0, g = 0, b = 0, a = 1] = valueNumbers(v);
-  const c = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0');
+  const c = (x: number) =>
+    Math.round(Math.max(0, Math.min(1, x)) * 255)
+      .toString(16)
+      .padStart(2, '0');
   return { hex: `#${c(r)}${c(g)}${c(b)}`, alpha: Math.max(0, Math.min(1, a)) };
 }
 
@@ -207,7 +221,8 @@ export function valueLike(like: string, typed: string): string {
       if (/^-?\d+$/.test(t)) return t;
       break;
     case 'float':
-      if (t !== '' && Number.isFinite(Number(t))) return /[.e]/i.test(t) ? t : godotFloat(Number(t));
+      if (t !== '' && Number.isFinite(Number(t)))
+        return /[.e]/i.test(t) ? t : godotFloat(Number(t));
       break;
     case 'string':
       if (!/^"/.test(t)) return godotQuote(typed);
@@ -221,7 +236,10 @@ export function valueLike(like: string, typed: string): string {
 /** Sets (value) or removes (null) a property of a node; value is a raw Godot value. */
 export function setNodeProp(text: string, path: string, key: string, value: string | null): string {
   if (!validPropKey(key)) throw new Error(`Bad property name "${key}".`);
-  if (value !== null && !validGodotValue(value)) throw new Error(`Bad value for ${key}: one Godot value on one line (e.g. 1.0, "text", Vector2(10, 20), Color(1, 0, 0, 1)).`);
+  if (value !== null && !validGodotValue(value))
+    throw new Error(
+      `Bad value for ${key}: one Godot value on one line (e.g. 1.0, "text", Vector2(10, 20), Color(1, 0, 0, 1)).`,
+    );
   const d = load(text);
   const s = node(d, path);
   const have = props(d, s).find((p) => p.key === key);
@@ -233,13 +251,16 @@ export function setNodeProp(text: string, path: string, key: string, value: stri
     const at = bodyEnd(d, s);
     d.lines.splice(at, 0, line);
     // A section that was only a header followed directly by the next one: keep a blank line.
-    if (at === s.end && at < d.lines.length - 1 && d.lines[at + 1]!.trim()) d.lines.splice(at + 1, 0, '');
+    if (at === s.end && at < d.lines.length - 1 && d.lines[at + 1]!.trim())
+      d.lines.splice(at + 1, 0, '');
   } else return text;
   return save(d);
 }
 
 function children(d: Doc, path: string): Sec[] {
-  return nodes(d).filter((n) => n.path !== path && (path === '.' ? n.path !== '.' : n.path!.startsWith(`${path}/`)));
+  return nodes(d).filter(
+    (n) => n.path !== path && (path === '.' ? n.path !== '.' : n.path!.startsWith(`${path}/`)),
+  );
 }
 
 function directChildren(d: Doc, path: string): Sec[] {
@@ -258,7 +279,8 @@ export function addNode(
   initial: Record<string, string> = {},
 ): { text: string; path: string } {
   if (!validNodeName(name)) throw new Error(`Bad node name "${name}" (no . : @ / " %).`);
-  if (!validNodeType(type)) throw new Error(`Bad node class "${type}" (like Sprite2D, CollisionShape2D, Label).`);
+  if (!validNodeType(type))
+    throw new Error(`Bad node class "${type}" (like Sprite2D, CollisionShape2D, Label).`);
   for (const [k, v] of Object.entries(initial)) {
     if (!validPropKey(k)) throw new Error(`Bad property name "${k}".`);
     if (!validGodotValue(v)) throw new Error(`Bad value for ${k}.`);
@@ -271,7 +293,11 @@ export function addNode(
   const block = [par, ...children(d, pp)];
   const last = block.reduce((a, b) => (b.start > a.start ? b : a));
   const at = bodyEnd(d, last);
-  const lines = ['', `[node name=${godotQuote(name)} type=${godotQuote(type)} parent=${godotQuote(pp)}]`, ...Object.entries(initial).map(([k, v]) => `${k} = ${v.trim()}`)];
+  const lines = [
+    '',
+    `[node name=${godotQuote(name)} type=${godotQuote(type)} parent=${godotQuote(pp)}]`,
+    ...Object.entries(initial).map(([k, v]) => `${k} = ${v.trim()}`),
+  ];
   d.lines.splice(at, 0, ...lines);
   return { text: save(d), path: pp === '.' ? name : `${pp}/${name}` };
 }
@@ -341,7 +367,8 @@ export interface NodeRename {
   unique?: { old: string; now: string };
 }
 
-export const movedPath = (p: string, r: NodeRename) => (under(p, r.old) ? r.now + p.slice(r.old.length) : p);
+export const movedPath = (p: string, r: NodeRename) =>
+  under(p, r.old) ? r.now + p.slice(r.old.length) : p;
 
 /**
  * A path written in `holder` (before the rename) as it must read after it; null = unchanged.
@@ -388,7 +415,8 @@ export function sceneScripts(text: string): ScriptRef[] {
   const d = load(text);
   const ext = new Map<string, string>();
   for (const x of d.secs)
-    if (x.kind === 'ext_resource' && x.attrs.id && x.attrs.path) ext.set(godotString(x.attrs.id), godotString(x.attrs.path));
+    if (x.kind === 'ext_resource' && x.attrs.id && x.attrs.path)
+      ext.set(godotString(x.attrs.id), godotString(x.attrs.path));
   const out: ScriptRef[] = [];
   for (const n of nodes(d))
     for (const p of props(d, n)) {
@@ -407,7 +435,11 @@ const IDENT_PATH = /^[A-Za-z_]\w*(?:\/[A-Za-z_]\w*)*$/;
  * %Unique, get_node / get_node_or_null / has_node("…"), NodePath("…") and ^"…". Comments are
  * left alone. Returns the new code and how many references changed.
  */
-export function renameInScript(code: string, holder: string, r: NodeRename): { code: string; count: number } {
+export function renameInScript(
+  code: string,
+  holder: string,
+  r: NodeRename,
+): { code: string; count: number } {
   let count = 0;
   const fix = (rel: string) => {
     const n = renamedRef(rel, holder, r);
@@ -436,14 +468,19 @@ export function renameInScript(code: string, holder: string, r: NodeRename): { c
       return n === null ? m : `$${q}${n}${q}`;
     });
     // $Path/To/Node and %Unique (unquoted), outside string literals.
-    head = outsideStrings(head, (part) => part.replace(/([$%])([A-Za-z_]\w*(?:\/[A-Za-z_]\w*)*)/g, (m, sig: string, p: string, at: number, all: string) => {
-      // %Name only as a node reference (not the modulo operator: "a % b", "x%2").
-      if (sig === '%' && (!r.unique || /[\w)\]]\s*$/.test(all.slice(0, at)))) return m;
-      const n = fix(sig === '%' ? `%${p}` : p);
-      if (n === null) return m;
-      if (sig === '%') return n;
-      return IDENT_PATH.test(n) ? `$${n}` : `$"${n}"`;
-    }));
+    head = outsideStrings(head, (part) =>
+      part.replace(
+        /([$%])([A-Za-z_]\w*(?:\/[A-Za-z_]\w*)*)/g,
+        (m, sig: string, p: string, at: number, all: string) => {
+          // %Name only as a node reference (not the modulo operator: "a % b", "x%2").
+          if (sig === '%' && (!r.unique || /[\w)\]]\s*$/.test(all.slice(0, at)))) return m;
+          const n = fix(sig === '%' ? `%${p}` : p);
+          if (n === null) return m;
+          if (sig === '%') return n;
+          return IDENT_PATH.test(n) ? `$${n}` : `$"${n}"`;
+        },
+      ),
+    );
     return head + tail;
   });
   return { code: lines.join('\n'), count };
@@ -505,12 +542,18 @@ export function renameNode(
     return { text: save(d), path: '.', refs: 0 };
   }
   const parent = godotString(s.attrs.parent!);
-  if (directChildren(d, parent).some((c) => c !== s && (c.attrs.name ? godotString(c.attrs.name) : '') === name))
+  if (
+    directChildren(d, parent).some(
+      (c) => c !== s && (c.attrs.name ? godotString(c.attrs.name) : '') === name,
+    )
+  )
     throw new Error(`There is already a node called "${name}" there.`);
   const now = parent === '.' ? name : `${parent}/${name}`;
   const move = (p: string) => (under(p, old) ? now + p.slice(old.length) : p);
   const oldName = s.attrs.name ? godotString(s.attrs.name) : name;
-  const unique = props(d, s).some((p) => p.key === 'unique_name_in_owner' && /=\s*true\b/.test(d.lines[p.from]!));
+  const unique = props(d, s).some(
+    (p) => p.key === 'unique_name_in_owner' && /=\s*true\b/.test(d.lines[p.from]!),
+  );
   const rn: NodeRename = { old, now, ...(unique ? { unique: { old: oldName, now: name } } : {}) };
   let refs = 0;
   // Bottom-up so the header rewrites (which can join lines) keep the indices of the others valid.
@@ -525,10 +568,14 @@ export function renameNode(
           return `NodePath(${godotQuote(n)})`;
         });
     if (x === s) setAttr(d, x, 'name', godotQuote(name));
-    else if (x.kind === 'node' && x.attrs.parent && under(godotString(x.attrs.parent), old)) setAttr(d, x, 'parent', godotQuote(move(godotString(x.attrs.parent))));
+    else if (x.kind === 'node' && x.attrs.parent && under(godotString(x.attrs.parent), old))
+      setAttr(d, x, 'parent', godotQuote(move(godotString(x.attrs.parent))));
     else if (x.kind === 'connection') {
-      for (const k of ['to', 'from']) if (x.attrs[k] && under(godotString(x.attrs[k]!), old)) setAttr(d, x, k, godotQuote(move(godotString(x.attrs[k]!))));
-    } else if (x.kind === 'editable' && x.attrs.path && under(godotString(x.attrs.path), old)) setAttr(d, x, 'path', godotQuote(move(godotString(x.attrs.path))));
+      for (const k of ['to', 'from'])
+        if (x.attrs[k] && under(godotString(x.attrs[k]!), old))
+          setAttr(d, x, k, godotQuote(move(godotString(x.attrs[k]!))));
+    } else if (x.kind === 'editable' && x.attrs.path && under(godotString(x.attrs.path), old))
+      setAttr(d, x, 'path', godotQuote(move(godotString(x.attrs.path))));
   }
   return { text: save(d), path: now, rename: rn, refs };
 }
@@ -557,7 +604,10 @@ export function scriptRenames(before: string, renames: NodeRename[]): ScriptRena
 }
 
 /** Applies scriptRenames edits to a script's code. */
-export function applyScriptRenames(code: string, sr: ScriptRenames): { code: string; count: number } {
+export function applyScriptRenames(
+  code: string,
+  sr: ScriptRenames,
+): { code: string; count: number } {
   let c = code;
   let count = 0;
   for (const e of sr.edits) {
@@ -582,7 +632,8 @@ export function moveNode(text: string, path: string, dir: -1 | 1): string {
     return { from: Math.min(...all.map((a) => a.start)), to: Math.max(...all.map((a) => a.end)) };
   };
   const [a, b] = dir < 0 ? [span(sibs[j]!), span(s)] : [span(s), span(sibs[j]!)];
-  if (a.to !== b.from) throw new Error('The nodes are not in tree order in the file; reorder them in Godot.');
+  if (a.to !== b.from)
+    throw new Error('The nodes are not in tree order in the file; reorder them in Godot.');
   const blockA = d.lines.slice(a.from, a.to);
   const blockB = d.lines.slice(b.from, b.to);
   // Keep the blank line that ends each block where it was.
@@ -595,14 +646,28 @@ export function moveNode(text: string, path: string, dir: -1 | 1): string {
   const tb = trail(blockB);
   const coreA = blockA.slice(0, blockA.length - ta);
   const coreB = blockB.slice(0, blockB.length - tb);
-  d.lines.splice(a.from, a.to - a.from + b.to - b.from, ...coreB, ...blockA.slice(blockA.length - ta), ...coreA, ...blockB.slice(blockB.length - tb));
+  d.lines.splice(
+    a.from,
+    a.to - a.from + b.to - b.from,
+    ...coreB,
+    ...blockA.slice(blockA.length - ta),
+    ...coreA,
+    ...blockB.slice(blockB.length - tb),
+  );
   return save(d);
 }
 
 // ───────────────────────── signals and scripts ─────────────────────────
 
-export function connectSignal(text: string, signal: string, from: string, to: string, method: string): string {
-  if (!validSignalName(signal) || !validSignalName(method)) throw new Error('Bad signal or method name.');
+export function connectSignal(
+  text: string,
+  signal: string,
+  from: string,
+  to: string,
+  method: string,
+): string {
+  if (!validSignalName(signal) || !validSignalName(method))
+    throw new Error('Bad signal or method name.');
   const d = load(text);
   const f = node(d, from).path!;
   const t = node(d, to).path!;
@@ -618,12 +683,23 @@ export function connectSignal(text: string, signal: string, from: string, to: st
   let end = d.lines.length;
   while (end > 0 && !d.lines[end - 1]!.trim()) end--;
   const firstConn = !d.secs.some((x) => x.kind === 'connection');
-  d.lines.splice(end, 0, ...(firstConn || end === 0 ? [''] : []), `[connection signal=${godotQuote(signal)} from=${godotQuote(f)} to=${godotQuote(t)} method=${godotQuote(method)}]`);
+  d.lines.splice(
+    end,
+    0,
+    ...(firstConn || end === 0 ? [''] : []),
+    `[connection signal=${godotQuote(signal)} from=${godotQuote(f)} to=${godotQuote(t)} method=${godotQuote(method)}]`,
+  );
   if (d.lines[d.lines.length - 1] !== '') d.lines.push('');
   return save(d);
 }
 
-export function disconnectSignal(text: string, signal: string, from: string, to: string, method?: string): string {
+export function disconnectSignal(
+  text: string,
+  signal: string,
+  from: string,
+  to: string,
+  method?: string,
+): string {
   const d = load(text);
   const f = normPath(from);
   const t = normPath(to);
@@ -641,25 +717,35 @@ export function disconnectSignal(text: string, signal: string, from: string, to:
 }
 
 /** Adds an [ext_resource] (reusing one with the same path and type). Returns the text and its id. */
-export function addExtResource(text: string, type: string, res: string): { text: string; id: string } {
-  if (!/^res:\/\/[^"\r\n]+$/.test(res) || res.split('/').includes('..')) throw new Error(`Bad resource path "${res}" (res://…).`);
+export function addExtResource(
+  text: string,
+  type: string,
+  res: string,
+): { text: string; id: string } {
+  if (!/^res:\/\/[^"\r\n]+$/.test(res) || res.split('/').includes('..'))
+    throw new Error(`Bad resource path "${res}" (res://…).`);
   if (!validNodeType(type)) throw new Error(`Bad resource type "${type}".`);
   const d = load(text);
   const exts = d.secs.filter((x) => x.kind === 'ext_resource');
-  const same = exts.find((x) => godotString(x.attrs.path ?? '') === res && godotString(x.attrs.type ?? '') === type);
+  const same = exts.find(
+    (x) => godotString(x.attrs.path ?? '') === res && godotString(x.attrs.type ?? '') === type,
+  );
   if (same) return { text, id: godotString(same.attrs.id ?? '') };
   const ids = new Set(exts.map((x) => godotString(x.attrs.id ?? '')));
   let n = exts.length + 1;
   while (ids.has(`${n}_zs`)) n++;
   const id = `${n}_zs`;
   const line = `[ext_resource type=${godotQuote(type)} path=${godotQuote(res)} id=${godotQuote(id)}]`;
-  const after = exts.length ? exts[exts.length - 1]! : d.secs.find((x) => x.kind === 'gd_scene' || x.kind === 'gd_resource');
+  const after = exts.length
+    ? exts[exts.length - 1]!
+    : d.secs.find((x) => x.kind === 'gd_scene' || x.kind === 'gd_resource');
   if (!after) throw new Error('This is not a Godot scene (no [gd_scene] header).');
   const at = bodyEnd(d, after);
   d.lines.splice(at, 0, ...(exts.length ? [line] : ['', line]));
   // Old scenes count their resources in load_steps.
   const head = d.secs.find((x) => x.kind === 'gd_scene');
-  if (head?.attrs.load_steps && /^\d+$/.test(head.attrs.load_steps)) setAttr(d, head, 'load_steps', String(Number(head.attrs.load_steps) + 1));
+  if (head?.attrs.load_steps && /^\d+$/.test(head.attrs.load_steps))
+    setAttr(d, head, 'load_steps', String(Number(head.attrs.load_steps) + 1));
   return { text: save(d), id };
 }
 
@@ -702,10 +788,34 @@ export function parseSceneOps(raw: unknown): SceneOp[] {
     const a = (o ?? {}) as Record<string, unknown>;
     switch (a.op) {
       case 'set':
-        return { op: 'set', node: str(a.node) || '.', prop: str(a.prop), value: a.value === null ? null : typeof a.value === 'number' || typeof a.value === 'boolean' ? String(a.value) : str(a.value) };
+        return {
+          op: 'set',
+          node: str(a.node) || '.',
+          prop: str(a.prop),
+          value:
+            a.value === null
+              ? null
+              : typeof a.value === 'number' || typeof a.value === 'boolean'
+                ? String(a.value)
+                : str(a.value),
+        };
       case 'add': {
-        const p = a.props && typeof a.props === 'object' ? Object.fromEntries(Object.entries(a.props as Record<string, unknown>).map(([k, v]) => [k, typeof v === 'string' ? v : String(v)])) : undefined;
-        return { op: 'add', parent: str(a.parent) || '.', name: str(a.name), type: str(a.type), props: p };
+        const p =
+          a.props && typeof a.props === 'object'
+            ? Object.fromEntries(
+                Object.entries(a.props as Record<string, unknown>).map(([k, v]) => [
+                  k,
+                  typeof v === 'string' ? v : String(v),
+                ]),
+              )
+            : undefined;
+        return {
+          op: 'add',
+          parent: str(a.parent) || '.',
+          name: str(a.name),
+          type: str(a.type),
+          props: p,
+        };
       }
       case 'remove':
         return { op: 'remove', node: str(a.node) };
@@ -714,20 +824,40 @@ export function parseSceneOps(raw: unknown): SceneOp[] {
       case 'move':
         return { op: 'move', node: str(a.node), dir: a.dir === 'up' || a.dir === -1 ? -1 : 1 };
       case 'connect':
-        return { op: 'connect', signal: str(a.signal), from: str(a.from) || '.', to: str(a.to) || '.', method: str(a.method) };
+        return {
+          op: 'connect',
+          signal: str(a.signal),
+          from: str(a.from) || '.',
+          to: str(a.to) || '.',
+          method: str(a.method),
+        };
       case 'disconnect':
-        return { op: 'disconnect', signal: str(a.signal), from: str(a.from) || '.', to: str(a.to) || '.', method: str(a.method) || undefined };
+        return {
+          op: 'disconnect',
+          signal: str(a.signal),
+          from: str(a.from) || '.',
+          to: str(a.to) || '.',
+          method: str(a.method) || undefined,
+        };
       case 'script':
-        return { op: 'script', node: str(a.node) || '.', path: a.path === null || a.path === '' ? null : str(a.path) };
+        return {
+          op: 'script',
+          node: str(a.node) || '.',
+          path: a.path === null || a.path === '' ? null : str(a.path),
+        };
     }
-    throw new Error(`ops[${i}]: unknown op ${JSON.stringify(a.op)} (set, add, remove, rename, move, connect, disconnect, script).`);
+    throw new Error(
+      `ops[${i}]: unknown op ${JSON.stringify(a.op)} (set, add, remove, rename, move, connect, disconnect, script).`,
+    );
   });
 }
 
 export function describeSceneOp(o: SceneOp): string {
   switch (o.op) {
     case 'set':
-      return o.value === null ? `${o.node}: quitar ${o.prop}` : `${o.node}.${o.prop} = ${o.value.length > 60 ? `${o.value.slice(0, 60)}…` : o.value}`;
+      return o.value === null
+        ? `${o.node}: quitar ${o.prop}`
+        : `${o.node}.${o.prop} = ${o.value.length > 60 ? `${o.value.slice(0, 60)}…` : o.value}`;
     case 'add':
       return `añadir ${o.name} (${o.type}) en ${o.parent}`;
     case 'remove':
@@ -751,7 +881,10 @@ export function applySceneOps(text: string, ops: SceneOp[]): string {
 }
 
 /** applySceneOps, also giving the renames done (for the scripts: scriptRenames). */
-export function applySceneOpsFull(text: string, ops: SceneOp[]): { text: string; renames: NodeRename[] } {
+export function applySceneOpsFull(
+  text: string,
+  ops: SceneOp[],
+): { text: string; renames: NodeRename[] } {
   const renames: NodeRename[] = [];
   let t = text;
   ops.forEach((o, i) => {
@@ -794,11 +927,53 @@ export function applySceneOpsFull(text: string, ops: SceneOp[]): { text: string;
 
 /** Node classes offered when adding a node (any class name is accepted). */
 export const COMMON_NODE_TYPES = [
-  'Node', 'Node2D', 'Sprite2D', 'AnimatedSprite2D', 'CharacterBody2D', 'RigidBody2D', 'StaticBody2D', 'Area2D',
-  'CollisionShape2D', 'CollisionPolygon2D', 'Camera2D', 'TileMapLayer', 'Marker2D', 'Path2D', 'Line2D', 'Polygon2D',
-  'PointLight2D', 'GPUParticles2D', 'CPUParticles2D', 'AudioStreamPlayer2D', 'Timer', 'AnimationPlayer',
-  'Node3D', 'MeshInstance3D', 'CharacterBody3D', 'RigidBody3D', 'StaticBody3D', 'Area3D', 'CollisionShape3D',
-  'Camera3D', 'DirectionalLight3D', 'OmniLight3D', 'SpotLight3D', 'WorldEnvironment', 'GPUParticles3D', 'AudioStreamPlayer3D',
-  'Control', 'CanvasLayer', 'Label', 'Button', 'TextureRect', 'ColorRect', 'Panel', 'VBoxContainer', 'HBoxContainer',
-  'MarginContainer', 'ProgressBar', 'LineEdit', 'AudioStreamPlayer',
+  'Node',
+  'Node2D',
+  'Sprite2D',
+  'AnimatedSprite2D',
+  'CharacterBody2D',
+  'RigidBody2D',
+  'StaticBody2D',
+  'Area2D',
+  'CollisionShape2D',
+  'CollisionPolygon2D',
+  'Camera2D',
+  'TileMapLayer',
+  'Marker2D',
+  'Path2D',
+  'Line2D',
+  'Polygon2D',
+  'PointLight2D',
+  'GPUParticles2D',
+  'CPUParticles2D',
+  'AudioStreamPlayer2D',
+  'Timer',
+  'AnimationPlayer',
+  'Node3D',
+  'MeshInstance3D',
+  'CharacterBody3D',
+  'RigidBody3D',
+  'StaticBody3D',
+  'Area3D',
+  'CollisionShape3D',
+  'Camera3D',
+  'DirectionalLight3D',
+  'OmniLight3D',
+  'SpotLight3D',
+  'WorldEnvironment',
+  'GPUParticles3D',
+  'AudioStreamPlayer3D',
+  'Control',
+  'CanvasLayer',
+  'Label',
+  'Button',
+  'TextureRect',
+  'ColorRect',
+  'Panel',
+  'VBoxContainer',
+  'HBoxContainer',
+  'MarginContainer',
+  'ProgressBar',
+  'LineEdit',
+  'AudioStreamPlayer',
 ];

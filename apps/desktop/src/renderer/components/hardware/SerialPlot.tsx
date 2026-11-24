@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, openFile, toast, useStore } from '../../store';
 import { Icon } from '../Icon';
-import { niceTicks, plotCsv, plotRange, seriesStats, type PlotData, type PlotSample } from '../../../shared/serialPlot';
+import {
+  niceTicks,
+  plotCsv,
+  plotRange,
+  seriesStats,
+  type PlotData,
+  type PlotSample,
+} from '../../../shared/serialPlot';
 import { th } from './hardwareStrings';
 
 /**
@@ -26,7 +33,9 @@ export function SerialPlot({ data, tick }: { data: PlotData; tick: number }) {
   const root = useStore((s) => s.workspace?.root ?? null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  const [win, setWin] = useState<number>(() => Number(localStorage.getItem('zs.hw.plotWin')) || 300);
+  const [win, setWin] = useState<number>(
+    () => Number(localStorage.getItem('zs.hw.plotWin')) || 300,
+  );
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [paused, setPaused] = useState<PlotSample[] | null>(null);
   const [size, setSize] = useState({ w: 300, h: 180 });
@@ -42,13 +51,16 @@ export function SerialPlot({ data, tick }: { data: PlotData; tick: number }) {
   const series = data.series;
   const shown = series.filter((s) => !hidden.has(s));
   const colors = useMemo(() => (box.current ? palette(box.current) : []), [size.w]); // eslint-disable-line react-hooks/exhaustive-deps
-  const color = (name: string) => colors[series.indexOf(name) % Math.max(1, colors.length)] ?? 'currentColor';
+  const color = (name: string) =>
+    colors[series.indexOf(name) % Math.max(1, colors.length)] ?? 'currentColor';
   const stats = useMemo(() => seriesStats(samples, series), [samples, series]);
 
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: Math.max(120, el.clientWidth), h: Math.max(120, el.clientHeight) }));
+    const ro = new ResizeObserver(() =>
+      setSize({ w: Math.max(120, el.clientWidth), h: Math.max(120, el.clientHeight) }),
+    );
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -157,7 +169,9 @@ export function SerialPlot({ data, tick }: { data: PlotData; tick: number }) {
     try {
       const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
       const path = `serial/plot-${stamp}.csv`;
-      await api().workspace.createDir('serial').catch(() => undefined);
+      await api()
+        .workspace.createDir('serial')
+        .catch(() => undefined);
       await api().workspace.writeBytes(path, new TextEncoder().encode(plotCsv(all, series)));
       toast(th('plotSaved', { path }));
       void openFile(path);
@@ -194,7 +208,13 @@ export function SerialPlot({ data, tick }: { data: PlotData; tick: number }) {
         >
           <Icon name={paused ? 'continue' : 'pause'} size={12} />
         </button>
-        <button className="icon-btn" title={th('plotCsv')} aria-label={th('plotCsv')} disabled={!root || !data.samples.length} onClick={() => void saveCsv()}>
+        <button
+          className="icon-btn"
+          title={th('plotCsv')}
+          aria-label={th('plotCsv')}
+          disabled={!root || !data.samples.length}
+          onClick={() => void saveCsv()}
+        >
           <Icon name="download" size={12} />
         </button>
       </div>
@@ -205,13 +225,21 @@ export function SerialPlot({ data, tick }: { data: PlotData; tick: number }) {
           if (!samples.length) return;
           const r = e.currentTarget.getBoundingClientRect();
           const { left, right } = plotX.current;
-          const f = Math.max(0, Math.min(1, (e.clientX - r.left - left) / Math.max(1, right - left)));
+          const f = Math.max(
+            0,
+            Math.min(1, (e.clientX - r.left - left) / Math.max(1, right - left)),
+          );
           const n = samples[0]!.n + Math.round(f * Math.max(1, Math.min(win, samples.length) - 1));
           setHover(Math.min(samples[samples.length - 1]!.n, n));
         }}
         onMouseLeave={() => setHover(null)}
       >
-        <canvas ref={canvas} style={{ width: size.w, height: size.h }} aria-label={th('plot')} role="img" />
+        <canvas
+          ref={canvas}
+          style={{ width: size.w, height: size.h }}
+          aria-label={th('plot')}
+          role="img"
+        />
         {!data.samples.length && <div className="hw-plotempty">{th('plotEmpty')}</div>}
       </div>
       {!!series.length && (
@@ -231,9 +259,15 @@ export function SerialPlot({ data, tick }: { data: PlotData; tick: number }) {
                 })
               }
             >
-              <span className="hw-swatch" style={{ background: color(st.name) }} aria-hidden="true" />
+              <span
+                className="hw-swatch"
+                style={{ background: color(st.name) }}
+                aria-hidden="true"
+              />
               <span className="hw-lgname">{st.name}</span>
-              <span className="hw-lgval">{fmt(hovered ? hovered.values[st.name] ?? Number.NaN : st.last)}</span>
+              <span className="hw-lgval">
+                {fmt(hovered ? (hovered.values[st.name] ?? Number.NaN) : st.last)}
+              </span>
             </button>
           ))}
         </div>

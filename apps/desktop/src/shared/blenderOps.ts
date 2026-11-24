@@ -23,10 +23,20 @@ export const BLENDER_PRIMITIVES = [
 const MOD_SETTINGS = {
   bevel: { width: 'num', segments: 'int', angle: 'deg', limit: ['NONE', 'ANGLE', 'WEIGHT'] },
   subsurf: { levels: 'int', render_levels: 'int' },
-  mirror: { axis: ['X', 'Y', 'Z', 'XY', 'XZ', 'YZ', 'XYZ'], bisect: 'bool', clip: 'bool', object: 'obj' },
+  mirror: {
+    axis: ['X', 'Y', 'Z', 'XY', 'XZ', 'YZ', 'XYZ'],
+    bisect: 'bool',
+    clip: 'bool',
+    object: 'obj',
+  },
   array: { count: 'int', offset: 'vec3', constant: 'vec3', merge: 'bool' },
   solidify: { thickness: 'num', offset: 'num', even: 'bool' },
-  boolean: { operation: ['DIFFERENCE', 'UNION', 'INTERSECT'], object: 'obj', solver: ['EXACT', 'FLOAT', 'MANIFOLD'], hide_cutter: 'bool' },
+  boolean: {
+    operation: ['DIFFERENCE', 'UNION', 'INTERSECT'],
+    object: 'obj',
+    solver: ['EXACT', 'FLOAT', 'MANIFOLD'],
+    hide_cutter: 'bool',
+  },
   decimate: { ratio: 'num' },
   remesh: { voxel_size: 'num', smooth: 'bool' },
   smooth: { factor: 'num', iterations: 'int' },
@@ -76,19 +86,27 @@ function err(i: number, op: string, msg: string): never {
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
-function vec3(v: unknown, i: number, op: string, what: string, lim = 1e6): [number, number, number] {
+function vec3(
+  v: unknown,
+  i: number,
+  op: string,
+  what: string,
+  lim = 1e6,
+): [number, number, number] {
   if (!Array.isArray(v) || v.length !== 3 || !v.every(isNum) || v.some((x) => Math.abs(x) > lim))
     err(i, op, `"${what}" must be [x, y, z] numbers`);
   return v as [number, number, number];
 }
 
 function name(v: unknown, i: number, op: string, what = 'object'): string {
-  if (typeof v !== 'string' || !OBJ_NAME.test(v)) err(i, op, `"${what}" must be an object name (1–63 characters)`);
+  if (typeof v !== 'string' || !OBJ_NAME.test(v))
+    err(i, op, `"${what}" must be an object name (1–63 characters)`);
   return v;
 }
 
 function num(v: unknown, i: number, op: string, what: string, min: number, max: number): number {
-  if (!isNum(v) || v < min || v > max) err(i, op, `"${what}" must be a number from ${min} to ${max}`);
+  if (!isNum(v) || v < min || v > max)
+    err(i, op, `"${what}" must be a number from ${min} to ${max}`);
   return v;
 }
 
@@ -118,7 +136,8 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
     if (!r || typeof r !== 'object') err(i, '?', 'must be an object');
     const a = r as Record<string, unknown>;
     const op = String(a.op ?? '');
-    if (!(BLENDER_OP_NAMES as readonly string[]).includes(op)) err(i, op || '?', `unknown op; use ${BLENDER_OP_NAMES.join(', ')}`);
+    if (!(BLENDER_OP_NAMES as readonly string[]).includes(op))
+      err(i, op || '?', `unknown op; use ${BLENDER_OP_NAMES.join(', ')}`);
     const out: Record<string, unknown> = { op };
     const tf = () => {
       if (a.location !== undefined) out.location = vec3(a.location, i, op, 'location');
@@ -128,13 +147,16 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
     switch (op) {
       case 'add': {
         const t = String(a.type ?? '');
-        if (!(BLENDER_PRIMITIVES as readonly string[]).includes(t)) err(i, op, `"type" must be ${BLENDER_PRIMITIVES.join('|')}`);
+        if (!(BLENDER_PRIMITIVES as readonly string[]).includes(t))
+          err(i, op, `"type" must be ${BLENDER_PRIMITIVES.join('|')}`);
         out.type = t;
         if (a.name !== undefined) out.name = name(a.name, i, op, 'name');
         if (a.size !== undefined) out.size = num(a.size, i, op, 'size', 1e-6, 1e5);
-        if (a.segments !== undefined) out.segments = Math.round(num(a.segments, i, op, 'segments', 3, 256));
+        if (a.segments !== undefined)
+          out.segments = Math.round(num(a.segments, i, op, 'segments', 3, 256));
         if (t === 'text') {
-          if (typeof a.text !== 'string' || !a.text || a.text.length > 200) err(i, op, '"text" (1–200 characters) is required');
+          if (typeof a.text !== 'string' || !a.text || a.text.length > 200)
+            err(i, op, '"text" (1–200 characters) is required');
           out.text = a.text;
           if (a.extrude !== undefined) out.extrude = num(a.extrude, i, op, 'extrude', 0, 1e3);
         }
@@ -144,7 +166,8 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
       case 'transform':
         out.object = name(a.object, i, op);
         tf();
-        if (!('location' in out || 'rotation' in out || 'scale' in out)) err(i, op, 'give location, rotation and/or scale');
+        if (!('location' in out || 'rotation' in out || 'scale' in out))
+          err(i, op, 'give location, rotation and/or scale');
         break;
       case 'delete':
         out.object = name(a.object, i, op);
@@ -167,10 +190,16 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
         const spec = MOD_SETTINGS[type] as Record<string, string | readonly string[]>;
         const set: Record<string, unknown> = {};
         const given = (a.settings ?? {}) as Record<string, unknown>;
-        if (typeof given !== 'object' || Array.isArray(given)) err(i, op, '"settings" must be an object');
+        if (typeof given !== 'object' || Array.isArray(given))
+          err(i, op, '"settings" must be an object');
         for (const [k, v] of Object.entries(given)) {
           const kind = spec[k];
-          if (!kind) err(i, op, `${type} has no setting "${k}" (it takes: ${Object.keys(spec).join(', ') || 'none'})`);
+          if (!kind)
+            err(
+              i,
+              op,
+              `${type} has no setting "${k}" (it takes: ${Object.keys(spec).join(', ') || 'none'})`,
+            );
           if (Array.isArray(kind)) {
             const up = String(v).toUpperCase();
             if (!kind.includes(up)) err(i, op, `"${k}" must be ${kind.join('|')}`);
@@ -186,9 +215,12 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
         }
         if (type === 'subsurf' && ((set.levels as number) > 6 || (set.render_levels as number) > 6))
           err(i, op, 'subsurf levels go up to 6');
-        if (type === 'array' && (set.count as number) > 1000) err(i, op, 'array count goes up to 1000');
-        if (type === 'boolean' && !set.object) err(i, op, 'boolean needs "object" (the cutter) in settings');
-        if (type === 'remesh' && set.voxel_size !== undefined && (set.voxel_size as number) <= 0) err(i, op, 'voxel_size must be > 0');
+        if (type === 'array' && (set.count as number) > 1000)
+          err(i, op, 'array count goes up to 1000');
+        if (type === 'boolean' && !set.object)
+          err(i, op, 'boolean needs "object" (the cutter) in settings');
+        if (type === 'remesh' && set.voxel_size !== undefined && (set.voxel_size as number) <= 0)
+          err(i, op, 'voxel_size must be > 0');
         out.settings = set;
         break;
       }
@@ -199,7 +231,8 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
       case 'apply':
         out.object = name(a.object, i, op);
         if (a.modifiers !== undefined) {
-          if (!Array.isArray(a.modifiers)) err(i, op, '"modifiers" must be a list of modifier names');
+          if (!Array.isArray(a.modifiers))
+            err(i, op, '"modifiers" must be a list of modifier names');
           out.modifiers = a.modifiers.map((m) => name(m, i, op, 'modifiers'));
         }
         break;
@@ -211,9 +244,13 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
         if (a.roughness !== undefined) out.roughness = num(a.roughness, i, op, 'roughness', 0, 1);
         if (a.alpha !== undefined) out.alpha = num(a.alpha, i, op, 'alpha', 0, 1);
         if (a.emission !== undefined) out.emission = color(a.emission, i, op, 'emission');
-        if (a.emission_strength !== undefined) out.emission_strength = num(a.emission_strength, i, op, 'emission_strength', 0, 1000);
+        if (a.emission_strength !== undefined)
+          out.emission_strength = num(a.emission_strength, i, op, 'emission_strength', 0, 1000);
         if (a.texture !== undefined) {
-          if (typeof a.texture !== 'string' || !/\.(png|jpe?g|webp|tga|exr|hdr|bmp|tiff?)$/i.test(a.texture))
+          if (
+            typeof a.texture !== 'string' ||
+            !/\.(png|jpe?g|webp|tga|exr|hdr|bmp|tiff?)$/i.test(a.texture)
+          )
             err(i, op, '"texture" must be an image file');
           out.texture = resolve(a.texture, 'texture');
         }
@@ -222,7 +259,8 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
       case 'uv': {
         out.object = name(a.object, i, op);
         const m = String(a.method ?? 'smart');
-        if (!(UV_METHODS as readonly string[]).includes(m)) err(i, op, `"method" must be ${UV_METHODS.join('|')}`);
+        if (!(UV_METHODS as readonly string[]).includes(m))
+          err(i, op, `"method" must be ${UV_METHODS.join('|')}`);
         out.method = m;
         if (a.angle !== undefined) out.angle = num(a.angle, i, op, 'angle', 1, 89);
         if (a.margin !== undefined) out.margin = num(a.margin, i, op, 'margin', 0, 1);
@@ -237,19 +275,22 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
       case 'origin': {
         out.object = name(a.object, i, op);
         const to = String(a.to ?? 'geometry');
-        if (!['geometry', 'bottom', 'world'].includes(to)) err(i, op, '"to" must be geometry|bottom|world');
+        if (!['geometry', 'bottom', 'world'].includes(to))
+          err(i, op, '"to" must be geometry|bottom|world');
         out.to = to;
         break;
       }
       case 'join':
-        if (!Array.isArray(a.objects) || a.objects.length < 2) err(i, op, '"objects" must list 2 or more names');
+        if (!Array.isArray(a.objects) || a.objects.length < 2)
+          err(i, op, '"objects" must list 2 or more names');
         out.objects = a.objects.map((o) => name(o, i, op, 'objects'));
         if (a.name !== undefined) out.name = name(a.name, i, op, 'name');
         break;
       case 'import': {
         if (typeof a.path !== 'string') err(i, op, '"path" is required');
         const ext = a.path.split('.').pop()!.toLowerCase();
-        if (!(BLENDER_IMPORTS as readonly string[]).includes(ext)) err(i, op, `imports ${BLENDER_IMPORTS.join(', ')}`);
+        if (!(BLENDER_IMPORTS as readonly string[]).includes(ext))
+          err(i, op, `imports ${BLENDER_IMPORTS.join(', ')}`);
         out.path = resolve(a.path, 'import');
         out.format = ext;
         if (a.scale !== undefined) out.scale = num(a.scale, i, op, 'scale', 1e-6, 1e6);
@@ -259,11 +300,13 @@ export function validateBlenderOps(raw: unknown, resolve: PathResolver): Blender
         if (typeof a.path !== 'string') err(i, op, '"path" is required');
         const ext = a.path.split('.').pop()!.toLowerCase();
         const fmt = ext === 'usdc' || ext === 'usda' || ext === 'usdz' ? 'usd' : ext;
-        if (!(BLENDER_EXPORTS as readonly string[]).includes(fmt)) err(i, op, `exports ${BLENDER_EXPORTS.join(', ')}`);
+        if (!(BLENDER_EXPORTS as readonly string[]).includes(fmt))
+          err(i, op, `exports ${BLENDER_EXPORTS.join(', ')}`);
         out.path = resolve(a.path, 'export');
         out.format = fmt;
         if (a.objects !== undefined) {
-          if (!Array.isArray(a.objects) || !a.objects.length) err(i, op, '"objects" must list object names');
+          if (!Array.isArray(a.objects) || !a.objects.length)
+            err(i, op, '"objects" must list object names');
           out.objects = a.objects.map((o) => name(o, i, op, 'objects'));
         }
         if (a.scale !== undefined) out.scale = num(a.scale, i, op, 'scale', 1e-6, 1e6);
@@ -315,7 +358,9 @@ export function describeBlenderOps(ops: BlenderOp[]): string {
     }
   };
   const lines = ops.map(one);
-  return lines.length > 8 ? `${lines.slice(0, 8).join('; ')}; y ${lines.length - 8} más` : lines.join('; ');
+  return lines.length > 8
+    ? `${lines.slice(0, 8).join('; ')}; y ${lines.length - 8} más`
+    : lines.join('; ');
 }
 
 /** Files the ops write (for the approval card and to tell the editor). */
@@ -356,8 +401,13 @@ export function describeBlenderReport(r: BlenderReport): string {
   const lines = [
     `Blender ${r.blender}; units ${r.units.system} (scale ${r.units.scale}); ${r.objects.length} object(s).`,
     ...r.objects.slice(0, 80).map((o) => {
-      const mesh = o.vertices !== undefined ? ` ${o.vertices} verts, ${o.faces} faces, ${o.triangles} tris` : '';
-      const mods = o.modifiers?.length ? ` modifiers: ${o.modifiers.map((m) => `${m.name}(${m.type})`).join(', ')}` : '';
+      const mesh =
+        o.vertices !== undefined
+          ? ` ${o.vertices} verts, ${o.faces} faces, ${o.triangles} tris`
+          : '';
+      const mods = o.modifiers?.length
+        ? ` modifiers: ${o.modifiers.map((m) => `${m.name}(${m.type})`).join(', ')}`
+        : '';
       const mats = o.materials?.length ? ` materials: ${o.materials.join(', ')}` : '';
       const uv = o.type === 'MESH' ? (o.uv?.length ? ` UV: ${o.uv.join(', ')}` : ' no UV') : '';
       return `- "${o.name}" ${o.type} at [${v3(o.location)}] rot [${v3(o.rotation)}]° scale [${v3(o.scale)}] size [${v3(o.dimensions)}] m;${mesh}${mods}${mats}${uv}${o.parent ? ` parent ${o.parent}` : ''}`;

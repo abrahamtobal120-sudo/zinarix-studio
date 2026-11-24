@@ -41,7 +41,10 @@ interface Line {
 }
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']+': (Error: )?/,
+    '',
+  );
 
 const pref = (k: string, d: string) => localStorage.getItem(`zs.hw.${k}`) ?? d;
 const setPref = (k: string, v: string) => localStorage.setItem(`zs.hw.${k}`, v);
@@ -56,20 +59,23 @@ export function HardwarePanel() {
   const [port, setPort] = useState<string>(() => pref('port', ''));
   const [creating, setCreating] = useState(false);
 
-  const load = useCallback(
-    async (force = false) => {
-      const st = await api().pio.status(force).catch((): PioStatus => ({ state: 'missing' }));
-      setStatus(st);
-      if (st.state !== 'ready') return;
-      const [ps, ds] = await Promise.all([
-        api().pio.projects().catch(() => [] as PioProject[]),
-        api().pio.devices().catch(() => [] as PioDevice[]),
-      ]);
-      setProjects(ps);
-      setDevices(ds);
-    },
-    [],
-  );
+  const load = useCallback(async (force = false) => {
+    const st = await api()
+      .pio.status(force)
+      .catch((): PioStatus => ({ state: 'missing' }));
+    setStatus(st);
+    if (st.state !== 'ready') return;
+    const [ps, ds] = await Promise.all([
+      api()
+        .pio.projects()
+        .catch(() => [] as PioProject[]),
+      api()
+        .pio.devices()
+        .catch(() => [] as PioDevice[]),
+    ]);
+    setProjects(ps);
+    setDevices(ds);
+  }, []);
   useEffect(() => {
     void load();
   }, [load, root]);
@@ -99,11 +105,19 @@ export function HardwarePanel() {
       <div className="sidebar-title">
         <span className="panel-title">
           HARDWARE
-          {status?.state === 'ready' && <span className="hw-version">{th('version', { v: status.version.replace(/\.post\d+$/, '') })}</span>}
+          {status?.state === 'ready' && (
+            <span className="hw-version">
+              {th('version', { v: status.version.replace(/\.post\d+$/, '') })}
+            </span>
+          )}
         </span>
         <span className="sidebar-actions">
           {status?.state === 'ready' && root && (
-            <button title={th('newProject')} aria-label={th('newProject')} onClick={() => setCreating(true)}>
+            <button
+              title={th('newProject')}
+              aria-label={th('newProject')}
+              onClick={() => setCreating(true)}
+            >
               <Icon name="plus" size={15} />
             </button>
           )}
@@ -122,7 +136,12 @@ export function HardwarePanel() {
             <button className="btn" onClick={() => void runInTerminal(th('installCmd'))}>
               {th('install')}
             </button>
-            <button className="btn ghost" onClick={() => openLink('https://docs.platformio.org/en/latest/core/installation/index.html')}>
+            <button
+              className="btn ghost"
+              onClick={() =>
+                openLink('https://docs.platformio.org/en/latest/core/installation/index.html')
+              }
+            >
               {th('docs')}
             </button>
             <button className="btn ghost" onClick={() => void load(true)}>
@@ -188,9 +207,16 @@ export function HardwarePanel() {
                     {d.board ? '' : ` (${th('notBoard')})`}
                   </option>
                 ))}
-                {port && !devices.some((d) => d.port === port) && <option value={port}>{port}</option>}
+                {port && !devices.some((d) => d.port === port) && (
+                  <option value={port}>{port}</option>
+                )}
               </select>
-              <button className="icon-btn" title={th('refreshPorts')} aria-label={th('refreshPorts')} onClick={refreshPorts}>
+              <button
+                className="icon-btn"
+                title={th('refreshPorts')}
+                aria-label={th('refreshPorts')}
+                onClick={refreshPorts}
+              >
                 <Icon name="refresh" size={13} />
               </button>
             </label>
@@ -211,7 +237,17 @@ export function HardwarePanel() {
 }
 
 /** Build / upload / clean buttons, live output, memory and problems. */
-function BuildBox({ project, env, port, onDone }: { project: PioProject; env: string; port: string; onDone: () => void }) {
+function BuildBox({
+  project,
+  env,
+  port,
+  onDone,
+}: {
+  project: PioProject;
+  env: string;
+  port: string;
+  onDone: () => void;
+}) {
   const [out, setOut] = useState('');
   const [running, setRunning] = useState<PioTarget | null>(null);
   const [result, setResult] = useState<PioResult | null>(null);
@@ -246,11 +282,19 @@ function BuildBox({ project, env, port, onDone }: { project: PioProject; env: st
   useEffect(() => {
     if (pre.current) pre.current.scrollTop = pre.current.scrollHeight;
   }, [out, showOut]);
-  useEffect(() => () => void api().pio.stopJob(JOB).catch(() => undefined), []);
+  useEffect(
+    () => () =>
+      void api()
+        .pio.stopJob(JOB)
+        .catch(() => undefined),
+    [],
+  );
 
   const start = async (target: PioTarget) => {
     if (target === 'upload') {
-      const ok = await confirmDialog(th('uploadAsk', { port: port ? ` (${port})` : '' }), { okLabel: th('uploadGo') });
+      const ok = await confirmDialog(th('uploadAsk', { port: port ? ` (${port})` : '' }), {
+        okLabel: th('uploadGo'),
+      });
       if (!ok) return;
     }
     lastTarget.current = target;
@@ -259,7 +303,12 @@ function BuildBox({ project, env, port, onDone }: { project: PioProject; env: st
     setStopped(false);
     setRunning(target);
     try {
-      await api().pio.startJob(JOB, { dir: project.dir, env: env || null, target, port: port || null });
+      await api().pio.startJob(JOB, {
+        dir: project.dir,
+        env: env || null,
+        target,
+        port: port || null,
+      });
     } catch (e) {
       setRunning(null);
       setOut(`${errText(e)}\n`);
@@ -271,7 +320,10 @@ function BuildBox({ project, env, port, onDone }: { project: PioProject; env: st
   const fix = () => {
     const list = (result?.problems ?? [])
       .slice(0, 40)
-      .map((p) => `${p.severity}: ${problemPath(project.dir, p.file) ?? p.file}:${p.line}:${p.column}: ${p.message}`)
+      .map(
+        (p) =>
+          `${p.severity}: ${problemPath(project.dir, p.file) ?? p.file}:${p.line}:${p.column}: ${p.message}`,
+      )
       .join('\n');
     askAgent(th('fixPrompt', { dir: project.dir || '.', env: env || '-', errors: list }));
   };
@@ -279,13 +331,28 @@ function BuildBox({ project, env, port, onDone }: { project: PioProject; env: st
   return (
     <div className="hw-section">
       <div className="hw-actions">
-        <button className="btn" disabled={!!running} onClick={() => void start('build')} title="pio run">
+        <button
+          className="btn"
+          disabled={!!running}
+          onClick={() => void start('build')}
+          title="pio run"
+        >
           <Icon name="check" size={13} /> {th('build')}
         </button>
-        <button className="btn" disabled={!!running} onClick={() => void start('upload')} title="pio run -t upload">
+        <button
+          className="btn"
+          disabled={!!running}
+          onClick={() => void start('upload')}
+          title="pio run -t upload"
+        >
           <Icon name="bolt" size={13} /> {th('upload')}
         </button>
-        <button className="btn ghost" disabled={!!running} onClick={() => void start('clean')} title="pio run -t clean">
+        <button
+          className="btn ghost"
+          disabled={!!running}
+          onClick={() => void start('clean')}
+          title="pio run -t clean"
+        >
           <Icon name="trash" size={13} /> {th('clean')}
         </button>
         {running && (
@@ -326,7 +393,11 @@ function BuildBox({ project, env, port, onDone }: { project: PioProject; env: st
       {result?.memory && (
         <div className="hw-mem">
           <MemBar label={th('ram')} used={result.memory.ramUsed} total={result.memory.ramTotal} />
-          <MemBar label={th('flash')} used={result.memory.flashUsed} total={result.memory.flashTotal} />
+          <MemBar
+            label={th('flash')}
+            used={result.memory.flashUsed}
+            total={result.memory.flashTotal}
+          />
         </div>
       )}
       {result && result.problems.length > 0 && (
@@ -374,7 +445,12 @@ function BuildBox({ project, env, port, onDone }: { project: PioProject; env: st
               <Icon name={showOut ? 'chevronDown' : 'chevron'} size={12} /> {th('output')}
             </button>
             <div className="spacer" />
-            <button className="icon-btn" title={th('clearOut')} aria-label={th('clearOut')} onClick={() => setOut('')}>
+            <button
+              className="icon-btn"
+              title={th('clearOut')}
+              aria-label={th('clearOut')}
+              onClick={() => setOut('')}
+            >
               <Icon name="trash" size={12} />
             </button>
           </div>
@@ -396,7 +472,10 @@ function MemBar({ label, used, total }: { label: string; used: number; total: nu
     <div className="hw-membar" title={`${used.toLocaleString()} / ${total.toLocaleString()} bytes`}>
       <span className="hw-memlabel">{label}</span>
       <span className="hw-memtrack">
-        <span className={`hw-memfill ${pct > 90 ? 'hot' : pct > 75 ? 'warm' : ''}`} style={{ width: `${pct}%` }} />
+        <span
+          className={`hw-memfill ${pct > 90 ? 'hot' : pct > 75 ? 'warm' : ''}`}
+          style={{ width: `${pct}%` }}
+        />
       </span>
       <span className="hw-memval">
         {pct.toFixed(1)}% · {(used / 1024).toFixed(1)}/{(total / 1024).toFixed(0)} KB
@@ -448,7 +527,9 @@ function SerialMonitor({
   const pre = useRef<HTMLPreElement>(null);
   const history = useRef<string[]>([]);
   const hpos = useRef(-1);
-  const [view, setView] = useState<'text' | 'plot'>(() => (pref('view', 'text') === 'plot' ? 'plot' : 'text'));
+  const [view, setView] = useState<'text' | 'plot'>(() =>
+    pref('view', 'text') === 'plot' ? 'plot' : 'text',
+  );
   const plot = useRef(new PlotData(2000));
   const [ptick, setPtick] = useState(0);
   const frame = useRef(0);
@@ -463,7 +544,9 @@ function SerialMonitor({
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   // The port of the monitor: the chosen one, else the only board plugged in.
-  const target = chosen || (devices.filter((d) => d.board).length === 1 ? devices.find((d) => d.board)!.port : '');
+  const target =
+    chosen ||
+    (devices.filter((d) => d.board).length === 1 ? devices.find((d) => d.board)!.port : '');
 
   useEffect(() => {
     if (!pref('baud', '')) setBaud(defaultBaud);
@@ -533,7 +616,8 @@ function SerialMonitor({
   };
 
   const text = useMemo(
-    () => (stamps ? lines.map((l) => `${clock(l.t)} → ${l.s}`).join('') : lines.map((l) => l.s).join('')),
+    () =>
+      stamps ? lines.map((l) => `${clock(l.t)} → ${l.s}`).join('') : lines.map((l) => l.s).join(''),
     [lines, stamps],
   );
 
@@ -554,18 +638,25 @@ function SerialMonitor({
             setPref('baud', e.target.value);
           }}
         >
-          {[...new Set([...BAUD_RATES, baud])].sort((a, b) => a - b).map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
+          {[...new Set([...BAUD_RATES, baud])]
+            .sort((a, b) => a - b)
+            .map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
         </select>
         {openPort ? (
           <button className="btn hw-small" onClick={close}>
             {th('close')}
           </button>
         ) : (
-          <button className="btn hw-small" disabled={busy} title={th('openTip')} onClick={() => void open()}>
+          <button
+            className="btn hw-small"
+            disabled={busy}
+            title={th('openTip')}
+            onClick={() => void open()}
+          >
             {th('open')}
           </button>
         )}
@@ -582,7 +673,8 @@ function SerialMonitor({
                 setPref('view', v);
               }}
             >
-              <Icon name={v === 'text' ? 'terminal' : 'chart'} size={11} /> {th(v === 'text' ? 'viewText' : 'viewPlot')}
+              <Icon name={v === 'text' ? 'terminal' : 'chart'} size={11} />{' '}
+              {th(v === 'text' ? 'viewText' : 'viewPlot')}
             </button>
           ))}
         </div>
@@ -598,7 +690,8 @@ function SerialMonitor({
           {th('timestamps')}
         </label>
         <label>
-          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> {th('autoscroll')}
+          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />{' '}
+          {th('autoscroll')}
         </label>
         <div className="spacer" />
         <button
@@ -631,16 +724,20 @@ function SerialMonitor({
       {view === 'plot' ? (
         <SerialPlot data={plot.current} tick={ptick} />
       ) : (
-      <pre
-        className="hw-serial"
-        ref={pre}
-        aria-live="off"
-        onWheel={(e) => {
-          if (e.deltaY < 0) setFollow(false);
-        }}
-      >
-        {text ? <AnsiText text={text} /> : <span className="hw-dim">{openPort ? th('monitorEmpty') : th('monitorClosed')}</span>}
-      </pre>
+        <pre
+          className="hw-serial"
+          ref={pre}
+          aria-live="off"
+          onWheel={(e) => {
+            if (e.deltaY < 0) setFollow(false);
+          }}
+        >
+          {text ? (
+            <AnsiText text={text} />
+          ) : (
+            <span className="hw-dim">{openPort ? th('monitorEmpty') : th('monitorClosed')}</span>
+          )}
+        </pre>
       )}
       <div className="hw-send">
         <input
@@ -684,9 +781,23 @@ function SerialMonitor({
   );
 }
 
-const QUICK = ['uno', 'nanoatmega328', 'esp32dev', 'esp32-s3-devkitc-1', 'pico', 'bluepill_f103c8', 'nodemcuv2'];
+const QUICK = [
+  'uno',
+  'nanoatmega328',
+  'esp32dev',
+  'esp32-s3-devkitc-1',
+  'pico',
+  'bluepill_f103c8',
+  'nodemcuv2',
+];
 
-function NewProject({ onCancel, onCreated }: { onCancel: () => void; onCreated: (dir: string) => void }) {
+function NewProject({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void;
+  onCreated: (dir: string) => void;
+}) {
   const [name, setName] = useState('mi-proyecto');
   const [query, setQuery] = useState('');
   const [boards, setBoards] = useState<PioBoard[] | null>(null);
@@ -704,7 +815,13 @@ function NewProject({ onCancel, onCreated }: { onCancel: () => void; onCreated: 
           if (!alive) return;
           const q = query.trim();
           // Without a search, the usual boards first.
-          setBoards(q ? list : [...list].sort((a, b) => Number(QUICK.includes(b.id)) - Number(QUICK.includes(a.id))));
+          setBoards(
+            q
+              ? list
+              : [...list].sort(
+                  (a, b) => Number(QUICK.includes(b.id)) - Number(QUICK.includes(a.id)),
+                ),
+          );
         })
         .catch(() => alive && setBoards([]));
     }, 300);
@@ -738,7 +855,11 @@ function NewProject({ onCancel, onCreated }: { onCancel: () => void; onCreated: 
       </label>
       <label className="hw-field col">
         <span>{th('board')}</span>
-        <input value={query} placeholder={th('boardSearch')} onChange={(e) => setQuery(e.target.value)} />
+        <input
+          value={query}
+          placeholder={th('boardSearch')}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </label>
       <div className="hw-boards" role="listbox" aria-label={th('board')}>
         {boards === null ? (
@@ -779,7 +900,11 @@ function NewProject({ onCancel, onCreated }: { onCancel: () => void; onCreated: 
       )}
       {busy && <div className="hw-hint">{th('creating')}</div>}
       <div className="hw-row-btns">
-        <button className="btn" disabled={!board || !name.trim() || busy} onClick={() => void create()}>
+        <button
+          className="btn"
+          disabled={!board || !name.trim() || busy}
+          onClick={() => void create()}
+        >
           {th('create')}
         </button>
         <button className="btn ghost" disabled={busy} onClick={onCancel}>

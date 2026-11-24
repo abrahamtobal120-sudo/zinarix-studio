@@ -60,13 +60,21 @@ export interface CadRenderResult {
   params: ScadParam[];
 }
 
-export type BuiltinRunner = (req: WasmRequest, signal: AbortSignal, timeoutMs: number) => Promise<WasmResponse>;
+export type BuiltinRunner = (
+  req: WasmRequest,
+  signal: AbortSignal,
+  timeoutMs: number,
+) => Promise<WasmResponse>;
 
 const MAX_FILES = 300;
 const MAX_BYTES = 150 * 1024 * 1024;
 
 /** Runs dist/main/cadWorker.mjs as a Node process (Electron with ELECTRON_RUN_AS_NODE). */
-export function builtinViaProcess(exe: string, script: string, env: Record<string, string> = {}): BuiltinRunner {
+export function builtinViaProcess(
+  exe: string,
+  script: string,
+  env: Record<string, string> = {},
+): BuiltinRunner {
   return (req, signal, timeoutMs) =>
     new Promise((resolveP, reject) => {
       const p = spawn(exe, [script], {
@@ -107,13 +115,22 @@ export function openscadCandidates(env = process.env, platform = process.platfor
   const out: string[] = [];
   if (env.ZINARIX_OPENSCAD) out.push(env.ZINARIX_OPENSCAD);
   const names = platform === 'win32' ? ['openscad.exe', 'openscad.com'] : ['openscad'];
-  for (const d of (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean)) for (const n of names) out.push(join(d, n));
+  for (const d of (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean))
+    for (const n of names) out.push(join(d, n));
   if (platform === 'win32') {
-    for (const base of [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && join(env.LOCALAPPDATA, 'Programs')])
-      if (base) for (const d of ['OpenSCAD', 'OpenSCAD (Nightly)']) out.push(join(base, d, 'openscad.exe'));
+    for (const base of [
+      env.ProgramFiles,
+      env['ProgramFiles(x86)'],
+      env.LOCALAPPDATA && join(env.LOCALAPPDATA, 'Programs'),
+    ])
+      if (base)
+        for (const d of ['OpenSCAD', 'OpenSCAD (Nightly)']) out.push(join(base, d, 'openscad.exe'));
     out.push(join(homedir(), 'scoop', 'apps', 'openscad', 'current', 'openscad.exe'));
   } else if (platform === 'darwin') {
-    out.push('/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD', join(homedir(), 'Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD'));
+    out.push(
+      '/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD',
+      join(homedir(), 'Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD'),
+    );
   } else out.push('/usr/bin/openscad', '/usr/local/bin/openscad', '/snap/bin/openscad');
   return [...new Set(out)];
 }
@@ -122,11 +139,21 @@ export function openscadCandidates(env = process.env, platform = process.platfor
 export function fontFiles(platform = process.platform): string[] {
   const c =
     platform === 'win32'
-      ? ['arial.ttf', 'arialbd.ttf', 'ariali.ttf', 'segoeui.ttf', 'segoeuib.ttf', 'times.ttf', 'cour.ttf'].map((f) =>
-          join(process.env.WINDIR ?? 'C:\\Windows', 'Fonts', f),
-        )
+      ? [
+          'arial.ttf',
+          'arialbd.ttf',
+          'ariali.ttf',
+          'segoeui.ttf',
+          'segoeuib.ttf',
+          'times.ttf',
+          'cour.ttf',
+        ].map((f) => join(process.env.WINDIR ?? 'C:\\Windows', 'Fonts', f))
       : platform === 'darwin'
-        ? ['/System/Library/Fonts/Supplemental/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf', '/System/Library/Fonts/Helvetica.ttc']
+        ? [
+            '/System/Library/Fonts/Supplemental/Arial.ttf',
+            '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+            '/System/Library/Fonts/Helvetica.ttc',
+          ]
         : [
             '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
             '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
@@ -162,7 +189,13 @@ const inside = (root: string, p: string) => {
   return !!r && !r.startsWith('..') && !isAbsolute(r);
 };
 
-const FLAG: Record<CadFormat, string> = { stl: 'binstl', '3mf': '3mf', obj: 'obj', off: 'off', amf: 'amf' };
+const FLAG: Record<CadFormat, string> = {
+  stl: 'binstl',
+  '3mf': '3mf',
+  obj: 'obj',
+  off: 'off',
+  amf: 'amf',
+};
 
 export class CadService {
   private native: NativeScad | null | undefined;
@@ -230,13 +263,15 @@ export class CadService {
         if (isAbsolute(dep) || /^[a-z]:/i.test(dep))
           throw new Error(`"${dep}": usa rutas relativas a archivos dentro del proyecto.`);
         const abs = resolve(root, dirname(rel), dep);
-        if (!inside(root, abs)) throw new Error(`"${dep}" está fuera del proyecto; solo se leen archivos dentro de él.`);
+        if (!inside(root, abs))
+          throw new Error(`"${dep}" está fuera del proyecto; solo se leen archivos dentro de él.`);
         const r = relative(root, abs).split(sep).join('/');
         // Missing ones may be libraries OpenSCAD has (MCAD); it reports what it cannot find.
         if (files.has(r) || !isFile(abs)) continue;
         const data = await readFile(abs);
         bytes += data.length;
-        if (files.size >= MAX_FILES || bytes > MAX_BYTES) throw new Error('El modelo usa demasiados archivos (o muy grandes).');
+        if (files.size >= MAX_FILES || bytes > MAX_BYTES)
+          throw new Error('El modelo usa demasiados archivos (o muy grandes).');
         files.set(r, data);
         if (/\.scad$/i.test(r)) queue.push([r, data.toString('utf8')]);
       }
@@ -244,7 +279,10 @@ export class CadService {
     return files;
   }
 
-  async render(input: CadRenderInput, signal: AbortSignal = new AbortController().signal): Promise<CadRenderResult> {
+  async render(
+    input: CadRenderInput,
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<CadRenderResult> {
     const started = Date.now();
     const format = input.format ?? 'stl';
     const code = input.code ?? (input.file ? await readFile(input.file, 'utf8') : null);
@@ -261,12 +299,16 @@ export class CadService {
     const mainRel = input.file ? relative(root, input.file).split(sep).join('/') : 'modelo.scad';
     const files = await this.collect(root, mainRel, code);
     const { native } = await this.engines();
-    const useNative = input.engine === 'native' ? true : input.engine === 'builtin' ? false : !!native;
+    const useNative =
+      input.engine === 'native' ? true : input.engine === 'builtin' ? false : !!native;
     if (useNative && !native) throw new Error('OpenSCAD no está instalado.');
     if (!useNative && !this.builtin) throw new Error('El OpenSCAD incluido no está disponible.');
     const timeoutMs = input.timeoutMs ?? 180_000;
     const toReal = (s: string, prefix: string) =>
-      s.split(prefix).join(root.endsWith(sep) ? root : root + sep).replace(/\/work\//g, '');
+      s
+        .split(prefix)
+        .join(root.endsWith(sep) ? root : root + sep)
+        .replace(/\/work\//g, '');
     if (useNative) {
       const work = await mkdtemp(join(tmpdir(), 'zinarix-scad-'));
       try {
@@ -277,9 +319,21 @@ export class CadService {
         }
         const mainTmp = join(work, ...mainRel.split('/'));
         const out = join(work, `.zinarix-out.${format}`);
-        const args = [mainTmp, '-o', out, '--export-format', FLAG[format], ...(native!.manifold ? ['--backend=manifold'] : []), ...defines];
+        const args = [
+          mainTmp,
+          '-o',
+          out,
+          '--export-format',
+          FLAG[format],
+          ...(native!.manifold ? ['--backend=manifold'] : []),
+          ...defines,
+        ];
         const raw = await new Promise<string>((res, rej) => {
-          const p = spawn(native!.path, args, { windowsHide: true, cwd: dirname(mainTmp), env: taskEnv(process.env) });
+          const p = spawn(native!.path, args, {
+            windowsHide: true,
+            cwd: dirname(mainTmp),
+            env: taskEnv(process.env),
+          });
           let t = '';
           const kill = () => p.kill('SIGKILL');
           const timer = setTimeout(kill, timeoutMs);
@@ -291,7 +345,10 @@ export class CadService {
             clearTimeout(timer);
             signal.removeEventListener('abort', kill);
             if (signal.aborted) rej(new Error('Cancelado.'));
-            else if (c === null) rej(new Error(`OpenSCAD tardó más de ${Math.round(timeoutMs / 1000)} s y se detuvo.`));
+            else if (c === null)
+              rej(
+                new Error(`OpenSCAD tardó más de ${Math.round(timeoutMs / 1000)} s y se detuvo.`),
+              );
             else res(t);
           });
         });
@@ -315,7 +372,14 @@ export class CadService {
     req.args = [...req.args, '--backend=manifold'];
     const r = await this.builtin!(req, signal, timeoutMs);
     const text = toReal(r.log, '/work/');
-    return this.finish(r.output !== undefined ? Buffer.from(r.output, 'base64') : null, format, text, 'builtin', started, params);
+    return this.finish(
+      r.output !== undefined ? Buffer.from(r.output, 'base64') : null,
+      format,
+      text,
+      'builtin',
+      started,
+      params,
+    );
   }
 
   private finish(
@@ -331,8 +395,15 @@ export class CadService {
       const errs = log.messages.filter((m) => m.severity === 'error');
       const why =
         errs.map((e) => `${e.message}${e.line ? ` (línea ${e.line})` : ''}`).join('\n') ||
-        (log.dimension === 'empty' ? 'El modelo está vacío: no dibuja nada.' : log.dimension === '2d' ? 'El modelo es 2D: usa linear_extrude() para darle grosor.' : raw.trim().split(/\r?\n/).slice(-3).join('\n'));
-      const e = new Error(why || 'OpenSCAD no generó el modelo.') as Error & { log?: ScadLog; raw?: string };
+        (log.dimension === 'empty'
+          ? 'El modelo está vacío: no dibuja nada.'
+          : log.dimension === '2d'
+            ? 'El modelo es 2D: usa linear_extrude() para darle grosor.'
+            : raw.trim().split(/\r?\n/).slice(-3).join('\n'));
+      const e = new Error(why || 'OpenSCAD no generó el modelo.') as Error & {
+        log?: ScadLog;
+        raw?: string;
+      };
       e.log = log;
       e.raw = raw;
       throw e;

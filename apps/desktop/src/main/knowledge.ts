@@ -43,7 +43,8 @@ const REFRESH_EVERY = 4000;
 
 const SKIP_EXT =
   /\.(png|jpe?g|gif|bmp|ico|webp|avif|svg|pdf|zip|gz|tgz|bz2|xz|7z|rar|jar|war|class|o|a|so|dll|dylib|exe|bin|wasm|mp[34]|mov|avi|webm|ogg|wav|flac|ttf|otf|woff2?|eot|psd|sqlite|db|lock|map|pyc|DS_Store)$/i;
-const SKIP_NAME = /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock|poetry\.lock|composer\.lock|go\.sum)$|\.min\.(js|css)$/i;
+const SKIP_NAME =
+  /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock|poetry\.lock|composer\.lock|go\.sum)$|\.min\.(js|css)$/i;
 
 // ---------------------------------------------------------------- vectors on disk
 
@@ -64,7 +65,10 @@ interface StoredChunk extends Chunk {
 
 /** Hash of what gets embedded for a chunk. */
 function chunkHash(c: Chunk): string {
-  return createHash('sha256').update(`${c.title ?? c.source}\n${c.text}`).digest('base64').slice(0, 16);
+  return createHash('sha256')
+    .update(`${c.title ?? c.source}\n${c.text}`)
+    .digest('base64')
+    .slice(0, 16);
 }
 
 interface CodeFile {
@@ -171,7 +175,11 @@ export class Knowledge {
       .sort((a, b) => b.created - a.created);
   }
 
-  async addMemory(text: string, scope: 'global' | 'project', project?: string): Promise<MemoryView> {
+  async addMemory(
+    text: string,
+    scope: 'global' | 'project',
+    project?: string,
+  ): Promise<MemoryView> {
     const clean = redact(text.replace(/\s+/g, ' ').trim()).slice(0, MAX_MEMORY_CHARS);
     if (!clean) throw new Error('empty memory');
     if (scope === 'project' && !project) throw new Error('no project folder is open');
@@ -337,7 +345,9 @@ export class Knowledge {
         for (const page of got) {
           if (!page) continue;
           pages++;
-          const { title, text } = page.html ? htmlToText(page.body) : { title: '', text: page.body };
+          const { title, text } = page.html
+            ? htmlToText(page.body)
+            : { title: '', text: page.body };
           chunks.push(...chunkProse(page.url, title || page.url, redact(text)));
           if (page.html)
             for (const link of docLinks(page.body, page.url, root))
@@ -379,7 +389,9 @@ export class Knowledge {
     const hit = this.docIndex.get(id);
     if (hit) return hit;
     try {
-      const raw = JSON.parse(await readFile(join(this.dir, 'docs', `${id}.json`), 'utf8')) as DocIndexFile;
+      const raw = JSON.parse(
+        await readFile(join(this.dir, 'docs', `${id}.json`), 'utf8'),
+      ) as DocIndexFile;
       const r = ranked(raw.chunks, raw.vecModel);
       this.docIndex.set(id, r);
       return r;
@@ -559,7 +571,14 @@ export class Knowledge {
       const c = r.chunks[index]!;
       if (out.some((h) => h.source === c.source && h.start <= c.end && c.start <= h.end && c.start))
         continue;
-      out.push({ source: c.source, start: c.start, end: c.end, title: c.title, text: c.text, score });
+      out.push({
+        source: c.source,
+        start: c.start,
+        end: c.end,
+        title: c.title,
+        text: c.text,
+        score,
+      });
       if (out.length >= limit) break;
     }
     return out;
@@ -577,7 +596,10 @@ export class Knowledge {
   }
 
   /** Embeds the chunks that have no vector yet (up to MAX_EMBEDDED); returns the model used. */
-  private async embedChunks(chunks: StoredChunk[], signal: AbortSignal): Promise<string | undefined> {
+  private async embedChunks(
+    chunks: StoredChunk[],
+    signal: AbortSignal,
+  ): Promise<string | undefined> {
     const model = this.core.config.roles.embeddings;
     if (!model) return undefined;
     const todo = chunks.filter((c) => !c.vec).slice(0, MAX_EMBEDDED);
@@ -637,7 +659,10 @@ async function fetchPage(
       res = await fetch(u, {
         redirect: 'manual',
         signal: AbortSignal.any([signal, AbortSignal.timeout(DOC_TIMEOUT)]),
-        headers: { 'user-agent': 'ZinarixStudio-Docs/1.0', accept: 'text/html,text/plain,text/markdown' },
+        headers: {
+          'user-agent': 'ZinarixStudio-Docs/1.0',
+          accept: 'text/html,text/plain,text/markdown',
+        },
       });
     } catch {
       return undefined;
@@ -722,7 +747,10 @@ export const KNOWLEDGE_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         query: { type: 'string' },
-        source: { type: 'string', description: 'Name of one docs source from docs_list (default: all)' },
+        source: {
+          type: 'string',
+          description: 'Name of one docs source from docs_list (default: all)',
+        },
         limit: { type: 'integer', description: 'Results (default 6, max 15)' },
       },
       required: ['query'],
@@ -730,7 +758,8 @@ export const KNOWLEDGE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'list_memories',
-    description: 'List the memories saved for the user (global and for this project), with their ids.',
+    description:
+      'List the memories saved for the user (global and for this project), with their ids.',
     parameters: { type: 'object', properties: {} },
   },
   {
@@ -753,7 +782,13 @@ export const KNOWLEDGE_TOOLS: ToolDefinition[] = [
 export const KNOWLEDGE_TOOL_NAMES = new Set(KNOWLEDGE_TOOLS.map((t) => t.name));
 export const KNOWLEDGE_READ_ONLY = ['semantic_search', 'docs_list', 'docs_search', 'list_memories'];
 /** Tools that work without an open folder. */
-export const KNOWLEDGE_NO_FOLDER = ['docs_list', 'docs_search', 'list_memories', 'remember', 'forget'];
+export const KNOWLEDGE_NO_FOLDER = [
+  'docs_list',
+  'docs_search',
+  'list_memories',
+  'remember',
+  'forget',
+];
 
 export function knowledgePreview(
   name: string,
@@ -806,7 +841,9 @@ export async function runKnowledgeTool(
       if (!ws) throw new Error('No folder is open in the editor.');
       const r = await k.codeSearch(ws, String(a.query ?? ''), num(a.limit, 8, 20), signal);
       if (!r.hits.length) return { content: 'No matches.', summary: 'sin resultados' };
-      const how = r.semantic ? 'by meaning (embeddings)' : 'by relevance (BM25; no embedding model set)';
+      const how = r.semantic
+        ? 'by meaning (embeddings)'
+        : 'by relevance (BM25; no embedding model set)';
       return {
         content: `${r.hits.length} results ${how}, from ${r.files} indexed files:\n\n${hitsText(r.hits, true)}`,
         summary: `${r.hits.length} resultados${r.semantic ? ' (semántico)' : ''}`,
@@ -816,12 +853,15 @@ export async function runKnowledgeTool(
       const d = k.docs();
       if (!d.length)
         return {
-          content: 'No documentation is indexed. The user can add some in Settings › Docs or with /docs <name> <url>.',
+          content:
+            'No documentation is indexed. The user can add some in Settings › Docs or with /docs <name> <url>.',
           summary: 'sin docs',
         };
       return {
         content: d
-          .map((s) => `- ${s.name}: ${s.url} · ${s.status} · ${s.pages} pages, ${s.chunks} passages`)
+          .map(
+            (s) => `- ${s.name}: ${s.url} · ${s.status} · ${s.pages} pages, ${s.chunks} passages`,
+          )
           .join('\n'),
         summary: `${d.length} fuentes`,
       };
@@ -832,7 +872,8 @@ export async function runKnowledgeTool(
         typeof a.source === 'string' && a.source ? a.source : undefined,
         num(a.limit, 6, 15),
       );
-      if (!hits.length) return { content: 'No matches in the indexed docs.', summary: 'sin resultados' };
+      if (!hits.length)
+        return { content: 'No matches in the indexed docs.', summary: 'sin resultados' };
       return { content: hitsText(hits, false), summary: `${hits.length} pasajes` };
     }
     case 'list_memories': {
@@ -851,7 +892,10 @@ export async function runKnowledgeTool(
     }
     case 'forget': {
       const ok = await k.removeMemory(String(a.id ?? ''));
-      return { content: ok ? 'Forgotten.' : 'No memory with that id.', summary: ok ? 'olvidada' : 'no existe' };
+      return {
+        content: ok ? 'Forgotten.' : 'No memory with that id.',
+        summary: ok ? 'olvidada' : 'no existe',
+      };
     }
   }
   throw new Error(`unknown tool ${name}`);

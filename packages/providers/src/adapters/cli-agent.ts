@@ -191,7 +191,15 @@ function contentText(m: ChatMessage): string {
   if (m.role !== 'user') return m.content;
   return typeof m.content === 'string'
     ? m.content
-    : m.content.map((p) => (p.type === 'text' ? p.text : p.type === 'image' ? '[imagen omitida]' : '[adjunto omitido]')).join('\n');
+    : m.content
+        .map((p) =>
+          p.type === 'text'
+            ? p.text
+            : p.type === 'image'
+              ? '[imagen omitida]'
+              : '[adjunto omitido]',
+        )
+        .join('\n');
 }
 
 /**
@@ -678,9 +686,7 @@ async function* run(
   const scratch = req.noTools ? mkdtempSync(join(tmpdir(), 'zinarix-cli-')) : undefined;
   const child = spawn(target.file, target.args, {
     cwd: scratch ?? req.cwd ?? homedir(),
-    env: cliEnv(
-      profile === 'claude' && req.reasoning ? CLAUDE_THINKING[req.reasoning] : undefined,
-    ),
+    env: cliEnv(profile === 'claude' && req.reasoning ? CLAUDE_THINKING[req.reasoning] : undefined),
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
     windowsVerbatimArguments: target.verbatim,

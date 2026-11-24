@@ -139,7 +139,8 @@ export function capText(c: Extract<CapCheck, { ok: false }>, lang: 'es' | 'en' =
 
 /** Total for the card: "$0.068", "~$0.07", or "costo no estimado (+ $0.05 de lo que sí)". */
 export function formatTotal(t: GenTotal, lang: 'es' | 'en' = 'es'): string {
-  if (t.usd !== null) return formatEstimate({ usd: t.usd, approximate: t.approximate, detail: '' }, lang);
+  if (t.usd !== null)
+    return formatEstimate({ usd: t.usd, approximate: t.approximate, detail: '' }, lang);
   const unk = lang === 'en' ? 'cost not estimated' : 'costo no estimado';
   if (!t.knownUsd) return unk;
   const known = formatEstimate({ usd: t.knownUsd, approximate: t.approximate, detail: '' }, lang);

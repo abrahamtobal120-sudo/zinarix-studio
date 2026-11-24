@@ -40,9 +40,18 @@ function fakeComputer(log: string[]): ComputerService {
     scroll: async () => void log.push('scroll'),
     type: async (t) => void log.push(`type ${t}`),
     keys: async (c) => void log.push(`keys ${[...c.mods, c.key].join('+')}`),
-    zoom: async (x, y, w, h) => (log.push(`zoom ${x},${y} ${w}x${h}`), { mediaType: 'image/png', data: 'BBBB', width: w * 2, height: h * 2 }),
-    open: async (t) => void log.push(`open ${t.kind}:${t.kind === 'url' ? t.url : t.kind === 'file' ? t.path : t.name}`),
-    windows: async () => [{ id: '1', app: 'notepad', title: 'Sin título: Bloc de notas' }, { id: '2', app: 'EXCEL', title: 'Ventas.xlsx - Excel' }],
+    zoom: async (x, y, w, h) => (
+      log.push(`zoom ${x},${y} ${w}x${h}`),
+      { mediaType: 'image/png', data: 'BBBB', width: w * 2, height: h * 2 }
+    ),
+    open: async (t) =>
+      void log.push(
+        `open ${t.kind}:${t.kind === 'url' ? t.url : t.kind === 'file' ? t.path : t.name}`,
+      ),
+    windows: async () => [
+      { id: '1', app: 'notepad', title: 'Sin título: Bloc de notas' },
+      { id: '2', app: 'EXCEL', title: 'Ventas.xlsx - Excel' },
+    ],
     focus: async (id) => (log.push(`focus ${id}`), true),
   };
 }
@@ -112,7 +121,10 @@ describe('Controlar la compu (chat switch)', () => {
   it('with the switch on, acts without asking and reports each action', async () => {
     const { turn, log } = setup();
     const h: string[] = [];
-    const r = await turn([shot, click, { name: 'computer_type', args: { text: 'hola' } }], hooks(h));
+    const r = await turn(
+      [shot, click, { name: 'computer_type', args: { text: 'hola' } }],
+      hooks(h),
+    );
     expect(r.asked).toEqual([]);
     expect(r.results.every((x) => x.ok)).toBe(true);
     expect(log).toEqual(['click 100,200', 'type hola']);

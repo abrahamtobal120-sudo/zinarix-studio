@@ -31,61 +31,70 @@ describe('Phaser web game template', () => {
     const g = new GodotService(mkdtempSync(join(root, 'data-')));
     const written = await g.create(root, 'saltos', 'web-phaser', 'Saltos');
     expect(written).toContain('saltos/lib/phaser.min.js');
-    expect(readFileSync(join(root, 'saltos/lib/phaser.min.js'), 'utf8').length).toBeGreaterThan(1_000_000);
+    expect(readFileSync(join(root, 'saltos/lib/phaser.min.js'), 'utf8').length).toBeGreaterThan(
+      1_000_000,
+    );
   });
 
-  it.skipIf(!electronExe)('runs in a real browser: no errors, the player walks, jumps and picks a coin', { timeout: 90_000 }, async () => {
-    const { _electron } = req('playwright') as typeof import('playwright');
-    const web = new WebGameServers();
-    const url = await web.url(root, 'saltos/');
-    const main = join(root, 'open-game.cjs');
-    writeFileSync(
-      main,
-      "const { app, BrowserWindow } = require('electron');\n" +
-        'app.whenReady().then(() => new BrowserWindow({ width: 1000, height: 640 }).loadURL(process.argv.at(-1)));\n',
-    );
-    const app = await _electron.launch({ executablePath: electronExe!, args: [main, url] });
-    try {
-      const page = await app.firstWindow();
-      const errors: string[] = [];
-      page.on('pageerror', (e) => errors.push(e.message));
-      page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-      await page.waitForFunction(() => {
-        const j = (window as unknown as { juego?: { scene?: { isActive(k: string): boolean } } }).juego;
-        return !!j?.scene?.isActive('nivel');
-      });
-      type Body = { x: number; y: number };
-      const state = () =>
-        page.evaluate(() => {
-          const s = (window as unknown as { juego: { scene: { getScene(k: string): unknown } } }).juego.scene.getScene('nivel') as {
-            jugador: Body;
-            puntos: number;
-          };
-          return { x: s.jugador.x, y: s.jugador.y, puntos: s.puntos };
+  it.skipIf(!electronExe)(
+    'runs in a real browser: no errors, the player walks, jumps and picks a coin',
+    { timeout: 90_000 },
+    async () => {
+      const { _electron } = req('playwright') as typeof import('playwright');
+      const web = new WebGameServers();
+      const url = await web.url(root, 'saltos/');
+      const main = join(root, 'open-game.cjs');
+      writeFileSync(
+        main,
+        "const { app, BrowserWindow } = require('electron');\n" +
+          'app.whenReady().then(() => new BrowserWindow({ width: 1000, height: 640 }).loadURL(process.argv.at(-1)));\n',
+      );
+      const app = await _electron.launch({ executablePath: electronExe!, args: [main, url] });
+      try {
+        const page = await app.firstWindow();
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+        await page.waitForFunction(() => {
+          const j = (window as unknown as { juego?: { scene?: { isActive(k: string): boolean } } })
+            .juego;
+          return !!j?.scene?.isActive('nivel');
         });
-      await page.waitForTimeout(800); // lands on the ground
-      const start = await state();
-      await page.locator('canvas').click();
-      await page.keyboard.down('ArrowRight');
-      await page.waitForTimeout(600);
-      await page.keyboard.up('ArrowRight');
-      const walked = await state();
-      expect(walked.x - start.x).toBeGreaterThan(80);
-      await page.keyboard.down('Space');
-      await page.waitForTimeout(250);
-      const jumped = await state();
-      await page.keyboard.up('Space');
-      expect(jumped.y).toBeLessThan(walked.y - 30);
-      // Walk to the coin on the ground (x 520) and pick it.
-      await page.keyboard.down('ArrowRight');
-      await page.waitForTimeout(1200);
-      await page.keyboard.up('ArrowRight');
-      await page.waitForTimeout(300);
-      expect((await state()).puntos).toBeGreaterThanOrEqual(1);
-      expect(errors).toEqual([]);
-    } finally {
-      await app.close();
-      web.stop();
-    }
-  });
+        type Body = { x: number; y: number };
+        const state = () =>
+          page.evaluate(() => {
+            const s = (
+              window as unknown as { juego: { scene: { getScene(k: string): unknown } } }
+            ).juego.scene.getScene('nivel') as {
+              jugador: Body;
+              puntos: number;
+            };
+            return { x: s.jugador.x, y: s.jugador.y, puntos: s.puntos };
+          });
+        await page.waitForTimeout(800); // lands on the ground
+        const start = await state();
+        await page.locator('canvas').click();
+        await page.keyboard.down('ArrowRight');
+        await page.waitForTimeout(600);
+        await page.keyboard.up('ArrowRight');
+        const walked = await state();
+        expect(walked.x - start.x).toBeGreaterThan(80);
+        await page.keyboard.down('Space');
+        await page.waitForTimeout(250);
+        const jumped = await state();
+        await page.keyboard.up('Space');
+        expect(jumped.y).toBeLessThan(walked.y - 30);
+        // Walk to the coin on the ground (x 520) and pick it.
+        await page.keyboard.down('ArrowRight');
+        await page.waitForTimeout(1200);
+        await page.keyboard.up('ArrowRight');
+        await page.waitForTimeout(300);
+        expect((await state()).puntos).toBeGreaterThanOrEqual(1);
+        expect(errors).toEqual([]);
+      } finally {
+        await app.close();
+        web.stop();
+      }
+    },
+  );
 });

@@ -94,7 +94,14 @@ export function arcToCubics(
   if (Math.abs(x1 - x2) < EPS && Math.abs(y1 - y2) < EPS) return [];
   rx = Math.abs(rx);
   ry = Math.abs(ry);
-  if (rx < EPS || ry < EPS) return [[{ x: x1, y: y1 }, { x: x2, y: y2 }, { x: x2, y: y2 }]];
+  if (rx < EPS || ry < EPS)
+    return [
+      [
+        { x: x1, y: y1 },
+        { x: x2, y: y2 },
+        { x: x2, y: y2 },
+      ],
+    ];
   const phi = (angle * Math.PI) / 180;
   const cos = Math.cos(phi);
   const sin = Math.sin(phi);
@@ -218,7 +225,8 @@ export function parsePathData(d: string): SubPath[] {
       continue;
     }
     const a = tk.slice(i, i + n);
-    if (a.length < n || a.some((v) => typeof v !== 'number')) throw new Error(`Path command "${cmd}" is missing numbers.`);
+    if (a.length < n || a.some((v) => typeof v !== 'number'))
+      throw new Error(`Path command "${cmd}" is missing numbers.`);
     i += n;
     const v = a as number[];
     const rel = cmd !== cmd.toUpperCase();
@@ -274,7 +282,11 @@ export function parsePathData(d: string): SubPath[] {
       case 'q':
       case 't': {
         const q: Pt =
-          lo === 'q' ? { x: v[0]! + ox, y: v[1]! + oy } : lq ? { x: 2 * x - lq.x, y: 2 * y - lq.y } : { x, y };
+          lo === 'q'
+            ? { x: v[0]! + ox, y: v[1]! + oy }
+            : lq
+              ? { x: 2 * x - lq.x, y: 2 * y - lq.y }
+              : { x, y };
         const nx = (lo === 'q' ? v[2]! : v[0]!) + ox;
         const ny = (lo === 'q' ? v[3]! : v[1]!) + oy;
         cubicTo(
@@ -310,7 +322,11 @@ function closeSub(s: SubPath): void {
   s.closed = true;
   const first = s.nodes[0]!;
   const lastN = s.nodes[s.nodes.length - 1]!;
-  if (s.nodes.length > 1 && Math.abs(first.x - lastN.x) < 1e-4 && Math.abs(first.y - lastN.y) < 1e-4) {
+  if (
+    s.nodes.length > 1 &&
+    Math.abs(first.x - lastN.x) < 1e-4 &&
+    Math.abs(first.y - lastN.y) < 1e-4
+  ) {
     if (lastN.ix !== undefined) {
       first.ix = lastN.ix;
       first.iy = lastN.iy;
@@ -381,7 +397,8 @@ export function segmentPoints(s: SubPath, i: number): [Pt, Pt, Pt, Pt] | null {
   ];
 }
 
-export const segmentCount = (s: SubPath): number => (s.closed ? s.nodes.length : Math.max(0, s.nodes.length - 1));
+export const segmentCount = (s: SubPath): number =>
+  s.closed ? s.nodes.length : Math.max(0, s.nodes.length - 1);
 
 function bez(p: [Pt, Pt, Pt, Pt], t: number): Pt {
   const u = 1 - t;
@@ -389,11 +406,17 @@ function bez(p: [Pt, Pt, Pt, Pt], t: number): Pt {
   const b = 3 * u * u * t;
   const c = 3 * u * t * t;
   const d = t * t * t;
-  return { x: a * p[0].x + b * p[1].x + c * p[2].x + d * p[3].x, y: a * p[0].y + b * p[1].y + c * p[2].y + d * p[3].y };
+  return {
+    x: a * p[0].x + b * p[1].x + c * p[2].x + d * p[3].x,
+    y: a * p[0].y + b * p[1].y + c * p[2].y + d * p[3].y,
+  };
 }
 
 /** The point of the path nearest to p: which sub-path, which segment and where (t 0…1). */
-export function nearestOnPath(subs: SubPath[], p: Pt): { sub: number; seg: number; t: number; dist: number; at: Pt } | null {
+export function nearestOnPath(
+  subs: SubPath[],
+  p: Pt,
+): { sub: number; seg: number; t: number; dist: number; at: Pt } | null {
   let best: { sub: number; seg: number; t: number; dist: number; at: Pt } | null = null;
   subs.forEach((s, si) => {
     for (let i = 0; i < segmentCount(s); i++) {
@@ -556,7 +579,8 @@ const K = 0.5522847498;
 export function rectPathData(x: number, y: number, w: number, h: number, rx = 0, ry = rx): string {
   rx = Math.max(0, Math.min(rx, w / 2));
   ry = Math.max(0, Math.min(ry || rx, h / 2));
-  if (!rx || !ry) return `M ${f(x)} ${f(y)} L ${f(x + w)} ${f(y)} L ${f(x + w)} ${f(y + h)} L ${f(x)} ${f(y + h)} Z`;
+  if (!rx || !ry)
+    return `M ${f(x)} ${f(y)} L ${f(x + w)} ${f(y)} L ${f(x + w)} ${f(y + h)} L ${f(x)} ${f(y + h)} Z`;
   const kx = rx * K;
   const ky = ry * K;
   return [

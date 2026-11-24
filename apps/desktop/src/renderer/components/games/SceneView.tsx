@@ -1,8 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, askText, getDoc, getEditor, openFile, save, setState, setTabViewer, toast, useStore } from '../../store';
+import {
+  api,
+  askText,
+  getDoc,
+  getEditor,
+  openFile,
+  save,
+  setState,
+  setTabViewer,
+  toast,
+  useStore,
+} from '../../store';
 import { confirmDialog } from '../../confirm';
 import { Icon } from '../Icon';
-import { godotString, parseTscn, relToRes, resToRel, sceneTree, type TscnNode } from '../../../shared/games';
+import {
+  godotString,
+  parseTscn,
+  relToRes,
+  resToRel,
+  sceneTree,
+  type TscnNode,
+} from '../../../shared/games';
 import {
   addNode,
   attachScript,
@@ -47,14 +65,29 @@ function applyText(path: string, next: string, group = ''): boolean {
   let a = 0;
   while (a < cur.length && a < next.length && cur[a] === next[a]) a++;
   let b = 0;
-  while (b < cur.length - a && b < next.length - a && cur[cur.length - 1 - b] === next[next.length - 1 - b]) b++;
+  while (
+    b < cur.length - a &&
+    b < next.length - a &&
+    cur[cur.length - 1 - b] === next[next.length - 1 - b]
+  )
+    b++;
   const from = m.getPositionAt(a);
   const to = m.getPositionAt(cur.length - b);
   const merge = group && group === lastGroup && Date.now() - lastAt < 800;
   if (!merge) m.pushStackElement();
   m.pushEditOperations(
     [],
-    [{ range: { startLineNumber: from.lineNumber, startColumn: from.column, endLineNumber: to.lineNumber, endColumn: to.column }, text: next.slice(a, next.length - b) }],
+    [
+      {
+        range: {
+          startLineNumber: from.lineNumber,
+          startColumn: from.column,
+          endLineNumber: to.lineNumber,
+          endColumn: to.column,
+        },
+        text: next.slice(a, next.length - b),
+      },
+    ],
     () => null,
   );
   lastGroup = group;
@@ -63,10 +96,17 @@ function applyText(path: string, next: string, group = ''): boolean {
 }
 
 type Kind = 'two' | 'three' | 'ui' | 'node';
-const UI = /^(Control|Label|RichTextLabel|Button|.*Button|.*Container|Panel|PanelContainer|ColorRect|TextureRect|NinePatchRect|LineEdit|TextEdit|CodeEdit|ProgressBar|.*Slider|SpinBox|ItemList|Tree|TabBar|TabContainer|MenuBar|ScrollBar|.*ScrollBar|Separator|.*Separator|ReferenceRect|SubViewportContainer|GraphEdit|GraphNode|VideoStreamPlayer)$/;
+const UI =
+  /^(Control|Label|RichTextLabel|Button|.*Button|.*Container|Panel|PanelContainer|ColorRect|TextureRect|NinePatchRect|LineEdit|TextEdit|CodeEdit|ProgressBar|.*Slider|SpinBox|ItemList|Tree|TabBar|TabContainer|MenuBar|ScrollBar|.*ScrollBar|Separator|.*Separator|ReferenceRect|SubViewportContainer|GraphEdit|GraphNode|VideoStreamPlayer)$/;
 function kindOf(n: TscnNode): Kind {
   if (/3D$/.test(n.type) || n.type === 'WorldEnvironment') return 'three';
-  if (/2D$/.test(n.type) || n.type === 'TileMap' || n.type === 'TileMapLayer' || n.type === 'Polygon2D') return 'two';
+  if (
+    /2D$/.test(n.type) ||
+    n.type === 'TileMap' ||
+    n.type === 'TileMapLayer' ||
+    n.type === 'Polygon2D'
+  )
+    return 'two';
   if (UI.test(n.type)) return 'ui';
   return 'node';
 }
@@ -111,7 +151,9 @@ export function SceneView({ path }: { path: string }) {
     void api()
       .games.scan()
       .then((s) => {
-        const p = s.godot.filter((g) => !g.dir || path.startsWith(`${g.dir}/`)).sort((a, b) => b.dir.length - a.dir.length)[0];
+        const p = s.godot
+          .filter((g) => !g.dir || path.startsWith(`${g.dir}/`))
+          .sort((a, b) => b.dir.length - a.dir.length)[0];
         if (alive) setProjectDir(p ? p.dir : null);
       })
       .catch(() => alive && setProjectDir(null));
@@ -121,12 +163,16 @@ export function SceneView({ path }: { path: string }) {
   }, [path]);
 
   const node = scene.nodes.find((n) => n.path === selected) ?? scene.nodes[0];
-  const rel = (res: string | undefined) => (res && projectDir !== undefined && projectDir !== null ? resToRel(res, projectDir) : null);
+  const rel = (res: string | undefined) =>
+    res && projectDir !== undefined && projectDir !== null ? resToRel(res, projectDir) : null;
   const resOfScene = projectDir != null ? path.slice(projectDir ? projectDir.length + 1 : 0) : null;
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (q) return tree.filter((t) => t.node.name.toLowerCase().includes(q) || t.node.type.toLowerCase().includes(q));
+    if (q)
+      return tree.filter(
+        (t) => t.node.name.toLowerCase().includes(q) || t.node.type.toLowerCase().includes(q),
+      );
     const out: typeof tree = [];
     let hideBelow: number | null = null;
     for (const t of tree) {
@@ -157,7 +203,9 @@ export function SceneView({ path }: { path: string }) {
     }, 50);
   };
 
-  const signals = node ? scene.connections.filter((c) => c.from === node.path || c.to === node.path) : [];
+  const signals = node
+    ? scene.connections.filter((c) => c.from === node.path || c.to === node.path)
+    : [];
   const dirty = useStore((s) => s.tabs.find((t) => t.path === path)?.dirty ?? false);
   const [adding, setAdding] = useState<{ name: string; type: string } | null>(null);
   const [newProp, setNewProp] = useState<{ key: string; value: string } | null>(null);
@@ -224,17 +272,26 @@ export function SceneView({ path }: { path: string }) {
   };
   const remove = async (n: TscnNode) => {
     if (n.path === '.') return;
-    if (!(await confirmDialog(tgm('removeAsk', { name: n.name }), { danger: true, okLabel: tgm('remove') }))) return;
-    if (edit((t) => removeNode(t, n.path))) setSelected(n.parent === '.' || n.parent === null ? '.' : n.parent);
+    if (
+      !(await confirmDialog(tgm('removeAsk', { name: n.name }), {
+        danger: true,
+        okLabel: tgm('remove'),
+      }))
+    )
+      return;
+    if (edit((t) => removeNode(t, n.path)))
+      setSelected(n.parent === '.' || n.parent === null ? '.' : n.parent);
   };
   const addChild = () => {
     if (!node || !adding) return;
     let to = '';
-    if (edit((t) => {
-      const r = addNode(t, node.path, adding.name.trim(), adding.type.trim());
-      to = r.path;
-      return r.text;
-    })) {
+    if (
+      edit((t) => {
+        const r = addNode(t, node.path, adding.name.trim(), adding.type.trim());
+        to = r.path;
+        return r.text;
+      })
+    ) {
       setAdding(null);
       setSelected(to);
     }
@@ -243,7 +300,11 @@ export function SceneView({ path }: { path: string }) {
   const newScript = async (n: TscnNode) => {
     if (projectDir == null) return;
     const folder = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-    const base = n.name.replace(/[^\w-]+/g, '_').replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase() || 'script';
+    const base =
+      n.name
+        .replace(/[^\w-]+/g, '_')
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .toLowerCase() || 'script';
     const file = `${folder ? `${folder}/` : ''}${base}.gd`;
     const res = relToRes(file, projectDir);
     if (!res) return;
@@ -300,10 +361,20 @@ export function SceneView({ path }: { path: string }) {
         <span className="gm-dim">{tgm('nodes', { n: scene.nodes.length })}</span>
         {dirty && <span className="gm-unsaved">{tgm('unsaved')}</span>}
         <div className="spacer" />
-        <button className="btn ghost gm-small" title={`${tgm('undo')} (Ctrl+Z)`} aria-label={tgm('undo')} onClick={undo}>
+        <button
+          className="btn ghost gm-small"
+          title={`${tgm('undo')} (Ctrl+Z)`}
+          aria-label={tgm('undo')}
+          onClick={undo}
+        >
           <Icon name="undo" size={13} />
         </button>
-        <button className="btn ghost gm-small" title={`${tgm('redo')} (Ctrl+Y)`} aria-label={tgm('redo')} onClick={redo}>
+        <button
+          className="btn ghost gm-small"
+          title={`${tgm('redo')} (Ctrl+Y)`}
+          aria-label={tgm('redo')}
+          onClick={redo}
+        >
           <Icon name="redo" size={13} />
         </button>
         {projectDir != null && resOfScene && (
@@ -320,13 +391,21 @@ export function SceneView({ path }: { path: string }) {
             </button>
             <button
               className="btn ghost gm-small"
-              onClick={() => void api().games.openEditor(projectDir, path).catch((e: Error) => toast(tgm('error', { err: e.message })))}
+              onClick={() =>
+                void api()
+                  .games.openEditor(projectDir, path)
+                  .catch((e: Error) => toast(tgm('error', { err: e.message })))
+              }
             >
               {tgm('editor')}
             </button>
           </>
         )}
-        <button className="btn ghost gm-small" title={tgm('textHint')} onClick={() => setTabViewer(path, undefined)}>
+        <button
+          className="btn ghost gm-small"
+          title={tgm('textHint')}
+          onClick={() => setTabViewer(path, undefined)}
+        >
           {'</>'} {tgm('text')}
         </button>
       </div>
@@ -336,7 +415,12 @@ export function SceneView({ path }: { path: string }) {
       ) : (
         <div className="gm-scene-main">
           <div className="gm-tree" role="tree" aria-label={tgm('sceneTitle')}>
-            <input className="gm-filter" value={filter} placeholder={tgm('filter')} onChange={(e) => setFilter(e.target.value)} />
+            <input
+              className="gm-filter"
+              value={filter}
+              placeholder={tgm('filter')}
+              onChange={(e) => setFilter(e.target.value)}
+            />
             {visible.map(({ node: n, depth, children }) => (
               <div
                 key={n.path}
@@ -363,13 +447,25 @@ export function SceneView({ path }: { path: string }) {
                     if (children) toggle(n.path);
                   }}
                 >
-                  {children > 0 && <Icon name={collapsed.has(n.path) ? 'chevron' : 'chevronDown'} size={12} />}
+                  {children > 0 && (
+                    <Icon name={collapsed.has(n.path) ? 'chevron' : 'chevronDown'} size={12} />
+                  )}
                 </span>
                 <span className={`gm-dot ${kindOf(n)}`} aria-hidden />
                 <span className="gm-tname">{n.name}</span>
-                <span className="gm-dim">{n.instance ? `⧉ ${n.instance.split('/').pop()}` : n.type}</span>
-                {n.script && <span className="gm-badge" title={n.script}><Icon name="code" size={11} /></span>}
-                {n.groups.length > 0 && <span className="gm-badge" title={n.groups.join(', ')}>#</span>}
+                <span className="gm-dim">
+                  {n.instance ? `⧉ ${n.instance.split('/').pop()}` : n.type}
+                </span>
+                {n.script && (
+                  <span className="gm-badge" title={n.script}>
+                    <Icon name="code" size={11} />
+                  </span>
+                )}
+                {n.groups.length > 0 && (
+                  <span className="gm-badge" title={n.groups.join(', ')}>
+                    #
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -384,21 +480,42 @@ export function SceneView({ path }: { path: string }) {
                 </button>
               </div>
               <div className="gm-node-actions">
-                <button className="btn ghost gm-small" title={`${tgm('rename')} (F2)`} onClick={() => void rename(node)}>
+                <button
+                  className="btn ghost gm-small"
+                  title={`${tgm('rename')} (F2)`}
+                  onClick={() => void rename(node)}
+                >
                   <Icon name="edit" size={12} /> {tgm('rename')}
                 </button>
-                <button className="btn ghost gm-small" onClick={() => setAdding({ name: '', type: 'Node2D' })}>
+                <button
+                  className="btn ghost gm-small"
+                  onClick={() => setAdding({ name: '', type: 'Node2D' })}
+                >
                   <Icon name="plus" size={12} /> {tgm('addChild')}
                 </button>
                 {node.path !== '.' && (
                   <>
-                    <button className="btn ghost gm-small" title={tgm('moveUp')} aria-label={tgm('moveUp')} onClick={() => edit((t) => moveNode(t, node.path, -1))}>
+                    <button
+                      className="btn ghost gm-small"
+                      title={tgm('moveUp')}
+                      aria-label={tgm('moveUp')}
+                      onClick={() => edit((t) => moveNode(t, node.path, -1))}
+                    >
                       <Icon name="arrowUp" size={12} />
                     </button>
-                    <button className="btn ghost gm-small" title={tgm('moveDown')} aria-label={tgm('moveDown')} onClick={() => edit((t) => moveNode(t, node.path, 1))}>
+                    <button
+                      className="btn ghost gm-small"
+                      title={tgm('moveDown')}
+                      aria-label={tgm('moveDown')}
+                      onClick={() => edit((t) => moveNode(t, node.path, 1))}
+                    >
                       <Icon name="arrowDown" size={12} />
                     </button>
-                    <button className="btn ghost gm-small gm-danger" title={`${tgm('remove')} (Supr)`} onClick={() => void remove(node)}>
+                    <button
+                      className="btn ghost gm-small gm-danger"
+                      title={`${tgm('remove')} (Supr)`}
+                      onClick={() => void remove(node)}
+                    >
                       <Icon name="trash" size={12} /> {tgm('remove')}
                     </button>
                   </>
@@ -436,7 +553,11 @@ export function SceneView({ path }: { path: string }) {
                   <button className="btn gm-small" type="submit" disabled={!adding.type.trim()}>
                     {tgm('add')}
                   </button>
-                  <button className="btn ghost gm-small" type="button" onClick={() => setAdding(null)}>
+                  <button
+                    className="btn ghost gm-small"
+                    type="button"
+                    onClick={() => setAdding(null)}
+                  >
                     {tgm('cancel')}
                   </button>
                 </form>
@@ -448,7 +569,11 @@ export function SceneView({ path }: { path: string }) {
                   <>
                     <dt>{tgm('instance')}</dt>
                     <dd>
-                      <button className="gm-link" disabled={!rel(node.instance)} onClick={() => void openFile(rel(node.instance)!)}>
+                      <button
+                        className="gm-link"
+                        disabled={!rel(node.instance)}
+                        onClick={() => void openFile(rel(node.instance)!)}
+                      >
                         {node.instance}
                       </button>
                     </dd>
@@ -458,7 +583,11 @@ export function SceneView({ path }: { path: string }) {
                 <dd className="gm-script-row">
                   {node.script ? (
                     <>
-                      <button className="gm-link" disabled={!rel(node.script)} onClick={() => void openFile(rel(node.script)!)}>
+                      <button
+                        className="gm-link"
+                        disabled={!rel(node.script)}
+                        onClick={() => void openFile(rel(node.script)!)}
+                      >
                         {node.script}
                       </button>
                       <button
@@ -493,7 +622,10 @@ export function SceneView({ path }: { path: string }) {
               <div className="gm-subtitle">
                 {tgm('props')}
                 <div className="spacer" />
-                <button className="btn ghost gm-small" onClick={() => setNewProp({ key: '', value: '' })}>
+                <button
+                  className="btn ghost gm-small"
+                  onClick={() => setNewProp({ key: '', value: '' })}
+                >
                   <Icon name="plus" size={12} /> {tgm('addProp')}
                 </button>
               </div>
@@ -504,7 +636,9 @@ export function SceneView({ path }: { path: string }) {
                       key={`${node.path}:${k}`}
                       k={k}
                       v={v}
-                      onSet={(value, group) => edit((t) => setNodeProp(t, node.path, k, value), group)}
+                      onSet={(value, group) =>
+                        edit((t) => setNodeProp(t, node.path, k, value), group)
+                      }
                       onRemove={() => edit((t) => setNodeProp(t, node.path, k, null))}
                     />
                   ))}
@@ -536,10 +670,18 @@ export function SceneView({ path }: { path: string }) {
                     value={newProp.value}
                     onChange={(e) => setNewProp({ ...newProp, value: e.target.value })}
                   />
-                  <button className="btn gm-small" type="submit" disabled={!newProp.key.trim() || !newProp.value.trim()}>
+                  <button
+                    className="btn gm-small"
+                    type="submit"
+                    disabled={!newProp.key.trim() || !newProp.value.trim()}
+                  >
                     {tgm('add')}
                   </button>
-                  <button className="btn ghost gm-small" type="button" onClick={() => setNewProp(null)}>
+                  <button
+                    className="btn ghost gm-small"
+                    type="button"
+                    onClick={() => setNewProp(null)}
+                  >
                     {tgm('cancel')}
                   </button>
                 </form>
@@ -549,7 +691,8 @@ export function SceneView({ path }: { path: string }) {
                   <div className="gm-subtitle">{tgm('signals')}</div>
                   {signals.map((c, i) => (
                     <div key={i} className="gm-signal mono">
-                      {c.from === '.' ? scene.nodes[0]?.name : c.from}.{c.signal} → {c.to === '.' ? scene.nodes[0]?.name : c.to}.{c.method}()
+                      {c.from === '.' ? scene.nodes[0]?.name : c.from}.{c.signal} →{' '}
+                      {c.to === '.' ? scene.nodes[0]?.name : c.to}.{c.method}()
                     </div>
                   ))}
                 </>
@@ -563,7 +706,17 @@ export function SceneView({ path }: { path: string }) {
 }
 
 /** One property: click to edit; booleans are a checkbox and colors a color picker. */
-function PropRow({ k, v, onSet, onRemove }: { k: string; v: string; onSet: (value: string, group?: string) => boolean; onRemove: () => void }) {
+function PropRow({
+  k,
+  v,
+  onSet,
+  onRemove,
+}: {
+  k: string;
+  v: string;
+  onSet: (value: string, group?: string) => boolean;
+  onRemove: () => void;
+}) {
   const [draft, setDraft] = useState<string | null>(null);
   const kind = valueKind(v);
   const input = useRef<HTMLInputElement>(null);
@@ -599,7 +752,12 @@ function PropRow({ k, v, onSet, onRemove }: { k: string; v: string; onSet: (valu
           />
         ) : kind === 'bool' ? (
           <label className="gm-prop-bool">
-            <input type="checkbox" aria-label={k} checked={v.trim() === 'true'} onChange={(e) => onSet(e.target.checked ? 'true' : 'false')} />
+            <input
+              type="checkbox"
+              aria-label={k}
+              checked={v.trim() === 'true'}
+              onChange={(e) => onSet(e.target.checked ? 'true' : 'false')}
+            />
             {v}
           </label>
         ) : (
@@ -610,7 +768,9 @@ function PropRow({ k, v, onSet, onRemove }: { k: string; v: string; onSet: (valu
                 className="gm-prop-color"
                 aria-label={k}
                 value={hexFromColor(v).hex}
-                onChange={(e) => onSet(colorFromHex(e.target.value, hexFromColor(v).alpha), `color:${k}`)}
+                onChange={(e) =>
+                  onSet(colorFromHex(e.target.value, hexFromColor(v).alpha), `color:${k}`)
+                }
               />
             )}
             <button className="gm-prop-value" onClick={start}>
@@ -618,7 +778,12 @@ function PropRow({ k, v, onSet, onRemove }: { k: string; v: string; onSet: (valu
             </button>
           </>
         )}
-        <button className="gm-prop-remove" title={tgm('removeProp')} aria-label={tgm('removeProp')} onClick={onRemove}>
+        <button
+          className="gm-prop-remove"
+          title={tgm('removeProp')}
+          aria-label={tgm('removeProp')}
+          onClick={onRemove}
+        >
           <Icon name="x" size={12} />
         </button>
       </dd>

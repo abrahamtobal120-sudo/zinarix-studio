@@ -101,7 +101,13 @@ export function QuickPick({
             } else if (e.key === 'Enter' && filtered[index]) onPick(filtered[index]!);
           }}
         />
-        <div className="pick-list" ref={list} id={`${uid}-list`} role="listbox" aria-label={placeholder}>
+        <div
+          className="pick-list"
+          ref={list}
+          id={`${uid}-list`}
+          role="listbox"
+          aria-label={placeholder}
+        >
           {filtered.map((it, i) => (
             <div key={it.id} role="presentation">
               {it.group && (i === 0 || filtered[i - 1]!.group !== it.group) && !query && (
@@ -127,9 +133,11 @@ export function QuickPick({
               </div>
             </div>
           ))}
-          {filtered.length === 0 && <div className="pick-empty" role="status">
+          {filtered.length === 0 && (
+            <div className="pick-empty" role="status">
               {t('noResults')}
-            </div>}
+            </div>
+          )}
         </div>
         {footer && <div className="pick-footer">{footer}</div>}
       </div>

@@ -102,7 +102,11 @@ export class MeshViewer {
   private readonly onUp = (e: PointerEvent) => this.pick(e);
 
   constructor(private readonly host: HTMLElement) {
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+    this.renderer = new WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true,
+    });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.className = 'cad-canvas';
@@ -110,7 +114,13 @@ export class MeshViewer {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = false;
     this.controls.addEventListener('change', () => this.draw());
-    this.front = new MeshStandardMaterial({ color: 0xf0a640, roughness: 0.55, metalness: 0.05, side: FrontSide, flatShading: false });
+    this.front = new MeshStandardMaterial({
+      color: 0xf0a640,
+      roughness: 0.55,
+      metalness: 0.05,
+      side: FrontSide,
+      flatShading: false,
+    });
     this.back = new MeshStandardMaterial({ color: 0xd04848, roughness: 0.8, side: BackSide });
     this.scene.add(new HemisphereLight(0xffffff, 0x444444, 1.4));
     this.scene.add(new AmbientLight(0xffffff, 0.25));
@@ -183,9 +193,18 @@ export class MeshViewer {
    * G-code: extrusion and travel segments (x0 y0 z0 x1 y1 z1 each). Shown layer by layer with
    * showLayers; the camera frames the extrusion.
    */
-  setToolpath(extrude: Float32Array, travel: Float32Array, refit: boolean, frame?: [number, number, number, number, number, number] | null): void {
+  setToolpath(
+    extrude: Float32Array,
+    travel: Float32Array,
+    refit: boolean,
+    frame?: [number, number, number, number, number, number] | null,
+  ): void {
     this.clearModel();
-    if (frame) this.frameBox = new Box3(new Vector3(frame[0], frame[1], Math.min(frame[2], 0)), new Vector3(frame[3], frame[4], frame[5]));
+    if (frame)
+      this.frameBox = new Box3(
+        new Vector3(frame[0], frame[1], Math.min(frame[2], 0)),
+        new Vector3(frame[3], frame[4], frame[5]),
+      );
     const attr = new BufferAttribute(extrude, 3);
     const geo = () => {
       const g = new BufferGeometry();
@@ -195,9 +214,22 @@ export class MeshViewer {
     const tg = new BufferGeometry();
     tg.setAttribute('position', new BufferAttribute(travel, 3));
     this.paths = {
-      done: new LineSegments(geo(), new LineBasicMaterial({ color: cssColor('--accent', 0xf0a640) })),
-      current: new LineSegments(geo(), new LineBasicMaterial({ color: cssColor('--fg', 0xffffff) })),
-      travel: new LineSegments(tg, new LineBasicMaterial({ color: cssColor('--info', 0x4aa3ff), transparent: true, opacity: 0.35 })),
+      done: new LineSegments(
+        geo(),
+        new LineBasicMaterial({ color: cssColor('--accent', 0xf0a640) }),
+      ),
+      current: new LineSegments(
+        geo(),
+        new LineBasicMaterial({ color: cssColor('--fg', 0xffffff) }),
+      ),
+      travel: new LineSegments(
+        tg,
+        new LineBasicMaterial({
+          color: cssColor('--info', 0x4aa3ff),
+          transparent: true,
+          opacity: 0.35,
+        }),
+      ),
     };
     this.root.add(this.paths.done, this.paths.current, this.paths.travel);
     this.buildBed();
@@ -209,12 +241,22 @@ export class MeshViewer {
    * Draws extrusion segments [from, to) with the current layer [curFrom, to) highlighted, and
    * travel [travelFrom, travelTo) when shown. Counts are segments.
    */
-  showLayers(o: { from: number; curFrom: number; to: number; travelFrom: number; travelTo: number; travel: boolean }): void {
+  showLayers(o: {
+    from: number;
+    curFrom: number;
+    to: number;
+    travelFrom: number;
+    travelTo: number;
+    travel: boolean;
+  }): void {
     if (!this.paths) return;
     this.paths.done.geometry.setDrawRange(o.from * 2, Math.max(0, o.curFrom - o.from) * 2);
     this.paths.current.geometry.setDrawRange(o.curFrom * 2, Math.max(0, o.to - o.curFrom) * 2);
     this.paths.travel.visible = o.travel;
-    this.paths.travel.geometry.setDrawRange(o.travelFrom * 2, Math.max(0, o.travelTo - o.travelFrom) * 2);
+    this.paths.travel.geometry.setDrawRange(
+      o.travelFrom * 2,
+      Math.max(0, o.travelTo - o.travelFrom) * 2,
+    );
     this.draw();
   }
 
@@ -241,15 +283,24 @@ export class MeshViewer {
     const d = this.downAt;
     this.downAt = null;
     // A drag orbits the camera; only a click picks.
-    if (!this.measuring || !d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4 || e.button !== 0) return;
+    if (!this.measuring || !d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4 || e.button !== 0)
+      return;
     const r = this.renderer.domElement.getBoundingClientRect();
     const ray = new Raycaster();
-    ray.setFromCamera(new Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
+    ray.setFromCamera(
+      new Vector2(
+        ((e.clientX - r.left) / r.width) * 2 - 1,
+        -((e.clientY - r.top) / r.height) * 2 + 1,
+      ),
+      this.camera,
+    );
     const meshes: Object3D[] = [];
     this.root.traverse((x) => {
       if ((x as Mesh).isMesh && (x as Mesh).material !== this.back) meshes.push(x);
     });
-    const hit = ray.intersectObjects(meshes, false).find((h) => !this.cut || this.cut.distanceToPoint(h.point) >= -1e-6);
+    const hit = ray
+      .intersectObjects(meshes, false)
+      .find((h) => !this.cut || this.cut.distanceToPoint(h.point) >= -1e-6);
     if (!hit) return;
     if (this.picks.length >= 2) {
       this.picks = [];
@@ -257,14 +308,20 @@ export class MeshViewer {
     }
     this.picks.push(hit.point.clone());
     const size = Math.max(this.bounds().getSize(new Vector3()).length(), 1e-3);
-    const dot = new Mesh(new SphereGeometry(size / 160, 12, 8), new MeshStandardMaterial({ color: cssColor('--fg', 0xffffff), depthTest: false }));
+    const dot = new Mesh(
+      new SphereGeometry(size / 160, 12, 8),
+      new MeshStandardMaterial({ color: cssColor('--fg', 0xffffff), depthTest: false }),
+    );
     dot.position.copy(hit.point);
     dot.renderOrder = 10;
     this.marks.add(dot);
     const [a, b] = this.picks;
     if (a && b) {
       const g = new BufferGeometry().setFromPoints([a, b]);
-      const line = new LineSegments(g, new LineBasicMaterial({ color: cssColor('--fg', 0xffffff), depthTest: false }));
+      const line = new LineSegments(
+        g,
+        new LineBasicMaterial({ color: cssColor('--fg', 0xffffff), depthTest: false }),
+      );
       line.renderOrder = 10;
       this.marks.add(line);
     }
@@ -284,7 +341,8 @@ export class MeshViewer {
     this.root.traverse((x) => {
       const m = x as Mesh;
       if (!m.isMesh || m.material === this.front || m.material === this.back) return;
-      for (const mat of Array.isArray(m.material) ? m.material : [m.material]) if (mat) mat.clippingPlanes = planes;
+      for (const mat of Array.isArray(m.material) ? m.material : [m.material])
+        if (mat) mat.clippingPlanes = planes;
     });
     this.draw();
   }
@@ -360,7 +418,8 @@ export class MeshViewer {
       const m = x as Mesh;
       if (m.isMesh && m.material !== this.front && m.material !== this.back) {
         const mats = Array.isArray(m.material) ? m.material : [m.material];
-        for (const mat of mats) if (mat && 'wireframe' in mat) (mat as MeshStandardMaterial).wireframe = this.wireframe;
+        for (const mat of mats)
+          if (mat && 'wireframe' in mat) (mat as MeshStandardMaterial).wireframe = this.wireframe;
       }
     });
   }
@@ -379,19 +438,48 @@ export class MeshViewer {
     const z = abs ? 0 : b.isEmpty() ? 0 : b.min.z;
     const step = bx >= 50 ? 10 : bx / 22;
     const pts: number[] = [];
-    for (let x = -bx / 2; x <= bx / 2 + 1e-9; x += step) pts.push(cx + x, cy - by / 2, z, cx + x, cy + by / 2, z);
-    for (let y = -by / 2; y <= by / 2 + 1e-9; y += step) pts.push(cx - bx / 2, cy + y, z, cx + bx / 2, cy + y, z);
+    for (let x = -bx / 2; x <= bx / 2 + 1e-9; x += step)
+      pts.push(cx + x, cy - by / 2, z, cx + x, cy + by / 2, z);
+    for (let y = -by / 2; y <= by / 2 + 1e-9; y += step)
+      pts.push(cx - bx / 2, cy + y, z, cx + bx / 2, cy + y, z);
     const grid = new BufferGeometry();
     grid.setAttribute('position', new BufferAttribute(Float32Array.from(pts), 3));
-    this.bedGroup.add(new LineSegments(grid, new LineBasicMaterial({ color: cssColor('--border', 0x3a3f48), transparent: true, opacity: 0.7 })));
+    this.bedGroup.add(
+      new LineSegments(
+        grid,
+        new LineBasicMaterial({
+          color: cssColor('--border', 0x3a3f48),
+          transparent: true,
+          opacity: 0.7,
+        }),
+      ),
+    );
     // The outline turns red when the model sticks out of the bed.
-    const fits = b.isEmpty() || (abs ? b.min.x >= -1 && b.min.y >= -1 && b.max.x <= bx + 1 && b.max.y <= by + 1 : b.max.x - b.min.x <= bx && b.max.y - b.min.y <= by);
+    const fits =
+      b.isEmpty() ||
+      (abs
+        ? b.min.x >= -1 && b.min.y >= -1 && b.max.x <= bx + 1 && b.max.y <= by + 1
+        : b.max.x - b.min.x <= bx && b.max.y - b.min.y <= by);
     const o = [
-      [-1, -1], [1, -1], [1, -1], [1, 1], [1, 1], [-1, 1], [-1, 1], [-1, -1],
+      [-1, -1],
+      [1, -1],
+      [1, -1],
+      [1, 1],
+      [1, 1],
+      [-1, 1],
+      [-1, 1],
+      [-1, -1],
     ].flatMap(([sx, sy]) => [cx + (sx! * bx) / 2, cy + (sy! * by) / 2, z]);
     const outline = new BufferGeometry();
     outline.setAttribute('position', new BufferAttribute(Float32Array.from(o), 3));
-    this.bedGroup.add(new LineSegments(outline, new LineBasicMaterial({ color: fits ? cssColor('--fg-dim', 0x888888) : new Color(0xe05050) })));
+    this.bedGroup.add(
+      new LineSegments(
+        outline,
+        new LineBasicMaterial({
+          color: fits ? cssColor('--fg-dim', 0x888888) : new Color(0xe05050),
+        }),
+      ),
+    );
   }
 
   view(v: ViewName): void {
@@ -399,7 +487,13 @@ export class MeshViewer {
     const center = b.isEmpty() ? new Vector3() : b.getCenter(new Vector3());
     const size = b.isEmpty() ? 50 : Math.max(b.getSize(new Vector3()).length(), 1e-3);
     const dir =
-      v === 'front' ? new Vector3(0, -1, 0.0001) : v === 'top' ? new Vector3(0, -0.0001, 1) : v === 'right' ? new Vector3(1, 0, 0.0001) : new Vector3(1, -1.2, 0.9);
+      v === 'front'
+        ? new Vector3(0, -1, 0.0001)
+        : v === 'top'
+          ? new Vector3(0, -0.0001, 1)
+          : v === 'right'
+            ? new Vector3(1, 0, 0.0001)
+            : new Vector3(1, -1.2, 0.9);
     dir.normalize();
     // Fit the bounding sphere in the narrower of the two angles (a tall, thin view cuts the sides).
     const vHalf = (this.camera.fov * Math.PI) / 360;

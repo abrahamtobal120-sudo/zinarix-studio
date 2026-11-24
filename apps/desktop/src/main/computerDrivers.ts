@@ -229,7 +229,15 @@ export class WinDriver implements Driver {
     const encoded = Buffer.from(WIN_LOOP, 'utf16le').toString('base64');
     const proc = spawn(
       'powershell.exe',
-      ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-EncodedCommand',
+        encoded,
+      ],
       { windowsHide: true },
     );
     this.proc = proc;
@@ -290,7 +298,8 @@ export class WinDriver implements Driver {
   }
   async type(text: string) {
     // Long texts in pieces so one line never gets huge.
-    for (let i = 0; i < text.length; i += 400) await this.cmd(`text ${b64(text.slice(i, i + 400))}`);
+    for (let i = 0; i < text.length; i += 400)
+      await this.cmd(`text ${b64(text.slice(i, i + 400))}`);
   }
   async keys(c: KeyCombo) {
     const mods = c.mods.length ? c.mods.map((m) => WIN_VK[m]).join(',') : '-';
@@ -354,8 +363,20 @@ const MAC_MOD: Record<string, string> = {
 
 function runJxa(script: string): Promise<string> {
   return new Promise((resolve, reject) =>
-    execFile('osascript', ['-l', 'JavaScript', '-e', script], { timeout: 30_000 }, (err, out, errOut) =>
-      err ? reject(new Error(String(errOut || err.message).trim().slice(0, 400))) : resolve(String(out).trim()),
+    execFile(
+      'osascript',
+      ['-l', 'JavaScript', '-e', script],
+      { timeout: 30_000 },
+      (err, out, errOut) =>
+        err
+          ? reject(
+              new Error(
+                String(errOut || err.message)
+                  .trim()
+                  .slice(0, 400),
+              ),
+            )
+          : resolve(String(out).trim()),
     ),
   );
 }
@@ -382,7 +403,8 @@ export class MacDriver implements Driver {
   async click(x: number, y: number, b: MouseButton, n: number) {
     const [down, up, btn] = b === 'right' ? [3, 4, 1] : b === 'middle' ? [25, 26, 2] : [1, 2, 0];
     let s = `${JXA_MOUSE} ev(5, ${x}, ${y}, 0); sleep(0.04);`;
-    for (let k = 1; k <= n; k++) s += ` ev(${down}, ${x}, ${y}, ${btn}, ${k}); ev(${up}, ${x}, ${y}, ${btn}, ${k}); sleep(0.06);`;
+    for (let k = 1; k <= n; k++)
+      s += ` ev(${down}, ${x}, ${y}, ${btn}, ${k}); ev(${up}, ${x}, ${y}, ${btn}, ${k}); sleep(0.06);`;
     await runJxa(s);
   }
   async drag(x1: number, y1: number, x2: number, y2: number) {
@@ -405,7 +427,10 @@ export class MacDriver implements Driver {
   async type(text: string) {
     const lines = text.replace(/\r/g, '').split('\n');
     const parts = lines
-      .map((l, i) => `${l ? `se.keystroke(${JSON.stringify(l)});` : ''}${i < lines.length - 1 ? ' se.keyCode(36);' : ''}`)
+      .map(
+        (l, i) =>
+          `${l ? `se.keystroke(${JSON.stringify(l)});` : ''}${i < lines.length - 1 ? ' se.keyCode(36);' : ''}`,
+      )
       .join(' ');
     await runJxa(`var se = Application('System Events'); ${parts}`);
   }
@@ -416,7 +441,8 @@ export class MacDriver implements Driver {
       return;
     }
     const code = c.key.length > 1 ? MAC_KEYCODE[c.key] : undefined;
-    if (c.key.length > 1 && code === undefined) throw new Error(`The key "${c.key}" does not exist on macOS.`);
+    if (c.key.length > 1 && code === undefined)
+      throw new Error(`The key "${c.key}" does not exist on macOS.`);
     await runJxa(
       `var se = Application('System Events'); ${
         code !== undefined
@@ -428,7 +454,15 @@ export class MacDriver implements Driver {
   async openApp(name: string) {
     await new Promise<void>((resolve, reject) =>
       execFile('open', ['-a', name], { timeout: 30_000 }, (err, _o, errOut) =>
-        err ? reject(new Error(String(errOut || err.message).trim().slice(0, 300))) : resolve(),
+        err
+          ? reject(
+              new Error(
+                String(errOut || err.message)
+                  .trim()
+                  .slice(0, 300),
+              ),
+            )
+          : resolve(),
       ),
     );
   }
@@ -483,7 +517,15 @@ const X_KEYS: Record<string, string> = {
 function xdo(args: string[]): Promise<string> {
   return new Promise((resolve, reject) =>
     execFile('xdotool', args, { timeout: 30_000 }, (err, out, errOut) =>
-      err ? reject(new Error(String(errOut || err.message).trim().slice(0, 400))) : resolve(String(out)),
+      err
+        ? reject(
+            new Error(
+              String(errOut || err.message)
+                .trim()
+                .slice(0, 400),
+            ),
+          )
+        : resolve(String(out)),
     ),
   );
 }
@@ -530,7 +572,8 @@ export class LinuxDriver implements Driver {
     await xdo(['key', '--clearmodifiers', names.join('+')]);
   }
   async openApp(name: string) {
-    if (/\s/.test(name)) throw new Error('On Linux give the command name of the program (no spaces).');
+    if (/\s/.test(name))
+      throw new Error('On Linux give the command name of the program (no spaces).');
     await new Promise<void>((resolve, reject) => {
       const p = spawn(name, [], { detached: true, stdio: 'ignore' });
       p.once('error', (e) => reject(new Error(`"${name}" was not found (${e.message}).`)));
@@ -550,7 +593,11 @@ export class LinuxDriver implements Driver {
       if (!title) continue;
       const pid = Number((await xdo(['getwindowpid', id]).catch(() => '0')).trim()) || 0;
       let app = '';
-      if (pid) app = await readFile(`/proc/${pid}/comm`, 'utf8').then((s) => s.trim(), () => '');
+      if (pid)
+        app = await readFile(`/proc/${pid}/comm`, 'utf8').then(
+          (s) => s.trim(),
+          () => '',
+        );
       out.push({ id, pid, app, title });
     }
     return out;

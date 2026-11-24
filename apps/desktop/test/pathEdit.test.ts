@@ -17,7 +17,14 @@ import {
   setNodeType,
 } from '../src/shared/pathEdit.js';
 import { TEMPLATES, buildTemplate, svgSize, wrapText } from '../src/shared/graphics.js';
-import { diskPoints, mirrorPoints, mulberry32, pixelBox, rectMap, scaleRect } from '../src/shared/paint.js';
+import {
+  diskPoints,
+  mirrorPoints,
+  mulberry32,
+  pixelBox,
+  rectMap,
+  scaleRect,
+} from '../src/shared/paint.js';
 import { setTextLines, textValue } from '../src/renderer/components/vector/vectorSession.js';
 
 const close = (a: number, b: number, eps = 1e-3) => expect(Math.abs(a - b)).toBeLessThan(eps);
@@ -94,7 +101,12 @@ describe('editing nodes', () => {
     // B(0.5) of the original curve.
     const b = (t: number) => {
       const u = 1 - t;
-      return u * u * u * before[0].y + 3 * u * u * t * before[1].y + 3 * u * t * t * before[2].y + t * t * t * before[3].y;
+      return (
+        u * u * u * before[0].y +
+        3 * u * u * t * before[1].y +
+        3 * u * t * t * before[2].y +
+        t * t * t * before[3].y
+      );
     };
     close(mid.y, b(0.5));
     close(mid.x, 50);
@@ -220,14 +232,42 @@ describe('paint helpers', () => {
   });
 
   it('moving and scaling a box of pixels', () => {
-    expect(pixelBox([{ x: -5, y: 2.5 }, { x: 10.2, y: 300 }], 50, 50)).toEqual({ x: 0, y: 2, w: 11, h: 48 });
-    expect(pixelBox([{ x: 60, y: 60 }, { x: 70, y: 70 }], 50, 50)).toBeNull();
+    expect(
+      pixelBox(
+        [
+          { x: -5, y: 2.5 },
+          { x: 10.2, y: 300 },
+        ],
+        50,
+        50,
+      ),
+    ).toEqual({ x: 0, y: 2, w: 11, h: 48 });
+    expect(
+      pixelBox(
+        [
+          { x: 60, y: 60 },
+          { x: 70, y: 70 },
+        ],
+        50,
+        50,
+      ),
+    ).toBeNull();
     const m = rectMap({ x: 10, y: 10, w: 20, h: 10 }, { x: 0, y: 0, w: 40, h: 20 });
     expect(m).toEqual([2, 0, 0, 2, -20, -20]);
     // Flipped: the left edge lands on the right.
     const f = rectMap({ x: 0, y: 0, w: 10, h: 10 }, { x: 0, y: 0, w: 10, h: 10 }, true);
     expect(f[0] * 0 + f[4]).toBe(10);
-    expect(scaleRect({ x: 0, y: 0, w: 100, h: 50 }, 'se', 200, 60, true)).toEqual({ x: 0, y: 0, w: 200, h: 100 });
-    expect(scaleRect({ x: 0, y: 0, w: 100, h: 50 }, 'nw', 50, 10, false)).toEqual({ x: 50, y: 10, w: 50, h: 40 });
+    expect(scaleRect({ x: 0, y: 0, w: 100, h: 50 }, 'se', 200, 60, true)).toEqual({
+      x: 0,
+      y: 0,
+      w: 200,
+      h: 100,
+    });
+    expect(scaleRect({ x: 0, y: 0, w: 100, h: 50 }, 'nw', 50, 10, false)).toEqual({
+      x: 50,
+      y: 10,
+      w: 50,
+      h: 40,
+    });
   });
 });

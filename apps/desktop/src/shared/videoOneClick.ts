@@ -179,11 +179,20 @@ export function pictureInPicture(
   const videoTracks = (q: VideoProject) => q.tracks.filter((t) => t.kind === 'video');
   // Display order is top first: the tracks above c's are the ones before it.
   const free = (q: VideoProject, tid: string) =>
-    !q.clips.some((x) => x.trackId === tid && x.id !== id && x.start < end && x.start + (x.out - x.in) / (x.speed ?? 1) > c.start);
+    !q.clips.some(
+      (x) =>
+        x.trackId === tid &&
+        x.id !== id &&
+        x.start < end &&
+        x.start + (x.out - x.in) / (x.speed ?? 1) > c.start,
+    );
   let next = p;
   const vt = videoTracks(next);
   const mine = vt.findIndex((t) => t.id === c.trackId);
-  let target = vt.slice(0, Math.max(0, mine)).reverse().find((t) => !t.locked && free(next, t.id));
+  let target = vt
+    .slice(0, Math.max(0, mine))
+    .reverse()
+    .find((t) => !t.locked && free(next, t.id));
   if (!target) {
     next = addVideoTrack(next);
     target = videoTracks(next)[0]!;
@@ -258,7 +267,14 @@ export function frameColorStats(px: Uint8Array | Uint8ClampedArray, channels = 3
   };
   let sum = 0;
   for (let v = 0; v < 256; v++) sum += v * hist[v]!;
-  return { r: r / n / 255, g: g / n / 255, b: b / n / 255, lo: pct(0.01), hi: pct(0.99), mean: sum / n / 255 };
+  return {
+    r: r / n / 255,
+    g: g / n / 255,
+    b: b / n / 255,
+    lo: pct(0.01),
+    hi: pct(0.99),
+    mean: sum / n / 255,
+  };
 }
 
 const LIFT_K = 0.4; // videoColor.ts: lift wheel reach
@@ -296,7 +312,8 @@ export function autoGrade(s: ColorStats): ColorGrade | undefined {
   // Drop the neutral parts (videoColor's cleanGrade would too; kept here to stay import-free).
   for (const k of ['gain', 'lift', 'gamma'] as const) {
     const wh = grade[k]!;
-    for (const kk of Object.keys(wh) as (keyof typeof wh)[]) if (Math.abs(wh[kk]!) < 0.005) delete wh[kk];
+    for (const kk of Object.keys(wh) as (keyof typeof wh)[])
+      if (Math.abs(wh[kk]!) < 0.005) delete wh[kk];
     if (!Object.keys(wh).length) delete grade[k];
   }
   return Object.keys(grade).length ? grade : undefined;
@@ -305,13 +322,20 @@ export function autoGrade(s: ColorStats): ColorGrade | undefined {
 // ---------------- social formats ----------------
 
 /** Share of the frame the apps cover with their buttons and captions (top, bottom, sides). */
-export const SAFE_ZONES: Record<'vertical' | 'square' | 'wide', { top: number; bottom: number; side: number }> = {
+export const SAFE_ZONES: Record<
+  'vertical' | 'square' | 'wide',
+  { top: number; bottom: number; side: number }
+> = {
   vertical: { top: 0.12, bottom: 0.2, side: 0.06 },
   square: { top: 0.06, bottom: 0.1, side: 0.06 },
   wide: { top: 0.05, bottom: 0.05, side: 0.05 },
 };
 export const safeZoneFor = (w: number, h: number) =>
-  h > w * 1.2 ? SAFE_ZONES.vertical : Math.abs(w - h) < Math.max(w, h) * 0.1 ? SAFE_ZONES.square : SAFE_ZONES.wide;
+  h > w * 1.2
+    ? SAFE_ZONES.vertical
+    : Math.abs(w - h) < Math.max(w, h) * 0.1
+      ? SAFE_ZONES.square
+      : SAFE_ZONES.wide;
 
 /**
  * Centre reframing for another frame size: each picture is zoomed (by its transform scale) so it
@@ -378,7 +402,16 @@ export function fitTitlesToSafeZone(p: VideoProject, width: number, height: numb
     if (!bad.has(c.id) || !c.text) return c;
     const lines = c.text.content.split('\n');
     const longest = Math.max(...lines.map((l) => [...l].length));
-    const t = { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, flipH: false, flipV: false, ...c.transform };
+    const t = {
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      opacity: 1,
+      flipH: false,
+      flipV: false,
+      ...c.transform,
+    };
     const room = { w: 1 - 2 * z.side, h: 1 - z.top - z.bottom };
     const sz = c.text.size * t.scale;
     const wShare = (longest * 0.55 * sz * height) / width;

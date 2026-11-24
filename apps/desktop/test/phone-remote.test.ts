@@ -51,7 +51,10 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     const base = st.url!;
     const pair = await get(`${base}/api/pair`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/130' },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/130',
+      },
       body: JSON.stringify({ pin: st.pin }),
     });
     expect(pair.status).toBe(200);
@@ -79,11 +82,13 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
 
     // Renaming, then unpairing from the phone.
     expect(
-      (await get(`${base2}/api/rename`, {
-        method: 'POST',
-        headers: { ...auth, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Mi celular' }),
-      })).status,
+      (
+        await get(`${base2}/api/rename`, {
+          method: 'POST',
+          headers: { ...auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Mi celular' }),
+        })
+      ).status,
     ).toBe(200);
     expect(b.devices()[0]!.name).toBe('Mi celular');
     await get(`${base2}/api/unpair`, {
@@ -135,7 +140,9 @@ describe.skipIf(!ip)('phone remote survives a restart', () => {
     expect(res.headers.get('content-type')).toBe('application/vnd.android.package-archive');
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe('PK\x03\x04 fake apk');
     // The panel links to it instead of GitHub.
-    expect(await (await get(`${st.url}/`)).text()).toContain('const APP_APK = "/Zinarix-Remote.apk"');
+    expect(await (await get(`${st.url}/`)).text()).toContain(
+      'const APP_APK = "/Zinarix-Remote.apk"',
+    );
   });
 });
 
@@ -166,7 +173,9 @@ describe.skipIf(!ip)('phone remote: Zinarix settings', () => {
     const set = (body: unknown) =>
       get(`${base}/api/config`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
 
-    expect((await get(`${base}/api/caps`, { headers: auth }).then((r) => r.json())).config).toBe(true);
+    expect((await get(`${base}/api/caps`, { headers: auth }).then((r) => r.json())).config).toBe(
+      true,
+    );
     const g = await get(`${base}/api/config`, { headers: auth });
     expect(g.status).toBe(200);
     expect(((await g.json()) as { version: string }).version).toBe('1.0.0');
@@ -200,7 +209,10 @@ describe.skipIf(!ip)('phone remote: Zinarix settings', () => {
     const { phonePage } = await import('../src/main/phonePage.js');
     for (const lang of ['es', 'en'] as const) {
       const html = phonePage('n0nce', lang);
-      const js = html.slice(html.indexOf('<script nonce="n0nce">') + 22, html.lastIndexOf('</script>'));
+      const js = html.slice(
+        html.indexOf('<script nonce="n0nce">') + 22,
+        html.lastIndexOf('</script>'),
+      );
       expect(() => new Function(js)).not.toThrow();
       expect(js).toContain('async function openConfig()');
       expect(html).toContain('id="config2"');
@@ -210,9 +222,15 @@ describe.skipIf(!ip)('phone remote: Zinarix settings', () => {
 
 describe('deviceName', () => {
   it('names common phones', () => {
-    expect(deviceName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari/604.1')).toBe('iPhone · Safari');
-    expect(deviceName('Mozilla/5.0 (Linux; Android 10; K) Chrome/130 Mobile Safari/537.36')).toBe('Android · Chrome');
-    expect(deviceName('Mozilla/5.0 (Linux; Android 13; SM-S911B) SamsungBrowser/23.0 Chrome/115')).toBe('SM-S911B · Samsung Internet');
+    expect(deviceName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari/604.1')).toBe(
+      'iPhone · Safari',
+    );
+    expect(deviceName('Mozilla/5.0 (Linux; Android 10; K) Chrome/130 Mobile Safari/537.36')).toBe(
+      'Android · Chrome',
+    );
+    expect(
+      deviceName('Mozilla/5.0 (Linux; Android 13; SM-S911B) SamsungBrowser/23.0 Chrome/115'),
+    ).toBe('SM-S911B · Samsung Internet');
   });
 });
 
@@ -227,7 +245,11 @@ describe.skipIf(!ip)('D1: a stolen phone token is worth less', () => {
       body: JSON.stringify({ pin: st.pin }),
     });
     const { token } = (await pair.json()) as { token: string };
-    return { a, base, auth: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
+    return {
+      a,
+      base,
+      auth: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    };
   }
 
   it('gives no terminal until it is turned on at the computer', async () => {

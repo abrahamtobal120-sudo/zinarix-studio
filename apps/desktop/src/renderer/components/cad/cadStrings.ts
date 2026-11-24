@@ -9,7 +9,8 @@ const es = {
   engineNative: 'OpenSCAD {v} instalado',
   engineNativeFast: 'OpenSCAD {v} instalado (rápido)',
   engineBuiltin: 'OpenSCAD incluido en Zinarix',
-  engineBuiltinHint: 'Funciona sin instalar nada. Con OpenSCAD instalado los modelos grandes salen más rápido.',
+  engineBuiltinHint:
+    'Funciona sin instalar nada. Con OpenSCAD instalado los modelos grandes salen más rápido.',
   engineNone: 'No hay ningún motor de OpenSCAD disponible.',
   download: 'Descargar OpenSCAD',
   pick: 'Elegir OpenSCAD…',
@@ -51,7 +52,8 @@ const es = {
   problems: 'Mensajes',
   line: 'línea {n}',
   fixAi: 'Arreglar con IA',
-  fixAiPrompt: 'El modelo OpenSCAD {file} da estos errores. Corrígelo y revisa con cad_render que quede bien:\n{errors}',
+  fixAiPrompt:
+    'El modelo OpenSCAD {file} da estos errores. Corrígelo y revisa con cad_render que quede bien:\n{errors}',
   error: 'No se pudo generar',
   empty: 'El modelo está vacío.',
   // Print check (shared with the model viewer)
@@ -76,7 +78,8 @@ const es = {
   fit: 'Encuadrar',
   loadingModel: 'Cargando el modelo…',
   loadFail: 'No se pudo abrir el modelo: {err}',
-  checkAiPrompt: 'Revisa {file} para imprimirlo en 3D con mesh_check{units} y dime qué hay que arreglar.',
+  checkAiPrompt:
+    'Revisa {file} para imprimirlo en 3D con mesh_check{units} y dime qué hay que arreglar.',
   slice: 'Rebanar e imprimir',
   slicePrinter: 'Impresora',
   sliceMaterial: 'Material',
@@ -103,7 +106,8 @@ const es = {
   profileUse: 'Usar mi perfil (.ini)…',
   profileOn: 'Con tu perfil: {file}',
   profileOff: 'Quitar perfil',
-  profileHint: 'Con tu perfil de PrusaSlicer se usan tu cama, tu G-code de inicio y tus ajustes; aquí solo cambian material, capa, relleno, paredes y soportes.',
+  profileHint:
+    'Con tu perfil de PrusaSlicer se usan tu cama, tu G-code de inicio y tus ajustes; aquí solo cambian material, capa, relleno, paredes y soportes.',
   openIn: 'Abrir en {app}',
   gcodeTitle: 'G-code',
   layer: 'Capa {n} de {total}',
@@ -121,14 +125,16 @@ const es = {
   tempBed: 'cama {b} °C',
   slicedWith: 'Rebanado con',
   approx: '(aprox.)',
-  binaryGcode: 'Este G-code es binario (.bgcode): se puede enviar a la impresora pero no verlo aquí.',
+  binaryGcode:
+    'Este G-code es binario (.bgcode): se puede enviar a la impresora pero no verlo aquí.',
   gcodeTruncated: 'El archivo es muy grande: solo se dibuja la primera parte.',
   gcodeEmpty: 'Este G-code no tiene movimientos de impresión.',
   asText: 'Texto',
   asTextHint: 'Abrir el G-code como texto',
   outOfBed: 'Se sale de la cama',
   printers: 'Impresoras',
-  noPrinters: 'Agrega tu impresora con OctoPrint o Klipper (Mainsail / Fluidd) para mandarle el G-code desde Zinarix.',
+  noPrinters:
+    'Agrega tu impresora con OctoPrint o Klipper (Mainsail / Fluidd) para mandarle el G-code desde Zinarix.',
   addPrinter: 'Agregar impresora',
   editPrinter: 'Editar',
   removePrinter: 'Quitar',
@@ -176,7 +182,8 @@ const en: Record<keyof typeof es, string> = {
   engineNative: 'OpenSCAD {v} installed',
   engineNativeFast: 'OpenSCAD {v} installed (fast)',
   engineBuiltin: 'OpenSCAD built into Zinarix',
-  engineBuiltinHint: 'Works without installing anything. With OpenSCAD installed big models come out faster.',
+  engineBuiltinHint:
+    'Works without installing anything. With OpenSCAD installed big models come out faster.',
   engineNone: 'No OpenSCAD engine is available.',
   download: 'Download OpenSCAD',
   pick: 'Choose OpenSCAD…',
@@ -210,14 +217,16 @@ const en: Record<keyof typeof es, string> = {
   exported: 'Saved: {file}',
   exporting: 'Exporting…',
   params: 'Parameters',
-  noParams: 'No parameters. Write lines like this at the top of the file: width = 60; // [20:1:200]',
+  noParams:
+    'No parameters. Write lines like this at the top of the file: width = 60; // [20:1:200]',
   saveParams: 'Save to the file',
   resetParams: 'Reset',
   paramsChanged: 'Changed values only show here until you save them.',
   problems: 'Messages',
   line: 'line {n}',
   fixAi: 'Fix with AI',
-  fixAiPrompt: 'The OpenSCAD model {file} gives these errors. Fix it and check with cad_render that it looks right:\n{errors}',
+  fixAiPrompt:
+    'The OpenSCAD model {file} gives these errors. Fix it and check with cad_render that it looks right:\n{errors}',
   error: 'Could not build it',
   empty: 'The model is empty.',
   print: '3D printing',
@@ -240,7 +249,8 @@ const en: Record<keyof typeof es, string> = {
   fit: 'Fit',
   loadingModel: 'Loading the model…',
   loadFail: 'Could not open the model: {err}',
-  checkAiPrompt: 'Check {file} for 3D printing with mesh_check{units} and tell me what needs fixing.',
+  checkAiPrompt:
+    'Check {file} for 3D printing with mesh_check{units} and tell me what needs fixing.',
   slice: 'Slice and print',
   slicePrinter: 'Printer',
   sliceMaterial: 'Material',
@@ -267,7 +277,8 @@ const en: Record<keyof typeof es, string> = {
   profileUse: 'Use my profile (.ini)…',
   profileOn: 'With your profile: {file}',
   profileOff: 'Remove profile',
-  profileHint: 'With your PrusaSlicer profile your bed, start G-code and settings are used; here only material, layer, infill, walls and supports change.',
+  profileHint:
+    'With your PrusaSlicer profile your bed, start G-code and settings are used; here only material, layer, infill, walls and supports change.',
   openIn: 'Open in {app}',
   gcodeTitle: 'G-code',
   layer: 'Layer {n} of {total}',
@@ -292,7 +303,8 @@ const en: Record<keyof typeof es, string> = {
   asTextHint: 'Open the G-code as text',
   outOfBed: 'It goes outside the bed',
   printers: 'Printers',
-  noPrinters: 'Add your printer with OctoPrint or Klipper (Mainsail / Fluidd) to send it G-code from Zinarix.',
+  noPrinters:
+    'Add your printer with OctoPrint or Klipper (Mainsail / Fluidd) to send it G-code from Zinarix.',
   addPrinter: 'Add printer',
   editPrinter: 'Edit',
   removePrinter: 'Remove',

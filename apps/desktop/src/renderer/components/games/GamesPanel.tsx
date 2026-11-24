@@ -29,7 +29,10 @@ const MAX_OUT = 400_000;
 type Problem = GodotProblem & { count: number };
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']+': (Error: )?/,
+    '',
+  );
 
 /**
  * The running game's console lives outside React: the scene viewer can start a scene and the
@@ -70,7 +73,11 @@ function useRun(): RunState {
 }
 
 /** Runs a Godot project (or one of its scenes) in its window; output goes to the Games panel. */
-export async function runGame(dir: string, scene: string | null, opts: { debugCollisions?: boolean } = {}): Promise<void> {
+export async function runGame(
+  dir: string,
+  scene: string | null,
+  opts: { debugCollisions?: boolean } = {},
+): Promise<void> {
   listenRun();
   setRun({ out: '', code: undefined, running: true, dir });
   try {
@@ -89,8 +96,12 @@ export function GamesPanel() {
 
   const load = useCallback(async (force = false) => {
     const [st, sc] = await Promise.all([
-      api().games.status(force).catch((): GodotStatus => ({ state: 'missing' })),
-      api().games.scan().catch((): GamesScan => ({ godot: [], others: [], web: [] })),
+      api()
+        .games.status(force)
+        .catch((): GodotStatus => ({ state: 'missing' })),
+      api()
+        .games.scan()
+        .catch((): GamesScan => ({ godot: [], others: [], web: [] })),
     ]);
     setStatus(st);
     setScan(sc);
@@ -127,11 +138,19 @@ export function GamesPanel() {
         </span>
         <span className="sidebar-actions">
           {root && (
-            <button title={tgm('newGame')} aria-label={tgm('newGame')} onClick={() => setCreating(true)}>
+            <button
+              title={tgm('newGame')}
+              aria-label={tgm('newGame')}
+              onClick={() => setCreating(true)}
+            >
               <Icon name="plus" size={15} />
             </button>
           )}
-          <button title={tgm('refresh')} aria-label={tgm('refresh')} onClick={() => void load(true)}>
+          <button
+            title={tgm('refresh')}
+            aria-label={tgm('refresh')}
+            onClick={() => void load(true)}
+          >
             <Icon name="refresh" size={15} />
           </button>
         </span>
@@ -155,7 +174,10 @@ export function GamesPanel() {
             <div className="gm-card">
               <p>{tgm('godotMissing')}</p>
               <div className="gm-btns">
-                <button className="btn" onClick={() => openLink('https://godotengine.org/download')}>
+                <button
+                  className="btn"
+                  onClick={() => openLink('https://godotengine.org/download')}
+                >
                   {tgm('download')}
                 </button>
                 <button className="btn ghost" onClick={() => void pick()}>
@@ -189,12 +211,20 @@ export function GamesPanel() {
               <div className="gm-subtitle">{tgm('web')}</div>
               {scan.web.map((w) => (
                 <div className="gm-row" key={w.entry}>
-                  <button className="gm-link" title={w.entry} onClick={() => void openFile(w.entry)}>
+                  <button
+                    className="gm-link"
+                    title={w.entry}
+                    onClick={() => void openFile(w.entry)}
+                  >
                     {w.dir || '.'}
                   </button>
                   <span className="gm-tag">{w.lib}</span>
                   <div className="spacer" />
-                  <button className="btn gm-small" title={tgm('playHint')} onClick={() => void playWeb(w.dir)}>
+                  <button
+                    className="btn gm-small"
+                    title={tgm('playHint')}
+                    onClick={() => void playWeb(w.dir)}
+                  >
                     <Icon name="play" size={13} /> {tgm('play')}
                   </button>
                 </div>
@@ -212,7 +242,9 @@ export function GamesPanel() {
                     <span className="gm-name" title={o.dir}>
                       {o.name}
                     </span>
-                    {o.version && <span className="gm-dim">{tgm('version', { v: o.version })}</span>}
+                    {o.version && (
+                      <span className="gm-dim">{tgm('version', { v: o.version })}</span>
+                    )}
                     <div className="spacer" />
                     <button
                       className="btn ghost gm-small"
@@ -280,10 +312,15 @@ function GodotBox({
 
   const problems = useMemo(() => {
     const all = [...parseGodotOutput(out), ...checkProblems];
-    return all.filter((p, i) => all.findIndex((q) => q.file === p.file && q.line === p.line && q.message === p.message) === i);
+    return all.filter(
+      (p, i) =>
+        all.findIndex((q) => q.file === p.file && q.line === p.line && q.message === p.message) ===
+        i,
+    );
   }, [out, checkProblems]);
 
-  const start = (scene: string | null) => void runGame(project.dir, scene, { debugCollisions: collisions });
+  const start = (scene: string | null) =>
+    void runGame(project.dir, scene, { debugCollisions: collisions });
   const stop = () => void api().games.stop(RUN);
 
   const check = async () => {
@@ -293,7 +330,11 @@ function GodotBox({
       const r = await api().games.check(project.dir);
       setCheckProblems(r.problems);
       const files = new Set(r.problems.map((p) => p.file)).size;
-      setCheckMsg(r.problems.length ? tgm('checkBad', { n: r.checked, e: files }) : tgm('checkOk', { n: r.checked }));
+      setCheckMsg(
+        r.problems.length
+          ? tgm('checkBad', { n: r.checked, e: files })
+          : tgm('checkOk', { n: r.checked }),
+      );
     } catch (e) {
       setCheckMsg(tgm('error', { err: errText(e) }));
     } finally {
@@ -336,7 +377,10 @@ function GodotBox({
   const fix = () => {
     const list = problems
       .slice(0, 40)
-      .map((p) => `${p.severity}: ${resToRel(p.file, project.dir) ?? (p.file || '?')}${p.line ? `:${p.line}` : ''}: ${p.message}`)
+      .map(
+        (p) =>
+          `${p.severity}: ${resToRel(p.file, project.dir) ?? (p.file || '?')}${p.line ? `:${p.line}` : ''}: ${p.message}`,
+      )
       .join('\n');
     askAgent(tgm('fixPrompt', { dir: project.dir || '.', errors: list }));
   };
@@ -347,7 +391,11 @@ function GodotBox({
       <div className="gm-subtitle">
         <span className="gm-tag godot">{tgm('godot')}</span>
         {projects.length > 1 ? (
-          <select value={project.dir} onChange={(e) => onPick(e.target.value)} aria-label={tgm('project')}>
+          <select
+            value={project.dir}
+            onChange={(e) => onPick(e.target.value)}
+            aria-label={tgm('project')}
+          >
             {projects.map((p) => (
               <option key={p.dir} value={p.dir}>
                 {p.info.name} ({p.dir || '.'})
@@ -359,7 +407,12 @@ function GodotBox({
         )}
       </div>
       <div className="gm-dim">
-        {[info.version && `Godot ${info.version}`, info.renderer, project.scripts === 1 ? tgm('scriptsOne') : tgm('scriptsCount', { n: project.scripts }), project.dir && `${project.dir}/`]
+        {[
+          info.version && `Godot ${info.version}`,
+          info.renderer,
+          project.scripts === 1 ? tgm('scriptsOne') : tgm('scriptsCount', { n: project.scripts }),
+          project.dir && `${project.dir}/`,
+        ]
           .filter(Boolean)
           .join(' · ')}
       </div>
@@ -369,32 +422,70 @@ function GodotBox({
             <Icon name="stop" size={13} /> {tgm('stop')}
           </button>
         ) : (
-          <button className="btn primary" disabled={!ready} title={tgm('runHint')} onClick={() => start(null)}>
+          <button
+            className="btn primary"
+            disabled={!ready}
+            title={tgm('runHint')}
+            onClick={() => start(null)}
+          >
             <Icon name="play" size={13} /> {tgm('run')}
           </button>
         )}
-        <button className="btn ghost" disabled={!ready} onClick={() => void api().games.openEditor(project.dir).catch((e) => toast(tgm('error', { err: errText(e) })))}>
+        <button
+          className="btn ghost"
+          disabled={!ready}
+          onClick={() =>
+            void api()
+              .games.openEditor(project.dir)
+              .catch((e) => toast(tgm('error', { err: errText(e) })))
+          }
+        >
           {tgm('editor')}
         </button>
-        <button className="btn ghost" disabled={!ready || busy !== null} onClick={() => void check()}>
+        <button
+          className="btn ghost"
+          disabled={!ready || busy !== null}
+          onClick={() => void check()}
+        >
           {busy === 'check' ? tgm('checking') : tgm('check')}
         </button>
-        <button className="btn ghost" disabled={!ready || busy !== null} title={tgm('shotHint')} onClick={() => void capture()}>
-          {busy === 'shot' ? tgm('shooting') : (<><Icon name="image" size={13} /> {tgm('shot')}</>)}
+        <button
+          className="btn ghost"
+          disabled={!ready || busy !== null}
+          title={tgm('shotHint')}
+          onClick={() => void capture()}
+        >
+          {busy === 'shot' ? (
+            tgm('shooting')
+          ) : (
+            <>
+              <Icon name="image" size={13} /> {tgm('shot')}
+            </>
+          )}
         </button>
       </div>
       <label className="gm-check">
-        <input type="checkbox" checked={collisions} onChange={(e) => setCollisions(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={collisions}
+          onChange={(e) => setCollisions(e.target.checked)}
+        />
         {tgm('collisions')}
       </label>
-      {checkMsg && <div className={`gm-status ${checkProblems.length ? 'bad' : 'ok'}`}>{checkMsg}</div>}
+      {checkMsg && (
+        <div className={`gm-status ${checkProblems.length ? 'bad' : 'ok'}`}>{checkMsg}</div>
+      )}
       {shot && (
         <button className="gm-shot" onClick={() => setShot(null)} title={tgm('clear')}>
           <img src={shot} alt={tgm('shot')} />
         </button>
       )}
 
-      <button className="gm-toggle gm-subtitle" onClick={() => setShowScenes((v) => !v)} aria-expanded={showScenes}>
+      <button
+        className="gm-toggle gm-subtitle"
+        onClick={() => setShowScenes((v) => !v)}
+        aria-expanded={showScenes}
+      >
         <Icon name={showScenes ? 'chevronDown' : 'chevron'} size={12} />
         {tgm('scenes', { n: project.scenes.length })}
       </button>
@@ -405,9 +496,17 @@ function GodotBox({
               <button className="gm-link" title={s} onClick={() => void openFile(s)}>
                 {s.slice(project.dir ? project.dir.length + 1 : 0)}
               </button>
-              {i === 0 && info.mainScene && s.endsWith(info.mainScene.slice(6)) && <span className="gm-tag">{tgm('mainScene')}</span>}
+              {i === 0 && info.mainScene && s.endsWith(info.mainScene.slice(6)) && (
+                <span className="gm-tag">{tgm('mainScene')}</span>
+              )}
               <div className="spacer" />
-              <button className="icon-btn" disabled={!ready} title={tgm('runScene')} aria-label={tgm('runScene')} onClick={() => start(s)}>
+              <button
+                className="icon-btn"
+                disabled={!ready}
+                title={tgm('runScene')}
+                aria-label={tgm('runScene')}
+                onClick={() => start(s)}
+              >
                 <Icon name="play" size={13} />
               </button>
             </div>
@@ -417,8 +516,16 @@ function GodotBox({
 
       <div className="gm-subtitle">
         {tgm('output')}
-        <span className={`gm-status ${running ? 'busy' : code === 0 ? 'ok' : code != null ? 'bad' : ''}`}>
-          {running ? tgm('running') : code === null ? tgm('stoppedRun') : code !== undefined ? tgm('ended', { code }) : ''}
+        <span
+          className={`gm-status ${running ? 'busy' : code === 0 ? 'ok' : code != null ? 'bad' : ''}`}
+        >
+          {running
+            ? tgm('running')
+            : code === null
+              ? tgm('stoppedRun')
+              : code !== undefined
+                ? tgm('ended', { code })
+                : ''}
         </span>
         <div className="spacer" />
         {(out || checkProblems.length > 0) && (
@@ -448,7 +555,12 @@ function GodotBox({
           {problems.slice(0, 100).map((p, i) => {
             const rel = resToRel(p.file, project.dir);
             return (
-              <button key={i} className={`gm-problem ${p.severity}`} disabled={!rel} onClick={() => openProblem(p)}>
+              <button
+                key={i}
+                className={`gm-problem ${p.severity}`}
+                disabled={!rel}
+                onClick={() => openProblem(p)}
+              >
                 <Icon name={p.severity === 'error' ? 'x' : 'warning'} size={12} />
                 <span className="gm-pmsg">
                   {p.message}
@@ -472,14 +584,23 @@ function GodotBox({
       <div className="gm-row gm-export">
         {project.presets.length ? (
           <>
-            <select value={preset} onChange={(e) => setPreset(e.target.value)} aria-label={tgm('export')}>
+            <select
+              value={preset}
+              onChange={(e) => setPreset(e.target.value)}
+              aria-label={tgm('export')}
+            >
               {project.presets.map((p) => (
                 <option key={p.name} value={p.name}>
                   {p.name}
                 </option>
               ))}
             </select>
-            <button className="btn ghost gm-small" disabled={!ready || busy !== null} title={tgm('exportHint')} onClick={() => void doExport()}>
+            <button
+              className="btn ghost gm-small"
+              disabled={!ready || busy !== null}
+              title={tgm('exportHint')}
+              onClick={() => void doExport()}
+            >
               {busy === 'export' ? tgm('exporting') : tgm('export')}
             </button>
           </>
@@ -493,18 +614,25 @@ function GodotBox({
 }
 
 /** New game from a template, in a new folder of the open folder. */
-function NewGame({ onCancel, onCreated }: { onCancel: () => void; onCreated: (folder: string) => void }) {
+function NewGame({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void;
+  onCreated: (folder: string) => void;
+}) {
   const [template, setTemplate] = useState<GameTemplate>('godot-platformer');
   const [name, setName] = useState('');
   const [folder, setFolder] = useState('');
   const [busy, setBusy] = useState(false);
-  const autoFolder = (name || 'mi-juego')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^\w.-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || 'mi-juego';
+  const autoFolder =
+    (name || 'mi-juego')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^\w.-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'mi-juego';
   const target = folder || autoFolder;
 
   const create = async () => {
@@ -528,7 +656,12 @@ function NewGame({ onCancel, onCreated }: { onCancel: () => void; onCreated: (fo
       <div className="gm-templates" role="radiogroup" aria-label={tgm('template')}>
         {GAME_TEMPLATES.map((tp) => (
           <label key={tp.id} className={`gm-template ${template === tp.id ? 'on' : ''}`}>
-            <input type="radio" name="gm-template" checked={template === tp.id} onChange={() => setTemplate(tp.id)} />
+            <input
+              type="radio"
+              name="gm-template"
+              checked={template === tp.id}
+              onChange={() => setTemplate(tp.id)}
+            />
             <span className="gm-tname">{tgm(`tpl.${tp.id}` as KeyGames)}</span>
             <span className="gm-dim">{tgm(`tpl.${tp.id}.d` as KeyGames)}</span>
           </label>
@@ -536,11 +669,21 @@ function NewGame({ onCancel, onCreated }: { onCancel: () => void; onCreated: (fo
       </div>
       <label className="gm-field">
         <span>{tgm('gameName')}</span>
-        <input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="Mi juego" />
+        <input
+          value={name}
+          maxLength={80}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Mi juego"
+        />
       </label>
       <label className="gm-field">
         <span>{tgm('folder')}</span>
-        <input value={folder} maxLength={60} onChange={(e) => setFolder(e.target.value)} placeholder={autoFolder} />
+        <input
+          value={folder}
+          maxLength={60}
+          onChange={(e) => setFolder(e.target.value)}
+          placeholder={autoFolder}
+        />
       </label>
       <div className="gm-btns">
         <button className="btn" disabled={busy} onClick={() => void create()}>

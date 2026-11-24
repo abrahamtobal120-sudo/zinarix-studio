@@ -51,7 +51,9 @@ const READ_START = /^\s*\(*\s*(select|with|explain|show|table|values|describe)\b
 
 /** True when the query could change data or schema (or runs more than one statement). */
 export function isWriteSql(sql: string): boolean {
-  const s = stripLiterals(sql).trim().replace(/;[\s;]*$/, '');
+  const s = stripLiterals(sql)
+    .trim()
+    .replace(/;[\s;]*$/, '');
   if (!s) return false;
   if (s.includes(';')) return true; // several statements
   if (!READ_START.test(s)) return true;

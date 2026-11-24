@@ -82,9 +82,7 @@ describe('mediaGen helpers', () => {
   it('formats estimates, with ~ when approximate', () => {
     expect(formatEstimate({ usd: 0.106, approximate: false, detail: '' })).toBe('$0.106');
     expect(formatEstimate({ usd: 0.00123, approximate: true, detail: '' })).toBe('~$0.0012');
-    expect(formatEstimate({ usd: null, approximate: false, detail: '' })).toBe(
-      'costo no estimado',
-    );
+    expect(formatEstimate({ usd: null, approximate: false, detail: '' })).toBe('costo no estimado');
   });
 });
 

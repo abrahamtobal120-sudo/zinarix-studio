@@ -10,7 +10,12 @@ import {
   outputsText,
   runNotebookTool,
 } from '../src/main/notebookTools.js';
-import { emptyNotebook, newCell, parseNotebook, serializeNotebook } from '../src/shared/notebook.js';
+import {
+  emptyNotebook,
+  newCell,
+  parseNotebook,
+  serializeNotebook,
+} from '../src/shared/notebook.js';
 
 const root = mkdtempSync(join(tmpdir(), 'zs-nbt-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -65,8 +70,19 @@ describe('text for the model', () => {
         execution_count: 1,
         extra: {},
       },
-      { output_type: 'display_data', data: { 'image/png': 'AAAA', 'text/plain': '<Figure>' }, metadata: {}, extra: {} },
-      { output_type: 'error', ename: 'ValueError', evalue: 'bad', traceback: ['\u001b[31mTraceback\u001b[0m', 'line 1'], extra: {} },
+      {
+        output_type: 'display_data',
+        data: { 'image/png': 'AAAA', 'text/plain': '<Figure>' },
+        metadata: {},
+        extra: {},
+      },
+      {
+        output_type: 'error',
+        ename: 'ValueError',
+        evalue: 'bad',
+        traceback: ['\u001b[31mTraceback\u001b[0m', 'line 1'],
+        extra: {},
+      },
     ]);
     expect(t).toContain('hola');
     expect(t).toContain('42');
@@ -85,7 +101,11 @@ describe('text for the model', () => {
 describe('approval cards and paths', () => {
   it('reading needs no approval; editing and running do', () => {
     expect(notebookPreview('notebook_read', { path: 'a.ipynb' }, root)).toBeNull();
-    const e = notebookPreview('notebook_edit', { path: 'a.ipynb', edits: [{ op: 'delete', cell: 1 }] }, root);
+    const e = notebookPreview(
+      'notebook_edit',
+      { path: 'a.ipynb', edits: [{ op: 'delete', cell: 1 }] },
+      root,
+    );
     expect(e && 'risk' in e && e.risk).toBe('medium');
     const r = notebookPreview('notebook_run', { path: 'a.ipynb' }, root);
     expect(r && 'risk' in r && r.risk).toBe('high');
@@ -94,19 +114,28 @@ describe('approval cards and paths', () => {
   it('refuses paths outside the project and files that are not notebooks', () => {
     const out = notebookPreview('notebook_run', { path: '../x.ipynb' }, root);
     expect(out && 'error' in out && out.error).toMatch(/inside/);
-    const txt = notebookPreview('notebook_edit', { path: 'a.py', edits: [{ op: 'delete', cell: 1 }] }, root);
+    const txt = notebookPreview(
+      'notebook_edit',
+      { path: 'a.py', edits: [{ op: 'delete', cell: 1 }] },
+      root,
+    );
     expect(txt && 'error' in txt && txt.error).toMatch(/ipynb/);
   });
 
   it('notebook_edit creates a new notebook and notebook_read reads it back', async () => {
     const host = () => new NotebookKernels(() => undefined);
-    const w = await runNotebookTool(host, 'notebook_edit', {
-      path: 'new.ipynb',
-      edits: [
-        { op: 'replace', cell: 1, source: 'x = 2' },
-        { op: 'insert', cell: 2, type: 'markdown', source: '# Notes' },
-      ],
-    }, root);
+    const w = await runNotebookTool(
+      host,
+      'notebook_edit',
+      {
+        path: 'new.ipynb',
+        edits: [
+          { op: 'replace', cell: 1, source: 'x = 2' },
+          { op: 'insert', cell: 2, type: 'markdown', source: '# Notes' },
+        ],
+      },
+      root,
+    );
     expect(w.ok).toBe(true);
     expect(w.changed).toBe(join(root, 'new.ipynb'));
     const nb = parseNotebook(readFileSync(join(root, 'new.ipynb'), 'utf8'));
@@ -156,7 +185,12 @@ describe.skipIf(!status.ok)('notebook_run on a real kernel', () => {
     expect(r.image?.width).toBe(1);
     // restart=true clears the variables.
     writeFileSync(join(root, 'run.ipynb'), serializeNotebook(nbWith('b')));
-    const fresh = await runNotebookTool(() => kernels, 'notebook_run', { path: 'run.ipynb', restart: true }, root);
+    const fresh = await runNotebookTool(
+      () => kernels,
+      'notebook_run',
+      { path: 'run.ipynb', restart: true },
+      root,
+    );
     expect(fresh.ok).toBe(false);
     expect(fresh.content).toContain('NameError');
   }, 120_000);

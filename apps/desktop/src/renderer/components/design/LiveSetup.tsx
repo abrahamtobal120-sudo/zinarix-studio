@@ -7,7 +7,10 @@ import { Icon } from '../Icon';
 import { detectRunTasks, runTask, type RunTask } from '../RunPanel';
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']*': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']*': (Error: )?/,
+    '',
+  );
 
 /** Seconds the panel waits for a started project to answer. */
 const WAIT_S = 120;
@@ -24,10 +27,17 @@ async function startTask(app: DesignApp): Promise<RunTask | null> {
   const entries = await api()
     .workspace.readDir(app.dir || '.')
     .catch(() => []);
-  const rootEntries = app.dir ? await api().workspace.readDir('.').catch(() => []) : entries;
+  const rootEntries = app.dir
+    ? await api()
+        .workspace.readDir('.')
+        .catch(() => [])
+    : entries;
   const installed = [...entries, ...rootEntries].some((e) => e.dir && e.name === 'node_modules');
   if (installed) return task;
-  const command = task.command.replace(/\b(npm|pnpm|yarn|bun) run (\S+)$/, '$1 install && $1 run $2');
+  const command = task.command.replace(
+    /\b(npm|pnpm|yarn|bun) run (\S+)$/,
+    '$1 install && $1 run $2',
+  );
   return { ...task, command };
 }
 
@@ -137,7 +147,11 @@ export function LiveSetup(props: {
         {view.apps.length > 1 && (
           <label className="dz-live-row">
             <span>{t('dzLiveApp')}</span>
-            <select value={app.dir} onChange={(e) => setDir(e.target.value)} disabled={busy || waited !== null}>
+            <select
+              value={app.dir}
+              onChange={(e) => setDir(e.target.value)}
+              disabled={busy || waited !== null}
+            >
               {view.apps.map((a) => (
                 <option key={a.dir} value={a.dir}>
                   {(a.dir || '.') + ' — ' + a.label}
@@ -158,7 +172,11 @@ export function LiveSetup(props: {
 
         <div className="dz-empty-actions">
           {waited === null ? (
-            <button className={found ? '' : 'primary'} disabled={!task || busy} onClick={() => void start()}>
+            <button
+              className={found ? '' : 'primary'}
+              disabled={!task || busy}
+              onClick={() => void start()}
+            >
               <Icon name="play" size={14} /> {t('dzLiveStart')}
             </button>
           ) : (
@@ -172,7 +190,11 @@ export function LiveSetup(props: {
             </button>
           )}
           {app.built && (
-            <button disabled={busy || waited !== null} onClick={() => void built()} title={t('dzLiveBuiltTitle')}>
+            <button
+              disabled={busy || waited !== null}
+              onClick={() => void built()}
+              title={t('dzLiveBuiltTitle')}
+            >
               {t('dzLiveBuilt', { dir: app.built })}
             </button>
           )}
@@ -181,7 +203,9 @@ export function LiveSetup(props: {
           </button>
           <button onClick={props.onExit}>{t('dzExit')}</button>
         </div>
-        {task && waited === null && <p className="dz-live-note">{t('dzLiveStartCmd', { cmd: task.command })}</p>}
+        {task && waited === null && (
+          <p className="dz-live-note">{t('dzLiveStartCmd', { cmd: task.command })}</p>
+        )}
         {task === null && <p className="dz-live-note">{t('dzLiveNoTask')}</p>}
         {waited !== null && (
           <p className="dz-live-note" role="status">
@@ -197,7 +221,12 @@ export function LiveSetup(props: {
           }}
         >
           <span>{t('dzLiveManual')}</span>
-          <input value={url} onChange={(e) => setUrl(e.target.value)} spellCheck={false} aria-label={t('dzLiveManual')} />
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            spellCheck={false}
+            aria-label={t('dzLiveManual')}
+          />
           <button type="submit" disabled={busy}>
             {t('dzLiveConnect')}
           </button>

@@ -87,7 +87,10 @@ export function fileIcon(path: string): ReactNode {
   if (/\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(name))
     return glyph('M2 3.5h12v9H2zM6.5 6v4l3.5-2z', '#d9576b');
   if (/\.(mp3|wav|ogg|flac|m4a|aac|opus)$/i.test(name))
-    return glyph('M6 12V3.5l7-1.5v8.5M6 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM13 10.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z', '#5aa0e0');
+    return glyph(
+      'M6 12V3.5l7-1.5v8.5M6 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM13 10.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z',
+      '#5aa0e0',
+    );
   for (const [re, text, color] of BADGES) {
     if (!re.test(name)) continue;
     const size = text === '{}' ? 8 : text.length >= 3 ? 5.2 : text.length === 2 ? 6.6 : 8.5;

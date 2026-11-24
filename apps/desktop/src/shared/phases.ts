@@ -63,7 +63,9 @@ export function isPhasesDoc(path: string): boolean {
 // ---------------- analysis ----------------
 
 const ANALYZE = {
-  es: (path: string) => `MODO FASES. El archivo "${path}" (va adjunto) describe los cambios que quiero en este proyecto.
+  es: (
+    path: string,
+  ) => `MODO FASES. El archivo "${path}" (va adjunto) describe los cambios que quiero en este proyecto.
 1. Léelo completo y revisa el proyecto lo necesario (archivos, estructura, cómo se prueba) para entender qué hay que tocar.
 2. Divide TODO el trabajo en FASES (bloques grandes, en orden de dependencia) y cada fase en SUBFASES pequeñas: cada subfase debe poder hacerse en un solo turno de un agente y terminar en un estado que compila / funciona, con una forma concreta de verificarla.
 3. No cambies nada todavía.
@@ -72,7 +74,9 @@ Responde con un resumen de 2 a 4 líneas y, al final, EXACTAMENTE un bloque \`\`
 {"title": "nombre corto del plan", "phases": [{"title": "Fase…", "goal": "para qué sirve", "subphases": [{"title": "Subfase…", "detail": "qué archivos y qué cambio concreto, y cómo se verifica"}]}]}
 \`\`\`
 Máximo ${MAX_PHASES} fases y ${MAX_SUBPHASES} subfases por fase. No dejes fuera nada de lo que pide el documento.`,
-  en: (path: string) => `PHASES MODE. The file "${path}" (attached) describes the changes I want in this project.
+  en: (
+    path: string,
+  ) => `PHASES MODE. The file "${path}" (attached) describes the changes I want in this project.
 1. Read it fully and look at the project as much as needed (files, structure, how it is tested) to understand what has to change.
 2. Split ALL the work into PHASES (big blocks, in dependency order) and each phase into small SUBPHASES: each subphase must fit in one agent turn and end in a state that builds / works, with a concrete way to check it.
 3. Do not change anything yet.
@@ -151,7 +155,12 @@ function planFromData(data: unknown, source: string, now: Date): PhasePlan | nul
     if (!subphases.length)
       subphases.push({ id: `${n}.1`, title, detail: clip(po.goal, MAX_DETAIL), status: 'pending' });
     const goal = clip(po.goal, MAX_DETAIL);
-    phases.push({ id: String(n), title: title || `Fase ${n}`, ...(goal ? { goal } : {}), subphases });
+    phases.push({
+      id: String(n),
+      title: title || `Fase ${n}`,
+      ...(goal ? { goal } : {}),
+      subphases,
+    });
   }
   if (!phases.length) return null;
   return {
@@ -177,7 +186,10 @@ export function phasesFromMarkdown(md: string, source: string, now = new Date())
   const ones = heads.filter((h) => h.level === 1);
   if (ones.length === 1 && heads.some((h) => h.level === 2)) docTitle = ones[0]!.text;
   const phaseLevel = docTitle ? 2 : Math.min(...heads.map((h) => h.level), 9);
-  const data: { title: string; phases: { title: string; subphases: { title: string; detail: string }[] }[] } = {
+  const data: {
+    title: string;
+    phases: { title: string; subphases: { title: string; detail: string }[] }[];
+  } = {
     title: docTitle,
     phases: [],
   };
@@ -292,7 +304,9 @@ export function planOutline(plan: PhasePlan, current?: string): string {
           .map(
             (s) =>
               `  ${MARK[s.status]} ${s.id} ${s.title}${s.id === current ? '   <== AHORA' : ''}` +
-              (s.status === 'done' && s.summary ? `\n      → ${s.summary.split('\n')[0]!.slice(0, 200)}` : ''),
+              (s.status === 'done' && s.summary
+                ? `\n      → ${s.summary.split('\n')[0]!.slice(0, 200)}`
+                : ''),
           )
           .join('\n'),
     )
@@ -360,16 +374,27 @@ export function parseSubResult(text: string): { ok: boolean; summary: string; ma
     const l = lines[i]!.replace(/[*_`>]/g, '').trim();
     const fail = /^(RESULTADO|RESULT)\s*:\s*(FALLO|FAIL(ED)?)\b\s*:?\s*(.*)$/i.exec(l);
     if (fail)
-      return { ok: false, summary: clip(fail[4] || lines.slice(i + 1).join(' '), MAX_SUMMARY) || 'Falló', marked: true };
+      return {
+        ok: false,
+        summary: clip(fail[4] || lines.slice(i + 1).join(' '), MAX_SUMMARY) || 'Falló',
+        marked: true,
+      };
     const ok = /^(RESULTADO|RESULT)\s*:\s*OK\b\s*[:.\-—]?\s*(.*)$/i.exec(l);
     if (ok)
       return {
         ok: true,
-        summary: clip(ok[2] || lines.slice(i + 1).join(' ') || lines.slice(0, i).filter(Boolean).at(-1), MAX_SUMMARY),
+        summary: clip(
+          ok[2] || lines.slice(i + 1).join(' ') || lines.slice(0, i).filter(Boolean).at(-1),
+          MAX_SUMMARY,
+        ),
         marked: true,
       };
   }
-  const last = lines.map((l) => l.trim()).filter(Boolean).at(-1) ?? '';
+  const last =
+    lines
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .at(-1) ?? '';
   return { ok: true, summary: clip(last, MAX_SUMMARY), marked: false };
 }
 
@@ -382,7 +407,9 @@ export function readSavedPlan(text: string): PhasePlan | null {
     if (!plan) return null;
     // Keep the saved statuses and summaries (planFromData resets them).
     const saved = new Map(
-      d.phases.flatMap((p) => (Array.isArray(p?.subphases) ? p.subphases : [])).map((s) => [s?.id, s]),
+      d.phases
+        .flatMap((p) => (Array.isArray(p?.subphases) ? p.subphases : []))
+        .map((s) => [s?.id, s]),
     );
     let out = plan;
     for (const s of allSubs(plan)) {
@@ -393,7 +420,10 @@ export function readSavedPlan(text: string): PhasePlan | null {
           ...(typeof old.summary === 'string' ? { summary: clip(old.summary, MAX_SUMMARY) } : {}),
         });
     }
-    return resetRunning({ ...out, created: typeof d.created === 'string' ? d.created : out.created });
+    return resetRunning({
+      ...out,
+      created: typeof d.created === 'string' ? d.created : out.created,
+    });
   } catch {
     return null;
   }

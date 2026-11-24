@@ -52,8 +52,26 @@ export class ImageService {
   async png(img: Rgba, signal?: AbortSignal): Promise<Buffer> {
     const { out } = await runFfmpeg(
       this.ffmpeg(),
-      ['-hide_banner', '-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${img.width}x${img.height}`,
-        '-i', 'pipe:0', '-frames:v', '1', '-c:v', 'png', '-f', 'image2pipe', 'pipe:1'],
+      [
+        '-hide_banner',
+        '-v',
+        'error',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgba',
+        '-s',
+        `${img.width}x${img.height}`,
+        '-i',
+        'pipe:0',
+        '-frames:v',
+        '1',
+        '-c:v',
+        'png',
+        '-f',
+        'image2pipe',
+        'pipe:1',
+      ],
       Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength),
       signal,
     );
@@ -73,7 +91,19 @@ export class ImageService {
     if (st.size > MAX_FILE) throw new Error('The picture is too large to edit.');
     const { out, err } = await runFfmpeg(
       this.ffmpeg(),
-      ['-hide_banner', '-nostdin', '-i', abs, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgba', 'pipe:1'],
+      [
+        '-hide_banner',
+        '-nostdin',
+        '-i',
+        abs,
+        '-frames:v',
+        '1',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgba',
+        'pipe:1',
+      ],
       null,
       signal,
     );
@@ -98,7 +128,14 @@ export class ImageService {
     const codec: Record<ImageFormat, string[]> = {
       png: ['-c:v', 'png', '-pix_fmt', 'rgba'],
       // -q:v 2 (best) … 31 (worst).
-      jpg: ['-c:v', 'mjpeg', '-pix_fmt', 'yuvj444p', '-q:v', String(Math.round(2 + ((100 - q) / 100) * 29))],
+      jpg: [
+        '-c:v',
+        'mjpeg',
+        '-pix_fmt',
+        'yuvj444p',
+        '-q:v',
+        String(Math.round(2 + ((100 - q) / 100) * 29)),
+      ],
       webp: ['-c:v', 'libwebp', '-pix_fmt', 'yuva420p', '-quality', String(q)],
     };
     await mkdir(dirname(abs), { recursive: true });
@@ -201,8 +238,15 @@ export const IMAGE_TOOLS: ToolDefinition[] = [
         rotate: { type: 'integer', enum: [0, 90, 180, 270], description: 'Clockwise degrees' },
         flipH: { type: 'boolean', description: 'Mirror left ↔ right' },
         flipV: { type: 'boolean', description: 'Mirror top ↔ bottom' },
-        straighten: n('Small turn to level a horizon, degrees -45…45 (clockwise +); zooms in so no corner is empty, size unchanged', -45, 45),
-        auto: { type: 'boolean', description: 'Automatic fix of contrast, brightness, colour cast and vibrance' },
+        straighten: n(
+          'Small turn to level a horizon, degrees -45…45 (clockwise +); zooms in so no corner is empty, size unchanged',
+          -45,
+          45,
+        ),
+        auto: {
+          type: 'boolean',
+          description: 'Automatic fix of contrast, brightness, colour cast and vibrance',
+        },
         crop: {
           type: 'object',
           description: 'Box to keep, in pixels of the rotated picture: x, y (top-left), w, h',
@@ -214,12 +258,26 @@ export const IMAGE_TOOLS: ToolDefinition[] = [
           },
           required: ['x', 'y', 'w', 'h'],
         },
-        width: { type: 'integer', minimum: 1, maximum: MAX_SIDE, description: 'Final width in pixels (keeps the proportion when height is left out)' },
-        height: { type: 'integer', minimum: 1, maximum: MAX_SIDE, description: 'Final height in pixels (keeps the proportion when width is left out)' },
+        width: {
+          type: 'integer',
+          minimum: 1,
+          maximum: MAX_SIDE,
+          description: 'Final width in pixels (keeps the proportion when height is left out)',
+        },
+        height: {
+          type: 'integer',
+          minimum: 1,
+          maximum: MAX_SIDE,
+          description: 'Final height in pixels (keeps the proportion when width is left out)',
+        },
         exposure: n('Stops, -3…3', -3, 3),
         brightness: n('-100…100', -100, 100),
         contrast: n('-100…100', -100, 100),
-        highlights: n('Only the bright parts: − recovers a burnt sky, + brightens, -100…100', -100, 100),
+        highlights: n(
+          'Only the bright parts: − recovers a burnt sky, + brightens, -100…100',
+          -100,
+          100,
+        ),
         shadows: n('Only the dark parts: + lifts them, − deepens them, -100…100', -100, 100),
         hue: n('Turn all colours, degrees -180…180', -180, 180),
         vibrance: n('Saturation that spares strong colours and skin, -100…100', -100, 100),
@@ -230,7 +288,12 @@ export const IMAGE_TOOLS: ToolDefinition[] = [
         blur: n('Radius in pixels, 0…50', 0, 50),
         sharpen: n('0…100', 0, 100),
         vignette: n('Darker (+) or lighter (−) corners, -100…100', -100, 100),
-        quality: { type: 'integer', minimum: 1, maximum: 100, description: 'JPEG / WebP quality (default 92)' },
+        quality: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 100,
+          description: 'JPEG / WebP quality (default 92)',
+        },
       },
       required: ['path'],
     },
@@ -245,7 +308,10 @@ export const IMAGE_TOOLS: ToolDefinition[] = [
         path: { type: 'string', description: 'Picture (png, jpg, webp or bmp)' },
         out: { type: 'string', description: 'Where to save (optional; .png keeps transparency)' },
         model: { type: 'string', enum: ['fast', 'precise'], description: 'Default fast' },
-        background: { type: 'string', description: 'Optional solid colour behind the subject, "#rrggbb"' },
+        background: {
+          type: 'string',
+          description: 'Optional solid colour behind the subject, "#rrggbb"',
+        },
         trim: { type: 'boolean', description: 'Crop to the subject (with a small margin)' },
       },
       required: ['path'],
@@ -269,10 +335,14 @@ export function projectPath(root: string, p: unknown): string {
 }
 
 /** Where image_edit writes (and whether it replaces a file). */
-function target(root: string, a: Record<string, unknown>): { src: string; out: string; replaces: boolean } {
+function target(
+  root: string,
+  a: Record<string, unknown>,
+): { src: string; out: string; replaces: boolean } {
   const src = projectPath(root, a.path);
   const ext = src.split('.').pop()?.toLowerCase() ?? '';
-  if (!EDITABLE_EXT.has(ext)) throw new Error('Only png, jpg, webp and bmp pictures can be edited.');
+  if (!EDITABLE_EXT.has(ext))
+    throw new Error('Only png, jpg, webp and bmp pictures can be edited.');
   const out =
     typeof a.out === 'string' && a.out.trim()
       ? projectPath(root, a.out)
@@ -286,14 +356,20 @@ export function cutoutName(path: string, ext = 'png'): string {
   return path.replace(/(\.[^./\\]+)?$/, `-sin-fondo.${ext}`);
 }
 
-function cutoutTarget(root: string, a: Record<string, unknown>): { src: string; out: string; replaces: boolean } {
+function cutoutTarget(
+  root: string,
+  a: Record<string, unknown>,
+): { src: string; out: string; replaces: boolean } {
   const src = projectPath(root, a.path);
   const ext = src.split('.').pop()?.toLowerCase() ?? '';
-  if (!EDITABLE_EXT.has(ext)) throw new Error('Only png, jpg, webp and bmp pictures can be cut out.');
+  if (!EDITABLE_EXT.has(ext))
+    throw new Error('Only png, jpg, webp and bmp pictures can be cut out.');
   if (a.background !== undefined && !parseHex(a.background))
     throw new Error('"background" must be a colour like "#ffffff".');
-  if (a.model !== undefined && !isBgModelId(a.model)) throw new Error('"model" must be "fast" or "precise".');
-  const out = typeof a.out === 'string' && a.out.trim() ? projectPath(root, a.out) : cutoutName(src);
+  if (a.model !== undefined && !isBgModelId(a.model))
+    throw new Error('"model" must be "fast" or "precise".');
+  const out =
+    typeof a.out === 'string' && a.out.trim() ? projectPath(root, a.out) : cutoutName(src);
   const f = formatOf(out);
   if (!f) throw new Error('"out" must end in .png, .jpg or .webp.');
   if (f === 'jpg' && !parseHex(a.background))
@@ -326,7 +402,9 @@ export function imagePreview(
     try {
       const t = cutoutTarget(root, a);
       const model = a.model === 'precise' ? 'preciso' : 'rápido';
-      const colour = parseHex(a.background) ? `fondo ${String(a.background)}` : 'fondo transparente';
+      const colour = parseHex(a.background)
+        ? `fondo ${String(a.background)}`
+        : 'fondo transparente';
       return {
         risk: t.replaces ? 'high' : 'medium',
         action: `quitar el fondo de ${rel(root, t.src)} → ${rel(root, t.out)}`,
@@ -357,8 +435,10 @@ export function imagePreview(
       warning: t.replaces
         ? `Se reemplaza ${rel(root, t.out)} (no se puede deshacer desde el chat).`
         : 'Se guarda una copia nueva; el original no cambia.',
-      command: (a.auto === true ? `ajuste automático${isIdentity(e) ? '' : ', '}` : '') +
-        (a.auto === true && isIdentity(e) ? '' : describeEdit(e)) + size,
+      command:
+        (a.auto === true ? `ajuste automático${isIdentity(e) ? '' : ', '}` : '') +
+        (a.auto === true && isIdentity(e) ? '' : describeEdit(e)) +
+        size,
       path: rel(root, t.out),
       // A new file only adds; replacing one is asked every time.
       ...(t.replaces ? {} : { allowKey: 'image_edit:new' }),
@@ -374,8 +454,15 @@ export async function runImageTool(
   a: Record<string, unknown>,
   root: string | undefined,
   signal?: AbortSignal,
-): Promise<{ ok: boolean; content: string; summary: string; image?: ComputerShot; changed?: string }> {
-  if (!root) return { ok: false, content: 'No folder is open in the editor.', summary: 'sin carpeta' };
+): Promise<{
+  ok: boolean;
+  content: string;
+  summary: string;
+  image?: ComputerShot;
+  changed?: string;
+}> {
+  if (!root)
+    return { ok: false, content: 'No folder is open in the editor.', summary: 'sin carpeta' };
   try {
     if (name === 'image_remove_bg') return await removeBackground(images, a, root, signal);
     if (name === 'image_info') {
@@ -408,7 +495,11 @@ export async function runImageTool(
         edit = cleanEdit(sum, img.width, img.height);
       }
       if (isIdentity(edit) && t.out === t.src)
-        return { ok: false, content: 'Nothing to change: give at least one edit.', summary: 'sin cambios' };
+        return {
+          ok: false,
+          content: 'Nothing to change: give at least one edit.',
+          summary: 'sin cambios',
+        };
       const res = applyEdit(img, edit);
       const quality = typeof a.quality === 'number' ? a.quality : 92;
       await images.encode(res, t.out, quality, signal);
@@ -455,10 +546,20 @@ async function removeBackground(
   a: Record<string, unknown>,
   root: string,
   signal?: AbortSignal,
-): Promise<{ ok: boolean; content: string; summary: string; image?: ComputerShot; changed?: string }> {
+): Promise<{
+  ok: boolean;
+  content: string;
+  summary: string;
+  image?: ComputerShot;
+  changed?: string;
+}> {
   const bg = images.bg;
   if (!bg?.available)
-    return { ok: false, content: 'Background removal is not available in this installation.', summary: 'no disponible' };
+    return {
+      ok: false,
+      content: 'Background removal is not available in this installation.',
+      summary: 'no disponible',
+    };
   const t = cutoutTarget(root, a);
   const model = a.model === 'precise' ? 'precise' : 'fast';
   if (!bg.modelPath(model))
@@ -475,7 +576,11 @@ async function removeBackground(
   const mask = await bg.mask(img, model, signal);
   const share = maskCoverage(mask);
   if (share < 0.002)
-    return { ok: false, content: 'No clear subject was found in the picture: nothing was saved.', summary: 'sin sujeto' };
+    return {
+      ok: false,
+      content: 'No clear subject was found in the picture: nothing was saved.',
+      summary: 'sin sujeto',
+    };
   let out = applyMask(img, mask);
   if (a.trim === true) {
     const box = contentBox(out, Math.round(Math.max(out.width, out.height) * 0.02));
@@ -493,6 +598,11 @@ async function removeBackground(
     content: `Saved ${rel(root, t.out)} (${out.width} × ${out.height} px, ${colour ? `background ${colour}` : 'transparent background'}). The subject covers ${Math.round(share * 100)} % of the original picture. Model ${model}, ${secs} s. The preview shows the result${colour ? '' : ' over a checkerboard (= transparent)'}.`,
     summary: `${rel(root, t.out)} · ${out.width}×${out.height}`,
     changed: t.out,
-    image: { mediaType: 'image/png', data: png.toString('base64'), width: small.width, height: small.height },
+    image: {
+      mediaType: 'image/png',
+      data: png.toString('base64'),
+      width: small.width,
+      height: small.height,
+    },
   };
 }

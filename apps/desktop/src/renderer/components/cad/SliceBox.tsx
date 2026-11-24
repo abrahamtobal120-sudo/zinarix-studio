@@ -23,7 +23,9 @@ const SETTINGS_KEY = 'zs.slice.settings';
 /** The last settings used (any model), checked again in case the list of choices changed. */
 export function loadSliceSettings(): SliceSettings {
   try {
-    return validateSlice(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<SliceSettings>);
+    return validateSlice(
+      JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<SliceSettings>,
+    );
   } catch {
     return DEFAULT_SLICE;
   }
@@ -38,7 +40,15 @@ const base = (p: string) => p.split(/[\\/]/).pop() ?? p;
  * own profile), then view the layers or open the model in a desktop slicer.
  * `code` / `values`: a .scad is sliced as the editor shows it (unsaved text and parameters).
  */
-export function SliceBox({ path, code, values }: { path: string; code?: () => string | null; values?: Record<string, unknown> }) {
+export function SliceBox({
+  path,
+  code,
+  values,
+}: {
+  path: string;
+  code?: () => string | null;
+  values?: Record<string, unknown>;
+}) {
   const [view, setView] = useState<SlicerView | null>(slicerCache);
   const [s, setS] = useState<SliceSettings>(loadSliceSettings);
   const [busy, setBusy] = useState(false);
@@ -47,7 +57,11 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
   const key = `slice:${path}`;
 
   useEffect(() => {
-    if (!slicerCache) void api().print.slicer().then((v) => ((slicerCache = v), setView(v))).catch(() => {});
+    if (!slicerCache)
+      void api()
+        .print.slicer()
+        .then((v) => ((slicerCache = v), setView(v)))
+        .catch(() => {});
   }, []);
   useEffect(() => () => void api().print.cancel(key), [key]);
   useEffect(() => localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)), [s]);
@@ -78,7 +92,9 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
   };
 
   const pick = async () => {
-    const v = await api().print.pickSlicer().catch(() => null);
+    const v = await api()
+      .print.pickSlicer()
+      .catch(() => null);
     if (v) setView((slicerCache = v));
     else toast(tc('notSlicer'));
   };
@@ -93,7 +109,15 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
 
   if (!view) return null;
   const opens = view.desktop.map((d) => (
-    <button key={d.id} className="btn ghost cad-small" onClick={() => void api().print.openIn(d.id, path).catch((e: unknown) => toast(errText(e)))}>
+    <button
+      key={d.id}
+      className="btn ghost cad-small"
+      onClick={() =>
+        void api()
+          .print.openIn(d.id, path)
+          .catch((e: unknown) => toast(errText(e)))
+      }
+    >
       <Icon name="external" /> {tc('openIn', { app: d.name })}
     </button>
   ));
@@ -102,7 +126,10 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
       <div className="cad-slice">
         <p className="cad-hint">{tc('noSlicer')}</p>
         <div className="cad-row-btns">
-          <button className="btn ghost cad-small" onClick={() => openLink('https://www.prusa3d.com/page/prusaslicer_424/')}>
+          <button
+            className="btn ghost cad-small"
+            onClick={() => openLink('https://www.prusa3d.com/page/prusaslicer_424/')}
+          >
             {tc('downloadSlicer')}
           </button>
           <button className="btn ghost cad-small" onClick={() => void pick()}>
@@ -144,7 +171,10 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
         </label>
         <label className="cad-field" title={tc('sliceLayerHint')}>
           <span>{tc('sliceLayer')}</span>
-          <select value={s.layerHeight} onChange={(e) => set({ layerHeight: Number(e.target.value) })}>
+          <select
+            value={s.layerHeight}
+            onChange={(e) => set({ layerHeight: Number(e.target.value) })}
+          >
             {LAYER_CHOICES.map((h) => (
               <option key={h} value={h}>
                 {h} mm
@@ -154,7 +184,10 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
         </label>
         <label className="cad-field">
           <span>{tc('sliceSupports')}</span>
-          <select value={s.supports} onChange={(e) => set({ supports: e.target.value as SupportMode })}>
+          <select
+            value={s.supports}
+            onChange={(e) => set({ supports: e.target.value as SupportMode })}
+          >
             {sup.map(([v, l]) => (
               <option key={v} value={v}>
                 {l}
@@ -164,17 +197,35 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
         </label>
         <label className="cad-field">
           <span>{tc('sliceWalls')}</span>
-          <input type="number" min={1} max={10} value={s.walls} onChange={(e) => e.target.value && set({ walls: Number(e.target.value) })} />
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={s.walls}
+            onChange={(e) => e.target.value && set({ walls: Number(e.target.value) })}
+          />
         </label>
       </div>
       <label className="cad-field">
         <span>
           {tc('sliceInfill')} {s.infill} %
         </span>
-        <input type="range" min={0} max={100} step={5} value={s.infill} aria-label={tc('sliceInfill')} onChange={(e) => set({ infill: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={s.infill}
+          aria-label={tc('sliceInfill')}
+          onChange={(e) => set({ infill: Number(e.target.value) })}
+        />
       </label>
       <label className="cad-check">
-        <input type="checkbox" checked={s.brim > 0} onChange={(e) => set({ brim: e.target.checked ? 5 : 0 })} />
+        <input
+          type="checkbox"
+          checked={s.brim > 0}
+          onChange={(e) => set({ brim: e.target.checked ? 5 : 0 })}
+        />
         {tc('sliceBrim')}
       </label>
       <div className="cad-row-btns">
@@ -194,7 +245,12 @@ export function SliceBox({ path, code, values }: { path: string; code?: () => st
       {done && (
         <div className="cad-slice-done" role="status">
           <span>
-            <strong>{base(done.path)}</strong> · {tc('sliceDone', { time: formatDuration(done.timeS, lang === 'en' ? 'en' : 'es'), grams: done.grams.toFixed(1), layers: done.layers })}
+            <strong>{base(done.path)}</strong> ·{' '}
+            {tc('sliceDone', {
+              time: formatDuration(done.timeS, lang === 'en' ? 'en' : 'es'),
+              grams: done.grams.toFixed(1),
+              layers: done.layers,
+            })}
           </span>
           <button className="btn ghost cad-small" onClick={() => void openFile(done.path)}>
             {tc('sliceOpen')}

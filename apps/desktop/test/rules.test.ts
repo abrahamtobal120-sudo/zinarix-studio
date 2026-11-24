@@ -325,7 +325,11 @@ describe('Cursor and Copilot rules in sub-folders (hierarchy)', () => {
         '---\nalwaysApply: true\n---\nWeb cursor',
         'cursor',
       ),
-      parseRule('apps/web/.cursor/rules/tsx.mdc', '---\nglobs: ["src/*.tsx"]\n---\nWeb tsx', 'cursor'),
+      parseRule(
+        'apps/web/.cursor/rules/tsx.mdc',
+        '---\nglobs: ["src/*.tsx"]\n---\nWeb tsx',
+        'cursor',
+      ),
       parseRule('apps/web/.github/copilot-instructions.md', 'Web copilot', 'copilot'),
     ];
     expect(rules[1]!.applies).toBe('always');
@@ -338,6 +342,8 @@ describe('Cursor and Copilot rules in sub-folders (hierarchy)', () => {
       ['apps/web/.cursor/rules/tsx.mdc', 'src/*.tsx'],
       ['apps/web/.github/copilot-instructions.md', 'folder'],
     ]);
-    expect(at(['apps/web/lib/a.ts']).map((x) => x[0])).not.toContain('apps/web/.cursor/rules/tsx.mdc');
+    expect(at(['apps/web/lib/a.ts']).map((x) => x[0])).not.toContain(
+      'apps/web/.cursor/rules/tsx.mdc',
+    );
   });
 });

@@ -321,7 +321,10 @@ export interface LspHostOptions {
    * Godot's GDScript server runs inside a headless editor and speaks TCP). Returns the
    * process to spawn, or a message when it can't (shown as "missing").
    */
-  special?: (command: string, root: string) => Promise<{ exe: string; args: string[]; env?: Record<string, string> } | { missing: string }>;
+  special?: (
+    command: string,
+    root: string,
+  ) => Promise<{ exe: string; args: string[]; env?: Record<string, string> } | { missing: string }>;
 }
 
 /**
@@ -346,7 +349,9 @@ export class LspHost {
   }
 
   /** Server for a Monaco language: user override first, then the built-in candidates. */
-  private resolve(language: string):
+  private resolve(
+    language: string,
+  ):
     | { exe: string; args: string[]; name: string; label: string }
     | { special: string; name: string; label: string; install: string }
     | { missing: string; label: string }
@@ -363,7 +368,8 @@ export class LspHost {
     if (!entry) return null;
     for (const c of entry.candidates) {
       if (c.command.startsWith('@')) {
-        if (this.opts.special) return { special: c.command, name: c.name, label, install: c.install };
+        if (this.opts.special)
+          return { special: c.command, name: c.name, label, install: c.install };
         continue;
       }
       const exe = findExecutable(c.command);
@@ -376,7 +382,10 @@ export class LspHost {
     const data = join(
       this.opts.dataDir ?? tmpdir(),
       'lsp-data',
-      createHash('sha256').update(this.root ?? '').digest('hex').slice(0, 12),
+      createHash('sha256')
+        .update(this.root ?? '')
+        .digest('hex')
+        .slice(0, 12),
     );
     return c.args.map((a) => {
       if (!a.includes('${dataDir}')) return a;
@@ -422,15 +431,28 @@ export class LspHost {
     s.starting = (async () => {
       let spec: { exe: string; args: string[]; env?: Record<string, string> };
       if ('special' in r) {
-        const got = await this.opts.special!(r.special, root).catch((e: Error) => ({ missing: e.message }));
+        const got = await this.opts.special!(r.special, root).catch((e: Error) => ({
+          missing: e.message,
+        }));
         if ('missing' in got) {
-          this.setStatus(s, { state: 'missing', detail: got.missing || r.install, server: undefined });
+          this.setStatus(s, {
+            state: 'missing',
+            detail: got.missing || r.install,
+            server: undefined,
+          });
           return undefined;
         }
         spec = got;
       } else spec = r;
       if (this.root !== root) return undefined;
-      const client = new LspClient(spec.exe, spec.args, root, this.sink, lspLanguageId(language), spec.env);
+      const client = new LspClient(
+        spec.exe,
+        spec.args,
+        root,
+        this.sink,
+        lspLanguageId(language),
+        spec.env,
+      );
       client.onExit = (code, stderr) => this.crashed(language, client, code, stderr);
       try {
         await client.ready;

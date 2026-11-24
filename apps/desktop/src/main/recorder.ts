@@ -138,26 +138,42 @@ export class Recorder {
     const rec = this.recs.get(id);
     const display = this.display;
     if (!rec || !display || rec.cursor) return false;
-    const c: CursorRec = { display, start: Date.now(), pausedMs: 0, pausedAt: 0, samples: [], timer: 0 as never };
+    const c: CursorRec = {
+      display,
+      start: Date.now(),
+      pausedMs: 0,
+      pausedAt: 0,
+      samples: [],
+      timer: 0 as never,
+    };
     let lx = NaN;
     let ly = NaN;
-    c.timer = setInterval(() => {
-      if (c.pausedAt || c.samples.length >= CURSOR_MAX) return;
-      let pt: { x: number; y: number };
-      try {
-        pt = screen.getCursorScreenPoint();
-      } catch {
-        return;
-      }
-      const b = c.display.bounds;
-      const x = Math.round(((pt.x - b.x) / b.width) * 1e4) / 1e4;
-      const y = Math.round(((pt.y - b.y) / b.height) * 1e4) / 1e4;
-      const t = Date.now() - c.start - c.pausedMs;
-      if (x === lx && y === ly && c.samples.length && t - c.samples[c.samples.length - 1]![0] < 1000) return;
-      lx = x;
-      ly = y;
-      c.samples.push([t, x, y]);
-    }, Math.round(1000 / CURSOR_RATE));
+    c.timer = setInterval(
+      () => {
+        if (c.pausedAt || c.samples.length >= CURSOR_MAX) return;
+        let pt: { x: number; y: number };
+        try {
+          pt = screen.getCursorScreenPoint();
+        } catch {
+          return;
+        }
+        const b = c.display.bounds;
+        const x = Math.round(((pt.x - b.x) / b.width) * 1e4) / 1e4;
+        const y = Math.round(((pt.y - b.y) / b.height) * 1e4) / 1e4;
+        const t = Date.now() - c.start - c.pausedMs;
+        if (
+          x === lx &&
+          y === ly &&
+          c.samples.length &&
+          t - c.samples[c.samples.length - 1]![0] < 1000
+        )
+          return;
+        lx = x;
+        ly = y;
+        c.samples.push([t, x, y]);
+      },
+      Math.round(1000 / CURSOR_RATE),
+    );
     rec.cursor = c;
     return true;
   }
@@ -204,7 +220,8 @@ export class Recorder {
       throw new Error('La grabación quedó vacía.');
     }
     const bin = this.ffmpeg();
-    if (bin && (await remux(bin, rec.part, rec.path))) await unlink(rec.part).catch(() => undefined);
+    if (bin && (await remux(bin, rec.part, rec.path)))
+      await unlink(rec.part).catch(() => undefined);
     else await rename(rec.part, rec.path);
     if (rec.cursor?.samples.length) {
       const b = rec.cursor.display.bounds;
@@ -235,10 +252,7 @@ function displayOf(src: DesktopCapturerSource): Display | null {
   if (!src.id.startsWith('screen:')) return null;
   try {
     const all = screen.getAllDisplays();
-    return (
-      all.find((d) => String(d.id) === src.display_id) ??
-      (all.length === 1 ? all[0]! : null)
-    );
+    return all.find((d) => String(d.id) === src.display_id) ?? (all.length === 1 ? all[0]! : null);
   } catch {
     return null;
   }

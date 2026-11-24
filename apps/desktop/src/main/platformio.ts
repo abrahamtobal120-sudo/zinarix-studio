@@ -131,14 +131,21 @@ export class PlatformioService {
       }
     }
     return this.found
-      ? { state: 'ready', version: this.found.version, bin: this.found.bin, python: this.found.python }
+      ? {
+          state: 'ready',
+          version: this.found.version,
+          bin: this.found.bin,
+          python: this.found.python,
+        }
       : { state: 'missing' };
   }
 
   private async bin(): Promise<string> {
     const st = await this.status();
     if (st.state !== 'ready')
-      throw new Error('PlatformIO no está instalado (pip install platformio, o la extensión de VS Code).');
+      throw new Error(
+        'PlatformIO no está instalado (pip install platformio, o la extensión de VS Code).',
+      );
     return st.bin;
   }
 
@@ -152,10 +159,16 @@ export class PlatformioService {
       } catch {
         return;
       }
-      if (entries.some((e) => e.isFile() && e.name.toLowerCase() === 'platformio.ini')) dirs.push(dir);
+      if (entries.some((e) => e.isFile() && e.name.toLowerCase() === 'platformio.ini'))
+        dirs.push(dir);
       if (depth > 0)
         for (const e of entries)
-          if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== '.pio')
+          if (
+            e.isDirectory() &&
+            !e.name.startsWith('.') &&
+            e.name !== 'node_modules' &&
+            e.name !== '.pio'
+          )
             await look(join(dir, e.name), depth - 1);
     };
     await look(root, 2);
@@ -174,7 +187,9 @@ export class PlatformioService {
   }
 
   async devices(): Promise<PioDevice[]> {
-    return parseDevices(await exec(await this.bin(), ['device', 'list', '--serial', '--json-output'], 30_000));
+    return parseDevices(
+      await exec(await this.bin(), ['device', 'list', '--serial', '--json-output'], 30_000),
+    );
   }
 
   /** Boards PlatformIO knows (search words, e.g. "esp32" or "uno"). */
@@ -188,7 +203,8 @@ export class PlatformioService {
   private absDir(root: string, dir: string): string {
     if (!validProjectDir(dir)) throw new Error('Carpeta de proyecto no válida.');
     const abs = dir ? join(root, dir) : root;
-    if (!existsSync(join(abs, 'platformio.ini'))) throw new Error('Esa carpeta no tiene platformio.ini.');
+    if (!existsSync(join(abs, 'platformio.ini')))
+      throw new Error('Esa carpeta no tiene platformio.ini.');
     return abs;
   }
 
@@ -205,7 +221,11 @@ export class PlatformioService {
     this.stopJob(key);
     // Uploading needs the port: the monitor lets it go and comes back afterwards.
     const reopen = job.target === 'upload' ? await this.releasePorts(job.port ?? null) : [];
-    const p = spawn(bin, args, { windowsHide: true, env: pioEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(bin, args, {
+      windowsHide: true,
+      env: pioEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     this.jobs.set(key, p);
     let all = '';
     const take = (b: Buffer) => {
@@ -231,7 +251,11 @@ export class PlatformioService {
   }
 
   /** The same, waited for (the agent's tools): result plus the end of the output. */
-  async runJob(root: string, job: PioJob, signal?: AbortSignal): Promise<PioResult & { tail: string }> {
+  async runJob(
+    root: string,
+    job: PioJob,
+    signal?: AbortSignal,
+  ): Promise<PioResult & { tail: string }> {
     return new Promise((resolve, reject) => {
       const key = `agent:${Math.random().toString(36).slice(2)}`;
       let out = '';
@@ -262,14 +286,30 @@ export class PlatformioService {
   }
 
   /** A new project: <root>/<name> with platformio.ini for the board and a starter sketch. */
-  async createProject(root: string, name: string, board: string, framework: string): Promise<string> {
-    if (!/^[\w][\w .-]{0,63}$/.test(name) || name.includes('..')) throw new Error('Nombre no válido.');
+  async createProject(
+    root: string,
+    name: string,
+    board: string,
+    framework: string,
+  ): Promise<string> {
+    if (!/^[\w][\w .-]{0,63}$/.test(name) || name.includes('..'))
+      throw new Error('Nombre no válido.');
     if (!validBoardId(board)) throw new Error('Placa no válida.');
     if (!/^[\w-]{1,40}$/.test(framework)) throw new Error('Framework no válido.');
     const dir = join(root, name.trim());
-    if (existsSync(join(dir, 'platformio.ini'))) throw new Error('Ya hay un proyecto con ese nombre.');
+    if (existsSync(join(dir, 'platformio.ini')))
+      throw new Error('Ya hay un proyecto con ese nombre.');
     await mkdir(dir, { recursive: true });
-    const args = ['project', 'init', '-d', dir, '-b', board, '--project-option', `framework=${framework}`];
+    const args = [
+      'project',
+      'init',
+      '-d',
+      dir,
+      '-b',
+      board,
+      '--project-option',
+      `framework=${framework}`,
+    ];
     await exec(await this.bin(), args, 10 * 60_000);
     const src = join(dir, 'src');
     await mkdir(src, { recursive: true });
@@ -282,17 +322,25 @@ export class PlatformioService {
   // ---------------- libraries ----------------
 
   /** The PlatformIO registry (needs internet). */
-  async searchLibraries(query: string, page = 1): Promise<{ libraries: PioLibrary[]; total: number; pages: number }> {
+  async searchLibraries(
+    query: string,
+    page = 1,
+  ): Promise<{ libraries: PioLibrary[]; total: number; pages: number }> {
     if (!validLibQuery(query)) throw new Error('Búsqueda no válida.');
     const p = Math.max(1, Math.min(100, Math.floor(page)));
-    return parseLibSearch(await exec(await this.bin(), ['pkg', 'search', query.trim(), '-p', String(p)], 60_000));
+    return parseLibSearch(
+      await exec(await this.bin(), ['pkg', 'search', query.trim(), '-p', String(p)], 60_000),
+    );
   }
 
   /** lib_deps of the env and the libraries downloaded for it (.pio/libdeps/<env>). */
   async libraries(root: string, dir: string, env: string | null): Promise<PioInstalledLibs> {
     const abs = this.absDir(root, dir);
-    const { envs, defaultEnvs } = parsePlatformioIni(await readFile(join(abs, 'platformio.ini'), 'utf8'));
-    const e = envs.find((x) => x.name === env) ?? envs.find((x) => x.name === defaultEnvs[0]) ?? envs[0];
+    const { envs, defaultEnvs } = parsePlatformioIni(
+      await readFile(join(abs, 'platformio.ini'), 'utf8'),
+    );
+    const e =
+      envs.find((x) => x.name === env) ?? envs.find((x) => x.name === defaultEnvs[0]) ?? envs[0];
     if (!e) return { env: null, deps: [], installed: [] };
     const base = join(abs, '.pio', 'libdeps', e.name);
     const names = await readdir(base, { withFileTypes: true }).catch(() => []);
@@ -308,7 +356,9 @@ export class PlatformioService {
           /* keep */
         }
       if (!version) {
-        const props = await readFile(join(base, d.name, 'library.properties'), 'utf8').catch(() => '');
+        const props = await readFile(join(base, d.name, 'library.properties'), 'utf8').catch(
+          () => '',
+        );
         version = /^version\s*=\s*(.+)$/m.exec(props)?.[1]?.trim() ?? '';
       }
       installed.push({ name: d.name, version });
@@ -327,7 +377,15 @@ export class PlatformioService {
     if (!validLibSpec(spec)) throw new Error('Librería no válida (owner/nombre@versión).');
     if (env !== null && !validEnvName(env)) throw new Error('Entorno no válido.');
     const abs = this.absDir(root, dir);
-    const args = ['pkg', remove ? 'uninstall' : 'install', '-d', abs, '-l', remove ? libName(spec) : spec.trim(), ...(env ? ['-e', env] : [])];
+    const args = [
+      'pkg',
+      remove ? 'uninstall' : 'install',
+      '-d',
+      abs,
+      '-l',
+      remove ? libName(spec) : spec.trim(),
+      ...(env ? ['-e', env] : []),
+    ];
     return exec(await this.bin(), args, 10 * 60_000);
   }
 
@@ -341,7 +399,10 @@ export class PlatformioService {
     if (cur) this.closeSerial(port);
     const st = await this.status();
     const python = st.state === 'ready' ? st.python : null;
-    if (!python) throw new Error('No se encontró el Python de PlatformIO (~/.platformio/penv) para el monitor serie.');
+    if (!python)
+      throw new Error(
+        'No se encontró el Python de PlatformIO (~/.platformio/penv) para el monitor serie.',
+      );
     const proc = spawn(python, ['-u', '-c', SERIAL_SCRIPT, port, String(baud)], {
       windowsHide: true,
       env: pioEnv(),
@@ -415,7 +476,9 @@ export class PlatformioService {
     if (!s) throw new Error('El monitor de ese puerto no está abierto.');
     if (data.length > 64 * 1024) throw new Error('Demasiado texto.');
     await s.ready;
-    await new Promise<void>((ok, fail) => s.proc.stdin!.write(Buffer.from(data, 'utf8'), (e) => (e ? fail(e) : ok())));
+    await new Promise<void>((ok, fail) =>
+      s.proc.stdin!.write(Buffer.from(data, 'utf8'), (e) => (e ? fail(e) : ok())),
+    );
   }
 
   serialText(port: string): string | null {
@@ -452,7 +515,8 @@ function serialError(stderr: string): string {
   const msg = m[2]!.trim();
   if (/PermissionError|Access is denied|Acceso denegado|busy/i.test(msg))
     return 'El puerto está ocupado por otro programa (¿otro monitor serie abierto?).';
-  if (/FileNotFoundError|could not open port|No such file/i.test(msg)) return 'El puerto no existe (¿la placa está conectada?).';
+  if (/FileNotFoundError|could not open port|No such file/i.test(msg))
+    return 'El puerto no existe (¿la placa está conectada?).';
   return msg.slice(0, 300);
 }
 
@@ -484,6 +548,9 @@ function exec(bin: string, args: string[], timeout: number): Promise<string> {
 /** pio starts SCons and compilers: on Windows only taskkill /T stops them all. */
 function killTree(p: ChildProcess): void {
   if (process.platform === 'win32' && p.pid) {
-    spawn('taskkill', ['/PID', String(p.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on('error', () => p.kill());
+    spawn('taskkill', ['/PID', String(p.pid), '/T', '/F'], {
+      windowsHide: true,
+      stdio: 'ignore',
+    }).on('error', () => p.kill());
   } else p.kill();
 }

@@ -203,7 +203,11 @@ function telegram(token: string, on: LinkEvents): Link {
         text,
         link_preview_options: { is_disabled: true },
         ...(buttons
-          ? { reply_markup: { inline_keyboard: [buttons.map((b) => ({ text: b.label, callback_data: b.data }))] } }
+          ? {
+              reply_markup: {
+                inline_keyboard: [buttons.map((b) => ({ text: b.label, callback_data: b.data }))],
+              },
+            }
           : {}),
       });
     },
@@ -233,7 +237,9 @@ function discord(token: string, on: LinkEvents): Link {
     if (res.status === 204) return null;
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = new Error((json as { message?: string }).message || `HTTP ${res.status}`) as Error & {
+      const err = new Error(
+        (json as { message?: string }).message || `HTTP ${res.status}`,
+      ) as Error & {
         code?: number;
       };
       err.code = res.status;
@@ -272,7 +278,12 @@ function discord(token: string, on: LinkEvents): Link {
     let seq: number | null = null;
     let acked = true;
     sock.onmessage = (ev) => {
-      const p = JSON.parse(String(ev.data)) as { op: number; d: DiscordData; s?: number; t?: string };
+      const p = JSON.parse(String(ev.data)) as {
+        op: number;
+        d: DiscordData;
+        s?: number;
+        t?: string;
+      };
       if (typeof p.s === 'number') seq = p.s;
       switch (p.op) {
         case 10: {
@@ -310,7 +321,9 @@ function discord(token: string, on: LinkEvents): Link {
             const app = p.d.application?.id ?? p.d.user?.id;
             on.ready(
               p.d.user?.username ?? 'bot',
-              app ? `https://discord.com/oauth2/authorize?client_id=${app}&scope=bot&permissions=0` : undefined,
+              app
+                ? `https://discord.com/oauth2/authorize?client_id=${app}&scope=bot&permissions=0`
+                : undefined,
             );
           } else if (p.t === 'MESSAGE_CREATE') {
             const m = p.d;
@@ -350,7 +363,9 @@ function discord(token: string, on: LinkEvents): Link {
       if (ctl.signal.aborted) return;
       if (ev.code === 4004) return on.fail('Token de Discord inválido.');
       if (ev.code === 4013 || ev.code === 4014)
-        return on.fail('Discord no permite los permisos del bot (revisa los "Privileged Gateway Intents").');
+        return on.fail(
+          'Discord no permite los permisos del bot (revisa los "Privileged Gateway Intents").',
+        );
       void sleep(RETRY_MS, ctl.signal).then(() => {
         if (!ctl.signal.aborted) void connect();
       });
@@ -451,7 +466,9 @@ export class ChatBots {
 
   private paired(): Record<BotKind, string[]> {
     try {
-      const j = JSON.parse(readFileSync(this.pairedFile(), 'utf8')) as Partial<Record<BotKind, string[]>>;
+      const j = JSON.parse(readFileSync(this.pairedFile(), 'utf8')) as Partial<
+        Record<BotKind, string[]>
+      >;
       return { telegram: j.telegram ?? [], discord: j.discord ?? [] };
     } catch {
       return { telegram: [], discord: [] };
@@ -469,7 +486,9 @@ export class ChatBots {
 
   private lastChats(): Partial<Record<LinkKind, string>> {
     try {
-      return JSON.parse(readFileSync(this.chatsFile(), 'utf8')) as Partial<Record<LinkKind, string>>;
+      return JSON.parse(readFileSync(this.chatsFile(), 'utf8')) as Partial<
+        Record<LinkKind, string>
+      >;
     } catch {
       return {};
     }
@@ -489,7 +508,9 @@ export class ChatBots {
   /** Whether a scheduled result can be sent to this app right now. */
   canNotify(kind: LinkKind): boolean {
     if (!this.active || !this.links.has(kind)) return false;
-    return Boolean(this.lastChats()[kind] ?? (kind === 'telegram' ? this.paired().telegram[0] : undefined));
+    return Boolean(
+      this.lastChats()[kind] ?? (kind === 'telegram' ? this.paired().telegram[0] : undefined),
+    );
   }
 
   /**
@@ -497,11 +518,14 @@ export class ChatBots {
    * app. Throws a readable error when it cannot (remote off, bot not connected, no chat yet).
    */
   async notify(kind: LinkKind, text: string, fallbackChat?: string): Promise<void> {
-    if (!this.active) throw new Error('el control desde el celular está apagado (Configuración → Celular)');
+    if (!this.active)
+      throw new Error('el control desde el celular está apagado (Configuración → Celular)');
     if (!this.links.has(kind)) throw new Error('no está conectado');
     // In private Telegram chats the chat id is the user id.
     const chat =
-      this.lastChats()[kind] ?? (kind === 'telegram' ? this.paired().telegram[0] : undefined) ?? fallbackChat;
+      this.lastChats()[kind] ??
+      (kind === 'telegram' ? this.paired().telegram[0] : undefined) ??
+      fallbackChat;
     if (!chat) throw new Error('escríbele primero al bot desde tu chat para vincularlo');
     await this.say(kind, chat, text);
   }
@@ -686,7 +710,8 @@ export class ChatBots {
       case '/abrir':
       case '/open': {
         const repo = await this.findRepo(key, arg);
-        if (!repo) return this.say(kind, m.chat, 'No encontré ese repo. Usa /repos para ver la lista.');
+        if (!repo)
+          return this.say(kind, m.chat, 'No encontré ese repo. Usa /repos para ver la lista.');
         try {
           if (cmd.toLowerCase() === '/pull') {
             await this.say(kind, m.chat, `Haciendo pull de ${repo.name}…`);
@@ -696,7 +721,11 @@ export class ChatBots {
           await this.deps.repos.open(repo.path);
           return this.say(kind, m.chat, `${repo.name} abierto en Zinarix.`);
         } catch (e) {
-          return this.say(kind, m.chat, `${repo.name}: ${e instanceof Error ? e.message : String(e)}`);
+          return this.say(
+            kind,
+            m.chat,
+            `${repo.name}: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
       case '/parar':
@@ -714,7 +743,10 @@ export class ChatBots {
           kind,
           m.chat,
           s.chats
-            .map((c, i) => `${i + 1}. ${c.title}${c.id === s.chatId ? ' ←' : ''}${c.busy ? ' (trabajando)' : ''}`)
+            .map(
+              (c, i) =>
+                `${i + 1}. ${c.title}${c.id === s.chatId ? ' ←' : ''}${c.busy ? ' (trabajando)' : ''}`,
+            )
             .join('\n') + '\n\n/chat 2 para cambiar',
         );
       }
@@ -752,11 +784,16 @@ export class ChatBots {
     if (n) return repos[n - 1];
     const q = arg.toLowerCase();
     if (!q) return repos.find((r) => r.open);
-    return repos.find((r) => r.name.toLowerCase() === q) ?? repos.find((r) => r.name.toLowerCase().includes(q));
+    return (
+      repos.find((r) => r.name.toLowerCase() === q) ??
+      repos.find((r) => r.name.toLowerCase().includes(q))
+    );
   }
 
   private pendingApprovals() {
-    return (this.snapshot?.turns ?? []).flatMap((t) => t.tools.filter((x) => x.status === 'approval'));
+    return (this.snapshot?.turns ?? []).flatMap((t) =>
+      t.tools.filter((x) => x.status === 'approval'),
+    );
   }
 
   private decide(toolCallId: string, ok: boolean): void {
@@ -785,7 +822,8 @@ export class ChatBots {
     const done =
       !s.busy &&
       last?.role === 'assistant' &&
-      (this.phase === 'running' || (this.phase === 'waiting' && s.turns.length > this.turnsAtSend + 1));
+      (this.phase === 'running' ||
+        (this.phase === 'waiting' && s.turns.length > this.turnsAtSend + 1));
     if (!done) return;
     this.phase = 'idle';
     const text = [last.text, last.error ? `Error: ${last.error}` : ''].filter(Boolean).join('\n\n');

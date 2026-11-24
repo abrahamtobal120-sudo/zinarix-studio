@@ -40,12 +40,28 @@ const files = {
     'difference() {\n  cube([ancho, ancho, alto]);\n  if (hueca) translate([2, 2, 2]) cube([ancho - 4, ancho - 4, alto]);\n}\n',
   'pieza.stl': (() => {
     const v = [
-      [0, 0, 0], [20, 0, 0], [20, 20, 0], [0, 20, 0],
-      [0, 0, 20], [20, 0, 20], [20, 20, 20], [0, 20, 20],
+      [0, 0, 0],
+      [20, 0, 0],
+      [20, 20, 0],
+      [0, 20, 0],
+      [0, 0, 20],
+      [20, 0, 20],
+      [20, 20, 20],
+      [0, 20, 20],
     ];
     const f = [
-      [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4],
-      [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7],
+      [0, 2, 1],
+      [0, 3, 2],
+      [4, 5, 6],
+      [4, 6, 7],
+      [0, 1, 5],
+      [0, 5, 4],
+      [1, 2, 6],
+      [1, 6, 5],
+      [2, 3, 7],
+      [2, 7, 6],
+      [3, 0, 4],
+      [3, 4, 7],
     ];
     const t = f.map(
       (x) =>
@@ -59,8 +75,19 @@ const files = {
     const l = [';FLAVOR:Marlin', 'M104 S210', 'M140 S60', 'G28', 'G92 E0'];
     let e = 0;
     for (let z = 1; z <= 20; z++) {
-      l.push(`;LAYER_CHANGE`, `;Z:${(z * 0.2).toFixed(1)}`, `G1 Z${(z * 0.2).toFixed(1)} F600`, ';TYPE:Perimeter');
-      for (const [x, y] of [[100, 100], [120, 100], [120, 120], [100, 120], [100, 100]])
+      l.push(
+        `;LAYER_CHANGE`,
+        `;Z:${(z * 0.2).toFixed(1)}`,
+        `G1 Z${(z * 0.2).toFixed(1)} F600`,
+        ';TYPE:Perimeter',
+      );
+      for (const [x, y] of [
+        [100, 100],
+        [120, 100],
+        [120, 120],
+        [100, 120],
+        [100, 100],
+      ])
         l.push(`G1 X${x} Y${y} E${(e += 0.8).toFixed(3)} F1800`);
     }
     return l.join('\n') + '\n';
@@ -427,7 +454,11 @@ for (const theme of themes) {
     ['pieza.gcode', 2500],
     ['foto.png', 1500],
   ])
-    await visit(p(`file-${name.replace('.', '-')}`), () => row(name).click({ timeout: 5000 }), wait);
+    await visit(
+      p(`file-${name.replace('.', '-')}`),
+      () => row(name).click({ timeout: 5000 }),
+      wait,
+    );
   await visit(p('security'), () => cmd('security.center'), 1200);
   await esc();
   await visit(p('scanner'), () => cmd('security.scanner'), 1200);

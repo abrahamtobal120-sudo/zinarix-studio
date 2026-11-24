@@ -68,8 +68,11 @@ describe('EQ (RBJ peaking)', () => {
     expect(ffmpegEq({ low: 0 })).toEqual([]);
     const evil = { low: '1:afade' } as unknown as { low: number };
     expect(ffmpegEq(evil)).toEqual([]);
-    for (const s of ffmpegEq({ low: 1e9, lowMid: -1e9 })) expect(s).toMatch(/^equalizer=f=\d+:t=q:w=1:g=-?24$/);
-    expect(webAudioEqParams({ lowMid: -2 })).toEqual([{ type: 'peaking', frequency: 400, Q: 1, gain: -2 }]);
+    for (const s of ffmpegEq({ low: 1e9, lowMid: -1e9 }))
+      expect(s).toMatch(/^equalizer=f=\d+:t=q:w=1:g=-?24$/);
+    expect(webAudioEqParams({ lowMid: -2 })).toEqual([
+      { type: 'peaking', frequency: 400, Q: 1, gain: -2 },
+    ]);
   });
 });
 
@@ -82,7 +85,9 @@ describe('compressor', () => {
       release: 2000,
       makeup: 24,
     });
-    expect(cleanComp({ threshold: -20, ratio: 1, attack: 10, release: 100, makeup: 0 })).toBeUndefined();
+    expect(
+      cleanComp({ threshold: -20, ratio: 1, attack: 10, release: 100, makeup: 0 }),
+    ).toBeUndefined();
     expect(cleanComp(null)).toBeUndefined();
     expect(cleanComp({ ratio: 4 })).toMatchObject({ ratio: 4, threshold: -24 });
     expect(validComp(undefined)).toBe(true);
@@ -101,7 +106,9 @@ describe('compressor', () => {
 
   it('ffmpegComp uses linear threshold/makeup inside acompressor limits', () => {
     const [f] = ffmpegComp({ threshold: -60, ratio: 4, attack: 0.1, release: 2000, makeup: 24 });
-    expect(f).toMatch(/^acompressor=threshold=0\.001:ratio=4:attack=0\.1:release=2000:makeup=15\.848932:knee=1/);
+    expect(f).toMatch(
+      /^acompressor=threshold=0\.001:ratio=4:attack=0\.1:release=2000:makeup=15\.848932:knee=1/,
+    );
     expect(ffmpegComp(undefined)).toEqual([]);
     const [g] = ffmpegComp({ threshold: 0, ratio: 2, attack: 5, release: 50, makeup: 0 });
     expect(g).toContain('threshold=1:');
@@ -109,7 +116,13 @@ describe('compressor', () => {
   });
 
   it('Web Audio params cancel the automatic makeup gain', () => {
-    const w = webAudioCompParams({ threshold: -20, ratio: 4, attack: 10, release: 1500, makeup: 3 })!;
+    const w = webAudioCompParams({
+      threshold: -20,
+      ratio: 4,
+      attack: 10,
+      release: 1500,
+      makeup: 3,
+    })!;
     expect(w).toMatchObject({ threshold: -20, ratio: 4, attack: 0.01, release: 1, knee: 0 });
     // auto makeup = 0.6·20·(1−1/4) = 9 dB → node gain 3 − 9 = −6 dB
     expect(20 * Math.log10(w.makeupGain)).toBeCloseTo(-6, 9);
@@ -146,7 +159,10 @@ describe('K-weighting', () => {
 
 describe('LoudnessMeter (pure)', () => {
   const sine = (sr: number, sec: number, f: number, amp: number) =>
-    Float32Array.from({ length: Math.round(sr * sec) }, (_, i) => amp * Math.sin((2 * Math.PI * f * i) / sr));
+    Float32Array.from(
+      { length: Math.round(sr * sec) },
+      (_, i) => amp * Math.sin((2 * Math.PI * f * i) / sr),
+    );
 
   it('a 997 Hz full-scale-referenced sine reads as expected and silence is −Infinity', () => {
     const m = new LoudnessMeter(48000, 2);
@@ -190,9 +206,20 @@ function ff(args: string[]) {
 /** Decodes a lavfi source (optionally filtered) to planar float channels. */
 function pcm(src: string, channels: number, af?: string): Float32Array[] {
   const r = ff([
-    '-v', 'error', '-f', 'lavfi', '-i', src,
+    '-v',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    src,
     ...(af ? ['-af', af] : []),
-    '-ac', String(channels), '-ar', String(SR), '-f', 'f32le', '-',
+    '-ac',
+    String(channels),
+    '-ar',
+    String(SR),
+    '-f',
+    'f32le',
+    '-',
   ]);
   const buf = Buffer.from(r.stdout);
   const all = new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 4));
@@ -233,8 +260,10 @@ describe.skipIf(!tools.ffmpeg)('audio FX with FFmpeg', () => {
 
   it('LoudnessMeter matches ffmpeg ebur128 (integrated ±0.5 LU, short-term ±1.5)', () => {
     // Loud tone, a near-silent part (gated out), then a bass part with different channels.
-    const L = 'if(lt(t,4),0.1*sin(2*PI*1000*t),if(lt(t,7),0.001*sin(2*PI*440*t),0.3*sin(2*PI*80*t)))';
-    const R = 'if(lt(t,4),0.05*sin(2*PI*500*t),if(lt(t,7),0.001*sin(2*PI*440*t),0.2*sin(2*PI*3000*t)))';
+    const L =
+      'if(lt(t,4),0.1*sin(2*PI*1000*t),if(lt(t,7),0.001*sin(2*PI*440*t),0.3*sin(2*PI*80*t)))';
+    const R =
+      'if(lt(t,4),0.05*sin(2*PI*500*t),if(lt(t,7),0.001*sin(2*PI*440*t),0.2*sin(2*PI*3000*t)))';
     const src = `aevalsrc=exprs='${L}|${R}':s=${SR}:d=10`;
     const meter = new LoudnessMeter(SR, 2);
     meter.push(pcm(src, 2));
@@ -249,7 +278,9 @@ describe.skipIf(!tools.ffmpeg)('audio FX with FFmpeg', () => {
     const tone = `aevalsrc=0.1*sin(2*PI*1000*t)|0.05*sin(2*PI*500*t):s=${SR}:d=5`;
     const m2 = new LoudnessMeter(SR, 2);
     m2.push(pcm(tone, 2));
-    const log2 = String(ff(['-v', 'info', '-f', 'lavfi', '-i', tone, '-af', 'ebur128', '-f', 'null', '-']).stderr);
+    const log2 = String(
+      ff(['-v', 'info', '-f', 'lavfi', '-i', tone, '-af', 'ebur128', '-f', 'null', '-']).stderr,
+    );
     const s = [...log2.matchAll(/S:\s+(-?[\d.]+)/g)].map((x) => Number(x[1]));
     const refS = s[s.length - 1]!;
     expect(Math.abs(m2.shortTerm() - refS)).toBeLessThan(1.5);

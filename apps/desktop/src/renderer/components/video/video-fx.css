@@ -192,7 +192,13 @@
     position: relative;
     height: 5px;
     border-radius: var(--radius-xs);
-    background: linear-gradient(90deg, var(--ok) 0%, var(--ok) 70%, var(--warn) 85%, var(--danger) 100%);
+    background: linear-gradient(
+      90deg,
+      var(--ok) 0%,
+      var(--ok) 70%,
+      var(--warn) 85%,
+      var(--danger) 100%
+    );
     overflow: hidden;
   }
   .vs-meter-fill {

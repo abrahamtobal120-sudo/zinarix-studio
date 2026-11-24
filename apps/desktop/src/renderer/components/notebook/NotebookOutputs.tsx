@@ -29,13 +29,71 @@ const SUPPORTED = [
 
 /** Tags kept from HTML outputs (pandas tables, simple rich reprs). Everything else: its text. */
 const TAGS = new Set([
-  'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
-  'div', 'span', 'p', 'br', 'hr', 'b', 'strong', 'i', 'em', 'u', 's', 'small', 'sub', 'sup',
-  'code', 'pre', 'kbd', 'samp', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'blockquote',
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'details', 'summary', 'img', 'a',
+  'table',
+  'thead',
+  'tbody',
+  'tfoot',
+  'tr',
+  'th',
+  'td',
+  'caption',
+  'colgroup',
+  'col',
+  'div',
+  'span',
+  'p',
+  'br',
+  'hr',
+  'b',
+  'strong',
+  'i',
+  'em',
+  'u',
+  's',
+  'small',
+  'sub',
+  'sup',
+  'code',
+  'pre',
+  'kbd',
+  'samp',
+  'ul',
+  'ol',
+  'li',
+  'dl',
+  'dt',
+  'dd',
+  'blockquote',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'details',
+  'summary',
+  'img',
+  'a',
 ]);
 /** Dropped with their content. */
-const DROP = new Set(['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'template', 'noscript', 'svg', 'math', 'form', 'input', 'button', 'select', 'textarea']);
+const DROP = new Set([
+  'script',
+  'style',
+  'iframe',
+  'object',
+  'embed',
+  'link',
+  'meta',
+  'template',
+  'noscript',
+  'svg',
+  'math',
+  'form',
+  'input',
+  'button',
+  'select',
+  'textarea',
+]);
 
 function convert(node: Node, key: number): ReactNode {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent;
@@ -48,7 +106,8 @@ function convert(node: Node, key: number): ReactNode {
   const props: Record<string, unknown> = { key };
   const span = (name: string) => {
     const v = Number(el.getAttribute(name));
-    if (Number.isInteger(v) && v > 0 && v < 1000) props[name === 'colspan' ? 'colSpan' : 'rowSpan'] = v;
+    if (Number.isInteger(v) && v > 0 && v < 1000)
+      props[name === 'colspan' ? 'colSpan' : 'rowSpan'] = v;
   };
   if (tag === 'td' || tag === 'th') {
     span('colspan');
@@ -96,18 +155,39 @@ function DataView({ data, metadata }: { data: JsonObject; metadata: JsonObject }
     ...(typeof meta.height === 'number' ? { height: meta.height } : {}),
   };
   if (mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/gif')
-    return <img className="nb-img" alt="" src={`data:${mime};base64,${text.replace(/\s+/g, '')}`} {...size} />;
+    return (
+      <img
+        className="nb-img"
+        alt=""
+        src={`data:${mime};base64,${text.replace(/\s+/g, '')}`}
+        {...size}
+      />
+    );
   if (mime === 'image/svg+xml')
     // As an <img>, an SVG cannot run script.
-    return <img className="nb-img" alt="" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`} {...size} />;
+    return (
+      <img
+        className="nb-img"
+        alt=""
+        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`}
+        {...size}
+      />
+    );
   if (mime === 'text/html') return <SafeHtml html={text} />;
-  if (mime === 'text/markdown') return <div className="nb-md"><Markdown text={text} /></div>;
+  if (mime === 'text/markdown')
+    return (
+      <div className="nb-md">
+        <Markdown text={text} />
+      </div>
+    );
   if (mime === 'application/json')
     return <pre className="nb-pre">{JSON.stringify(value, null, 2)}</pre>;
   return (
     <>
       {widget && <div className="nb-out-note">{tn('widget')}</div>}
-      <pre className="nb-pre"><AnsiText text={text} /></pre>
+      <pre className="nb-pre">
+        <AnsiText text={text} />
+      </pre>
     </>
   );
 }
@@ -129,7 +209,13 @@ function StreamText({ text }: { text: string }) {
   );
 }
 
-export const OutputView = memo(function OutputView({ o, onFix }: { o: NbOutput; onFix?: () => void }) {
+export const OutputView = memo(function OutputView({
+  o,
+  onFix,
+}: {
+  o: NbOutput;
+  onFix?: () => void;
+}) {
   if (o.output_type === 'stream')
     return (
       <pre className={`nb-pre ${o.name === 'stderr' ? 'nb-stderr' : ''}`}>
@@ -140,7 +226,11 @@ export const OutputView = memo(function OutputView({ o, onFix }: { o: NbOutput; 
     return (
       <div className="nb-error-box">
         <pre className="nb-pre nb-error">
-          {o.traceback.length ? <AnsiText text={o.traceback.join('\n')} /> : `${o.ename}: ${o.evalue}`}
+          {o.traceback.length ? (
+            <AnsiText text={o.traceback.join('\n')} />
+          ) : (
+            `${o.ename}: ${o.evalue}`
+          )}
         </pre>
         {onFix && (
           <div className="nb-error-actions">
@@ -149,7 +239,11 @@ export const OutputView = memo(function OutputView({ o, onFix }: { o: NbOutput; 
             </button>
             <button
               className="btn ghost"
-              onClick={() => void navigator.clipboard.writeText(stripAnsi(o.traceback.join('\n')) || `${o.ename}: ${o.evalue}`)}
+              onClick={() =>
+                void navigator.clipboard.writeText(
+                  stripAnsi(o.traceback.join('\n')) || `${o.ename}: ${o.evalue}`,
+                )
+              }
             >
               {tn('copyError')}
             </button>

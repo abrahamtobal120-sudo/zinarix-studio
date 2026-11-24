@@ -8,7 +8,11 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { BlenderModelService, blenderFailure } from '../src/main/blenderModel.js';
 import { Scene3DService } from '../src/main/scene3d.js';
-import { describeBlenderOps, describeBlenderReport, validateBlenderOps } from '../src/shared/blenderOps.js';
+import {
+  describeBlenderOps,
+  describeBlenderReport,
+  validateBlenderOps,
+} from '../src/shared/blenderOps.js';
 import { analyzeMesh, checkPrint, parseStl } from '../src/shared/mesh3d.js';
 import { runCadTool } from '../src/main/cadTools.js';
 
@@ -24,7 +28,12 @@ describe('validateBlenderOps', () => {
     const ops = validateBlenderOps(
       [
         { op: 'add', type: 'cube', name: 'Caja', size: 2, location: [0, 0, 1] },
-        { op: 'modifier', object: 'Caja', type: 'bevel', settings: { width: 0.1, segments: 3, limit: 'angle' } },
+        {
+          op: 'modifier',
+          object: 'Caja',
+          type: 'bevel',
+          settings: { width: 0.1, segments: 3, limit: 'angle' },
+        },
         { op: 'material', object: 'Caja', color: '#ff0000', metallic: 1 },
         { op: 'export', path: 'out/caja.stl', scale: 1000 },
       ],
@@ -41,18 +50,31 @@ describe('validateBlenderOps', () => {
   it('refuses unknown ops, settings and paths outside', () => {
     expect(() => validateBlenderOps([{ op: 'python', code: 'x' }], inside)).toThrow(/unknown op/);
     expect(() =>
-      validateBlenderOps([{ op: 'modifier', object: 'A', type: 'bevel', settings: { exec: 1 } }], inside),
+      validateBlenderOps(
+        [{ op: 'modifier', object: 'A', type: 'bevel', settings: { exec: 1 } }],
+        inside,
+      ),
     ).toThrow(/no setting "exec"/);
-    expect(() => validateBlenderOps([{ op: 'modifier', object: 'A', type: 'boolean' }], inside)).toThrow(/cutter/);
-    expect(() => validateBlenderOps([{ op: 'export', path: '../x.stl' }], inside)).toThrow(/outside/);
+    expect(() =>
+      validateBlenderOps([{ op: 'modifier', object: 'A', type: 'boolean' }], inside),
+    ).toThrow(/cutter/);
+    expect(() => validateBlenderOps([{ op: 'export', path: '../x.stl' }], inside)).toThrow(
+      /outside/,
+    );
     expect(() => validateBlenderOps([{ op: 'export', path: 'x.exe' }], inside)).toThrow(/exports/);
-    expect(() => validateBlenderOps([{ op: 'add', type: 'cube', name: 'a"b' }], inside)).toThrow(/name/);
-    expect(() => validateBlenderOps([{ op: 'material', object: 'A', color: 'red' }], inside)).toThrow(/#rrggbb/);
+    expect(() => validateBlenderOps([{ op: 'add', type: 'cube', name: 'a"b' }], inside)).toThrow(
+      /name/,
+    );
+    expect(() =>
+      validateBlenderOps([{ op: 'material', object: 'A', color: 'red' }], inside),
+    ).toThrow(/#rrggbb/);
     expect(() => validateBlenderOps([], inside)).toThrow(/non-empty/);
   });
 
   it('reads the runner error line', () => {
-    expect(blenderFailure('foo\nZINARIX_ERROR op #2 (modifier): no object "X"\nBlender quit')).toBe('op #2 (modifier): no object "X"');
+    expect(blenderFailure('foo\nZINARIX_ERROR op #2 (modifier): no object "X"\nBlender quit')).toBe(
+      'op #2 (modifier): no object "X"',
+    );
   });
 });
 
@@ -67,8 +89,20 @@ describe.skipIf(!blender)('blender_model with a real Blender', () => {
     const ops = validateBlenderOps(
       [
         { op: 'add', type: 'cube', name: 'Caja', size: 0.04, location: [0, 0, 0.02] },
-        { op: 'add', type: 'cylinder', name: 'Hueco', size: 0.02, location: [0, 0, 0.03], scale: [1, 1, 3] },
-        { op: 'modifier', object: 'Caja', type: 'boolean', settings: { operation: 'difference', object: 'Hueco' } },
+        {
+          op: 'add',
+          type: 'cylinder',
+          name: 'Hueco',
+          size: 0.02,
+          location: [0, 0, 0.03],
+          scale: [1, 1, 3],
+        },
+        {
+          op: 'modifier',
+          object: 'Caja',
+          type: 'boolean',
+          settings: { operation: 'difference', object: 'Hueco' },
+        },
         { op: 'modifier', object: 'Caja', type: 'bevel', settings: { width: 0.002, segments: 2 } },
         { op: 'apply', object: 'Caja' },
         { op: 'delete', object: 'Hueco' },
@@ -108,8 +142,17 @@ describe.skipIf(!blender)('blender_model with a real Blender', () => {
       }),
     ).rejects.toThrow(/op #1 \(modifier\): no object "NoExiste"/);
     expect(readFileSync(blend).equals(before)).toBe(true);
-    const r = await svc.run({ input: blend, ops: validateBlenderOps([{ op: 'modifier', object: 'Caja', type: 'subsurf', settings: { levels: 1 } }], inside) });
-    expect(r.report.objects.find((o) => o.name === 'Caja')!.modifiers).toContainEqual({ name: 'Subsurf', type: 'SUBSURF' });
+    const r = await svc.run({
+      input: blend,
+      ops: validateBlenderOps(
+        [{ op: 'modifier', object: 'Caja', type: 'subsurf', settings: { levels: 1 } }],
+        inside,
+      ),
+    });
+    expect(r.report.objects.find((o) => o.name === 'Caja')!.modifiers).toContainEqual({
+      name: 'Subsurf',
+      type: 'SUBSURF',
+    });
   }, 120_000);
 
   it('the agent tools drive the real Blender (inspect, then model and export for printing)', async () => {
@@ -134,13 +177,25 @@ describe.skipIf(!blender)('blender_model with a real Blender', () => {
     expect(made.content).toContain('Print check of arte/aro.stl');
     expect(made.content).toContain('watertight');
     expect(made.image?.mediaType).toBe('image/png');
-    const seen = await runCadTool(undefined, svc, 'blender_inspect', { path: 'arte/llavero.blend' }, dir, signal);
+    const seen = await runCadTool(
+      undefined,
+      svc,
+      'blender_inspect',
+      { path: 'arte/llavero.blend' },
+      dir,
+      signal,
+    );
     expect(seen.ok).toBe(true);
-    expect(seen.content).toMatch(/"Aro" MESH .* materials: Material|"Aro" MESH .* materials: Aro material/);
+    expect(seen.content).toMatch(
+      /"Aro" MESH .* materials: Material|"Aro" MESH .* materials: Aro material/,
+    );
   }, 120_000);
 
   it('imports a mesh file as input', async () => {
-    const r = await svc.run({ input: join(dir, 'caja.glb'), ops: validateBlenderOps([{ op: 'rename', object: 'Caja', name: 'Importada' }], inside) });
+    const r = await svc.run({
+      input: join(dir, 'caja.glb'),
+      ops: validateBlenderOps([{ op: 'rename', object: 'Caja', name: 'Importada' }], inside),
+    });
     expect(r.report.objects.map((o) => o.name)).toContain('Importada');
   }, 120_000);
 });

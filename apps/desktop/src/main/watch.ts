@@ -146,7 +146,9 @@ async function material(ws: Workspace, p: ProjectState | undefined): Promise<str
     const diffOf = async (base: string) => {
       const names = await git(ws, ['diff', '--name-only', '-z', base]).catch(() => '');
       const secrets = names.split('\0').filter((f) => f && isSecretFile(f));
-      const skip = secrets.length ? ['--', '.', ...secrets.map((f) => `:(exclude,literal)${f}`)] : [];
+      const skip = secrets.length
+        ? ['--', '.', ...secrets.map((f) => `:(exclude,literal)${f}`)]
+        : [];
       return git(ws, [...args, base, ...skip]).catch(() => '');
     };
     let diff = await diffOf(known ? since! : 'HEAD');

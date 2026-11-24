@@ -98,14 +98,22 @@ export class Automations {
       const runs = (Array.isArray(j.runs) ? j.runs : []).map((r) =>
         // A run left halfway when the app closed.
         r.state === 'running'
-          ? { ...r, state: 'failed' as const, error: 'Zinarix se cerró durante la tarea.', endedAt: r.startedAt }
+          ? {
+              ...r,
+              state: 'failed' as const,
+              error: 'Zinarix se cerró durante la tarea.',
+              endedAt: r.startedAt,
+            }
           : r,
       );
       return {
         version: 1,
         tasks: Array.isArray(j.tasks) ? j.tasks : [],
         runs,
-        bots: (Array.isArray(j.bots) ? j.bots : []).map((b) => ({ ...b, widget: cleanWidget(b.widget, b.name) })),
+        bots: (Array.isArray(j.bots) ? j.bots : []).map((b) => ({
+          ...b,
+          widget: cleanWidget(b.widget, b.name),
+        })),
       };
     } catch {
       // Unreadable: keep a copy instead of losing it on the next save.
@@ -181,13 +189,18 @@ export class Automations {
   // ---------------- Tasks ----------------
 
   private cleanTask(input: AutoTaskInput): Omit<AutoTask, 'id' | 'createdAt' | 'nextRun'> {
-    const name = String(input.name ?? '').trim().slice(0, 80);
+    const name = String(input.name ?? '')
+      .trim()
+      .slice(0, 80);
     if (!name) throw new Error('Ponle un nombre a la tarea.');
-    const prompt = String(input.prompt ?? '').trim().slice(0, 8000);
+    const prompt = String(input.prompt ?? '')
+      .trim()
+      .slice(0, 8000);
     if (!prompt) throw new Error('Escribe qué tiene que hacer la IA.');
     const schedule = checkSchedule(input.schedule);
     if (typeof schedule === 'string') throw new Error(schedule);
-    if (input.bot && !this.data.bots.some((b) => b.id === input.bot)) throw new Error('Ese bot ya no existe.');
+    if (input.bot && !this.data.bots.some((b) => b.id === input.bot))
+      throw new Error('Ese bot ya no existe.');
     const model = typeof input.model === 'string' ? input.model.trim() : '';
     return {
       name,
@@ -227,7 +240,8 @@ export class Automations {
     delete t.folder;
     Object.assign(t, clean);
     t.nextRun = t.enabled ? nextRun(t.schedule, this.now()) : null;
-    if (t.enabled && t.schedule.kind === 'once' && t.nextRun === null) throw new Error('Esa fecha ya pasó.');
+    if (t.enabled && t.schedule.kind === 'once' && t.nextRun === null)
+      throw new Error('Esa fecha ya pasó.');
     this.changed();
     return this.status();
   }
@@ -267,7 +281,9 @@ export class Automations {
   }
 
   clearRuns(task?: string): AutomationsStatus {
-    this.data.runs = this.data.runs.filter((r) => r.state === 'running' || (task !== undefined && r.task !== task));
+    this.data.runs = this.data.runs.filter(
+      (r) => r.state === 'running' || (task !== undefined && r.task !== task),
+    );
     this.changed();
     return this.status();
   }
@@ -299,11 +315,15 @@ export class Automations {
     this.data.runs = this.data.runs.slice(0, RUNS_KEPT);
     this.changed();
     const lang = this.o.lang?.() ?? 'es';
-    const ws = t.tools === 'read' && t.folder && existsSync(t.folder) ? new Workspace(t.folder) : undefined;
-    const limit = setTimeout(() => {
-      r.error = 'Tardó demasiado: se detuvo.';
-      this.o.runner.abort(rid);
-    }, this.o.maxRunMs ?? 10 * 60_000);
+    const ws =
+      t.tools === 'read' && t.folder && existsSync(t.folder) ? new Workspace(t.folder) : undefined;
+    const limit = setTimeout(
+      () => {
+        r.error = 'Tardó demasiado: se detuvo.';
+        this.o.runner.abort(rid);
+      },
+      this.o.maxRunMs ?? 10 * 60_000,
+    );
     let failed: string | undefined;
     try {
       await this.o.runner.chat(
@@ -369,7 +389,10 @@ export class Automations {
   /** Notification, and the chosen chat apps. */
   private async report(t: AutoTask, r: AutoRun): Promise<void> {
     const body = r.state === 'ok' ? r.text : `Error: ${r.error ?? '?'}`;
-    this.o.notify?.(`${r.state === 'ok' ? '✓' : '✗'} ${t.name}`, body.slice(0, 200) || '(sin texto)');
+    this.o.notify?.(
+      `${r.state === 'ok' ? '✓' : '✗'} ${t.name}`,
+      body.slice(0, 200) || '(sin texto)',
+    );
     if (!t.deliver.length || !this.o.deliver) return;
     const text = `⏰ ${t.name}\n\n${body || '(sin texto)'}`;
     const problems: string[] = [];
@@ -377,7 +400,9 @@ export class Automations {
       try {
         await this.o.deliver(kind, text);
       } catch (e) {
-        problems.push(`${kind === 'whatsapp' ? 'WhatsApp' : kind[0]!.toUpperCase() + kind.slice(1)}: ${msg(e)}`);
+        problems.push(
+          `${kind === 'whatsapp' ? 'WhatsApp' : kind[0]!.toUpperCase() + kind.slice(1)}: ${msg(e)}`,
+        );
       }
     }
     if (problems.length) r.delivery = problems;

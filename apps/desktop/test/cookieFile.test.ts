@@ -8,8 +8,27 @@ describe('parseCookieFile', () => {
   it('reads a Cookie-Editor JSON export', () => {
     const r = parseCookieFile(
       JSON.stringify([
-        { domain: '.github.com', name: 'logged_in', value: 'yes', path: '/', secure: true, httpOnly: true, sameSite: 'lax', expirationDate: future, hostOnly: false },
-        { domain: 'github.com', name: '__Host-sess', value: 'x', path: '/a', secure: true, hostOnly: true, session: true, sameSite: 'strict' },
+        {
+          domain: '.github.com',
+          name: 'logged_in',
+          value: 'yes',
+          path: '/',
+          secure: true,
+          httpOnly: true,
+          sameSite: 'lax',
+          expirationDate: future,
+          hostOnly: false,
+        },
+        {
+          domain: 'github.com',
+          name: '__Host-sess',
+          value: 'x',
+          path: '/a',
+          secure: true,
+          hostOnly: true,
+          session: true,
+          sameSite: 'strict',
+        },
         { domain: 'old.com', name: 'gone', value: '1', expirationDate: 10 },
         { name: 'nodomain', value: '1' },
       ]),
@@ -34,11 +53,28 @@ describe('parseCookieFile', () => {
 
   it('reads a Playwright storage state and fixes SameSite=None without Secure', () => {
     const r = parseCookieFile(
-      JSON.stringify({ cookies: [{ name: 'a', value: 'b', domain: '.x.com', path: '/', expires: -1, httpOnly: false, secure: false, sameSite: 'None' }] }),
+      JSON.stringify({
+        cookies: [
+          {
+            name: 'a',
+            value: 'b',
+            domain: '.x.com',
+            path: '/',
+            expires: -1,
+            httpOnly: false,
+            secure: false,
+            sameSite: 'None',
+          },
+        ],
+      }),
       NOW,
     );
     expect(r.cookies).toHaveLength(1);
-    expect(r.cookies[0]).toMatchObject({ url: 'http://x.com/', sameSite: 'unspecified', domain: '.x.com' });
+    expect(r.cookies[0]).toMatchObject({
+      url: 'http://x.com/',
+      sameSite: 'unspecified',
+      domain: '.x.com',
+    });
   });
 
   it('reads cookies.txt (Netscape) with #HttpOnly_ lines', () => {
@@ -50,8 +86,17 @@ describe('parseCookieFile', () => {
     ].join('\n');
     const r = parseCookieFile(txt, NOW);
     expect(r.skipped).toBe(1);
-    expect(r.cookies[0]).toMatchObject({ domain: '.google.com', secure: true, name: 'SID', value: 'abc' });
-    expect(r.cookies[1]).toMatchObject({ url: 'http://mail.example.org/inbox', httpOnly: true, value: 'v\tw' });
+    expect(r.cookies[0]).toMatchObject({
+      domain: '.google.com',
+      secure: true,
+      name: 'SID',
+      value: 'abc',
+    });
+    expect(r.cookies[1]).toMatchObject({
+      url: 'http://mail.example.org/inbox',
+      httpOnly: true,
+      value: 'v\tw',
+    });
     expect(r.cookies[1]!.domain).toBeUndefined();
   });
 

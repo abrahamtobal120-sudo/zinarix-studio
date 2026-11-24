@@ -1,15 +1,82 @@
 /* Settings → Claves (dueño) */
 @layer features {
-.owner-keys h4 { display: flex; align-items: center; gap: 6px; margin: 18px 0 4px; }
-.owner-key-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 420px; overflow: auto; padding-right: 4px; }
-.owner-key { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--bg-2); display: flex; flex-direction: column; gap: 6px; }
-.owner-key.given { opacity: 0.6; }
-.owner-key-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.owner-key-head .spacer { flex: 1; }
-.owner-given { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); cursor: pointer; }
-.owner-key-code { font-size: var(--text-xs); word-break: break-all; user-select: all; background: var(--bg); border-radius: 4px; padding: 4px 6px; max-height: 3.6em; overflow: hidden; }
-.owner-key-note { font-size: var(--text-sm); }
-.owner-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; align-items: end; }
-.owner-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-sm); }
-.settings-quiz { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-3); }
+  .owner-keys h4 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 18px 0 4px;
+  }
+  .owner-key-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    max-height: 420px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+  .owner-key {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--bg-2);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .owner-key.given {
+    opacity: 0.6;
+  }
+  .owner-key-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .owner-key-head .spacer {
+    flex: 1;
+  }
+  .owner-given {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .owner-key-code {
+    font-size: var(--text-xs);
+    word-break: break-all;
+    user-select: all;
+    background: var(--bg);
+    border-radius: 4px;
+    padding: 4px 6px;
+    max-height: 3.6em;
+    overflow: hidden;
+  }
+  .owner-key-note {
+    font-size: var(--text-sm);
+  }
+  .owner-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 8px;
+    align-items: end;
+  }
+  .owner-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--text-sm);
+  }
+  .settings-quiz {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-3);
+  }
 }

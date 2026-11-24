@@ -83,16 +83,19 @@ const es = {
   // Mixer meters
   meterMaster: 'General (salida)',
   meterLevel: 'Nivel',
-  meterHint: 'Nivel estimado con la forma de onda. Que no llegue al rojo (0 dB) para que no se sature.',
+  meterHint:
+    'Nivel estimado con la forma de onda. Que no llegue al rojo (0 dB) para que no se sature.',
   // Auto zoom of recordings
   zoomTitle: 'Zoom automático',
-  zoomHint: 'Acerca la imagen hacia donde está el cursor cuando se queda quieto, como Screen Studio.',
+  zoomHint:
+    'Acerca la imagen hacia donde está el cursor cuando se queda quieto, como Screen Studio.',
   zoomApply: 'Aplicar zoom automático',
   zoomRemove: 'Quitar zoom',
   zoomAmount: 'Acercamiento',
   zoomNone: 'No se encontraron momentos para acercar (el cursor no se detuvo).',
   zoomDone: 'Zoom automático: {n} acercamiento(s).',
-  zoomNoTrack: 'Esta grabación no tiene el recorrido del cursor (se graba solo en pantallas completas).',
+  zoomNoTrack:
+    'Esta grabación no tiene el recorrido del cursor (se graba solo en pantallas completas).',
   recAutoZoom: 'Zoom automático hacia el cursor (solo pantallas)',
   zoomOn: 'Este clip tiene zoom (fotogramas clave de escala y posición).',
 };
@@ -178,7 +181,8 @@ const en: Record<Fase4Key, string> = {
   // Mixer meters
   meterMaster: 'Master (output)',
   meterLevel: 'Level',
-  meterHint: 'Level estimated from the waveform. Keep it out of the red (0 dB) so it does not clip.',
+  meterHint:
+    'Level estimated from the waveform. Keep it out of the red (0 dB) so it does not clip.',
   // Auto zoom of recordings
   zoomTitle: 'Auto zoom',
   zoomHint: 'Zooms in towards the cursor when it rests, like Screen Studio.',

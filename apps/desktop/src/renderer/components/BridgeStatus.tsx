@@ -31,7 +31,9 @@ export function BridgeStatus() {
     setSites(b.origins.join('\n'));
   };
   useEffect(() => {
-    void api().scene3d.bridge().then(show, () => show(CLOSED));
+    void api()
+      .scene3d.bridge()
+      .then(show, () => show(CLOSED));
   }, []);
   useEffect(() => {
     if (!open) return;

@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { confirmDialog } from '../../confirm';
 import { api, openFile, toast, useStore } from '../../store';
 import { Icon } from '../Icon';
-import { toDevicePoint, type MobileDevice, type MobileInput, type MobileKey } from '../../../shared/mobile';
+import {
+  toDevicePoint,
+  type MobileDevice,
+  type MobileInput,
+  type MobileKey,
+} from '../../../shared/mobile';
 import { tm } from './mobileStrings';
 
 /**
@@ -13,7 +18,10 @@ import { tm } from './mobileStrings';
  */
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']+': (Error: )?/,
+    '',
+  );
 const fail = (e: unknown) => toast(tm('error', { err: errText(e) }));
 
 const KEYMAP: Record<string, MobileKey> = {
@@ -27,13 +35,25 @@ const KEYMAP: Record<string, MobileKey> = {
   ArrowRight: 'dpad_right',
 };
 
-const NAV: { key: MobileKey; icon: Parameters<typeof Icon>[0]['name']; label: 'navBack' | 'navHome' | 'navRecents' }[] = [
+const NAV: {
+  key: MobileKey;
+  icon: Parameters<typeof Icon>[0]['name'];
+  label: 'navBack' | 'navHome' | 'navRecents';
+}[] = [
   { key: 'back', icon: 'back', label: 'navBack' },
   { key: 'home', icon: 'home', label: 'navHome' },
   { key: 'recents', icon: 'apps', label: 'navRecents' },
 ];
 
-export function ScreenView({ device, scrcpy, onBack }: { device: MobileDevice; scrcpy: boolean; onBack: () => void }) {
+export function ScreenView({
+  device,
+  scrcpy,
+  onBack,
+}: {
+  device: MobileDevice;
+  scrcpy: boolean;
+  onBack: () => void;
+}) {
   const root = useStore((s) => s.workspace?.root ?? null);
   const [url, setUrl] = useState<string | null>(null);
   const [live, setLive] = useState(true);
@@ -102,14 +122,23 @@ export function ScreenView({ device, scrcpy, onBack }: { device: MobileDevice; s
     clearTimeout(typeTimer.current);
     const t = typed.current;
     typed.current = '';
-    if (t) void send({ kind: 'text', text: t }, tm('typed', { text: t.length > 24 ? `${t.slice(0, 24)}…` : t }));
+    if (t)
+      void send(
+        { kind: 'text', text: t },
+        tm('typed', { text: t.length > 24 ? `${t.slice(0, 24)}…` : t }),
+      );
   }, [send]);
   useEffect(() => () => clearTimeout(typeTimer.current), []);
 
   const point = (e: React.PointerEvent) => {
     const el = img.current!;
     const r = el.getBoundingClientRect();
-    return toDevicePoint(e.clientX - r.left, e.clientY - r.top, { width: r.width, height: r.height }, { width: el.naturalWidth, height: el.naturalHeight });
+    return toDevicePoint(
+      e.clientX - r.left,
+      e.clientY - r.top,
+      { width: r.width, height: r.height },
+      { width: el.naturalWidth, height: el.naturalHeight },
+    );
   };
 
   const onUp = (e: React.PointerEvent) => {
@@ -121,11 +150,26 @@ export function ScreenView({ device, scrcpy, onBack }: { device: MobileDevice; s
     const scale = img.current.naturalWidth / Math.max(1, img.current.getBoundingClientRect().width);
     const moved = Math.hypot(end.x - start.x, end.y - start.y) / scale;
     if (moved < 8) {
-      if (dt < 450) void send({ kind: 'tap', x: start.x, y: start.y }, tm('tapped', { x: start.x, y: start.y }));
-      else void send({ kind: 'long_press', x: start.x, y: start.y, ms: Math.min(3000, dt) }, tm('held', { x: start.x, y: start.y }));
+      if (dt < 450)
+        void send(
+          { kind: 'tap', x: start.x, y: start.y },
+          tm('tapped', { x: start.x, y: start.y }),
+        );
+      else
+        void send(
+          { kind: 'long_press', x: start.x, y: start.y, ms: Math.min(3000, dt) },
+          tm('held', { x: start.x, y: start.y }),
+        );
     } else
       void send(
-        { kind: 'swipe', x: start.x, y: start.y, x2: end.x, y2: end.y, ms: Math.max(80, Math.min(2000, dt)) },
+        {
+          kind: 'swipe',
+          x: start.x,
+          y: start.y,
+          x2: end.x,
+          y2: end.y,
+          ms: Math.max(80, Math.min(2000, dt)),
+        },
         tm('swiped'),
       );
   };
@@ -138,8 +182,12 @@ export function ScreenView({ device, scrcpy, onBack }: { device: MobileDevice; s
       const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
       const path = `media/screenshots/${device.model.replace(/[^\w-]+/g, '_')}-${stamp}.png`;
       // createDir makes one level at a time.
-      await api().workspace.createDir('media').catch(() => undefined);
-      await api().workspace.createDir('media/screenshots').catch(() => undefined);
+      await api()
+        .workspace.createDir('media')
+        .catch(() => undefined);
+      await api()
+        .workspace.createDir('media/screenshots')
+        .catch(() => undefined);
       await api().workspace.writeBytes(path, bytes);
       toast(tm('saved', { path }));
       void openFile(path);
@@ -168,12 +216,23 @@ export function ScreenView({ device, scrcpy, onBack }: { device: MobileDevice; s
           <Icon name={live ? 'pause' : 'continue'} size={14} />
         </button>
         {root && (
-          <button className="icon-btn" title={tm('shotSave')} aria-label={tm('shotSave')} disabled={!url} onClick={() => void save()}>
+          <button
+            className="icon-btn"
+            title={tm('shotSave')}
+            aria-label={tm('shotSave')}
+            disabled={!url}
+            onClick={() => void save()}
+          >
             <Icon name="download" size={14} />
           </button>
         )}
         {scrcpy && (
-          <button className="icon-btn" title={tm('mirrorTip')} aria-label={tm('mirror')} onClick={() => void api().mobile.mirror(device.serial).catch(fail)}>
+          <button
+            className="icon-btn"
+            title={tm('mirrorTip')}
+            aria-label={tm('mirror')}
+            onClick={() => void api().mobile.mirror(device.serial).catch(fail)}
+          >
             <Icon name="eye" size={14} />
           </button>
         )}
@@ -223,18 +282,36 @@ export function ScreenView({ device, scrcpy, onBack }: { device: MobileDevice; s
       </div>
       <div className="mb-nav" role="toolbar" aria-label={tm('navBar')}>
         {NAV.map((n) => (
-          <button key={n.key} className="icon-btn" title={tm(n.label)} aria-label={tm(n.label)} onClick={() => void send({ kind: 'key', key: n.key }, tm(n.label))}>
+          <button
+            key={n.key}
+            className="icon-btn"
+            title={tm(n.label)}
+            aria-label={tm(n.label)}
+            onClick={() => void send({ kind: 'key', key: n.key }, tm(n.label))}
+          >
             <Icon name={n.icon} size={15} />
           </button>
         ))}
         <span className="mb-navsep" />
-        <button className="btn ghost hw-small" title={tm('volDown')} onClick={() => void send({ kind: 'key', key: 'volume_down' }, tm('volDown'))}>
+        <button
+          className="btn ghost hw-small"
+          title={tm('volDown')}
+          onClick={() => void send({ kind: 'key', key: 'volume_down' }, tm('volDown'))}
+        >
           −
         </button>
-        <button className="btn ghost hw-small" title={tm('volUp')} onClick={() => void send({ kind: 'key', key: 'volume_up' }, tm('volUp'))}>
+        <button
+          className="btn ghost hw-small"
+          title={tm('volUp')}
+          onClick={() => void send({ kind: 'key', key: 'volume_up' }, tm('volUp'))}
+        >
           +
         </button>
-        <button className="btn ghost hw-small" title={tm('powerTip')} onClick={() => void send({ kind: 'key', key: 'power' }, tm('power'))}>
+        <button
+          className="btn ghost hw-small"
+          title={tm('powerTip')}
+          onClick={() => void send({ kind: 'key', key: 'power' }, tm('power'))}
+        >
           {tm('power')}
         </button>
       </div>
@@ -257,20 +334,42 @@ export function AppsView({ device, onBack }: { device: MobileDevice; onBack: () 
 
   const load = useCallback(async () => {
     setPkgs(null);
-    setPkgs(await api().mobile.packages(device.serial, !system).catch((e) => (fail(e), [] as string[])));
+    setPkgs(
+      await api()
+        .mobile.packages(device.serial, !system)
+        .catch((e) => (fail(e), [] as string[])),
+    );
   }, [device.serial, system]);
   useEffect(() => {
     void load();
   }, [load]);
   useEffect(() => {
-    if (root) void api().mobile.apks().then(setApks).catch(() => setApks([]));
+    if (root)
+      void api()
+        .mobile.apks()
+        .then(setApks)
+        .catch(() => setApks([]));
   }, [root]);
 
-  const shown = useMemo(() => (pkgs ?? []).filter((p) => !query || p.toLowerCase().includes(query.toLowerCase())), [pkgs, query]);
+  const shown = useMemo(
+    () => (pkgs ?? []).filter((p) => !query || p.toLowerCase().includes(query.toLowerCase())),
+    [pkgs, query],
+  );
 
   const act = async (pkg: string, action: 'launch' | 'stop' | 'clear' | 'uninstall') => {
-    if (action === 'clear' && !(await confirmDialog(tm('clearAsk', { pkg }), { okLabel: tm('appClear'), danger: true }))) return;
-    if (action === 'uninstall' && !(await confirmDialog(tm('uninstallAsk', { pkg }), { okLabel: tm('appUninstall'), danger: true }))) return;
+    if (
+      action === 'clear' &&
+      !(await confirmDialog(tm('clearAsk', { pkg }), { okLabel: tm('appClear'), danger: true }))
+    )
+      return;
+    if (
+      action === 'uninstall' &&
+      !(await confirmDialog(tm('uninstallAsk', { pkg }), {
+        okLabel: tm('appUninstall'),
+        danger: true,
+      }))
+    )
+      return;
     setBusy(`${pkg}:${action}`);
     try {
       await api().mobile.app(device.serial, pkg, action);
@@ -306,7 +405,12 @@ export function AppsView({ device, onBack }: { device: MobileDevice; onBack: () 
           {tm('apps')} · {device.model}
         </span>
         <div className="spacer" />
-        <button className="icon-btn" title={tm('refresh')} aria-label={tm('refresh')} onClick={() => void load()}>
+        <button
+          className="icon-btn"
+          title={tm('refresh')}
+          aria-label={tm('refresh')}
+          onClick={() => void load()}
+        >
           <Icon name="refresh" size={14} />
         </button>
       </div>
@@ -324,7 +428,11 @@ export function AppsView({ device, onBack }: { device: MobileDevice; onBack: () 
                   <span className="mb-apkname" title={a}>
                     {a}
                   </span>
-                  <button className="btn hw-small" disabled={!!busy} onClick={() => void install(a)}>
+                  <button
+                    className="btn hw-small"
+                    disabled={!!busy}
+                    onClick={() => void install(a)}
+                  >
                     {busy === `apk:${a}` ? tm('installing') : tm('install')}
                   </button>
                 </div>
@@ -334,9 +442,19 @@ export function AppsView({ device, onBack }: { device: MobileDevice; onBack: () 
         )}
         <div className="hw-section">
           <div className="mb-lfilters">
-            <input value={query} placeholder={tm('appSearch')} aria-label={tm('appSearch')} onChange={(e) => setQuery(e.target.value)} />
+            <input
+              value={query}
+              placeholder={tm('appSearch')}
+              aria-label={tm('appSearch')}
+              onChange={(e) => setQuery(e.target.value)}
+            />
             <label className="mb-sys">
-              <input type="checkbox" checked={system} onChange={(e) => setSystem(e.target.checked)} /> {tm('systemApps')}
+              <input
+                type="checkbox"
+                checked={system}
+                onChange={(e) => setSystem(e.target.checked)}
+              />{' '}
+              {tm('systemApps')}
             </label>
           </div>
           {pkgs === null ? (
@@ -351,16 +469,40 @@ export function AppsView({ device, onBack }: { device: MobileDevice; onBack: () 
                     {p}
                   </span>
                   <span className="mb-appbtns">
-                    <button className="icon-btn" title={tm('appLaunch')} aria-label={`${tm('appLaunch')} ${p}`} disabled={!!busy} onClick={() => void act(p, 'launch')}>
+                    <button
+                      className="icon-btn"
+                      title={tm('appLaunch')}
+                      aria-label={`${tm('appLaunch')} ${p}`}
+                      disabled={!!busy}
+                      onClick={() => void act(p, 'launch')}
+                    >
                       <Icon name="continue" size={12} />
                     </button>
-                    <button className="icon-btn" title={tm('appStop')} aria-label={`${tm('appStop')} ${p}`} disabled={!!busy} onClick={() => void act(p, 'stop')}>
+                    <button
+                      className="icon-btn"
+                      title={tm('appStop')}
+                      aria-label={`${tm('appStop')} ${p}`}
+                      disabled={!!busy}
+                      onClick={() => void act(p, 'stop')}
+                    >
                       <Icon name="pause" size={12} />
                     </button>
-                    <button className="icon-btn" title={tm('appClear')} aria-label={`${tm('appClear')} ${p}`} disabled={!!busy} onClick={() => void act(p, 'clear')}>
+                    <button
+                      className="icon-btn"
+                      title={tm('appClear')}
+                      aria-label={`${tm('appClear')} ${p}`}
+                      disabled={!!busy}
+                      onClick={() => void act(p, 'clear')}
+                    >
                       <Icon name="refresh" size={12} />
                     </button>
-                    <button className="icon-btn" title={tm('appUninstall')} aria-label={`${tm('appUninstall')} ${p}`} disabled={!!busy} onClick={() => void act(p, 'uninstall')}>
+                    <button
+                      className="icon-btn"
+                      title={tm('appUninstall')}
+                      aria-label={`${tm('appUninstall')} ${p}`}
+                      disabled={!!busy}
+                      onClick={() => void act(p, 'uninstall')}
+                    >
                       <Icon name="trash" size={12} />
                     </button>
                   </span>
@@ -408,7 +550,12 @@ export function WifiConnect({ onConnected }: { onConnected: () => void }) {
       }}
     >
       <div className="hw-hint">{tm('wifiHelp')}</div>
-      <input value={addr} placeholder="192.168.1.20:37099" aria-label={tm('wifiAddr')} onChange={(e) => setAddr(e.target.value)} />
+      <input
+        value={addr}
+        placeholder="192.168.1.20:37099"
+        aria-label={tm('wifiAddr')}
+        onChange={(e) => setAddr(e.target.value)}
+      />
       <input
         value={code}
         inputMode="numeric"
@@ -418,7 +565,11 @@ export function WifiConnect({ onConnected }: { onConnected: () => void }) {
         onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
       />
       <div className="hw-row-btns">
-        <button className="btn hw-small" type="submit" disabled={busy || !addr.trim() || (!!code && code.length !== 6)}>
+        <button
+          className="btn hw-small"
+          type="submit"
+          disabled={busy || !addr.trim() || (!!code && code.length !== 6)}
+        >
           {code ? tm('wifiPair') : tm('wifiConnect')}
         </button>
         <button className="btn ghost hw-small" type="button" onClick={() => setOpen(false)}>

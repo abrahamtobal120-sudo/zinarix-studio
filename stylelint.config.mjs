@@ -5,5 +5,10 @@ export default {
   rules: {
     'color-no-hex': true,
   },
-  ignoreFiles: ['**/node_modules/**', '**/dist/**', '**/release/**', 'apps/desktop/src/renderer/ui/tokens.css'],
+  ignoreFiles: [
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/release/**',
+    'apps/desktop/src/renderer/ui/tokens.css',
+  ],
 };

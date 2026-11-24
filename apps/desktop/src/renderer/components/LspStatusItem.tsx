@@ -86,13 +86,20 @@ export function LspStatusItem() {
         title={text}
         onClick={() => setOpen((o) => !o)}
       >
-        <Icon name={status.state === 'missing' || status.state === 'error' ? 'warning' : 'code'} size={13} />{' '}
+        <Icon
+          name={status.state === 'missing' || status.state === 'error' ? 'warning' : 'code'}
+          size={13}
+        />{' '}
         {status.state === 'ready' ? status.server : text}
       </button>
       {open && (
         <div className="lsp-pop" role="dialog" aria-label={text}>
-          {status.state === 'ready' && <p>{tl('lspPopReady', { label, server: status.server ?? '' })}</p>}
-          {status.state === 'error' && <p>{tl('lspPopError', { label, detail: status.detail ?? '' })}</p>}
+          {status.state === 'ready' && (
+            <p>{tl('lspPopReady', { label, server: status.server ?? '' })}</p>
+          )}
+          {status.state === 'error' && (
+            <p>{tl('lspPopError', { label, detail: status.detail ?? '' })}</p>
+          )}
           {(status.state === 'missing' || status.state === 'error') && entry && (
             <>
               {status.state === 'missing' && <p>{tl('lspPopMissing', { label })}</p>}
@@ -105,7 +112,11 @@ export function LspStatusItem() {
                       {cmd ? (
                         <>
                           <code>{cmd}</code>
-                          <button className="btn" title={tl('lspInstallHint')} onClick={() => install(cmd)}>
+                          <button
+                            className="btn"
+                            title={tl('lspInstallHint')}
+                            onClick={() => install(cmd)}
+                          >
                             {tl('lspInstall')}
                           </button>
                         </>
@@ -120,7 +131,11 @@ export function LspStatusItem() {
           )}
           <div className="lsp-actions">
             <button className="btn" disabled={busy} onClick={() => void retry()}>
-              {busy ? tl('lspRetrying') : status.state === 'ready' ? tl('lspRestart') : tl('lspRetry')}
+              {busy
+                ? tl('lspRetrying')
+                : status.state === 'ready'
+                  ? tl('lspRestart')
+                  : tl('lspRetry')}
             </button>
           </div>
         </div>

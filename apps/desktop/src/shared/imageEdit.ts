@@ -135,7 +135,17 @@ export const IMAGE_PRESETS: { id: string; edit: ImageEdit }[] = [
   { id: 'sepia', edit: { sepia: 85, contrast: -5 } },
   { id: 'fade', edit: { contrast: -30, brightness: 10, saturation: -25 } },
   { id: 'punch', edit: { contrast: 35, saturation: 20, sharpen: 30 } },
-  { id: 'film', edit: { contrast: -12, highlights: -25, shadows: 20, vibrance: -15, temperature: 12, vignette: 25 } },
+  {
+    id: 'film',
+    edit: {
+      contrast: -12,
+      highlights: -25,
+      shadows: 20,
+      vibrance: -15,
+      temperature: 12,
+      vignette: 25,
+    },
+  },
   { id: 'drama', edit: { contrast: 30, highlights: -40, shadows: 30, vibrance: 25, vignette: 40 } },
   { id: 'noir', edit: { grayscale: 100, contrast: 45, shadows: -20, vignette: 45 } },
   { id: 'pastel', edit: { brightness: 18, contrast: -25, vibrance: -10, hue: -8 } },
@@ -189,12 +199,20 @@ export function cleanEdit(x: unknown, w: number, h: number): ImageEdit {
   if (a.flipH === true) e.flipH = true;
   if (a.flipV === true) e.flipV = true;
   const st = num(a.straighten);
-  if (st !== undefined && Math.abs(st) >= 0.05) e.straighten = Math.round(clamp(st, -45, 45) * 10) / 10;
+  if (st !== undefined && Math.abs(st) >= 0.05)
+    e.straighten = Math.round(clamp(st, -45, 45) * 10) / 10;
   const o = orientedSize(w, h, e.rotate);
   const c = a.crop as Record<string, unknown> | undefined;
   if (c && typeof c === 'object') {
     const [cx, cy, cw, ch] = [num(c.x), num(c.y), num(c.w), num(c.h)];
-    if (cx !== undefined && cy !== undefined && cw !== undefined && ch !== undefined && cw > 0 && ch > 0) {
+    if (
+      cx !== undefined &&
+      cy !== undefined &&
+      cw !== undefined &&
+      ch !== undefined &&
+      cw > 0 &&
+      ch > 0
+    ) {
       const k = clampCrop({ x: cx, y: cy, w: cw, h: ch }, o.w, o.h);
       if (k.x || k.y || k.w !== o.w || k.h !== o.h) e.crop = k;
     }
@@ -392,8 +410,12 @@ export function straightenImage(img: Rgba, deg: number): Rgba {
       const o = (y * W + x) * 4;
       if (a > 0) {
         out[o] = (src[i00]! * w00 + src[i10]! * w10 + src[i01]! * w01 + src[i11]! * w11) / a;
-        out[o + 1] = (src[i00 + 1]! * w00 + src[i10 + 1]! * w10 + src[i01 + 1]! * w01 + src[i11 + 1]! * w11) / a;
-        out[o + 2] = (src[i00 + 2]! * w00 + src[i10 + 2]! * w10 + src[i01 + 2]! * w01 + src[i11 + 2]! * w11) / a;
+        out[o + 1] =
+          (src[i00 + 1]! * w00 + src[i10 + 1]! * w10 + src[i01 + 1]! * w01 + src[i11 + 1]! * w11) /
+          a;
+        out[o + 2] =
+          (src[i00 + 2]! * w00 + src[i10 + 2]! * w10 + src[i01 + 2]! * w01 + src[i11 + 2]! * w11) /
+          a;
       }
       out[o + 3] = a;
     }
@@ -619,7 +641,14 @@ export function colorPixels(px: Uint8ClampedArray, e: ImageEdit): void {
 // ------------------------------------------------------------------- filters
 
 /** One box-blur pass along an axis (running sum, edges clamped). */
-function boxPass(src: Float32Array, dst: Float32Array, w: number, h: number, r: number, horizontal: boolean): void {
+function boxPass(
+  src: Float32Array,
+  dst: Float32Array,
+  w: number,
+  h: number,
+  r: number,
+  horizontal: boolean,
+): void {
   const len = horizontal ? w : h;
   const lines = horizontal ? h : w;
   const step = horizontal ? 4 : w * 4;
@@ -777,7 +806,8 @@ export function autoEdit(img: Rgba): ImageEdit {
   const mid = at(0.5);
   const e: Record<string, number> = {};
   const spread = hi - lo;
-  if (spread > 0.05 && spread < 0.9) e.contrast = Math.round(clamp((0.95 / spread - 1) * 100, 0, 45));
+  if (spread > 0.05 && spread < 0.9)
+    e.contrast = Math.round(clamp((0.95 / spread - 1) * 100, 0, 45));
   if (mid > 0.03 && mid < 0.97) {
     // Brightness is a gamma: the one that brings the middle grey to about 0.47.
     const gamma = Math.log(0.47) / Math.log(mid);
@@ -823,7 +853,8 @@ export function applyEdit(img: Rgba, e: ImageEdit, scale = 1, mask?: Uint8Array 
     const before = e.crop ?? orientedSize(img.width / scale, img.height / scale, e.rotate);
     blurScale = (scale * before.w) / e.resize.w;
   }
-  if (out === img) out = { width: img.width, height: img.height, data: new Uint8ClampedArray(img.data) };
+  if (out === img)
+    out = { width: img.width, height: img.height, data: new Uint8ClampedArray(img.data) };
   colorPixels(out.data, e);
   if (e.blur) out = blurImage(out, e.blur * blurScale);
   if (e.sharpen) out = sharpenImage(out, e.sharpen);

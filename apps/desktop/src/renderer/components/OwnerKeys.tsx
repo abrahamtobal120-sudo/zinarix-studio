@@ -12,7 +12,8 @@ const es = {
   lead: 'Solo tú ves esto. Las claves se firman con la llave privada de esta PC y se guardan en {path}.',
   noKey: 'No se pueden hacer claves aquí: {why}',
   gifts: '{n} claves de regalo Pro + AI',
-  giftsLead: 'Gratis y sin vencimiento, para tus clientes de Pro AI. Marca cada una cuando la entregues.',
+  giftsLead:
+    'Gratis y sin vencimiento, para tus clientes de Pro AI. Marca cada una cuando la entregues.',
   left: '{n} sin entregar',
   copy: 'Copiar',
   copied: 'Clave copiada',
@@ -39,7 +40,8 @@ const en: typeof es = {
   lead: 'Only you see this. Keys are signed with this PC’s private key and saved in {path}.',
   noKey: 'Keys cannot be made here: {why}',
   gifts: '{n} free Pro + AI gift keys',
-  giftsLead: 'Free and never expiring, for your Pro AI customers. Tick each one when you hand it out.',
+  giftsLead:
+    'Free and never expiring, for your Pro AI customers. Tick each one when you hand it out.',
   left: '{n} not handed out',
   copy: 'Copy',
   copied: 'Key copied',
@@ -137,7 +139,9 @@ export function OwnerKeysSection() {
   if (error) return <p className="plan-error">{error}</p>;
   if (!st) return <p className="dim">{tk('loading')}</p>;
   if (!st.available) return <p className="plan-error">{tk('noKey', { why: st.reason ?? '' })}</p>;
-  const gifts = st.keys.filter((k) => k.gift).sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+  const gifts = st.keys
+    .filter((k) => k.gift)
+    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
   const others = st.keys.filter((k) => !k.gift);
   const left = gifts.filter((k) => !k.given);
   const create = async () => {

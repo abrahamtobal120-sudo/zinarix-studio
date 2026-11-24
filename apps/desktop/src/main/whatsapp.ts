@@ -181,7 +181,6 @@ const readBoxJs = `(() => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-
 /** "Ana (Tú)": the chat with yourself ("Message yourself"). */
 const SELF = /\s*\((t[uú]|you)\)\s*$/i;
 
@@ -323,7 +322,13 @@ export class WhatsApp {
       this.configured.add(ses);
       ses.setUserAgent(chromeAgent());
       // Notifications, voice notes, calls' camera and copy/paste, for WhatsApp only.
-      const ok = new Set(['notifications', 'media', 'clipboard-read', 'clipboard-sanitized-write', 'fullscreen']);
+      const ok = new Set([
+        'notifications',
+        'media',
+        'clipboard-read',
+        'clipboard-sanitized-write',
+        'fullscreen',
+      ]);
       const fromWa = (url: string) => url.startsWith(URL_HOME);
       ses.setPermissionRequestHandler((wc, perm, cb) => cb(ok.has(perm) && fromWa(wc.getURL())));
       ses.setPermissionCheckHandler((_wc, perm, origin) => ok.has(perm) && fromWa(`${origin}/`));
@@ -433,8 +438,7 @@ export class WhatsApp {
     const now = await this.run<Read>(readJs([]));
     if (now?.chat) this.current = { id: now.chat, title: now.title };
     const cur = now?.chat ? this.current : undefined;
-    if (!cur?.id)
-      throw new Error(ERR_OPEN_CHAT);
+    if (!cur?.id) throw new Error(ERR_OPEN_CHAT);
     if (!this.chats.some((c) => c.id === cur.id)) {
       // Only the user's own messages are orders until they choose otherwise (the panel asks
       // for a confirmation before letting another person command the computer).
@@ -519,7 +523,9 @@ export class WhatsApp {
   private run<T>(code: string): Promise<T | null> {
     const wc = this.view?.webContents;
     if (!wc || wc.isDestroyed()) return Promise.resolve(null);
-    return wc.executeJavaScriptInIsolatedWorld(998, [{ code }]).catch(() => null) as Promise<T | null>;
+    return wc
+      .executeJavaScriptInIsolatedWorld(998, [{ code }])
+      .catch(() => null) as Promise<T | null>;
   }
 
   /**
@@ -573,7 +579,11 @@ export class WhatsApp {
       const r = await this.run<Read>(readJs(chats.map((c) => c.title)));
       if (!r) return;
       const cur = r.chat ? { id: r.chat, title: r.title } : undefined;
-      if (cur?.id !== this.current?.id || cur?.title !== this.current?.title || r.logged !== this.logged) {
+      if (
+        cur?.id !== this.current?.id ||
+        cur?.title !== this.current?.title ||
+        r.logged !== this.logged
+      ) {
         this.current = cur;
         this.logged = r.logged;
         this.changed();

@@ -44,9 +44,16 @@ export function blenderFailure(log: string): string {
 export class BlenderModelService {
   constructor(private readonly blender: () => Promise<{ path: string; version: string } | null>) {}
 
-  async run(job: BlenderModelJob, signal?: AbortSignal, timeoutMs = 10 * 60_000): Promise<BlenderModelResult> {
+  async run(
+    job: BlenderModelJob,
+    signal?: AbortSignal,
+    timeoutMs = 10 * 60_000,
+  ): Promise<BlenderModelResult> {
     const b = await this.blender();
-    if (!b) throw new Error('Blender no está instalado (necesita Blender 3.6 o más nuevo). Elígelo en el estudio 3D o descárgalo de blender.org.');
+    if (!b)
+      throw new Error(
+        'Blender no está instalado (necesita Blender 3.6 o más nuevo). Elígelo en el estudio 3D o descárgalo de blender.org.',
+      );
     if (job.input && !existsSync(job.input)) throw new Error(`No existe ${job.input}.`);
     const started = Date.now();
     const work = await mkdtemp(join(tmpdir(), 'zinarix-blend-'));

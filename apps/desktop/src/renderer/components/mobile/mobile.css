@@ -1,249 +1,249 @@
 @layer features {
-/* Phone panel (Fase 5B del plan de funciones); shares the hw-* layout of the Hardware panel */
-.mb-first {
-  border-top: none;
-}
-.mb-tool {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
-}
-.mb-tlabel {
-  flex: 1;
-}
-.mb-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--fg-dim);
-  opacity: 0.5;
-}
-.mb-dot.on {
-  background: var(--ok);
-  opacity: 1;
-}
-.mb-device,
-.mb-project {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-sm);
-}
-.mb-device.on {
-  background: var(--sel-soft);
-}
-.mb-dname,
-.mb-pname {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
-  min-width: 0;
-}
-.mb-dname > span:first-of-type,
-.mb-pname > span:last-child {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mb-kind {
-  font-size: var(--text-2xs);
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  background: var(--bg-3);
-  color: var(--fg-dim);
-}
-.mb-avd {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
-}
-.mb-avdname {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mb-ltitle {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mb-lfilters {
-  display: flex;
-  gap: var(--space-1);
-  padding: 0 var(--space-2) var(--space-1);
-}
-.mb-lfilters select {
-  font-size: var(--text-xs);
-}
-.mb-lfilters input {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--text-xs);
-}
-.mb-log {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  margin: 0 var(--space-2) var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  background: var(--code-bg);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-.mb-line {
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.mb-ltime {
-  color: var(--fg-dim);
-}
-.mb-llevel {
-  font-weight: 700;
-}
-.mb-ltag {
-  color: var(--accent-text);
-}
-.mb-line.lv-W .mb-llevel,
-.mb-line.lv-W {
-  color: var(--warn);
-}
-.mb-line.lv-E,
-.mb-line.lv-F {
-  color: var(--danger);
-}
-.mb-line.lv-V,
-.mb-line.lv-D {
-  color: var(--fg-dim);
-}
-.mb-shot {
-  max-width: 100%;
-  max-height: 70vh;
-  object-fit: contain;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  align-self: center;
-}
+  /* Phone panel (Fase 5B del plan de funciones); shares the hw-* layout of the Hardware panel */
+  .mb-first {
+    border-top: none;
+  }
+  .mb-tool {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+  }
+  .mb-tlabel {
+    flex: 1;
+  }
+  .mb-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--fg-dim);
+    opacity: 0.5;
+  }
+  .mb-dot.on {
+    background: var(--ok);
+    opacity: 1;
+  }
+  .mb-device,
+  .mb-project {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    border-radius: var(--radius-sm);
+  }
+  .mb-device.on {
+    background: var(--sel-soft);
+  }
+  .mb-dname,
+  .mb-pname {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    min-width: 0;
+  }
+  .mb-dname > span:first-of-type,
+  .mb-pname > span:last-child {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mb-kind {
+    font-size: var(--text-2xs);
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--bg-3);
+    color: var(--fg-dim);
+  }
+  .mb-avd {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+  }
+  .mb-avdname {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mb-ltitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mb-lfilters {
+    display: flex;
+    gap: var(--space-1);
+    padding: 0 var(--space-2) var(--space-1);
+  }
+  .mb-lfilters select {
+    font-size: var(--text-xs);
+  }
+  .mb-lfilters input {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-xs);
+  }
+  .mb-log {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    margin: 0 var(--space-2) var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    background: var(--code-bg);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+  .mb-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .mb-ltime {
+    color: var(--fg-dim);
+  }
+  .mb-llevel {
+    font-weight: 700;
+  }
+  .mb-ltag {
+    color: var(--accent-text);
+  }
+  .mb-line.lv-W .mb-llevel,
+  .mb-line.lv-W {
+    color: var(--warn);
+  }
+  .mb-line.lv-E,
+  .mb-line.lv-F {
+    color: var(--danger);
+  }
+  .mb-line.lv-V,
+  .mb-line.lv-D {
+    color: var(--fg-dim);
+  }
+  .mb-shot {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    align-self: center;
+  }
 }
 
 @layer features {
-/* Phone screen inside Zinarix, apps and Wi-Fi (mejoras de la Fase 5B) */
-.mb-screenwrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-2);
-  overflow: hidden;
-}
-.mb-screen {
-  height: 100%;
-  max-width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius);
-  outline: none;
-}
-.mb-screen:focus-visible {
-  box-shadow: 0 0 0 2px var(--focus);
-}
-.mb-screen img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  user-select: none;
-  touch-action: none;
-}
-.mb-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border-top: 1px solid var(--border);
-}
-.mb-navsep {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  margin: 0 var(--space-1);
-}
-.mb-screeninfo {
-  text-align: center;
-  font-size: var(--text-xs);
-  padding: 0 var(--space-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mb-screenhelp {
-  padding: var(--space-1) var(--space-2) var(--space-2);
-}
-.mb-apps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.mb-apps li,
-.mb-apk {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
-  padding: 2px 0;
-  min-width: 0;
-}
-.mb-apps li:hover {
-  background: var(--hover);
-}
-.mb-pkg,
-.mb-apkname {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-}
-.mb-appbtns {
-  display: inline-flex;
-  opacity: 0.6;
-}
-.mb-apps li:hover .mb-appbtns,
-.mb-apps li:focus-within .mb-appbtns {
-  opacity: 1;
-}
-.mb-sys {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: var(--text-xs);
-  white-space: nowrap;
-}
-.mb-wifibtn {
-  align-self: flex-start;
-  margin-top: var(--space-1);
-}
-.mb-wifi {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-top: var(--space-1);
-}
-.mb-wifi input {
-  font-size: var(--text-xs);
-}
+  /* Phone screen inside Zinarix, apps and Wi-Fi (mejoras de la Fase 5B) */
+  .mb-screenwrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2);
+    overflow: hidden;
+  }
+  .mb-screen {
+    height: 100%;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    outline: none;
+  }
+  .mb-screen:focus-visible {
+    box-shadow: 0 0 0 2px var(--focus);
+  }
+  .mb-screen img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+  }
+  .mb-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border-top: 1px solid var(--border);
+  }
+  .mb-navsep {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    margin: 0 var(--space-1);
+  }
+  .mb-screeninfo {
+    text-align: center;
+    font-size: var(--text-xs);
+    padding: 0 var(--space-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mb-screenhelp {
+    padding: var(--space-1) var(--space-2) var(--space-2);
+  }
+  .mb-apps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .mb-apps li,
+  .mb-apk {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    padding: 2px 0;
+    min-width: 0;
+  }
+  .mb-apps li:hover {
+    background: var(--hover);
+  }
+  .mb-pkg,
+  .mb-apkname {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+  }
+  .mb-appbtns {
+    display: inline-flex;
+    opacity: 0.6;
+  }
+  .mb-apps li:hover .mb-appbtns,
+  .mb-apps li:focus-within .mb-appbtns {
+    opacity: 1;
+  }
+  .mb-sys {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+  .mb-wifibtn {
+    align-self: flex-start;
+    margin-top: var(--space-1);
+  }
+  .mb-wifi {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-top: var(--space-1);
+  }
+  .mb-wifi input {
+    font-size: var(--text-xs);
+  }
 }

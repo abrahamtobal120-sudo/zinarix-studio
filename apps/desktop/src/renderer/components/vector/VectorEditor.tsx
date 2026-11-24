@@ -2,7 +2,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent, KeyboardEvent, ReactNode } from 'react';
 import { api, getDoc, save, setTabViewer, toast } from '../../store';
 import { askAgent } from '../Chat';
-import { isTypingTarget, toHexColor, uniqueName, type AlignMode, type Handle, type ShapeKind } from '../../../shared/graphics';
+import {
+  isTypingTarget,
+  toHexColor,
+  uniqueName,
+  type AlignMode,
+  type Handle,
+  type ShapeKind,
+} from '../../../shared/graphics';
 import { tg, type KeyG } from '../graphics/graphicsStrings';
 import {
   NODE_EDITABLE,
@@ -48,7 +55,15 @@ const TOOLS: { id: Tool; icon: string; tip: KeyG }[] = [
   { id: 'hand', icon: '✋', tip: 'toolHand' },
 ];
 const SHAPE_KINDS: ShapeKind[] = ['star', 'triangle', 'hexagon', 'arrow', 'heart', 'speech'];
-const KEY_TOOL: Record<string, Tool> = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', p: 'pen', t: 'text', h: 'hand' };
+const KEY_TOOL: Record<string, Tool> = {
+  v: 'select',
+  r: 'rect',
+  o: 'ellipse',
+  l: 'line',
+  p: 'pen',
+  t: 'text',
+  h: 'hand',
+};
 
 export function VectorEditor({ path }: { path: string }) {
   const [, setTick] = useState(0);
@@ -62,7 +77,9 @@ export function VectorEditor({ path }: { path: string }) {
   useLayoutEffect(() => {
     const doc = getDoc(path);
     if (!doc || !stage.current || !host.current) return;
-    const session = new VectorSession(path, doc.model, stage.current, host.current, () => setTick((t) => t + 1));
+    const session = new VectorSession(path, doc.model, stage.current, host.current, () =>
+      setTick((t) => t + 1),
+    );
     session.load();
     setS(session);
     const ro = new ResizeObserver(() => {
@@ -102,30 +119,38 @@ export function VectorEditor({ path }: { path: string }) {
       e.preventDefault();
       e.stopPropagation();
     };
-    if (mod && k === 's') return stop(), s.flush(), void save(path);
+    if (mod && k === 's') return (stop(), s.flush(), void save(path));
     if (s.nodes) {
       // Editing the points of a path.
-      if (mod && k === 'a') return stop(), s.nodeSelectAll();
-      if (!mod && (k === 'delete' || k === 'backspace')) return stop(), s.nodeDelete();
-      if (!mod && (k === 'escape' || k === 'enter')) return stop(), s.exitNodes();
+      if (mod && k === 'a') return (stop(), s.nodeSelectAll());
+      if (!mod && (k === 'delete' || k === 'backspace')) return (stop(), s.nodeDelete());
+      if (!mod && (k === 'escape' || k === 'enter')) return (stop(), s.exitNodes());
       const step0 = (e.shiftKey ? 10 : 1) * Math.max(0.1, 1 / s.zoom);
-      const nArrows: Record<string, [number, number]> = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] };
-      if (!mod && nArrows[k]) return stop(), s.nodeNudge(nArrows[k]![0] * step0, nArrows[k]![1] * step0);
+      const nArrows: Record<string, [number, number]> = {
+        arrowleft: [-1, 0],
+        arrowright: [1, 0],
+        arrowup: [0, -1],
+        arrowdown: [0, 1],
+      };
+      if (!mod && nArrows[k])
+        return (stop(), s.nodeNudge(nArrows[k]![0] * step0, nArrows[k]![1] * step0));
     }
-    if (mod && k === 'z') return stop(), e.shiftKey ? s.redo() : s.undo();
-    if (mod && k === 'y') return stop(), s.redo();
-    if (mod && k === 'd') return stop(), s.duplicate();
-    if (mod && k === 'c') return stop(), s.copy();
-    if (mod && k === 'x') return stop(), s.copy(true);
-    if (mod && k === 'v') return stop(), s.paste();
-    if (mod && k === 'a') return stop(), s.selectAll();
-    if (mod && k === 'g') return stop(), e.shiftKey ? s.ungroup() : s.group();
-    if (mod && (e.key === ']' || e.key === '}')) return stop(), s.order(e.shiftKey ? 'front' : 'forward');
-    if (mod && (e.key === '[' || e.key === '{')) return stop(), s.order(e.shiftKey ? 'back' : 'backward');
-    if (mod && k === '0') return stop(), s.fit();
-    if (mod && k === '1') return stop(), s.setZoom(1);
-    if (mod && (k === '=' || k === '+')) return stop(), s.zoomAt(1.25);
-    if (mod && k === '-') return stop(), s.zoomAt(0.8);
+    if (mod && k === 'z') return (stop(), e.shiftKey ? s.redo() : s.undo());
+    if (mod && k === 'y') return (stop(), s.redo());
+    if (mod && k === 'd') return (stop(), s.duplicate());
+    if (mod && k === 'c') return (stop(), s.copy());
+    if (mod && k === 'x') return (stop(), s.copy(true));
+    if (mod && k === 'v') return (stop(), s.paste());
+    if (mod && k === 'a') return (stop(), s.selectAll());
+    if (mod && k === 'g') return (stop(), e.shiftKey ? s.ungroup() : s.group());
+    if (mod && (e.key === ']' || e.key === '}'))
+      return (stop(), s.order(e.shiftKey ? 'front' : 'forward'));
+    if (mod && (e.key === '[' || e.key === '{'))
+      return (stop(), s.order(e.shiftKey ? 'back' : 'backward'));
+    if (mod && k === '0') return (stop(), s.fit());
+    if (mod && k === '1') return (stop(), s.setZoom(1));
+    if (mod && (k === '=' || k === '+')) return (stop(), s.zoomAt(1.25));
+    if (mod && k === '-') return (stop(), s.zoomAt(0.8));
     if (mod) return;
     if (e.code === 'Space') {
       stop();
@@ -211,7 +236,10 @@ export function VectorEditor({ path }: { path: string }) {
             </button>
           ))}
           <div className="vd-menu-wrap">
-            <button className={menu === 'shapes' ? 'on' : ''} onClick={() => setMenu(menu === 'shapes' ? null : 'shapes')}>
+            <button
+              className={menu === 'shapes' ? 'on' : ''}
+              onClick={() => setMenu(menu === 'shapes' ? null : 'shapes')}
+            >
               ★ {tg('shapes')} ▾
             </button>
             {menu === 'shapes' && (
@@ -233,7 +261,11 @@ export function VectorEditor({ path }: { path: string }) {
           <ImageButton onPick={(r) => s?.addImage(r.url, r.w, r.h)} />
         </div>
         <div className="vd-group">
-          <button className={layersOpen !== false ? 'on' : ''} title={tg('layers')} onClick={() => setLayersOpen(layersOpen === false)}>
+          <button
+            className={layersOpen !== false ? 'on' : ''}
+            title={tg('layers')}
+            onClick={() => setLayersOpen(layersOpen === false)}
+          >
             ☰
           </button>
           <button disabled={!s?.canUndo()} title={tg('undo')} onClick={() => s?.undo()}>
@@ -253,16 +285,26 @@ export function VectorEditor({ path }: { path: string }) {
         </div>
         <div className="spacer" />
         <div className="vd-menu-wrap">
-          <button className={menu === 'ai' ? 'on' : ''} title={tg('aiEditHint')} onClick={() => setMenu(menu === 'ai' ? null : 'ai')}>
+          <button
+            className={menu === 'ai' ? 'on' : ''}
+            title={tg('aiEditHint')}
+            onClick={() => setMenu(menu === 'ai' ? null : 'ai')}
+          >
             {tg('aiEdit')}
           </button>
           {menu === 'ai' && <AiBox path={path} session={s} onDone={() => setMenu(null)} />}
         </div>
         <div className="vd-menu-wrap">
-          <button className={menu === 'export' ? 'on' : ''} disabled={!s?.root} onClick={() => setMenu(menu === 'export' ? null : 'export')}>
+          <button
+            className={menu === 'export' ? 'on' : ''}
+            disabled={!s?.root}
+            onClick={() => setMenu(menu === 'export' ? null : 'export')}
+          >
             ⤓ PNG / JPG
           </button>
-          {menu === 'export' && s && <ExportBox path={path} session={s} onDone={() => setMenu(null)} />}
+          {menu === 'export' && s && (
+            <ExportBox path={path} session={s} onDone={() => setMenu(null)} />
+          )}
         </div>
         <button title={tg('codeHint')} onClick={() => (s?.flush(), setTabViewer(path, undefined))}>
           {'</>'} {tg('code')}
@@ -310,14 +352,24 @@ function Overlay({ s }: { s: VectorSession }) {
   const a = st({ x: pg.x, y: pg.y });
   const b = st({ x: pg.x + pg.w, y: pg.y + pg.h });
   const out: ReactNode[] = [];
-  out.push(<rect key="page" className="vd-page" x={a.x} y={a.y} width={b.x - a.x} height={b.y - a.y} />);
+  out.push(
+    <rect key="page" className="vd-page" x={a.x} y={a.y} width={b.x - a.x} height={b.y - a.y} />,
+  );
   if (s.hover && !s.sel.includes(s.hover) && s.hover.isConnected) {
     const c = s.corners(s.hover).map(st);
-    out.push(<polygon key="hover" className="vd-hover" points={c.map((p) => `${p.x},${p.y}`).join(' ')} />);
+    out.push(
+      <polygon key="hover" className="vd-hover" points={c.map((p) => `${p.x},${p.y}`).join(' ')} />,
+    );
   }
   if (s.container && s.container !== s.root && s.container.isConnected) {
     const c = s.corners(s.container as SVGGraphicsElement).map(st);
-    out.push(<polygon key="group" className="vd-in-group" points={c.map((p) => `${p.x},${p.y}`).join(' ')} />);
+    out.push(
+      <polygon
+        key="group"
+        className="vd-in-group"
+        points={c.map((p) => `${p.x},${p.y}`).join(' ')}
+      />,
+    );
   }
   const sel = s.sel.filter((el) => el.isConnected);
   if (s.nodes && s.nodes.el.isConnected) {
@@ -326,7 +378,15 @@ function Overlay({ s }: { s: VectorSession }) {
     if (m) {
       // The outline of the path, drawn on top so thin or hidden strokes can be edited.
       const t = `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e - r.left} ${m.f - r.top})`;
-      out.push(<path key="nout" className="vd-node-outline" d={s.nodes.el.getAttribute('d') ?? ''} transform={t} vectorEffect="non-scaling-stroke" />);
+      out.push(
+        <path
+          key="nout"
+          className="vd-node-outline"
+          d={s.nodes.el.getAttribute('d') ?? ''}
+          transform={t}
+          vectorEffect="non-scaling-stroke"
+        />,
+      );
     }
     for (const n of s.nodeView()) {
       for (const [h, w] of [
@@ -334,16 +394,49 @@ function Overlay({ s }: { s: VectorSession }) {
         [n.o, 'out'],
       ] as const) {
         if (!h) continue;
-        out.push(<line key={`nl${n.key}${w}`} className="vd-pen-handle" x1={n.a.x} y1={n.a.y} x2={h.x} y2={h.y} />);
-        out.push(<circle key={`nh${n.key}${w}`} className="vd-node-h" data-nh={`${n.key}:${w}`} cx={h.x} cy={h.y} r={4} />);
+        out.push(
+          <line
+            key={`nl${n.key}${w}`}
+            className="vd-pen-handle"
+            x1={n.a.x}
+            y1={n.a.y}
+            x2={h.x}
+            y2={h.y}
+          />,
+        );
+        out.push(
+          <circle
+            key={`nh${n.key}${w}`}
+            className="vd-node-h"
+            data-nh={`${n.key}:${w}`}
+            cx={h.x}
+            cy={h.y}
+            r={4}
+          />,
+        );
       }
     }
     for (const n of s.nodeView()) {
       out.push(
         n.smooth ? (
-          <circle key={`n${n.key}`} className={`vd-node ${n.on ? 'on' : ''}`} data-n={n.key} cx={n.a.x} cy={n.a.y} r={5} />
+          <circle
+            key={`n${n.key}`}
+            className={`vd-node ${n.on ? 'on' : ''}`}
+            data-n={n.key}
+            cx={n.a.x}
+            cy={n.a.y}
+            r={5}
+          />
         ) : (
-          <rect key={`n${n.key}`} className={`vd-node ${n.on ? 'on' : ''}`} data-n={n.key} x={n.a.x - 4.5} y={n.a.y - 4.5} width={9} height={9} />
+          <rect
+            key={`n${n.key}`}
+            className={`vd-node ${n.on ? 'on' : ''}`}
+            data-n={n.key}
+            x={n.a.x - 4.5}
+            y={n.a.y - 4.5}
+            width={9}
+            height={9}
+          />
         ),
       );
     }
@@ -353,7 +446,13 @@ function Overlay({ s }: { s: VectorSession }) {
     else {
       for (const el of sel) {
         const c = s.corners(el).map(st);
-        out.push(<polygon key={`o${out.length}`} className="vd-sel-each" points={c.map((p) => `${p.x},${p.y}`).join(' ')} />);
+        out.push(
+          <polygon
+            key={`o${out.length}`}
+            className="vd-sel-each"
+            points={c.map((p) => `${p.x},${p.y}`).join(' ')}
+          />,
+        );
       }
       const bx = s.selBox()!;
       corners = [
@@ -363,8 +462,19 @@ function Overlay({ s }: { s: VectorSession }) {
         { x: bx.x, y: bx.y + bx.h },
       ].map(st);
     }
-    out.push(<polygon key="sel" className="vd-sel" points={corners.map((p) => `${p.x},${p.y}`).join(' ')} />);
-    const [nw, ne, se, sw] = corners as [typeof corners[0], typeof corners[0], typeof corners[0], typeof corners[0]];
+    out.push(
+      <polygon
+        key="sel"
+        className="vd-sel"
+        points={corners.map((p) => `${p.x},${p.y}`).join(' ')}
+      />,
+    );
+    const [nw, ne, se, sw] = corners as [
+      (typeof corners)[0],
+      (typeof corners)[0],
+      (typeof corners)[0],
+      (typeof corners)[0],
+    ];
     const mid = (p: typeof nw, q: typeof nw) => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
     const pos: Record<Handle, typeof nw> = {
       nw,
@@ -376,19 +486,33 @@ function Overlay({ s }: { s: VectorSession }) {
       sw,
       w: mid(sw, nw),
     };
-    const small = Math.hypot(ne.x - nw.x, ne.y - nw.y) < 24 || Math.hypot(sw.x - nw.x, sw.y - nw.y) < 24;
+    const small =
+      Math.hypot(ne.x - nw.x, ne.y - nw.y) < 24 || Math.hypot(sw.x - nw.x, sw.y - nw.y) < 24;
     // Rotation knob: above the top edge, along the box's own "up".
     const top = pos.n;
     const ux = nw.x - sw.x;
     const uy = nw.y - sw.y;
     const ul = Math.hypot(ux, uy) || 1;
     const knob = { x: top.x + (ux / ul) * 24, y: top.y + (uy / ul) * 24 };
-    out.push(<line key="rl" className="vd-rot-line" x1={top.x} y1={top.y} x2={knob.x} y2={knob.y} />);
+    out.push(
+      <line key="rl" className="vd-rot-line" x1={top.x} y1={top.y} x2={knob.x} y2={knob.y} />,
+    );
     out.push(<circle key="rot" className="vd-rot" data-h="rot" cx={knob.x} cy={knob.y} r={6} />);
     for (const h of HANDLES) {
       if (small && h.length === 1) continue;
       const p = pos[h];
-      out.push(<rect key={h} className={`vd-h vd-h-${h}`} data-h={h} x={p.x - 5} y={p.y - 5} width={10} height={10} rx={2} />);
+      out.push(
+        <rect
+          key={h}
+          className={`vd-h vd-h-${h}`}
+          data-h={h}
+          x={p.x - 5}
+          y={p.y - 5}
+          width={10}
+          height={10}
+          rx={2}
+        />,
+      );
     }
     if (sel.length === 1) {
       const bx = s.selBox()!;
@@ -413,28 +537,56 @@ function Overlay({ s }: { s: VectorSession }) {
   if (s.marquee) {
     const p = st({ x: s.marquee.x, y: s.marquee.y });
     const q = st({ x: s.marquee.x + s.marquee.w, y: s.marquee.y + s.marquee.h });
-    out.push(<rect key="mq" className="vd-marquee" x={Math.min(p.x, q.x)} y={Math.min(p.y, q.y)} width={Math.abs(q.x - p.x)} height={Math.abs(q.y - p.y)} />);
+    out.push(
+      <rect
+        key="mq"
+        className="vd-marquee"
+        x={Math.min(p.x, q.x)}
+        y={Math.min(p.y, q.y)}
+        width={Math.abs(q.x - p.x)}
+        height={Math.abs(q.y - p.y)}
+      />,
+    );
   }
   if (s.pen) {
     const toDoc = s.pen.el.getScreenCTM();
     const r = s.stage.getBoundingClientRect();
     const sp = (x: number, y: number) => {
       if (!toDoc) return { x: 0, y: 0 };
-      return { x: toDoc.a * x + toDoc.c * y + toDoc.e - r.left, y: toDoc.b * x + toDoc.d * y + toDoc.f - r.top };
+      return {
+        x: toDoc.a * x + toDoc.c * y + toDoc.e - r.left,
+        y: toDoc.b * x + toDoc.d * y + toDoc.f - r.top,
+      };
     };
-    const pts = s.pen.pts.map((p) => ({ a: sp(p.x, p.y), h: p.hx !== undefined ? sp(p.hx, p.hy!) : null }));
+    const pts = s.pen.pts.map((p) => ({
+      a: sp(p.x, p.y),
+      h: p.hx !== undefined ? sp(p.hx, p.hy!) : null,
+    }));
     const last = pts[pts.length - 1];
     if (last && s.pen.cursor) {
       const c = st(s.pen.cursor);
-      out.push(<line key="pc" className="vd-pen-next" x1={last.a.x} y1={last.a.y} x2={c.x} y2={c.y} />);
+      out.push(
+        <line key="pc" className="vd-pen-next" x1={last.a.x} y1={last.a.y} x2={c.x} y2={c.y} />,
+      );
     }
     pts.forEach((p, i) => {
       if (p.h) {
         const m = { x: 2 * p.a.x - p.h.x, y: 2 * p.a.y - p.h.y };
-        out.push(<line key={`pl${i}`} className="vd-pen-handle" x1={m.x} y1={m.y} x2={p.h.x} y2={p.h.y} />);
+        out.push(
+          <line key={`pl${i}`} className="vd-pen-handle" x1={m.x} y1={m.y} x2={p.h.x} y2={p.h.y} />,
+        );
         out.push(<circle key={`ph${i}`} className="vd-pen-hdot" cx={p.h.x} cy={p.h.y} r={3} />);
       }
-      out.push(<rect key={`pp${i}`} className={i === 0 ? 'vd-pen-pt first' : 'vd-pen-pt'} x={p.a.x - 4} y={p.a.y - 4} width={8} height={8} />);
+      out.push(
+        <rect
+          key={`pp${i}`}
+          className={i === 0 ? 'vd-pen-pt first' : 'vd-pen-pt'}
+          x={p.a.x - 4}
+          y={p.a.y - 4}
+          width={8}
+          height={8}
+        />,
+      );
     });
   }
   return <svg className="vd-overlay">{out}</svg>;
@@ -458,13 +610,19 @@ function TextBox({ s }: { s: VectorSession }) {
   const y = parseFloat((te.el.getAttribute('y') ?? '0').split(/[\s,]+/)[0]!) || 0;
   const scr = te.el.getScreenCTM();
   const r = s.stage.getBoundingClientRect();
-  const base = scr ? { x: scr.a * x + scr.c * y + scr.e - r.left, y: scr.b * x + scr.d * y + scr.f - r.top } : { x: 0, y: 0 };
+  const base = scr
+    ? { x: scr.a * x + scr.c * y + scr.e - r.left, y: scr.b * x + scr.d * y + scr.f - r.top }
+    : { x: 0, y: 0 };
   const anchor = cs.textAnchor;
   const wrapW = wrapWidth(te.el) * k;
   const lines = Math.max(1, value.split('\n').length);
-  const width = wrapW > 0 ? wrapW + 6 : Math.max(160, ...value.split('\n').map((l) => l.length * font * 0.62 + font));
+  const width =
+    wrapW > 0
+      ? wrapW + 6
+      : Math.max(160, ...value.split('\n').map((l) => l.length * font * 0.62 + font));
   const rows = wrapW > 0 ? Math.max(lines, te.el.querySelectorAll('tspan').length || 1) + 1 : lines;
-  const left = anchor === 'middle' ? base.x - width / 2 : anchor === 'end' ? base.x - width : base.x;
+  const left =
+    anchor === 'middle' ? base.x - width / 2 : anchor === 'end' ? base.x - width : base.x;
   return (
     <textarea
       ref={ref}
@@ -542,7 +700,9 @@ function Layers({ s }: { s: VectorSession }) {
                 if (isLocked(el) || isHidden(el)) return;
                 s.select(e.shiftKey ? (on ? s.sel.filter((x) => x !== el) : [...s.sel, el]) : [el]);
               }}
-              onDoubleClick={() => (el.localName === 'g' && !isLocked(el) ? s.enterGroup(el) : setRenaming(el))}
+              onDoubleClick={() =>
+                el.localName === 'g' && !isLocked(el) ? s.enterGroup(el) : setRenaming(el)
+              }
               onMouseEnter={() => {
                 s.hover = el;
                 s.bump();
@@ -612,7 +772,11 @@ const SHAPE_TAGS = 'rect,circle,ellipse,line,path,polygon,polyline,text,tspan,us
 
 /** What a color change touches: the elements, or the shapes inside the groups. */
 function paintTargets(els: SVGGraphicsElement[]): Element[] {
-  return els.flatMap((el) => (el.localName === 'g' ? [...el.querySelectorAll(SHAPE_TAGS)].filter((x) => x.localName !== 'tspan') : [el]));
+  return els.flatMap((el) =>
+    el.localName === 'g'
+      ? [...el.querySelectorAll(SHAPE_TAGS)].filter((x) => x.localName !== 'tspan')
+      : [el],
+  );
 }
 
 function readPaint(el: Element, prop: 'fill' | 'stroke'): string {
@@ -650,7 +814,12 @@ function NodePanel({ s }: { s: VectorSession }) {
           <button disabled={!n} title={tg('nodeSmooth')} onClick={() => s.nodeType('smooth')}>
             ◯ {tg('nodeSmoothShort')}
           </button>
-          <button disabled={!n} className="danger" title={tg('nodeDelete')} onClick={() => s.nodeDelete()}>
+          <button
+            disabled={!n}
+            className="danger"
+            title={tg('nodeDelete')}
+            onClick={() => s.nodeDelete()}
+          >
             🗑
           </button>
         </div>
@@ -709,9 +878,17 @@ function Inspector({ s }: { s: VectorSession }) {
         )}
         {one && (
           <div className="vd-row">
-            <NumField label={`${tg('rotation')} °`} value={s.angle(one)} onSet={(v) => s.setAngle(v)} />
-            <button title={tg('flipH')} onClick={() => s.flip('x')}>⇋</button>
-            <button title={tg('flipV')} onClick={() => s.flip('y')}>⇵</button>
+            <NumField
+              label={`${tg('rotation')} °`}
+              value={s.angle(one)}
+              onSet={(v) => s.setAngle(v)}
+            />
+            <button title={tg('flipH')} onClick={() => s.flip('x')}>
+              ⇋
+            </button>
+            <button title={tg('flipV')} onClick={() => s.flip('y')}>
+              ⇵
+            </button>
           </div>
         )}
         {one && NODE_EDITABLE.has(one.localName) && !isLocked(one) && (
@@ -737,7 +914,10 @@ function Inspector({ s }: { s: VectorSession }) {
               <input
                 key={i}
                 type="color"
-                value={toHexColor(st.getAttribute('stop-color') ?? getComputedStyle(st).stopColor) ?? '#000000'}
+                value={
+                  toHexColor(st.getAttribute('stop-color') ?? getComputedStyle(st).stopColor) ??
+                  '#000000'
+                }
                 onChange={(e) => {
                   writeStyle(st, 'stop-color', e.target.value);
                   s.soon();
@@ -757,7 +937,14 @@ function Inspector({ s }: { s: VectorSession }) {
           onNone={() => setAll('stroke', 'none')}
         />
         {stroke !== 'none' && (
-          <Slider label={tg('strokeWidth')} min={0} max={Math.max(40, Math.round(s.page.w / 20))} step={0.5} value={sw} onChange={(v) => setAll('stroke-width', String(v))} />
+          <Slider
+            label={tg('strokeWidth')}
+            min={0}
+            max={Math.max(40, Math.round(s.page.w / 20))}
+            step={0.5}
+            value={sw}
+            onChange={(v) => setAll('stroke-width', String(v))}
+          />
         )}
         <Slider
           label={tg('opacity')}
@@ -817,14 +1004,34 @@ function Inspector({ s }: { s: VectorSession }) {
         <p className="vd-hint">{tg('toPage')}</p>
         <h4>{tg('arrange')}</h4>
         <div className="vd-row vd-wrap">
-          <button title={tg('front')} onClick={() => s.order('front')}>⇈</button>
-          <button title={tg('forward')} onClick={() => s.order('forward')}>↑</button>
-          <button title={tg('backward')} onClick={() => s.order('backward')}>↓</button>
-          <button title={tg('back')} onClick={() => s.order('back')}>⇊</button>
-          <button title={tg('group')} disabled={sel.length < 2} onClick={() => s.group()}>▣</button>
-          <button title={tg('ungroup')} disabled={!sel.some((x) => x.localName === 'g')} onClick={() => s.ungroup()}>▢</button>
-          <button title={tg('duplicate')} onClick={() => s.duplicate()}>⧉</button>
-          <button title={tg('delete')} className="danger" onClick={() => s.remove()}>🗑</button>
+          <button title={tg('front')} onClick={() => s.order('front')}>
+            ⇈
+          </button>
+          <button title={tg('forward')} onClick={() => s.order('forward')}>
+            ↑
+          </button>
+          <button title={tg('backward')} onClick={() => s.order('backward')}>
+            ↓
+          </button>
+          <button title={tg('back')} onClick={() => s.order('back')}>
+            ⇊
+          </button>
+          <button title={tg('group')} disabled={sel.length < 2} onClick={() => s.group()}>
+            ▣
+          </button>
+          <button
+            title={tg('ungroup')}
+            disabled={!sel.some((x) => x.localName === 'g')}
+            onClick={() => s.ungroup()}
+          >
+            ▢
+          </button>
+          <button title={tg('duplicate')} onClick={() => s.duplicate()}>
+            ⧉
+          </button>
+          <button title={tg('delete')} className="danger" onClick={() => s.remove()}>
+            🗑
+          </button>
         </div>
       </section>
     </div>
@@ -844,7 +1051,8 @@ function TextPanel({ s, texts }: { s: VectorSession; texts: SVGTextElement[] }) 
     for (const el of texts) {
       writeStyle(el, prop, v);
       // tspans with their own value would hide the change.
-      for (const sp of el.querySelectorAll('tspan')) if (sp.getAttribute(prop) !== null) sp.removeAttribute(prop);
+      for (const sp of el.querySelectorAll('tspan'))
+        if (sp.getAttribute(prop) !== null) sp.removeAttribute(prop);
       // A wider font changes where the lines break.
       s.reflow(el);
     }
@@ -872,11 +1080,24 @@ function TextPanel({ s, texts }: { s: VectorSession; texts: SVGTextElement[] }) 
         </select>
       </label>
       <div className="vd-row">
-        <NumField label={tg('fontSize')} value={size} min={1} onSet={(v) => set('font-size', String(v))} />
-        <button className={bold ? 'on' : ''} title={tg('bold')} onClick={() => set('font-weight', bold ? '400' : '700')}>
+        <NumField
+          label={tg('fontSize')}
+          value={size}
+          min={1}
+          onSet={(v) => set('font-size', String(v))}
+        />
+        <button
+          className={bold ? 'on' : ''}
+          title={tg('bold')}
+          onClick={() => set('font-weight', bold ? '400' : '700')}
+        >
           <b>B</b>
         </button>
-        <button className={italic ? 'on' : ''} title={tg('italic')} onClick={() => set('font-style', italic ? null : 'italic')}>
+        <button
+          className={italic ? 'on' : ''}
+          title={tg('italic')}
+          onClick={() => set('font-style', italic ? null : 'italic')}
+        >
           <i>I</i>
         </button>
       </div>
@@ -888,12 +1109,24 @@ function TextPanel({ s, texts }: { s: VectorSession; texts: SVGTextElement[] }) 
             ['end', '⯈', 'alignRight'],
           ] as [string, string, KeyG][]
         ).map(([a, icon, tip]) => (
-          <button key={a} className={anchor === a ? 'on' : ''} title={tg(tip)} onClick={() => set('text-anchor', a)}>
+          <button
+            key={a}
+            className={anchor === a ? 'on' : ''}
+            title={tg(tip)}
+            onClick={() => set('text-anchor', a)}
+          >
             {icon}
           </button>
         ))}
       </div>
-      <Slider label={tg('spacing')} min={-10} max={Math.max(40, Math.round(size))} step={0.5} value={spacing} onChange={(v) => set('letter-spacing', v ? String(v) : null)} />
+      <Slider
+        label={tg('spacing')}
+        min={-10}
+        max={Math.max(40, Math.round(size))}
+        step={0.5}
+        value={spacing}
+        onChange={(v) => set('letter-spacing', v ? String(v) : null)}
+      />
       {texts.length === 1 &&
         (ww > 0 ? (
           <div className="vd-row">
@@ -906,7 +1139,9 @@ function TextPanel({ s, texts }: { s: VectorSession; texts: SVGTextElement[] }) 
           <button
             className="vd-wide"
             title={tg('wrapOnHint')}
-            onClick={() => s.setWrap(t0, Math.max(size * 6, Math.min(s.localBox(t0).w, s.page.w * 0.8)))}
+            onClick={() =>
+              s.setWrap(t0, Math.max(size * 6, Math.min(s.localBox(t0).w, s.page.w * 0.8)))
+            }
           >
             ↵ {tg('wrapOn')}
           </button>
@@ -916,7 +1151,9 @@ function TextPanel({ s, texts }: { s: VectorSession; texts: SVGTextElement[] }) 
 }
 
 function PagePanel({ s }: { s: VectorSession }) {
-  const bg = s.root ? kidsOf(s.root).find((k) => k.localName === 'rect' && isFullPage(s, k)) : undefined;
+  const bg = s.root
+    ? kidsOf(s.root).find((k) => k.localName === 'rect' && isFullPage(s, k))
+    : undefined;
   return (
     <div className="vd-side">
       <section>
@@ -949,15 +1186,32 @@ function PagePanel({ s }: { s: VectorSession }) {
 
 function isFullPage(s: VectorSession, el: SVGGraphicsElement): boolean {
   const b = s.docBox(el);
-  return Math.abs(b.x - s.page.x) < 1 && Math.abs(b.y - s.page.y) < 1 && Math.abs(b.w - s.page.w) < 1 && Math.abs(b.h - s.page.h) < 1;
+  return (
+    Math.abs(b.x - s.page.x) < 1 &&
+    Math.abs(b.y - s.page.y) < 1 &&
+    Math.abs(b.w - s.page.w) < 1 &&
+    Math.abs(b.h - s.page.h) < 1
+  );
 }
 
 // ------------------------------------------------------------------ small controls
 
-function ColorRow({ value, onPick, onNone }: { value: string; onPick: (v: string) => void; onNone: () => void }) {
+function ColorRow({
+  value,
+  onPick,
+  onNone,
+}: {
+  value: string;
+  onPick: (v: string) => void;
+  onNone: () => void;
+}) {
   return (
     <div className="vd-row">
-      <input type="color" value={value.startsWith('#') ? value : '#000000'} onChange={(e) => onPick(e.target.value)} />
+      <input
+        type="color"
+        value={value.startsWith('#') ? value : '#000000'}
+        onChange={(e) => onPick(e.target.value)}
+      />
       <input
         className="vd-hex"
         key={value}
@@ -1003,12 +1257,29 @@ function Slider({
         {Math.round(value * 10) / 10}
         {suffix}
       </span>
-      <input type="range" min={min} max={Math.max(max, value)} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <input
+        type="range"
+        min={min}
+        max={Math.max(max, value)}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
     </label>
   );
 }
 
-function NumField({ label, value, min, onSet }: { label: string; value: number; min?: number; onSet: (v: number) => void }) {
+function NumField({
+  label,
+  value,
+  min,
+  onSet,
+}: {
+  label: string;
+  value: number;
+  min?: number;
+  onSet: (v: number) => void;
+}) {
   const shown = String(Math.round(value * 100) / 100);
   return (
     <label className="vd-num">
@@ -1023,7 +1294,8 @@ function NumField({ label, value, min, onSet }: { label: string; value: number; 
         }}
         onBlur={(e) => {
           const v = Number(e.target.value.replace(',', '.'));
-          if (Number.isFinite(v) && (min === undefined || v >= min) && String(v) !== shown) onSet(v);
+          if (Number.isFinite(v) && (min === undefined || v >= min) && String(v) !== shown)
+            onSet(v);
         }}
       />
     </label>
@@ -1064,7 +1336,10 @@ function ImageButton({ onPick }: { onPick: (r: { url: string; w: number; h: numb
         onChange={(e) => {
           const f = e.target.files?.[0];
           e.target.value = '';
-          if (f) void readImage(f).then((r) => r && onPick(r)).catch((err: unknown) => toast(String(err)));
+          if (f)
+            void readImage(f)
+              .then((r) => r && onPick(r))
+              .catch((err: unknown) => toast(String(err)));
         }}
       />
     </>
@@ -1097,12 +1372,18 @@ export async function exportDesign(
       g.fillRect(0, 0, w, h);
     }
     g.drawImage(img, 0, 0, w, h);
-    const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, format === 'jpg' ? 'image/jpeg' : 'image/png', 0.92));
+    const blob = await new Promise<Blob | null>((ok) =>
+      c.toBlob(ok, format === 'jpg' ? 'image/jpeg' : 'image/png', 0.92),
+    );
     if (!blob) throw new Error('canvas');
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
     const base = path.slice(dir.length).replace(/\.svg$/i, '') + (k === 1 ? '' : `@${k}x`);
-    const files = new Set(await api().workspace.listFiles().catch(() => [] as string[]));
+    const files = new Set(
+      await api()
+        .workspace.listFiles()
+        .catch(() => [] as string[]),
+    );
     const name = uniqueName(base, format, (n) => files.has(dir + n));
     await api().workspace.writeBytes(dir + name, bytes);
     return dir + name;
@@ -1111,7 +1392,15 @@ export async function exportDesign(
   }
 }
 
-function ExportBox({ path, session, onDone }: { path: string; session: VectorSession; onDone: () => void }) {
+function ExportBox({
+  path,
+  session,
+  onDone,
+}: {
+  path: string;
+  session: VectorSession;
+  onDone: () => void;
+}) {
   const [k, setK] = useState(1);
   const [transparent, setTransparent] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -1119,7 +1408,14 @@ function ExportBox({ path, session, onDone }: { path: string; session: VectorSes
     setBusy(true);
     try {
       session.flush();
-      const out = await exportDesign(path, session.serialize(), session.page, format, k, transparent);
+      const out = await exportDesign(
+        path,
+        session.serialize(),
+        session.page,
+        format,
+        k,
+        transparent,
+      );
       toast(tg('exported', { name: out }));
       onDone();
     } catch (e) {
@@ -1142,7 +1438,12 @@ function ExportBox({ path, session, onDone }: { path: string; session: VectorSes
         {Math.round(session.page.w * k)} × {Math.round(session.page.h * k)} px
       </p>
       <label className="vd-check">
-        <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} /> {tg('transparent')}
+        <input
+          type="checkbox"
+          checked={transparent}
+          onChange={(e) => setTransparent(e.target.checked)}
+        />{' '}
+        {tg('transparent')}
       </label>
       <div className="vd-row">
         <button disabled={busy} className="on" onClick={() => void go('png')}>
@@ -1156,7 +1457,15 @@ function ExportBox({ path, session, onDone }: { path: string; session: VectorSes
   );
 }
 
-function AiBox({ path, session, onDone }: { path: string; session: VectorSession | null; onDone: () => void }) {
+function AiBox({
+  path,
+  session,
+  onDone,
+}: {
+  path: string;
+  session: VectorSession | null;
+  onDone: () => void;
+}) {
   const [text, setText] = useState('');
   const go = async () => {
     const want = text.trim();
@@ -1195,4 +1504,3 @@ function AiBox({ path, session, onDone }: { path: string; session: VectorSession
     </div>
   );
 }
-

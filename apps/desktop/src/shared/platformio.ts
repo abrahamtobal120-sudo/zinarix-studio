@@ -4,8 +4,7 @@
  */
 
 export type PioStatus =
-  | { state: 'missing' }
-  | { state: 'ready'; version: string; bin: string; python: string | null };
+  { state: 'missing' } | { state: 'ready'; version: string; bin: string; python: string | null };
 
 /** One [env:name] section of platformio.ini. */
 export interface PioEnv {
@@ -84,7 +83,10 @@ export type PioEvent =
   | { kind: 'serial-data'; port: string; chunk: string }
   | { kind: 'serial-state'; port: string; open: boolean; error?: string };
 
-export const BAUD_RATES = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 74880, 115200, 230400, 250000, 460800, 500000, 921600, 1000000, 2000000] as const;
+export const BAUD_RATES = [
+  300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 74880, 115200, 230400, 250000, 460800, 500000,
+  921600, 1000000, 2000000,
+] as const;
 
 /** Values of an ini key, with ";" / "#" comments and continuation lines folded in. */
 export function parseIni(text: string): Map<string, Map<string, string>> {
@@ -129,7 +131,7 @@ export function parsePlatformioIni(text: string): { envs: PioEnv[]; defaultEnvs:
     if (!m) continue;
     // "extends = env:base" copies another section's values first.
     const base = values.get('extends');
-    const ext = base ? ini.get(base.trim()) ?? ini.get(`env:${base.trim()}`) : undefined;
+    const ext = base ? (ini.get(base.trim()) ?? ini.get(`env:${base.trim()}`)) : undefined;
     const get = (k: string) => values.get(k) ?? ext?.get(k) ?? common.get(k) ?? '';
     const speed = Number.parseInt(get('monitor_speed'), 10);
     envs.push({
@@ -267,10 +269,19 @@ export function parseDevices(json: string): PioDevice[] {
     .map((r) => {
       const description = String(r.description ?? '');
       const hwid = String(r.hwid ?? '');
-      return { port: String(r.port ?? ''), description, hwid, board: looksLikeBoard(description, hwid) };
+      return {
+        port: String(r.port ?? ''),
+        description,
+        hwid,
+        board: looksLikeBoard(description, hwid),
+      };
     })
     .filter((d) => d.port);
-  return list.sort((a, b) => Number(b.board) - Number(a.board) || a.port.localeCompare(b.port, undefined, { numeric: true }));
+  return list.sort(
+    (a, b) =>
+      Number(b.board) - Number(a.board) ||
+      a.port.localeCompare(b.port, undefined, { numeric: true }),
+  );
 }
 
 /** pio boards --json-output → boards. */
@@ -285,7 +296,9 @@ export function parseBoards(json: string, limit = 200): PioBoard[] {
   // Two installed versions of a platform list the same boards twice.
   const seen = new Set<string>();
   return rows
-    .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object' && typeof r.id === 'string')
+    .filter(
+      (r): r is Record<string, unknown> => !!r && typeof r === 'object' && typeof r.id === 'string',
+    )
     .filter((r) => !seen.has(String(r.id)) && !!seen.add(String(r.id)))
     .slice(0, limit)
     .map((r) => ({
@@ -301,7 +314,8 @@ export function parseBoards(json: string, limit = 200): PioBoard[] {
 /** Arguments of `pio run` for a job (throws on anything not allowed). */
 export function runArgs(absDir: string, job: PioJob): string[] {
   if (job.env !== null && !validEnvName(job.env)) throw new Error('Entorno no válido.');
-  if (job.port != null && job.port !== '' && !validPort(job.port)) throw new Error('Puerto no válido.');
+  if (job.port != null && job.port !== '' && !validPort(job.port))
+    throw new Error('Puerto no válido.');
   const args = ['run', '-d', absDir];
   if (job.env) args.push('-e', job.env);
   if (job.target === 'upload') {
@@ -371,12 +385,19 @@ export interface PioInstalledLibs {
 }
 
 /** `pio pkg search` text → libraries (it has no JSON output). */
-export function parseLibSearch(text: string): { libraries: PioLibrary[]; total: number; pages: number } {
+export function parseLibSearch(text: string): {
+  libraries: PioLibrary[];
+  total: number;
+  pages: number;
+} {
   const head = /Found\s+(\d+)\s+packages\s+\(page\s+\d+\s+of\s+(\d+)\)/i.exec(text);
   const libraries: PioLibrary[] = [];
   const blocks = text.replace(/\r/g, '').split(/\n\s*\n/);
   for (const b of blocks) {
-    const lines = b.split('\n').map((l) => l.trim()).filter(Boolean);
+    const lines = b
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length < 2) continue;
     const id = /^([\w.-]+)\/(.+)$/.exec(lines[0]!);
     const meta = /^(Library|Platform|Tool)\s*\S\s*([\w.+-]+)\s*\S\s*(.*)$/u.exec(lines[1]!);
@@ -390,7 +411,11 @@ export function parseLibSearch(text: string): { libraries: PioLibrary[]; total: 
       description: lines.slice(2).join(' '),
     });
   }
-  return { libraries, total: head ? Number(head[1]) : libraries.length, pages: head ? Number(head[2]) : 1 };
+  return {
+    libraries,
+    total: head ? Number(head[1]) : libraries.length,
+    pages: head ? Number(head[2]) : 1,
+  };
 }
 
 /**
@@ -413,5 +438,11 @@ export function libName(spec: string): string {
 
 /** Search words for `pio pkg search` (letters, numbers, spaces and a few signs). */
 export function validLibQuery(q: unknown): q is string {
-  return typeof q === 'string' && q.trim().length > 0 && q.length <= 100 && /^[\w .+/#-]+$/.test(q) && !q.trim().startsWith('-');
+  return (
+    typeof q === 'string' &&
+    q.trim().length > 0 &&
+    q.length <= 100 &&
+    /^[\w .+/#-]+$/.test(q) &&
+    !q.trim().startsWith('-')
+  );
 }

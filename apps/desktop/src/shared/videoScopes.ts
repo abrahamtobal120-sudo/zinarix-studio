@@ -94,11 +94,23 @@ export const COLOR_BAR_TARGETS: readonly BarTarget[] = (
   ] as [BarName, [number, number, number]][]
 ).map(([name, rgb]) => {
   const { cb, cr } = rgbToCbCr(...rgb);
-  return { name, rgb, cb, cr, angle: cbcrAngle(cb, cr), radius: cbcrRadius(cb, cr), ...cbcrToBin(cb, cr) };
+  return {
+    name,
+    rgb,
+    cb,
+    cr,
+    angle: cbcrAngle(cb, cr),
+    radius: cbcrRadius(cb, cr),
+    ...cbcrToBin(cb, cr),
+  };
 });
 
 /** Sampling grid for a w×h frame bounded by `maxWidth` columns. */
-export function sampling(w: number, h: number, maxWidth = Infinity): { step: number; outW: number; outH: number } {
+export function sampling(
+  w: number,
+  h: number,
+  maxWidth = Infinity,
+): { step: number; outW: number; outH: number } {
   const step = Math.max(1, Math.ceil(w / Math.max(1, maxWidth)));
   return { step, outW: Math.ceil(w / step), outH: Math.ceil(h / step) };
 }

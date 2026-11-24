@@ -24,9 +24,10 @@ import { TOOLS } from '../src/main/agent.js';
 const appRoot = fileURLToPath(new URL('..', import.meta.url));
 const ortDir = join(appRoot, 'node_modules/onnxruntime-web/dist');
 // The fast model: next to the built worker, or in the build's cache.
-const modelDir = [join(appRoot, 'dist/bgremove'), join(appRoot, 'node_modules/.cache/zinarix-models')].find((d) =>
-  existsSync(join(d, BG_MODELS.fast.file)),
-);
+const modelDir = [
+  join(appRoot, 'dist/bgremove'),
+  join(appRoot, 'node_modules/.cache/zinarix-models'),
+].find((d) => existsSync(join(d, BG_MODELS.fast.file)));
 const ffmpeg = findFfmpeg(appRoot).ffmpeg;
 const root = mkdtempSync(join(tmpdir(), 'zinarix-bg-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -35,7 +36,7 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 function photo(w = 360, h = 240): Rgba {
   const d = new Uint8ClampedArray(w * h * 4);
   let seed = 7;
-  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const p = (y * w + x) * 4;
@@ -91,7 +92,11 @@ describe('background removal: pure parts', () => {
     expect(e).toMatchObject({ cutout: true, backdrop: '#ffffff' });
     expect(describeEdit(e)).toContain('quitar fondo (fondo #ffffff)');
     expect(cleanEdit({ backdrop: '#fff' }, 4, 2).backdrop).toBeUndefined();
-    const img: Rgba = { width: 2, height: 1, data: new Uint8ClampedArray([10, 10, 10, 255, 10, 10, 10, 255]) };
+    const img: Rgba = {
+      width: 2,
+      height: 1,
+      data: new Uint8ClampedArray([10, 10, 10, 255, 10, 10, 10, 255]),
+    };
     const cut = applyEdit(img, { cutout: true }, 1, new Uint8Array([255, 0]));
     expect([cut.data[3], cut.data[7]]).toEqual([255, 0]);
     expect(applyEdit(img, { cutout: true }, 1, null).data[7]).toBe(255);
@@ -114,7 +119,9 @@ describe('background removal: pure parts', () => {
     const empty = mkdtempSync(join(root, 'models-'));
     const s = new BgRemoveService(null, empty, inProcess);
     expect(s.status().every((m) => !m.ready)).toBe(true);
-    await expect(s.infer('precise', new Float32Array(3 * 1024 * 1024))).rejects.toThrow(/descargado/);
+    await expect(s.infer('precise', new Float32Array(3 * 1024 * 1024))).rejects.toThrow(
+      /descargado/,
+    );
     const none = new BgRemoveService(null, empty, null);
     expect(none.available).toBe(false);
   });
@@ -137,35 +144,62 @@ describe.skipIf(!modelDir)('background removal with the real model (ONNX Runtime
   }, 60_000);
 
   const worker = join(appRoot, 'dist/bgremove/bgWorker.mjs');
-  it.skipIf(!existsSync(worker))('runs as its own process (as in the app)', async () => {
-    const s = new BgRemoveService(join(appRoot, 'dist/bgremove'), join(root, 'm'), bgViaProcess(process.execPath, worker));
-    const mask = await s.mask(photo(), 'fast');
-    expect(mask[120 * 360 + 180]).toBeGreaterThan(200);
-  }, 60_000);
+  it.skipIf(!existsSync(worker))(
+    'runs as its own process (as in the app)',
+    async () => {
+      const s = new BgRemoveService(
+        join(appRoot, 'dist/bgremove'),
+        join(root, 'm'),
+        bgViaProcess(process.execPath, worker),
+      );
+      const mask = await s.mask(photo(), 'fast');
+      expect(mask[120 * 360 + 180]).toBeGreaterThan(200);
+    },
+    60_000,
+  );
 
-  it.skipIf(!ffmpeg)('the agent tool saves a transparent PNG and shows a preview', async () => {
-    const images = new ImageService(() => ffmpeg);
-    images.bg = new BgRemoveService(modelDir!, join(root, 'm'), inProcess);
-    await images.encode(photo(), join(root, 'disco.png'));
-    const r = await runImageTool(images, 'image_remove_bg', { path: 'disco.png', trim: true }, root);
-    expect(r.ok, r.content).toBe(true);
-    expect(r.image?.mediaType).toBe('image/png');
-    expect(r.changed).toBe(join(root, 'disco-sin-fondo.png'));
-    const back = await images.decode(join(root, 'disco-sin-fondo.png'));
-    // Trimmed to the disc (≈ 144 px) with a small margin.
-    expect(back.width).toBeLessThan(220);
-    expect(back.data[3]).toBeLessThan(60);
-    const mid = ((back.height >> 1) * back.width + (back.width >> 1)) * 4;
-    expect(back.data[mid + 3]).toBeGreaterThan(200);
-    // A solid colour behind, as JPEG.
-    const j = await runImageTool(images, 'image_remove_bg', { path: 'disco.png', out: 'disco.jpg', background: '#00ff00' }, root);
-    expect(j.ok, j.content).toBe(true);
-    const jb = await images.decode(join(root, 'disco.jpg'));
-    expect(jb.data[1]).toBeGreaterThan(200);
-    expect(jb.data[0]).toBeLessThan(60);
-    // The precise model is not downloaded here: a clear message, no file.
-    const p = await runImageTool(images, 'image_remove_bg', { path: 'disco.png', model: 'precise', out: 'p.png' }, root);
-    expect(p.ok).toBe(false);
-    expect(p.content).toMatch(/not downloaded/);
-  }, 60_000);
+  it.skipIf(!ffmpeg)(
+    'the agent tool saves a transparent PNG and shows a preview',
+    async () => {
+      const images = new ImageService(() => ffmpeg);
+      images.bg = new BgRemoveService(modelDir!, join(root, 'm'), inProcess);
+      await images.encode(photo(), join(root, 'disco.png'));
+      const r = await runImageTool(
+        images,
+        'image_remove_bg',
+        { path: 'disco.png', trim: true },
+        root,
+      );
+      expect(r.ok, r.content).toBe(true);
+      expect(r.image?.mediaType).toBe('image/png');
+      expect(r.changed).toBe(join(root, 'disco-sin-fondo.png'));
+      const back = await images.decode(join(root, 'disco-sin-fondo.png'));
+      // Trimmed to the disc (≈ 144 px) with a small margin.
+      expect(back.width).toBeLessThan(220);
+      expect(back.data[3]).toBeLessThan(60);
+      const mid = ((back.height >> 1) * back.width + (back.width >> 1)) * 4;
+      expect(back.data[mid + 3]).toBeGreaterThan(200);
+      // A solid colour behind, as JPEG.
+      const j = await runImageTool(
+        images,
+        'image_remove_bg',
+        { path: 'disco.png', out: 'disco.jpg', background: '#00ff00' },
+        root,
+      );
+      expect(j.ok, j.content).toBe(true);
+      const jb = await images.decode(join(root, 'disco.jpg'));
+      expect(jb.data[1]).toBeGreaterThan(200);
+      expect(jb.data[0]).toBeLessThan(60);
+      // The precise model is not downloaded here: a clear message, no file.
+      const p = await runImageTool(
+        images,
+        'image_remove_bg',
+        { path: 'disco.png', model: 'precise', out: 'p.png' },
+        root,
+      );
+      expect(p.ok).toBe(false);
+      expect(p.content).toMatch(/not downloaded/);
+    },
+    60_000,
+  );
 });

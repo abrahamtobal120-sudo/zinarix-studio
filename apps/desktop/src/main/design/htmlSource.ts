@@ -220,7 +220,8 @@ export function parseHtml(src: string): HtmlNode[] {
 /** Attribute that tells the preview which node of which file an element is. */
 export const SRC_ATTR = 'data-zx-src';
 
-const escAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+const escAttr = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 /**
  * The page as served to the preview: each start tag gets data-zx-src="file#N". Only the
@@ -333,7 +334,9 @@ export function sanitizeInline(html: string): string {
 export function setText(src: string, index: number, html: string): string {
   const n = nodeAt(src, index);
   if (!isTextNode(src, index) || !n.content)
-    throw new EditError('Este elemento tiene otros elementos dentro y no se puede escribir encima.');
+    throw new EditError(
+      'Este elemento tiene otros elementos dentro y no se puede escribir encima.',
+    );
   return src.slice(0, n.content[0]) + sanitizeInline(html) + src.slice(n.content[1]);
 }
 
@@ -388,7 +391,9 @@ export function parseStyle(style: string): [string, string][] {
     .filter(Boolean)
     .flatMap((d) => {
       const at = d.indexOf(':');
-      return at > 0 ? [[d.slice(0, at).trim().toLowerCase(), d.slice(at + 1).trim()] as [string, string]] : [];
+      return at > 0
+        ? [[d.slice(0, at).trim().toLowerCase(), d.slice(at + 1).trim()] as [string, string]]
+        : [];
     });
 }
 
@@ -396,7 +401,11 @@ export function parseStyle(style: string): [string, string][] {
  * Sets (or with null, removes) properties in the element's style attribute. The attribute
  * is created when missing and removed when it ends up empty.
  */
-export function setStyle(src: string, index: number, styles: Record<string, string | null>): string {
+export function setStyle(
+  src: string,
+  index: number,
+  styles: Record<string, string | null>,
+): string {
   const n = nodeAt(src, index);
   for (const [k, v] of Object.entries(styles)) {
     if (!STYLE_PROPS.has(k)) throw new EditError(`No se puede cambiar "${k}".`);

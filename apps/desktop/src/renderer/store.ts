@@ -81,7 +81,17 @@ export interface Tab {
   size?: number;
 }
 
-export type FileViewer = 'image' | 'hex' | 'large' | 'notebook' | 'design' | 'paint' | 'scene' | 'model' | 'gcode' | 'sketchup';
+export type FileViewer =
+  | 'image'
+  | 'hex'
+  | 'large'
+  | 'notebook'
+  | 'design'
+  | 'paint'
+  | 'scene'
+  | 'model'
+  | 'gcode'
+  | 'sketchup';
 
 /** Fase 7 (mejora): G-code opens as its toolpaths, layer by layer (with a switch to the text). */
 export const isGcodePath = (path: string): boolean => /\.(gcode|gco)$/i.test(path);
@@ -454,9 +464,14 @@ async function loadTab(path: string): Promise<void> {
   const name = path.split('/').pop() ?? path;
   {
     const file =
-      isImagePath(path) || isNotebookPath(path) || isPaintPath(path) || isMeshPath(path) || isGcodePath(path) || /\.skp$/i.test(path)
-      ? { content: '', binary: true, tooLarge: false }
-      : await api().workspace.readFile(path);
+      isImagePath(path) ||
+      isNotebookPath(path) ||
+      isPaintPath(path) ||
+      isMeshPath(path) ||
+      isGcodePath(path) ||
+      /\.skp$/i.test(path)
+        ? { content: '', binary: true, tooLarge: false }
+        : await api().workspace.readFile(path);
     const view = await viewerFor(path, file).catch(() => null);
     if (view) {
       setState((s) => ({
@@ -483,7 +498,11 @@ async function loadTab(path: string): Promise<void> {
           path,
           name,
           dirty: false,
-          ...(isSvgPath(path) ? { viewer: 'design' as const } : isScenePath(path) ? { viewer: 'scene' as const } : {}),
+          ...(isSvgPath(path)
+            ? { viewer: 'design' as const }
+            : isScenePath(path)
+              ? { viewer: 'scene' as const }
+              : {}),
         },
       ],
     }));
@@ -569,7 +588,10 @@ export function openPlaygroundTab(mode?: 'single' | 'compare' | 'build'): void {
   activate(PLAYGROUND_TAB);
   // The pane listens for this (it may mount in this same tick).
   if (mode)
-    setTimeout(() => window.dispatchEvent(new CustomEvent('zx-playground-mode', { detail: mode })), 0);
+    setTimeout(
+      () => window.dispatchEvent(new CustomEvent('zx-playground-mode', { detail: mode })),
+      0,
+    );
 }
 
 export function openBrowserTab(): void {

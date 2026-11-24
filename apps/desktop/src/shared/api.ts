@@ -1,7 +1,20 @@
 import type { CadEnginesView, CadFormat, CadRenderView } from './cad.js';
-import type { SketchupRunView, SketchupStatusView, SketchupUnits, SkpInfoView } from './sketchup.js';
+import type {
+  SketchupRunView,
+  SketchupStatusView,
+  SketchupUnits,
+  SkpInfoView,
+} from './sketchup.js';
 import type { BgModelId, BgStatusView } from './bgRemove.js';
-import type { PrinterAction, PrinterConfig, PrinterKind, PrinterStatus, SliceSettings, SliceView, SlicerView } from './slicer.js';
+import type {
+  PrinterAction,
+  PrinterConfig,
+  PrinterKind,
+  PrinterStatus,
+  SliceSettings,
+  SliceView,
+  SlicerView,
+} from './slicer.js';
 import type { DesignApplyResult, DesignOp, DesignSessionView } from './design.js';
 import type { AutoTaskInput, AutomationsStatus, BotInput } from './automations.js';
 /**
@@ -13,7 +26,13 @@ import type { ChatMessage, ModelInfo } from '@omni/shared';
 import type { IssueRequest, IssuerStatus, LicenseStatus } from './plans.js';
 import type { ChromeState } from './windowChrome.js';
 import type { TestDiscovery, TestEvent, TestRunRequest, TestRunSummary } from './testing.js';
-import type { JupyterStatus, KernelInfo, NbCompletions, NbVariable, NotebookEvent } from './notebook.js';
+import type {
+  JupyterStatus,
+  KernelInfo,
+  NbCompletions,
+  NbVariable,
+  NotebookEvent,
+} from './notebook.js';
 import type {
   DockerAction,
   DockerContainer,
@@ -46,7 +65,14 @@ import type { GamesScan, GameTemplate, GodotProblem, GodotStatus } from './games
 export type GamesEvent =
   | { kind: 'run-data'; key: string; chunk: string }
   | { kind: 'run-end'; key: string; code: number | null };
-import type { MobileAction, MobileDevice, MobileEvent, MobileInput, MobileProject, MobileTools } from './mobile.js';
+import type {
+  MobileAction,
+  MobileDevice,
+  MobileEvent,
+  MobileInput,
+  MobileProject,
+  MobileTools,
+} from './mobile.js';
 import type {
   Breakpoint,
   DebugConfig,
@@ -397,9 +423,7 @@ export interface GitHubPrView {
 }
 /** Fase 6: what "Revisar cambios" reviews. */
 export type ReviewSourceView =
-  | { kind: 'local' }
-  | { kind: 'branch'; base: string }
-  | { kind: 'pr'; number: number };
+  { kind: 'local' } | { kind: 'branch'; base: string } | { kind: 'pr'; number: number };
 export interface ReviewRequestView {
   source: ReviewSourceView;
   /** Reviewer models ("provider/model"); empty = the default model. */
@@ -1223,7 +1247,14 @@ export type AppEvent =
   /** Fase 5A (plan de funciones): PlatformIO build output, serial monitor data and state. */
   | { type: 'pio'; event: PioEvent }
   /** Fase 1B: download of a background-removal model (done / error at the end). */
-  | { type: 'bg:progress'; id: BgModelId; got: number; total: number; done?: boolean; error?: string }
+  | {
+      type: 'bg:progress';
+      id: BgModelId;
+      got: number;
+      total: number;
+      done?: boolean;
+      error?: string;
+    }
   | { type: 'games'; event: GamesEvent }
   /** Fase 5B (plan de funciones): a followed device log sent lines or ended. */
   | { type: 'mobile'; event: MobileEvent }
@@ -1684,7 +1715,10 @@ export interface OmniApi {
     exportWidget(id: string): Promise<{ dir: string; files: string[] } | null>;
     /** Publishes the widget on the connected Vercel account. sendKey = store the provider
      * key as BOT_API_KEY (encrypted) in the Vercel project (the user confirmed it). */
-    publishWidget(id: string, sendKey: boolean): Promise<{ status: AutomationsStatus; url: string; keySet: boolean }>;
+    publishWidget(
+      id: string,
+      sendKey: boolean,
+    ): Promise<{ status: AutomationsStatus; url: string; keySet: boolean }>;
     /** Where results can be delivered right now (bots connected, WhatsApp chat linked). */
     deliveries(): Promise<{ telegram: boolean; discord: boolean; whatsapp: boolean }>;
   };
@@ -1701,7 +1735,11 @@ export interface OmniApi {
      * How a framework project is shown: its dev server at `url` (live), its built files
      * (built) or nothing yet (none). `dir` is the app's folder ("" = the project).
      */
-    show(how: { mode: 'live' | 'built' | 'none'; dir: string; url?: string }): Promise<DesignSessionView>;
+    show(how: {
+      mode: 'live' | 'built' | 'none';
+      dir: string;
+      url?: string;
+    }): Promise<DesignSessionView>;
     /** Address of a dev server answering on this computer, the app's usual one first. */
     detect(dir: string): Promise<string | null>;
   };
@@ -2241,7 +2279,10 @@ export interface OmniApi {
     serialState(): Promise<{ port: string; baud: number; text: string }[]>;
     serialClear(port: string): Promise<void>;
     /** The PlatformIO registry (needs internet). */
-    searchLibraries(query: string, page: number): Promise<{ libraries: PioLibrary[]; total: number; pages: number }>;
+    searchLibraries(
+      query: string,
+      page: number,
+    ): Promise<{ libraries: PioLibrary[]; total: number; pages: number }>;
     libraries(dir: string, env: string | null): Promise<PioInstalledLibs>;
     /** pio pkg install / uninstall -l (saves lib_deps in platformio.ini). */
     changeLibrary(dir: string, env: string | null, spec: string, remove: boolean): Promise<void>;
@@ -2255,12 +2296,35 @@ export interface OmniApi {
     forgetExecutable(): Promise<GodotStatus>;
     openEditor(dir: string, file?: string): Promise<void>;
     /** Runs the game in its window; output as games run-data events with this key, then run-end. */
-    run(key: string, dir: string, opts: { scene: string | null; debugCollisions?: boolean; debugNavigation?: boolean }): Promise<void>;
+    run(
+      key: string,
+      dir: string,
+      opts: { scene: string | null; debugCollisions?: boolean; debugNavigation?: boolean },
+    ): Promise<void>;
     stop(key: string): Promise<boolean>;
-    check(dir: string): Promise<{ checked: number; problems: (GodotProblem & { count: number })[] }>;
+    check(
+      dir: string,
+    ): Promise<{ checked: number; problems: (GodotProblem & { count: number })[] }>;
     /** A frame of the game at a second of play (movie writer), as a data: URL. */
-    frame(dir: string, scene: string | null, at: number): Promise<{ image: string | null; problems: (GodotProblem & { count: number })[]; output: string }>;
-    export(dir: string, preset: string, debug: boolean): Promise<{ ok: boolean; path: string; output: string; problems: (GodotProblem & { count: number })[] }>;
+    frame(
+      dir: string,
+      scene: string | null,
+      at: number,
+    ): Promise<{
+      image: string | null;
+      problems: (GodotProblem & { count: number })[];
+      output: string;
+    }>;
+    export(
+      dir: string,
+      preset: string,
+      debug: boolean,
+    ): Promise<{
+      ok: boolean;
+      path: string;
+      output: string;
+      problems: (GodotProblem & { count: number })[];
+    }>;
     /** New project from a template in a new folder; returns the files (relative). */
     create(folder: string, template: GameTemplate, name: string): Promise<string[]>;
     /** http://127.0.0.1 address of a web game file of the open folder. */
@@ -2282,10 +2346,20 @@ export interface OmniApi {
     /** Asks the user for the OpenSCAD program (null = cancelled or not OpenSCAD). */
     pickNative(): Promise<CadEnginesView | null>;
     /** Renders the editor's text of a .scad to a binary STL; a new render with the same key cancels the last one. */
-    render(key: string, path: string, code: string, values: Record<string, unknown>): Promise<CadRenderView>;
+    render(
+      key: string,
+      path: string,
+      code: string,
+      values: Record<string, unknown>,
+    ): Promise<CadRenderView>;
     cancel(key: string): Promise<void>;
     /** Save dialog, then writes the model in that format (null = cancelled). */
-    export(path: string, code: string, values: Record<string, unknown>, format: CadFormat): Promise<{ path: string; size: number } | null>;
+    export(
+      path: string,
+      code: string,
+      values: Record<string, unknown>,
+      format: CadFormat,
+    ): Promise<{ path: string; size: number } | null>;
     /** New .scad of the open folder from a template; returns its path (relative, like tabs). */
     create(template: string, name: string): Promise<string>;
     /** Bytes of a mesh file of the open folder, for the model viewer (at most 300 MB). */
@@ -2303,7 +2377,11 @@ export interface OmniApi {
     /** Opens a .skp of the open folder in SketchUp. */
     open(path: string): Promise<void>;
     /** Runs ops (validated like sketchup_model) on a .skp, or on the model open in SketchUp (null). */
-    run(path: string | null, ops: Record<string, unknown>[], opts: { units?: SketchupUnits; save?: boolean; shot?: boolean }): Promise<SketchupRunView>;
+    run(
+      path: string | null,
+      ops: Record<string, unknown>[],
+      opts: { units?: SketchupUnits; save?: boolean; shot?: boolean },
+    ): Promise<SketchupRunView>;
     /** Bytes of an .stl/.obj/.dae of the open folder, for the preview. */
     readExport(path: string): Promise<Uint8Array>;
   };
@@ -2315,7 +2393,13 @@ export interface OmniApi {
     /** Asks for the user's PrusaSlicer profile (.ini); clear = stop using it. null = cancelled. */
     pickProfile(clear: boolean): Promise<SlicerView | null>;
     /** Slices a model of the open folder (a .scad with the editor's code and values) to a .gcode next to it. */
-    slice(key: string, path: string, code: string | null, values: Record<string, unknown>, settings: Partial<SliceSettings>): Promise<SliceView>;
+    slice(
+      key: string,
+      path: string,
+      code: string | null,
+      values: Record<string, unknown>,
+      settings: Partial<SliceSettings>,
+    ): Promise<SliceView>;
     cancel(key: string): Promise<void>;
     /** Opens a model in a desktop slicer (OrcaSlicer, Bambu Studio, Cura, PrusaSlicer). */
     openIn(app: string, path: string): Promise<void>;
@@ -2323,10 +2407,22 @@ export interface OmniApi {
   printers: {
     list(): Promise<(PrinterConfig & { hasKey: boolean })[]>;
     /** Adds or edits; key undefined keeps the saved one, '' removes it. */
-    save(p: { id?: string; name: string; kind: PrinterKind; url: string; key?: string }): Promise<PrinterConfig>;
+    save(p: {
+      id?: string;
+      name: string;
+      kind: PrinterKind;
+      url: string;
+      key?: string;
+    }): Promise<PrinterConfig>;
     remove(id: string): Promise<void>;
     /** Checks the address and key; returns the version the printer reports. */
-    test(p: { id?: string; name: string; kind: PrinterKind; url: string; key?: string }): Promise<string>;
+    test(p: {
+      id?: string;
+      name: string;
+      kind: PrinterKind;
+      url: string;
+      key?: string;
+    }): Promise<string>;
     status(id: string): Promise<PrinterStatus>;
     /** Uploads a .gcode of the open folder; start prints it. Returns the name on the printer. */
     send(id: string, path: string, start: boolean): Promise<string>;
@@ -2352,7 +2448,11 @@ export interface OmniApi {
     input(serial: string, input: MobileInput): Promise<void>;
     /** Installed apps (third=true: only the ones the user installed). */
     packages(serial: string, third: boolean): Promise<string[]>;
-    app(serial: string, pkg: string, action: 'launch' | 'stop' | 'clear' | 'uninstall'): Promise<void>;
+    app(
+      serial: string,
+      pkg: string,
+      action: 'launch' | 'stop' | 'clear' | 'uninstall',
+    ): Promise<void>;
     /** .apk files of the open folder (relative paths, newest builds included). */
     apks(): Promise<string[]>;
     install(serial: string, apk: string): Promise<void>;

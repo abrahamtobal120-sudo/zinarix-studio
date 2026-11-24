@@ -43,7 +43,8 @@ const es = {
   copied: 'Copiado',
   saved: 'Notebook guardado',
   saveFailed: 'No se pudo guardar: {err}',
-  diskChanged: 'El notebook cambió en el disco (por ejemplo, la IA). Tienes cambios sin guardar: se mantienen los tuyos.',
+  diskChanged:
+    'El notebook cambió en el disco (por ejemplo, la IA). Tienes cambios sin guardar: se mantienen los tuyos.',
   reloaded: 'Notebook actualizado desde el disco',
   outputHidden: 'Resultado oculto (clic para mostrar)',
   collapse: 'Ocultar resultado',
@@ -53,7 +54,8 @@ const es = {
   showAll: 'Salida muy larga: se ven los últimos caracteres. Mostrar todo ({n} mil)',
   fixAi: 'Arreglar con IA',
   fixAiTip: 'La IA lee el error, corrige la celda y la vuelve a ejecutar (con tu permiso)',
-  fixPrompt: 'En el notebook {path}, la celda {n} da este error al ejecutarse. Léela con notebook_read, corrige el código con notebook_edit y vuelve a ejecutarla con notebook_run para comprobar que funciona. Explica en pocas palabras qué estaba mal.\n\nCódigo de la celda {n}:\n```\n{code}\n```\n\nError:\n```\n{error}\n```',
+  fixPrompt:
+    'En el notebook {path}, la celda {n} da este error al ejecutarse. Léela con notebook_read, corrige el código con notebook_edit y vuelve a ejecutarla con notebook_run para comprobar que funciona. Explica en pocas palabras qué estaba mal.\n\nCódigo de la celda {n}:\n```\n{code}\n```\n\nError:\n```\n{error}\n```',
   copyError: 'Copiar error',
   variables: 'Variables',
   variablesTip: 'Ver las variables del kernel',
@@ -116,7 +118,8 @@ const en: Record<keyof typeof es, string> = {
   copied: 'Copied',
   saved: 'Notebook saved',
   saveFailed: 'Could not save: {err}',
-  diskChanged: 'The notebook changed on disk (the AI, for example). You have unsaved changes: yours are kept.',
+  diskChanged:
+    'The notebook changed on disk (the AI, for example). You have unsaved changes: yours are kept.',
   reloaded: 'Notebook reloaded from disk',
   outputHidden: 'Output hidden (click to show)',
   collapse: 'Hide output',
@@ -126,7 +129,8 @@ const en: Record<keyof typeof es, string> = {
   showAll: 'Very long output: showing the last characters. Show all ({n} thousand)',
   fixAi: 'Fix with AI',
   fixAiTip: 'The AI reads the error, fixes the cell and runs it again (with your approval)',
-  fixPrompt: 'In the notebook {path}, cell {n} fails with this error. Read it with notebook_read, fix the code with notebook_edit and run it again with notebook_run to check that it works. Briefly explain what was wrong.\n\nCode of cell {n}:\n```\n{code}\n```\n\nError:\n```\n{error}\n```',
+  fixPrompt:
+    'In the notebook {path}, cell {n} fails with this error. Read it with notebook_read, fix the code with notebook_edit and run it again with notebook_run to check that it works. Briefly explain what was wrong.\n\nCode of cell {n}:\n```\n{code}\n```\n\nError:\n```\n{error}\n```',
   copyError: 'Copy error',
   variables: 'Variables',
   variablesTip: 'Show the kernel variables',

@@ -106,7 +106,6 @@ writeFileSync(
   "import test from 'node:test';\nimport assert from 'node:assert';\nimport { isValidUser } from '../src/validate.js';\n\ntest('nombre obligatorio', () => assert.equal(isValidUser({ email: 'a@b.co' }), false));\ntest('email válido', () => assert.equal(isValidUser({ name: 'Ana', email: 'ana@mail.com' }), true));\ntest('email inválido', () => assert.equal(isValidUser({ name: 'Ana', email: 'ana' }), false));\n",
 );
 
-
 // Extra project files so every panel has something to show.
 writeFileSync(
   join(proj, 'index.html'),
@@ -118,8 +117,14 @@ writeFileSync(
   '// Caja con tapa\nancho = 60; // [20:120]\nlargo = 40; // [20:120]\nalto = 30; // [10:80]\npared = 2;\n\ndifference() {\n  cube([ancho, largo, alto]);\n  translate([pared, pared, pared]) cube([ancho - 2 * pared, largo - 2 * pared, alto]);\n}\ntranslate([0, largo + 10, 0]) cube([ancho, largo, pared]);\n',
 );
 try {
-  execSync('git init -q && git add -A && git -c user.name=Demo -c user.email=demo@example.com commit -qm "Primera versión de la API"', { cwd: proj });
-  writeFileSync(join(proj, 'README.md'), '# Tienda API\n\nAPI de ejemplo con validación de usuarios.\n');
+  execSync(
+    'git init -q && git add -A && git -c user.name=Demo -c user.email=demo@example.com commit -qm "Primera versión de la API"',
+    { cwd: proj },
+  );
+  writeFileSync(
+    join(proj, 'README.md'),
+    '# Tienda API\n\nAPI de ejemplo con validación de usuarios.\n',
+  );
 } catch (e) {
   console.warn('git', e.message);
 }
@@ -183,7 +188,10 @@ core.saveConfig({
 });
 core.close();
 
-writeFileSync(join(home, 'desktop.json'), JSON.stringify({ theme: process.env.SHOT_THEME ?? 'light', codePlan: 'pro' }));
+writeFileSync(
+  join(home, 'desktop.json'),
+  JSON.stringify({ theme: process.env.SHOT_THEME ?? 'light', codePlan: 'pro' }),
+);
 
 const require = createRequire(import.meta.url);
 const { ELECTRON_RUN_AS_NODE: _asNode, ...env } = process.env;
@@ -247,7 +255,11 @@ await step('usage', async () => {
   await cmd('ai.usage');
   await win.waitForSelector('.usage-table', { timeout: 8000 });
   await shot('usage');
-  await win.locator('.modal-x').first().click().catch(() => {});
+  await win
+    .locator('.modal-x')
+    .first()
+    .click()
+    .catch(() => {});
 });
 const sidebars = [
   ['git', 'view.git'],
@@ -275,7 +287,11 @@ for (const [name, id] of sidebars)
   await step(name, async () => {
     await cmd(id);
     await shot(name, 1600);
-    await win.locator('.modal-x').first().click({ timeout: 800 }).catch(() => {});
+    await win
+      .locator('.modal-x')
+      .first()
+      .click({ timeout: 800 })
+      .catch(() => {});
   });
 await step('studio3d', async () => {
   await cmd('app.studio3d');

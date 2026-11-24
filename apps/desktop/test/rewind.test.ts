@@ -292,7 +292,12 @@ describe('restore conversation', () => {
       async *stream(req: { messages: Msg[] }) {
         sent.push(req.messages.map((m) => ({ role: m.role, content: m.content })));
         for (const c of steps[step++] ?? [])
-          yield { type: 'tool_call', id: `c${++n}`, name: c.name, argsDelta: JSON.stringify(c.args) };
+          yield {
+            type: 'tool_call',
+            id: `c${++n}`,
+            name: c.name,
+            argsDelta: JSON.stringify(c.args),
+          };
         yield { type: 'text', delta: `answer ${step}` };
         yield { type: 'done', stopReason: 'stop' };
       },

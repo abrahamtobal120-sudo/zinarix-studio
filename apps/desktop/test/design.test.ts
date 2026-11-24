@@ -49,8 +49,25 @@ describe('HTML source map', () => {
   it('numbers elements in order, skipping comments and raw text', () => {
     const tags = nodes.map((n) => n.tag);
     expect(tags).toEqual([
-      'html', 'head', 'meta', 'title', 'style', 'script', 'body', 'header', 'h1', 'nav', 'a',
-      'section', 'p', 'b', 'img', 'button', 'ul', 'li', 'li',
+      'html',
+      'head',
+      'meta',
+      'title',
+      'style',
+      'script',
+      'body',
+      'header',
+      'h1',
+      'nav',
+      'a',
+      'section',
+      'p',
+      'b',
+      'img',
+      'button',
+      'ul',
+      'li',
+      'li',
     ]);
   });
 
@@ -66,7 +83,9 @@ describe('HTML source map', () => {
   it('annotates only the served copy, and stripping gives the file back', () => {
     const served = annotate(PAGE, 'index.html');
     expect(served).toContain(`<h1 ${SRC_ATTR}="index.html#${idx('h1')}">`);
-    expect(served).toContain(`<img src="foto.jpg" alt="Foto" ${SRC_ATTR}="index.html#${idx('img')}"/>`);
+    expect(served).toContain(
+      `<img src="foto.jpg" alt="Foto" ${SRC_ATTR}="index.html#${idx('img')}"/>`,
+    );
     expect(stripMarkers(served)).toBe(PAGE);
     // The served page has the same elements, in the same order.
     expect(parseHtml(served).map((n) => n.tag)).toEqual(nodes.map((n) => n.tag));
@@ -87,9 +106,9 @@ describe('edits', () => {
   });
 
   it('setText cleans what comes back from the preview', () => {
-    expect(sanitizeInline(`a<script>x()</script><b onclick="x()" ${SRC_ATTR}="i#3">b</b><div>c</div>`)).toBe(
-      'a<b>b</b>c',
-    );
+    expect(
+      sanitizeInline(`a<script>x()</script><b onclick="x()" ${SRC_ATTR}="i#3">b</b><div>c</div>`),
+    ).toBe('a<b>b</b>c');
     expect(sanitizeInline('<a href="javascript:alert(1)">x</a>')).toBe('<a>x</a>');
     expect(sanitizeInline('<strong>sin cerrar')).toBe('<strong>sin cerrar</strong>');
   });
@@ -113,7 +132,9 @@ describe('edits', () => {
   });
 
   it('setStyle refuses values that could load or break out', () => {
-    expect(() => setStyle(PAGE, idx('h1'), { background: 'url(http://x/y.png)' })).toThrow(EditError);
+    expect(() => setStyle(PAGE, idx('h1'), { background: 'url(http://x/y.png)' })).toThrow(
+      EditError,
+    );
     expect(() => setStyle(PAGE, idx('h1'), { color: 'red" onclick="x' })).toThrow(EditError);
     expect(() => setStyle(PAGE, idx('h1'), { position: 'fixed' })).toThrow(EditError);
   });
@@ -121,7 +142,11 @@ describe('edits', () => {
 
 describe('operations', () => {
   it('applies a style change and never writes markers', () => {
-    const out = applyOp(PAGE, { kind: 'setStyle', src: `index.html#${idx('h1')}`, styles: { color: '#123456' } });
+    const out = applyOp(PAGE, {
+      kind: 'setStyle',
+      src: `index.html#${idx('h1')}`,
+      styles: { color: '#123456' },
+    });
     expect(out).toContain('<h1 style="color: #123456">Bienvenidos</h1>');
     expect(out).not.toContain(SRC_ATTR);
   });
@@ -145,14 +170,28 @@ describe('operations', () => {
 
   it('refuses addresses that are not a numbered element', () => {
     expect(() => applyOp(PAGE, { kind: 'setText', src: 'rt:3', html: 'x' })).toThrow(EditError);
-    expect(() => applyOp(PAGE, { kind: 'setText', src: 'index.html#999', html: 'x' })).toThrow(EditError);
+    expect(() => applyOp(PAGE, { kind: 'setText', src: 'index.html#999', html: 'x' })).toThrow(
+      EditError,
+    );
   });
 });
 
 describe('project profile', () => {
   it('lists the pages of a plain site, home first, with friendly names', () => {
-    const pages = htmlPages(['contacto.html', 'index.html', 'blog/index.html', 'node_modules/x/a.html', 'dist/index.html', 'acerca-de.html']);
-    expect(pages.map((p) => p.file)).toEqual(['index.html', 'acerca-de.html', 'contacto.html', 'blog/index.html']);
+    const pages = htmlPages([
+      'contacto.html',
+      'index.html',
+      'blog/index.html',
+      'node_modules/x/a.html',
+      'dist/index.html',
+      'acerca-de.html',
+    ]);
+    expect(pages.map((p) => p.file)).toEqual([
+      'index.html',
+      'acerca-de.html',
+      'contacto.html',
+      'blog/index.html',
+    ]);
     expect(pages.map((p) => p.path)).toEqual(['/', '/acerca-de', '/contacto', '/blog/']);
     expect(pageName('acerca-de.html')).toBe('Acerca de');
     expect(pageName('blog/index.html')).toBe('Blog');
@@ -160,7 +199,10 @@ describe('project profile', () => {
 
   it('plain HTML is editable; frameworks are recognised but not yet', () => {
     expect(detectProfile(['index.html'], null)).toMatchObject({ kind: 'html', editable: true });
-    const react = detectProfile(['index.html', 'src/App.tsx'], JSON.stringify({ devDependencies: { vite: '1', react: '1' } }));
+    const react = detectProfile(
+      ['index.html', 'src/App.tsx'],
+      JSON.stringify({ devDependencies: { vite: '1', react: '1' } }),
+    );
     expect(react).toMatchObject({ kind: 'vite', label: 'React con Vite', editable: false });
     expect(detectProfile(['README.md'], null)).toMatchObject({ kind: 'unknown', editable: false });
   });
@@ -225,8 +267,12 @@ describe('page discovery (only real pages of the site)', () => {
   it('tells templates and fragments from real pages', () => {
     expect(pageProblem(PAGE)).toBeNull();
     expect(pageProblem('<body><h1>Hola</h1></body>')).toBeNull();
-    expect(pageProblem('<!doctype html><html><body>{{ release }} Versions Loading…</body></html>')).toBe('template');
-    expect(pageProblem('<html><body>{% block content %}{% endblock %}</body></html>')).toBe('template');
+    expect(
+      pageProblem('<!doctype html><html><body>{{ release }} Versions Loading…</body></html>'),
+    ).toBe('template');
+    expect(pageProblem('<html><body>{% block content %}{% endblock %}</body></html>')).toBe(
+      'template',
+    );
     expect(pageProblem('<html><body><%= title %></body></html>')).toBe('template');
     expect(pageProblem('<footer><p>© Blender</p></footer>')).toBe('fragment');
     expect(pageProblem('')).toBe('fragment');
@@ -275,7 +321,10 @@ describe('page discovery (only real pages of the site)', () => {
 
   it('a folder with only templates has no pages', async () => {
     const s = new DesignSession(
-      fakeFiles({ 'layout.html': '<html><body>{{ content }}</body></html>', 'nav.html': '<nav></nav>' }),
+      fakeFiles({
+        'layout.html': '<html><body>{{ content }}</body></html>',
+        'nav.html': '<nav></nav>',
+      }),
       'zxp://w1',
     );
     expect(await s.open()).toMatchObject({ kind: 'unknown', editable: false, pages: [] });
@@ -336,7 +385,11 @@ describe('design session', () => {
     const files = fakeFiles({ 'index.html': PAGE });
     const s = new DesignSession(files, 'zxp://w1');
     await s.open();
-    const r = await s.apply({ kind: 'setText', src: `index.html#${idx('h1')}`, html: '<b>Hola</b>' });
+    const r = await s.apply({
+      kind: 'setText',
+      src: `index.html#${idx('h1')}`,
+      html: '<b>Hola</b>',
+    });
     expect(r.reload).toBe(true);
   });
 
@@ -346,7 +399,11 @@ describe('design session', () => {
     await s.open();
     await s.serve('index.html');
     expect(await s.stale('index.html')).toBe(false);
-    await s.apply({ kind: 'setStyle', src: `index.html#${idx('h1')}`, styles: { color: '#ff0000' } });
+    await s.apply({
+      kind: 'setStyle',
+      src: `index.html#${idx('h1')}`,
+      styles: { color: '#ff0000' },
+    });
     expect(await s.stale('index.html')).toBe(false); // its own write is not "outside"
     files.data['index.html'] = files.data['index.html']!.replace('Bienvenidos', 'Editado a mano');
     expect(await s.stale('index.html')).toBe(true);
@@ -358,13 +415,20 @@ describe('design session', () => {
   it('only edits pages of the project, and not framework projects yet', async () => {
     const s = new DesignSession(fakeFiles({ 'index.html': PAGE, 'notes.txt': 'x' }), 'zxp://w1');
     await s.open();
-    await expect(s.apply({ kind: 'setText', src: 'notes.txt#0', html: 'x' })).rejects.toThrow(EditError);
+    await expect(s.apply({ kind: 'setText', src: 'notes.txt#0', html: 'x' })).rejects.toThrow(
+      EditError,
+    );
     const r = new DesignSession(
-      fakeFiles({ 'index.html': PAGE, 'package.json': JSON.stringify({ dependencies: { next: '1' } }) }),
+      fakeFiles({
+        'index.html': PAGE,
+        'package.json': JSON.stringify({ dependencies: { next: '1' } }),
+      }),
       'zxp://w1',
     );
     expect((await r.open()).editable).toBe(false);
-    await expect(r.apply({ kind: 'setText', src: `index.html#${idx('h1')}`, html: 'x' })).rejects.toThrow(EditError);
+    await expect(
+      r.apply({ kind: 'setText', src: `index.html#${idx('h1')}`, html: 'x' }),
+    ).rejects.toThrow(EditError);
   });
 
   it('two quick edits are written one after the other', async () => {
@@ -384,7 +448,9 @@ describe('design session', () => {
 describe('framework projects (live and built preview)', () => {
   it('tells a bundler entry page from a real page', async () => {
     const { isBundlerEntry } = await import('../src/main/design/projectProfile.js');
-    expect(isBundlerEntry('<div id="root"></div><script type="module" src="/src/main.tsx"></script>')).toBe(true);
+    expect(
+      isBundlerEntry('<div id="root"></div><script type="module" src="/src/main.tsx"></script>'),
+    ).toBe(true);
     expect(isBundlerEntry('<script src="./main.jsx" type="module"></script>')).toBe(true);
     expect(isBundlerEntry(PAGE)).toBe(false);
     expect(isBundlerEntry('<script type="module" src="app.js"></script>')).toBe(false);
@@ -401,16 +467,28 @@ describe('framework projects (live and built preview)', () => {
     ];
     const p = detectProfile(files, JSON.stringify({ devDependencies: { turbo: '1' } }), {
       nested: {
-        'apps/web': JSON.stringify({ dependencies: { react: '1' }, devDependencies: { vite: '1' } }),
+        'apps/web': JSON.stringify({
+          dependencies: { react: '1' },
+          devDependencies: { vite: '1' },
+        }),
         'apps/desktop': JSON.stringify({ devDependencies: { electron: '1', vite: '1' } }),
       },
       entries: new Set(['apps/web/index.html']),
     });
     expect(p).toMatchObject({ kind: 'vite', label: 'React con Vite', editable: false, pages: [] });
     expect(p.apps).toEqual([
-      { dir: 'apps/web', kind: 'vite', label: 'React con Vite', devUrl: 'http://localhost:5173', built: 'apps/web/dist' },
+      {
+        dir: 'apps/web',
+        kind: 'vite',
+        label: 'React con Vite',
+        devUrl: 'http://localhost:5173',
+        built: 'apps/web/dist',
+      },
     ]);
-    const electron = detectProfile(['package.json'], JSON.stringify({ devDependencies: { electron: '1' } }));
+    const electron = detectProfile(
+      ['package.json'],
+      JSON.stringify({ devDependencies: { electron: '1' } }),
+    );
     expect(electron).toMatchObject({ kind: 'desktop', apps: [] });
   });
 
@@ -432,9 +510,20 @@ describe('framework projects (live and built preview)', () => {
     });
     const s = new DesignSession(files, 'zxp://w1');
     const v = await s.open();
-    expect(v).toMatchObject({ mode: 'none', base: null, kind: 'vite', app: { dir: '', built: 'dist' } });
-    await expect(s.showBuilt('')).resolves.toMatchObject({ mode: 'built', base: 'zxp://w1', pages: [{ file: 'index.html' }] });
-    await expect(s.apply({ kind: 'setText', src: 'index.html#1', html: 'x' })).rejects.toThrow(EditError);
+    expect(v).toMatchObject({
+      mode: 'none',
+      base: null,
+      kind: 'vite',
+      app: { dir: '', built: 'dist' },
+    });
+    await expect(s.showBuilt('')).resolves.toMatchObject({
+      mode: 'built',
+      base: 'zxp://w1',
+      pages: [{ file: 'index.html' }],
+    });
+    await expect(s.apply({ kind: 'setText', src: 'index.html#1', html: 'x' })).rejects.toThrow(
+      EditError,
+    );
     await expect(s.showLive('', 'https://example.com')).rejects.toThrow(EditError);
     expect(s.hide()).toMatchObject({ mode: 'none' });
   });

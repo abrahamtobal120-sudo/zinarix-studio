@@ -14,11 +14,14 @@ const es = {
   lspStatusMissing: '{label}: sin autocompletado',
   lspStatusError: '{label}: el servidor falló',
   lspStatusStarting: '{label}: iniciando…',
-  lspPopMissing: 'No hay servidor de lenguaje para {label} en tu equipo. Sin él no hay autocompletado, errores ni "ir a la definición". Instala uno:',
-  lspPopReady: '{server} da autocompletado, errores, "ir a la definición" y renombrar para {label}.',
+  lspPopMissing:
+    'No hay servidor de lenguaje para {label} en tu equipo. Sin él no hay autocompletado, errores ni "ir a la definición". Instala uno:',
+  lspPopReady:
+    '{server} da autocompletado, errores, "ir a la definición" y renombrar para {label}.',
   lspPopError: 'El servidor de {label} falló: {detail}',
   lspInstall: 'Instalar en la terminal',
-  lspInstallHint: 'Escribe el comando en la terminal integrada y lo ejecuta. Cuando termine, pulsa "Volver a buscar".',
+  lspInstallHint:
+    'Escribe el comando en la terminal integrada y lo ejecuta. Cuando termine, pulsa "Volver a buscar".',
   lspManual: 'Instálalo a mano: {hint}',
   lspRetry: 'Volver a buscar',
   lspRetrying: 'Buscando servidores…',
@@ -70,11 +73,13 @@ const en: Record<keyof typeof es, string> = {
   lspStatusMissing: '{label}: no completion',
   lspStatusError: '{label}: the server failed',
   lspStatusStarting: '{label}: starting…',
-  lspPopMissing: 'There is no language server for {label} on this computer. Without one there is no completion, errors or "go to definition". Install one:',
+  lspPopMissing:
+    'There is no language server for {label} on this computer. Without one there is no completion, errors or "go to definition". Install one:',
   lspPopReady: '{server} gives completion, errors, "go to definition" and rename for {label}.',
   lspPopError: 'The {label} server failed: {detail}',
   lspInstall: 'Install in the terminal',
-  lspInstallHint: 'Types the command in the built-in terminal and runs it. When it ends, press "Look again".',
+  lspInstallHint:
+    'Types the command in the built-in terminal and runs it. When it ends, press "Look again".',
   lspManual: 'Install it by hand: {hint}',
   lspRetry: 'Look again',
   lspRetrying: 'Looking for servers…',

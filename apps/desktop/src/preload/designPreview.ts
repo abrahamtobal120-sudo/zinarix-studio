@@ -15,16 +15,62 @@ import type {
 (() => {
   const ATTR = 'data-zx-src';
   const INLINE = new Set([
-    'a', 'abbr', 'b', 'br', 'code', 'em', 'i', 'kbd', 'mark', 'q', 's', 'small', 'span',
-    'strong', 'sub', 'sup', 'time', 'u',
+    'a',
+    'abbr',
+    'b',
+    'br',
+    'code',
+    'em',
+    'i',
+    'kbd',
+    'mark',
+    'q',
+    's',
+    'small',
+    'span',
+    'strong',
+    'sub',
+    'sup',
+    'time',
+    'u',
   ]);
-  const SKIP = new Set(['script', 'style', 'link', 'meta', 'title', 'head', 'base', 'noscript', 'template']);
+  const SKIP = new Set([
+    'script',
+    'style',
+    'link',
+    'meta',
+    'title',
+    'head',
+    'base',
+    'noscript',
+    'template',
+  ]);
   const STYLE_KEYS = [
-    'color', 'background-color', 'background-image', 'font-size', 'font-weight', 'font-style',
-    'font-family', 'text-decoration-line', 'text-align', 'line-height', 'letter-spacing',
-    'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top',
-    'margin-right', 'margin-bottom', 'margin-left', 'border-top-left-radius', 'width',
-    'height', 'opacity', 'display', 'box-shadow',
+    'color',
+    'background-color',
+    'background-image',
+    'font-size',
+    'font-weight',
+    'font-style',
+    'font-family',
+    'text-decoration-line',
+    'text-align',
+    'line-height',
+    'letter-spacing',
+    'padding-top',
+    'padding-right',
+    'padding-bottom',
+    'padding-left',
+    'margin-top',
+    'margin-right',
+    'margin-bottom',
+    'margin-left',
+    'border-top-left-radius',
+    'width',
+    'height',
+    'opacity',
+    'display',
+    'box-shadow',
   ];
 
   /**
@@ -70,11 +116,19 @@ import type {
       // The drawing as a whole, not one of its lines.
       const svg = el?.closest('svg');
       if (svg) el = svg;
-      while (el && (SKIP.has(el.tagName.toLowerCase()) || el === document.documentElement || el === host))
+      while (
+        el &&
+        (SKIP.has(el.tagName.toLowerCase()) || el === document.documentElement || el === host)
+      )
         el = el.parentElement;
       return el as HTMLElement | null;
     }
-    while (el && (!el.hasAttribute(ATTR) || SKIP.has(el.tagName.toLowerCase()) || el === document.documentElement))
+    while (
+      el &&
+      (!el.hasAttribute(ATTR) ||
+        SKIP.has(el.tagName.toLowerCase()) ||
+        el === document.documentElement)
+    )
       el = el.parentElement;
     return el as HTMLElement | null;
   };
@@ -92,7 +146,10 @@ import type {
   const isEditable = (el: Element): boolean => {
     if (LIVE) return false;
     const tag = el.tagName.toLowerCase();
-    if (SKIP.has(tag) || ['img', 'input', 'video', 'iframe', 'svg', 'select', 'textarea', 'html', 'body'].includes(tag))
+    if (
+      SKIP.has(tag) ||
+      ['img', 'input', 'video', 'iframe', 'svg', 'select', 'textarea', 'html', 'body'].includes(tag)
+    )
       return false;
     const ok = (e: Element): boolean =>
       [...e.children].every((c) => INLINE.has(c.tagName.toLowerCase()) && ok(c));
@@ -167,12 +224,17 @@ import type {
     const r = place(selBox, selected);
     if (r && !editing) {
       const editable = selected ? isEditable(selected) : false;
-      for (const b of bar.querySelectorAll<HTMLElement>('[data-a="edit"],[data-a="bold"],[data-a="italic"],[data-a="underline"]'))
+      for (const b of bar.querySelectorAll<HTMLElement>(
+        '[data-a="edit"],[data-a="bold"],[data-a="italic"],[data-a="underline"]',
+      ))
         b.style.display = editable ? '' : 'none';
       bar.style.display = 'flex';
       const bh = bar.offsetHeight || 32;
       const top = r.top > bh + 8 ? r.top - bh - 6 : Math.min(innerHeight - bh - 4, r.bottom + 6);
-      Object.assign(bar.style, { left: `${Math.max(4, Math.min(r.left, innerWidth - bar.offsetWidth - 4))}px`, top: `${top}px` });
+      Object.assign(bar.style, {
+        left: `${Math.max(4, Math.min(r.left, innerWidth - bar.offsetWidth - 4))}px`,
+        top: `${top}px`,
+      });
     } else bar.style.display = editing ? 'flex' : 'none';
   };
   let frame = 0;
@@ -202,7 +264,8 @@ import type {
     const parents: DesignSelection['parents'] = [];
     for (let p = el.parentElement; p; p = p.parentElement) {
       const src = srcOf(p);
-      if (src && p !== document.documentElement) parents.push({ src, tag: p.tagName.toLowerCase(), text: snippet(p) });
+      if (src && p !== document.documentElement)
+        parents.push({ src, tag: p.tagName.toLowerCase(), text: snippet(p) });
     }
     const clone = el.cloneNode(true) as HTMLElement;
     for (const c of [clone, ...clone.querySelectorAll('*')]) c.removeAttribute(ATTR);
@@ -216,7 +279,7 @@ import type {
       inline: inlineOf(el),
       rect: { x: r.x, y: r.y, width: r.width, height: r.height },
       parents,
-      image: el instanceof HTMLImageElement ? el.getAttribute('src') ?? '' : undefined,
+      image: el instanceof HTMLImageElement ? (el.getAttribute('src') ?? '') : undefined,
       outer: clone.outerHTML.slice(0, 3000),
     };
   };
@@ -252,7 +315,8 @@ import type {
     e.el.removeAttribute('contenteditable');
     // zinarix-ignore: puts back the element's own original HTML.
     if (!keep) e.el.innerHTML = e.before;
-    else if (e.el.innerHTML !== e.before) post({ type: 'textChanged', src: srcOf(e.el)!, html: e.el.innerHTML });
+    else if (e.el.innerHTML !== e.before)
+      post({ type: 'textChanged', src: srcOf(e.el)!, html: e.el.innerHTML });
     getSelection()?.removeAllRanges();
     redraw();
     if (selected === e.el) post({ type: 'select', selection: describe(e.el) });
@@ -336,12 +400,17 @@ import type {
         return;
       }
       const key =
-        ctrl && k === 'z' && !e.shiftKey ? 'undo'
-        : ctrl && (k === 'y' || (k === 'z' && e.shiftKey)) ? 'redo'
-        : ctrl && k === 's' ? 'save'
-        : ctrl && k === 'k' ? 'ai'
-        : e.key === 'Escape' ? 'escape'
-        : null;
+        ctrl && k === 'z' && !e.shiftKey
+          ? 'undo'
+          : ctrl && (k === 'y' || (k === 'z' && e.shiftKey))
+            ? 'redo'
+            : ctrl && k === 's'
+              ? 'save'
+              : ctrl && k === 'k'
+                ? 'ai'
+                : e.key === 'Escape'
+                  ? 'escape'
+                  : null;
       if (key) {
         e.preventDefault();
         post({ type: 'key', key });
@@ -374,11 +443,15 @@ import type {
     true,
   );
   let scrollTimer = 0;
-  addEventListener('scroll', () => {
-    redraw();
-    clearTimeout(scrollTimer);
-    scrollTimer = window.setTimeout(() => post({ type: 'scroll', y: scrollY }), 150);
-  }, true);
+  addEventListener(
+    'scroll',
+    () => {
+      redraw();
+      clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(() => post({ type: 'scroll', y: scrollY }), 150);
+    },
+    true,
+  );
   addEventListener('resize', redraw);
   new ResizeObserver(redraw).observe(document.documentElement);
 
@@ -530,7 +603,11 @@ import type {
       clearTimeout(timer);
       timer = window.setTimeout(() => {
         treeBudget = 3000;
-        post({ type: 'tree', title: document.title, tree: document.body ? tree(document.body) : [] });
+        post({
+          type: 'tree',
+          title: document.title,
+          tree: document.body ? tree(document.body) : [],
+        });
         if (selected && !selected.isConnected) select(null);
         redraw();
       }, 400);

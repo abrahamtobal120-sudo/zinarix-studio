@@ -44,7 +44,7 @@ Para cada punto se explica:
 
 **Por qué pasa** — hay **cuatro causas** distintas. La barrita que se arrastra se llama `Sash` (`renderer/App.tsx:53-103`) y se dibuja en `App.tsx:507-514`.
 
-1. **Sin archivos abiertos no hay barrita.** Cuando no tienes ningún archivo abierto, el chat entra en "modo ancho" (`chatWide`, `App.tsx:254`) y ocupa todo el centro (`styles.css:6586`). En ese modo la barrita **no se dibuja** (`App.tsx:507`). Al abrir la app recién, que es lo más común, no hay nada que arrastrar. *Probablemente es lo que más te pasa.*
+1. **Sin archivos abiertos no hay barrita.** Cuando no tienes ningún archivo abierto, el chat entra en "modo ancho" (`chatWide`, `App.tsx:254`) y ocupa todo el centro (`styles.css:6586`). En ese modo la barrita **no se dibuja** (`App.tsx:507`). Al abrir la app recién, que es lo más común, no hay nada que arrastrar. _Probablemente es lo que más te pasa._
 2. **Con vista dividida o lista de chats, el ancho queda fijo.** El ancho mínimo sube a 620 px (dividido) + 190 px (lista) (`App.tsx:261`), y la cuenta de `App.tsx:263-268` hace que en pantallas de 1366–1440 px el resultado siempre sea ese mínimo, arrastres para donde arrastres. Además la lista mide en realidad 230 px (`styles.css:6637`), no 190.
 3. **El navegador, WhatsApp, el correo y el modo diseño "se comen" el arrastre.** La barrita escucha el mouse en la ventana (`App.tsx:82-100`), pero el navegador y WhatsApp son vistas nativas encima de la app, y correo/diseño son iframes. Cuando el cursor pasa sobre ellos la app deja de recibir el movimiento y a veces pierde el "soltar", así que el arrastre se corta o se queda pegado.
 4. **Zona muerta.** Si arrastras más allá del límite, el valor interno sigue cambiando aunque en pantalla no se mueva nada; luego tienes que regresar todo ese tramo antes de que reaccione.
@@ -176,7 +176,7 @@ Además el modal `SecurityCenter` (`Modals.tsx:89`) es **código muerto**: nada 
 
 **Cómo arreglarlo:**
 
-- Hacer el panel adaptable con *container queries* (`container-type: inline-size` en `.sec-section`). Debajo de ~640 px: el menú lateral pasa a iconos o pestañas arriba y el relleno baja a 14 px.
+- Hacer el panel adaptable con _container queries_ (`container-type: inline-size` en `.sec-section`). Debajo de ~640 px: el menú lateral pasa a iconos o pestañas arriba y el relleno baja a 14 px.
 - Cambiar los mínimos fijos por `min(220px, 100%)` y similares.
 - Filas del historial con `flex-wrap`.
 - Opcional: abrir Seguridad siempre maximizado, o como ventana grande.
@@ -194,14 +194,14 @@ Además el modal `SecurityCenter` (`Modals.tsx:89`) es **código muerto**: nada 
 2. **Otros selectores igual de frágiles:** leer mensajes (`:86-94`), buscador (`:115`), cuadro de texto y botón enviar (`:125`, `:155-158`), lista de chats (`:40-42`). Si uno se rompe, falla con "abre un chat" o las respuestas se atoran.
 3. **Los errores se tragan sin avisar:** `loadURL(...).catch(() => undefined)` (`:372`), scripts que devuelven `null` en cualquier error (`:522`, `:574`), el ciclo de lectura (`:500`) y `bots.ts:509`. Tú solo ves que "no hace nada".
 4. **Depende del control remoto del teléfono.** Si `phone.start()` falla (puerto ocupado o firewall), todas las órdenes responden "Zinarix no está conectado…" (`whatsapp.ts:655-659`, `bots.ts:507-513`). Solo una ventana puede tener el remoto.
-5. Menos probable: identidad del navegador (las cabeceras Sec-CH-UA siguen diciendo Electron) o un *service worker* viejo que deja la página en "cargando".
+5. Menos probable: identidad del navegador (las cabeceras Sec-CH-UA siguen diciendo Electron) o un _service worker_ viejo que deja la página en "cargando".
 
 **Cómo arreglarlo:**
 
 - Detección con varias alternativas: `#pane-side, [aria-label="Chat list"], [aria-label="Lista de chats"], [data-testid="chat-list"]`, y detectar el QR aparte. Devolver un estado `'qr' | conectado | desconectado | 'desconocido'`.
 - No desactivar el interruptor cuando el estado es "desconocido".
 - **Mostrar los errores** en el panel: añadir `error?: string` al estado de WhatsApp y llenarlo en `loadURL`, `did-fail-load` y en los fallos de scripts.
-- Botón **"Reiniciar sesión"** que borre *service workers* y caché de esa sesión y recargue.
+- Botón **"Reiniciar sesión"** que borre _service workers_ y caché de esa sesión y recargue.
 - Botón **"Desvincular"**: ya existe `whatsapp.forget` (`preload.ts:285`) pero no hay botón.
 - Mensaje claro cuando falla el remoto del teléfono.
 
@@ -258,16 +258,16 @@ Además el modal `SecurityCenter` (`Modals.tsx:89`) es **código muerto**: nada 
 
 **Estado actual:** unos **15 lugares** abren el navegador de Windows (`shell.openExternal`):
 
-| Dónde | Código |
-|---|---|
-| Ventanas emergentes de la app (Ctrl+clic en el editor, links de la terminal, links del correo) | `main.ts:2401-2404` |
-| Navegación de la ventana (se ignora en silencio) | `main.ts:2405-2407` |
-| IPC `app:openExternal` (**solo https**; los `http://localhost` no hacen nada) | `main.ts:1847-1850` |
-| Links en el chat (Markdown) — y las URL sueltas no se vuelven clicables | `Markdown.tsx:260`, `:271-280` |
-| Git | `GitPanel.tsx:332,357,440,647`; `GitModals.tsx:219,362,395` |
-| Nube / correo / otros | `GCloudPanel.tsx:25`, `SupabasePanel.tsx:36`, `VercelPanel.tsx:58`, `MailPanel.tsx:24`, `Modals.tsx:652,657`, `Plan.tsx:25,603,639`, `Settings.tsx:301` |
-| WhatsApp | `whatsapp.ts:346-354` |
-| Terminal: no tiene addon de links; las URL normales no son clicables | `Terminal.tsx` |
+| Dónde                                                                                          | Código                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ventanas emergentes de la app (Ctrl+clic en el editor, links de la terminal, links del correo) | `main.ts:2401-2404`                                                                                                                                     |
+| Navegación de la ventana (se ignora en silencio)                                               | `main.ts:2405-2407`                                                                                                                                     |
+| IPC `app:openExternal` (**solo https**; los `http://localhost` no hacen nada)                  | `main.ts:1847-1850`                                                                                                                                     |
+| Links en el chat (Markdown) — y las URL sueltas no se vuelven clicables                        | `Markdown.tsx:260`, `:271-280`                                                                                                                          |
+| Git                                                                                            | `GitPanel.tsx:332,357,440,647`; `GitModals.tsx:219,362,395`                                                                                             |
+| Nube / correo / otros                                                                          | `GCloudPanel.tsx:25`, `SupabasePanel.tsx:36`, `VercelPanel.tsx:58`, `MailPanel.tsx:24`, `Modals.tsx:652,657`, `Plan.tsx:25,603,639`, `Settings.tsx:301` |
+| WhatsApp                                                                                       | `whatsapp.ts:346-354`                                                                                                                                   |
+| Terminal: no tiene addon de links; las URL normales no son clicables                           | `Terminal.tsx`                                                                                                                                          |
 
 **Cómo arreglarlo:**
 
@@ -320,7 +320,7 @@ Además el modal `SecurityCenter` (`Modals.tsx:89`) es **código muerto**: nada 
 
 ## 14. Google Cloud: "zinarix no ha completado el proceso de verificación" (Error 403)
 
-**El mensaje completo:** *"zinarix no ha completado el proceso de verificación de Google. En estos momentos, la app se está probando y solo pueden acceder a ella los testers aprobados por el desarrollador… Error 403: access_denied".*
+**El mensaje completo:** _"zinarix no ha completado el proceso de verificación de Google. En estos momentos, la app se está probando y solo pueden acceder a ella los testers aprobados por el desarrollador… Error 403: access_denied"._
 
 **Por qué pasa:** **no es un error del código; es la configuración en Google Cloud Console.** La app trae un cliente OAuth integrado (lo mete `build.mjs:19-31` desde `apps/desktop/google-oauth.local.json`, cliente `1514…apps.googleusercontent.com`). La pantalla de consentimiento de ese proyecto está en estado **"Prueba" (Testing)** y la cuenta con la que entras **no está en la lista de usuarios de prueba**. Google responde exactamente ese 403.
 
@@ -337,7 +337,7 @@ Además el inicio de sesión de Google Cloud pide **también acceso completo a G
 
 ### Otras opciones
 
-- **Publicar la app ("En producción") sin verificar:** los usuarios verán "Google no ha verificado esta app" y podrán pasar con *Configuración avanzada → Ir a zinarix*. Con permisos sensibles hay un límite de 100 usuarios.
+- **Publicar la app ("En producción") sin verificar:** los usuarios verán "Google no ha verificado esta app" y podrán pasar con _Configuración avanzada → Ir a zinarix_. Con permisos sensibles hay un límite de 100 usuarios.
 - **Verificación completa** (para venderla a mucha gente): política de privacidad, página principal, dominio verificado y video demo para `cloud-platform`. Para `mail.google.com` además una auditoría de seguridad anual (CASA). Es caro y lento.
 - **Si solo la usan cuentas de tu Google Workspace** (por ejemplo, de tu empresa): tipo de usuario **Interno** → no necesita verificación.
 
@@ -385,7 +385,7 @@ Archivos: `renderer/components/VercelPanel.tsx`, `main/vercel.ts`.
 
 - **Alta prioridad:**
   - **Logs en tiempo real** de peticiones y funciones (hoy solo hay log de compilación).
-  - **Desplegar la carpeta local desde la app** con barra de progreso (API `/v13/deployments`), elegir rama, *deploy hooks*.
+  - **Desplegar la carpeta local desde la app** con barra de progreso (API `/v13/deployments`), elegir rama, _deploy hooks_.
   - **Variables:** ver el valor, por rama de Git, elegir tipo (sensitive/plain/encrypted), comparar entornos.
   - **Ayuda DNS de dominios:** qué registros A/CNAME/TXT poner, estado de mala configuración, redirecciones.
 - **Media:** Analytics y Speed Insights; conectar/desconectar repo, rama de producción; protección de despliegues; más de 30 despliegues y filtros por rama/estado/autor; resumen del despliegue; crear o importar proyectos.
@@ -393,7 +393,7 @@ Archivos: `renderer/components/VercelPanel.tsx`, `main/vercel.ts`.
 
 **Errores encontrados:**
 
-- `main/vercel.ts:473-476`: al editar una variable siempre manda `type: 'encrypted'` y **nunca manda la rama**. Si editas una variable de una rama o de tipo *sensitive*, se convierte en "todas las ramas" y "encrypted" sin avisar.
+- `main/vercel.ts:473-476`: al editar una variable siempre manda `type: 'encrypted'` y **nunca manda la rama**. Si editas una variable de una rama o de tipo _sensitive_, se convierte en "todas las ramas" y "encrypted" sin avisar.
 - `main/vercel.ts:421`: el log se descarga **completo cada 4 s** en vez de seguir desde donde iba.
 - `VercelPanel.tsx:330-336, 370-375`: si falla la carga mientras compila, sale un aviso de error **cada 5 s**.
 - Límites fijos sin paginación: dominios 50, proyectos 100, despliegues 30 (`main/vercel.ts:355,332,397`).

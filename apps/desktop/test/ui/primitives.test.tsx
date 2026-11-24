@@ -311,7 +311,11 @@ describe('Badge, Kbd, Skeleton, EmptyState', () => {
     );
     expect(screen.getByText('Local').className).toContain('ui-badge-ok');
     const kbd = screen.getByLabelText('Ctrl+Shift+P');
-    expect([...kbd.querySelectorAll('.ui-kbd-key')].map((k) => k.textContent)).toEqual(['Ctrl', 'Shift', 'P']);
+    expect([...kbd.querySelectorAll('.ui-kbd-key')].map((k) => k.textContent)).toEqual([
+      'Ctrl',
+      'Shift',
+      'P',
+    ]);
     expect(document.querySelectorAll('.ui-skeleton')).toHaveLength(3);
     expect(screen.getByText('Sin cambios')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Actualizar' })).toBeTruthy();

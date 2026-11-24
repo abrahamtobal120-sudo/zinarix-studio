@@ -251,18 +251,57 @@ function splineExpr(segs: CurveSeg[], v: string): string {
 
 /** Ready-made curves (the master curve; the channels stay as they are). */
 export const CURVE_PRESETS: { id: string; pts: CurvePoint[] }[] = [
-  { id: 'sSoft', pts: [[0, 0], [0.25, 0.21], [0.75, 0.79], [1, 1]] },
-  { id: 'sStrong', pts: [[0, 0], [0.25, 0.16], [0.75, 0.85], [1, 1]] },
-  { id: 'fade', pts: [[0, 0.1], [0.3, 0.32], [1, 0.95]] },
-  { id: 'brighten', pts: [[0, 0], [0.45, 0.58], [1, 1]] },
-  { id: 'darken', pts: [[0, 0], [0.55, 0.43], [1, 1]] },
+  {
+    id: 'sSoft',
+    pts: [
+      [0, 0],
+      [0.25, 0.21],
+      [0.75, 0.79],
+      [1, 1],
+    ],
+  },
+  {
+    id: 'sStrong',
+    pts: [
+      [0, 0],
+      [0.25, 0.16],
+      [0.75, 0.85],
+      [1, 1],
+    ],
+  },
+  {
+    id: 'fade',
+    pts: [
+      [0, 0.1],
+      [0.3, 0.32],
+      [1, 0.95],
+    ],
+  },
+  {
+    id: 'brighten',
+    pts: [
+      [0, 0],
+      [0.45, 0.58],
+      [1, 1],
+    ],
+  },
+  {
+    id: 'darken',
+    pts: [
+      [0, 0],
+      [0.55, 0.43],
+      [1, 1],
+    ],
+  },
 ];
 
 /** Whether the grade changes anything apart from the LUT. */
 export const gradeHasCurves = (g: ColorGrade | undefined): boolean => hasCurve(cleanGrade(g));
 
 /** Per channel (r, g, b) curve parameters of a grade. */
-export function channelCurves(g: ColorGrade | undefined): [ChannelCurve, ChannelCurve, ChannelCurve] {
+export function channelCurves(
+  g: ColorGrade | undefined,
+): [ChannelCurve, ChannelCurve, ChannelCurve] {
   const e = cleanGrade(g) ?? {};
   const t = e.temperature ?? 0;
   const ti = e.tint ?? 0;
@@ -442,7 +481,8 @@ export function applyLut(l: Lut3D, r: number, g: number, b: number): [number, nu
   const fz = z - z0;
   const N = l.size;
   const d = l.data;
-  const at = (xi: number, yi: number, zi: number, c: number) => d[((zi * N + yi) * N + xi) * 3 + c]!;
+  const at = (xi: number, yi: number, zi: number, c: number) =>
+    d[((zi * N + yi) * N + xi) * 3 + c]!;
   const out: [number, number, number] = [0, 0, 0];
   for (let c = 0; c < 3; c++) {
     const c00 = at(x0, y0, z0, c) * (1 - fx) + at(x1, y0, z0, c) * fx;

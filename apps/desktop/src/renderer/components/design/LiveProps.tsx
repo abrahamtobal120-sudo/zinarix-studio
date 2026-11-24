@@ -33,7 +33,12 @@ export function LiveProps(props: {
             .slice(0, 4)
             .reverse()
             .map((p) => (
-              <button key={p.src} className="link" onClick={() => props.onParent(p.src)} title={p.text}>
+              <button
+                key={p.src}
+                className="link"
+                onClick={() => props.onParent(p.src)}
+                title={p.text}
+              >
                 {tagName(p.tag)}
               </button>
             ))}

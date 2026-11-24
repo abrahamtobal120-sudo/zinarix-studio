@@ -8,10 +8,28 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { describeGcode, formatDuration, gcodeTris, parseDuration, parseGcode } from '../src/shared/gcode.js';
-import { DEFAULT_SLICE, describeSlice, sliceIni, slicerProblems, validateSlice } from '../src/shared/slicer.js';
+import {
+  describeGcode,
+  formatDuration,
+  gcodeTris,
+  parseDuration,
+  parseGcode,
+} from '../src/shared/gcode.js';
+import {
+  DEFAULT_SLICE,
+  describeSlice,
+  sliceIni,
+  slicerProblems,
+  validateSlice,
+} from '../src/shared/slicer.js';
 import { SlicerService, slicerCandidates } from '../src/main/slicer.js';
-import { PrinterClient, PrinterStore, normalizePrinterUrl, printerFileName, type Secret } from '../src/main/printers.js';
+import {
+  PrinterClient,
+  PrinterStore,
+  normalizePrinterUrl,
+  printerFileName,
+  type Secret,
+} from '../src/main/printers.js';
 import { cadPreview, runCadTool } from '../src/main/cadTools.js';
 import { CadService } from '../src/main/cad.js';
 import { runScadWasm } from '../src/main/cadWorker.js';
@@ -24,7 +42,14 @@ const signal = new AbortController().signal;
 /** A closed box as triangles (mm). */
 function box(sx: number, sy: number, sz: number): Float32Array {
   const v = (x: number, y: number, z: number) => [x * sx, y * sy, z * sz];
-  const q = (a: number[], b: number[], c: number[], d: number[]) => [...a, ...b, ...c, ...a, ...c, ...d];
+  const q = (a: number[], b: number[], c: number[], d: number[]) => [
+    ...a,
+    ...b,
+    ...c,
+    ...a,
+    ...c,
+    ...d,
+  ];
   return Float32Array.from([
     ...q(v(0, 0, 0), v(0, 1, 0), v(1, 1, 0), v(1, 0, 0)),
     ...q(v(0, 0, 1), v(1, 0, 1), v(1, 1, 1), v(0, 1, 1)),
@@ -75,8 +100,17 @@ describe('G-code reader', () => {
     expect(p.layers[1]).toMatchObject({ e0: 3, e1: 6 });
     expect(p.extrude.length / 6).toBe(6);
     // The second-layer relative move ends at (20, 20).
-    expect(Array.from(p.extrude.subarray(4 * 6, 4 * 6 + 6))).toEqual([20, 10, 0.4, 20, 20, 0.4].map((n) => Math.fround(n)));
-    expect(p.stats).toMatchObject({ slicer: 'PrusaSlicer 2.9.7', slicerTimeS: 3723, nozzleTemp: 215, bedTemp: 60, layers: 2, slicerFilamentMm: 4.5 });
+    expect(Array.from(p.extrude.subarray(4 * 6, 4 * 6 + 6))).toEqual(
+      [20, 10, 0.4, 20, 20, 0.4].map((n) => Math.fround(n)),
+    );
+    expect(p.stats).toMatchObject({
+      slicer: 'PrusaSlicer 2.9.7',
+      slicerTimeS: 3723,
+      nozzleTemp: 215,
+      bedTemp: 60,
+      layers: 2,
+      slicerFilamentMm: 4.5,
+    });
     // Net filament: retract and unretract cancel (3 on the first layer + 1.5 on the second).
     expect(p.stats.filamentMm).toBeCloseTo(4.5, 5);
     [10, 10, 0.2, 20, 20, 0.4].forEach((v, i) => expect(p.stats.bounds![i]).toBeCloseTo(v, 5));
@@ -84,7 +118,8 @@ describe('G-code reader', () => {
   });
 
   it('splits arcs, reads Cura comments and handles inches and odd lines', () => {
-    const g = ';FLAVOR:Marlin\n;TIME:600\n;Filament used: 1.5m\n;Layer height: 0.2\nG1 Z0.2\nG1 X10 Y0\nG2 X0 Y10 I-10 J0 E5\nM999 garbage\nG1 X\nfoo bar\n';
+    const g =
+      ';FLAVOR:Marlin\n;TIME:600\n;Filament used: 1.5m\n;Layer height: 0.2\nG1 Z0.2\nG1 X10 Y0\nG2 X0 Y10 I-10 J0 E5\nM999 garbage\nG1 X\nfoo bar\n';
     const p = parseGcode(g);
     expect(p.stats.slicer).toBe('Cura');
     expect(p.stats.slicerTimeS).toBe(600);
@@ -106,7 +141,10 @@ describe('G-code reader', () => {
   it('keeps a spiral (vase mode) as few layers, caps the segments and makes ribbons', () => {
     const lines = ['G1 Z0.2', 'G1 X0 Y0'];
     let e = 0;
-    for (let i = 1; i <= 400; i++) lines.push(`G1 X${(10 * Math.cos(i / 10)).toFixed(3)} Y${(10 * Math.sin(i / 10)).toFixed(3)} Z${(0.2 + i * 0.005).toFixed(4)} E${(e += 0.05).toFixed(3)}`);
+    for (let i = 1; i <= 400; i++)
+      lines.push(
+        `G1 X${(10 * Math.cos(i / 10)).toFixed(3)} Y${(10 * Math.sin(i / 10)).toFixed(3)} Z${(0.2 + i * 0.005).toFixed(4)} E${(e += 0.05).toFixed(3)}`,
+      );
     const p = parseGcode(lines.join('\n'));
     expect(p.layers.length).toBeLessThan(60);
     const capped = parseGcode(lines.join('\n'), { maxSegments: 50 });
@@ -120,7 +158,17 @@ describe('G-code reader', () => {
 
   it('leaves the start G-code (;TYPE:Custom) out of the size', () => {
     const p = parseGcode(
-      [';TYPE:Custom', 'G1 Z0.3', 'G1 X5 Y20', 'G1 X5 Y120 E10', ';TYPE:External perimeter', 'G1 Z0.2', 'G1 X100 Y100', 'G1 X110 Y100 E11', 'G1 X110 Y110 E12'].join('\n'),
+      [
+        ';TYPE:Custom',
+        'G1 Z0.3',
+        'G1 X5 Y20',
+        'G1 X5 Y120 E10',
+        ';TYPE:External perimeter',
+        'G1 Z0.2',
+        'G1 X100 Y100',
+        'G1 X110 Y100 E11',
+        'G1 X110 Y110 E12',
+      ].join('\n'),
     );
     expect(p.layers.length).toBe(1);
     expect(p.layers[0]!.z).toBe(0.2);
@@ -141,8 +189,22 @@ describe('G-code reader', () => {
 
 describe('slice settings', () => {
   it('validates and writes the .ini', () => {
-    const s = validateSlice({ printer: 'prusa_mk4', material: 'PETG', layerHeight: '0.15', infill: 30.4, supports: 'buildplate', brim: 4 });
-    expect(s).toMatchObject({ printer: 'prusa_mk4', material: 'petg', layerHeight: 0.15, infill: 30, supports: 'buildplate', brim: 4 });
+    const s = validateSlice({
+      printer: 'prusa_mk4',
+      material: 'PETG',
+      layerHeight: '0.15',
+      infill: 30.4,
+      supports: 'buildplate',
+      brim: 4,
+    });
+    expect(s).toMatchObject({
+      printer: 'prusa_mk4',
+      material: 'petg',
+      layerHeight: 0.15,
+      infill: 30,
+      supports: 'buildplate',
+      brim: 4,
+    });
     expect(() => validateSlice({ printer: 'nope' })).toThrow(/Unknown printer/);
     expect(() => validateSlice({ layerHeight: 0.5 })).toThrow(/between/);
     expect(() => validateSlice({ infill: 120 })).toThrow(/between/);
@@ -162,7 +224,11 @@ describe('slice settings', () => {
     expect(own).not.toContain('start_gcode');
     expect(own).toContain('layer_height = 0.15');
     expect(describeSlice(DEFAULT_SLICE)).toContain('PLA');
-    expect(slicerProblems('10 => Processing\n[error] Objects could not fit on the bed\nWarning: detected thin walls\n').errors).toEqual(['Objects could not fit on the bed']);
+    expect(
+      slicerProblems(
+        '10 => Processing\n[error] Objects could not fit on the bed\nWarning: detected thin walls\n',
+      ).errors,
+    ).toEqual(['Objects could not fit on the bed']);
   });
 });
 
@@ -177,7 +243,14 @@ describe.skipIf(!prusa)('PrusaSlicer (real)', () => {
     const i = await svc.info();
     expect(i.slicer?.name).toMatch(/PrusaSlicer|SuperSlicer/);
     const out = join(root, 'caja.gcode');
-    const r = await svc.slice({ model, out, settings: validateSlice({ layerHeight: 0.25, infill: 20, material: 'petg', brim: 3 }) }, signal);
+    const r = await svc.slice(
+      {
+        model,
+        out,
+        settings: validateSlice({ layerHeight: 0.25, infill: 20, material: 'petg', brim: 3 }),
+      },
+      signal,
+    );
     expect(existsSync(out)).toBe(true);
     expect(r.stats.layers).toBe(Math.round((10 - 0.25) / 0.25) + 1);
     expect(r.stats.layerHeight).toBe(0.25);
@@ -198,13 +271,18 @@ describe.skipIf(!prusa)('PrusaSlicer (real)', () => {
   it('says why a model that does not fit cannot be sliced', async () => {
     const big = join(root, 'grande.stl');
     writeFileSync(big, writeStl(box(400, 50, 10)));
-    await expect(svc.slice({ model: big, out: join(root, 'grande.gcode'), settings: DEFAULT_SLICE }, signal)).rejects.toThrow(/.+/);
+    await expect(
+      svc.slice({ model: big, out: join(root, 'grande.gcode'), settings: DEFAULT_SLICE }, signal),
+    ).rejects.toThrow(/.+/);
     expect(existsSync(join(root, 'grande.gcode'))).toBe(false);
   }, 120_000);
 
   it('loads the user profile first and keeps their machine', async () => {
     const prof = join(root, 'mi-impresora.ini');
-    writeFileSync(prof, 'bed_shape = 0x0,300x0,300x300,0x300\nnozzle_diameter = 0.4\ngcode_flavor = marlin2\nstart_gcode = G28 ; MI PERFIL\n');
+    writeFileSync(
+      prof,
+      'bed_shape = 0x0,300x0,300x300,0x300\nnozzle_diameter = 0.4\ngcode_flavor = marlin2\nstart_gcode = G28 ; MI PERFIL\n',
+    );
     await expect(svc.setProfile(join(root, 'caja.stl'))).rejects.toThrow(/no parece/);
     await svc.setProfile(prof);
     expect((await svc.info()).profile).toBe(prof);
@@ -218,16 +296,38 @@ describe.skipIf(!prusa)('PrusaSlicer (real)', () => {
 
   it('slice_model tool: an .scad is rendered, sliced and shown to the AI', async () => {
     const cad = new CadService(join(root, '.picked.json'), (req) => runScadWasm(req));
-    writeFileSync(join(root, 'taza.scad'), 'alto = 12; // [5:50]\ncylinder(h = alto, r = 10, $fn = 48);\n');
+    writeFileSync(
+      join(root, 'taza.scad'),
+      'alto = 12; // [5:50]\ncylinder(h = alto, r = 10, $fn = 48);\n',
+    );
     const card = cadPreview('slice_model', { path: 'taza.scad', infill: 10 }, root);
-    expect(card).toMatchObject({ risk: 'medium', allowKey: 'slice_model', action: 'rebanar taza.scad → taza.gcode' });
-    const r = await runCadTool(cad, undefined, 'slice_model', { path: 'taza.scad', params: { alto: 8 }, infill: 10 }, root, signal, { slicer: svc });
+    expect(card).toMatchObject({
+      risk: 'medium',
+      allowKey: 'slice_model',
+      action: 'rebanar taza.scad → taza.gcode',
+    });
+    const r = await runCadTool(
+      cad,
+      undefined,
+      'slice_model',
+      { path: 'taza.scad', params: { alto: 8 }, infill: 10 },
+      root,
+      signal,
+      { slicer: svc },
+    );
     expect(r.ok).toBe(true);
     expect(r.content).toMatch(/Sliced taza\.scad with (PrusaSlicer|SuperSlicer)/);
     expect(r.content).toMatch(/height 8\.0 mm/);
     expect(r.image?.mediaType).toBe('image/png');
     expect(r.changed).toBe(join(root, 'taza.gcode'));
-    const info = await runCadTool(cad, undefined, 'gcode_info', { path: 'taza.gcode', bed: [100, 100, 5] }, root, signal);
+    const info = await runCadTool(
+      cad,
+      undefined,
+      'gcode_info',
+      { path: 'taza.gcode', bed: [100, 100, 5] },
+      root,
+      signal,
+    );
     expect(info.content).toContain('WARNING: it goes outside a 100×100×5 mm printer');
     expect(info.image).toBeDefined();
   }, 180_000);
@@ -249,7 +349,9 @@ async function body(req: IncomingMessage): Promise<Buffer> {
   return Buffer.concat(parts);
 }
 
-function serve(handler: (s: Seen) => { status?: number; json?: unknown }): Promise<{ url: string; seen: Seen[]; server: Server }> {
+function serve(
+  handler: (s: Seen) => { status?: number; json?: unknown },
+): Promise<{ url: string; seen: Seen[]; server: Server }> {
   const seen: Seen[] = [];
   const server = createServer(async (req, res) => {
     const s: Seen = {
@@ -264,7 +366,11 @@ function serve(handler: (s: Seen) => { status?: number; json?: unknown }): Promi
     res.writeHead(r.status ?? 200, { 'Content-Type': 'application/json' });
     res.end(r.json === undefined ? '' : JSON.stringify(r.json));
   });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok({ url: `http://127.0.0.1:${(server.address() as { port: number }).port}`, seen, server })));
+  return new Promise((ok) =>
+    server.listen(0, '127.0.0.1', () =>
+      ok({ url: `http://127.0.0.1:${(server.address() as { port: number }).port}`, seen, server }),
+    ),
+  );
 }
 
 describe('printers', () => {
@@ -274,11 +380,29 @@ describe('printers', () => {
   beforeAll(async () => {
     octo = await serve((s) => {
       if (s.key !== 'CLAVE') return { status: 403, json: { error: 'Invalid API key' } };
-      if (s.url === '/api/version') return { json: { server: '1.10.2', api: '0.1', text: 'OctoPrint 1.10.2' } };
+      if (s.url === '/api/version')
+        return { json: { server: '1.10.2', api: '0.1', text: 'OctoPrint 1.10.2' } };
       if (s.url === '/api/job' && s.method === 'GET')
-        return { json: { state: printing ? 'Printing' : 'Operational', job: { file: { name: printing ? 'caja.gcode' : null } }, progress: { completion: printing ? 42.5 : null, printTimeLeft: printing ? 600 : null } } };
+        return {
+          json: {
+            state: printing ? 'Printing' : 'Operational',
+            job: { file: { name: printing ? 'caja.gcode' : null } },
+            progress: { completion: printing ? 42.5 : null, printTimeLeft: printing ? 600 : null },
+          },
+        };
       if (s.url === '/api/printer')
-        return { json: { state: { text: printing ? 'Printing' : 'Operational', flags: { printing, paused: false } }, temperature: { tool0: { actual: 214.8, target: 215 }, bed: { actual: 59.9, target: 60 } } } };
+        return {
+          json: {
+            state: {
+              text: printing ? 'Printing' : 'Operational',
+              flags: { printing, paused: false },
+            },
+            temperature: {
+              tool0: { actual: 214.8, target: 215 },
+              bed: { actual: 59.9, target: 60 },
+            },
+          },
+        };
       if (s.url === '/api/files/local') {
         if (s.body.includes('name="print"\r\n\r\ntrue')) printing = true;
         return { status: 201, json: { done: true } };
@@ -290,7 +414,8 @@ describe('printers', () => {
       return { status: 404 };
     });
     moon = await serve((s) => {
-      if (s.url === '/server/info') return { json: { result: { moonraker_version: 'v0.9.3', klippy_state: 'ready' } } };
+      if (s.url === '/server/info')
+        return { json: { result: { moonraker_version: 'v0.9.3', klippy_state: 'ready' } } };
       if (s.url.startsWith('/printer/objects/query'))
         return {
           json: {
@@ -305,7 +430,8 @@ describe('printers', () => {
             },
           },
         };
-      if (s.url === '/server/files/upload') return { status: 201, json: { result: { item: { path: 'pieza.gcode' } } } };
+      if (s.url === '/server/files/upload')
+        return { status: 201, json: { result: { item: { path: 'pieza.gcode' } } } };
       if (s.url.startsWith('/printer/print/')) return { json: { result: 'ok' } };
       return { status: 404 };
     });
@@ -325,66 +451,139 @@ describe('printers', () => {
   });
 
   it('OctoPrint: test, status, upload and print, cancel, bad key', async () => {
-    const c = new PrinterClient({ id: 'o', name: 'Ender', kind: 'octoprint', url: octo.url }, 'CLAVE');
+    const c = new PrinterClient(
+      { id: 'o', name: 'Ender', kind: 'octoprint', url: octo.url },
+      'CLAVE',
+    );
     expect(await c.test()).toBe('OctoPrint 1.10.2');
-    expect(await c.status()).toMatchObject({ online: true, printing: false, nozzle: { actual: 214.8, target: 215 }, bed: { actual: 59.9, target: 60 } });
+    expect(await c.status()).toMatchObject({
+      online: true,
+      printing: false,
+      nozzle: { actual: 214.8, target: 215 },
+      bed: { actual: 59.9, target: 60 },
+    });
     await c.upload('caja.gcode', new TextEncoder().encode('G28\n'), true);
     const up = octo.seen.find((s) => s.url === '/api/files/local')!;
     expect(up.type).toMatch(/multipart\/form-data/);
     expect(up.body.toString()).toContain('filename="caja.gcode"');
     expect(up.body.toString()).toContain('G28');
-    expect(await c.status()).toMatchObject({ printing: true, file: 'caja.gcode', progress: 0.425, timeLeftS: 600 });
+    expect(await c.status()).toMatchObject({
+      printing: true,
+      file: 'caja.gcode',
+      progress: 0.425,
+      timeLeftS: 600,
+    });
     await c.control('cancel');
     expect((await c.status()).printing).toBe(false);
-    const bad = new PrinterClient({ id: 'o', name: 'Ender', kind: 'octoprint', url: octo.url }, 'MALA');
+    const bad = new PrinterClient(
+      { id: 'o', name: 'Ender', kind: 'octoprint', url: octo.url },
+      'MALA',
+    );
     await expect(bad.test()).rejects.toThrow(/rechazó la clave/);
-    expect(await bad.status()).toMatchObject({ online: false, error: expect.stringMatching(/rechazó/) });
+    expect(await bad.status()).toMatchObject({
+      online: false,
+      error: expect.stringMatching(/rechazó/),
+    });
   });
 
   it('Moonraker: status with time left, upload and pause', async () => {
     const c = new PrinterClient({ id: 'm', name: 'Voron', kind: 'moonraker', url: moon.url }, null);
     expect(await c.test()).toMatch(/Moonraker v0\.9\.3 · Klipper ready/);
-    expect(await c.status()).toMatchObject({ online: true, printing: true, file: 'pieza.gcode', progress: 0.25, timeLeftS: 900, nozzle: { actual: 240.2 } });
+    expect(await c.status()).toMatchObject({
+      online: true,
+      printing: true,
+      file: 'pieza.gcode',
+      progress: 0.25,
+      timeLeftS: 900,
+      nozzle: { actual: 240.2 },
+    });
     await c.upload('pieza.gcode', new Uint8Array([71, 50, 56]), true);
     const up = moon.seen.find((s) => s.url === '/server/files/upload')!.body.toString();
     expect(up).toContain('name="root"\r\n\r\ngcodes');
     expect(up).toContain('name="print"\r\n\r\ntrue');
     await c.control('pause');
-    expect(moon.seen.some((s) => s.url === '/printer/print/pause' && s.method === 'POST')).toBe(true);
+    expect(moon.seen.some((s) => s.url === '/printer/print/pause' && s.method === 'POST')).toBe(
+      true,
+    );
   });
 
   it('a printer that is off is reported, not thrown', async () => {
-    const c = new PrinterClient({ id: 'x', name: 'Apagada', kind: 'octoprint', url: 'http://127.0.0.1:1' }, 'k');
-    expect(await c.status()).toMatchObject({ online: false, state: 'offline', error: expect.stringMatching(/Apagada/) });
+    const c = new PrinterClient(
+      { id: 'x', name: 'Apagada', kind: 'octoprint', url: 'http://127.0.0.1:1' },
+      'k',
+    );
+    expect(await c.status()).toMatchObject({
+      online: false,
+      state: 'offline',
+      error: expect.stringMatching(/Apagada/),
+    });
   });
 
   it('store keeps keys out of the JSON; agent tool reads freely and asks to print', async () => {
     const secrets = new Map<string, string>();
-    const sec = (id: string): Secret => ({ get: () => secrets.get(id) ?? null, set: (v) => void secrets.set(id, v), delete: () => void secrets.delete(id) });
+    const sec = (id: string): Secret => ({
+      get: () => secrets.get(id) ?? null,
+      set: (v) => void secrets.set(id, v),
+      delete: () => void secrets.delete(id),
+    });
     const file = join(root, 'printers.json');
     const store = new PrinterStore(file, sec);
-    const p = await store.save({ name: 'Ender', kind: 'octoprint', url: `${octo.url}/`, key: 'CLAVE' });
+    const p = await store.save({
+      name: 'Ender',
+      kind: 'octoprint',
+      url: `${octo.url}/`,
+      key: 'CLAVE',
+    });
     expect(readFileSync(file, 'utf8')).not.toContain('CLAVE');
-    expect(store.list()).toEqual([{ id: p.id, name: 'Ender', kind: 'octoprint', url: octo.url, hasKey: true }]);
+    expect(store.list()).toEqual([
+      { id: p.id, name: 'Ender', kind: 'octoprint', url: octo.url, hasKey: true },
+    ]);
     await store.save({ id: p.id, name: 'Ender 3', kind: 'octoprint', url: octo.url });
     expect(store.list()[0]).toMatchObject({ name: 'Ender 3', hasKey: true });
     expect(() => store.get('nada')).toThrow(/Están: Ender 3/);
 
     expect(cadPreview('printer', { action: 'status' }, root)).toBeNull();
     writeFileSync(join(root, 'pieza.gcode'), 'G28\nG1 Z0.2\nG1 X10 Y10 E1\n');
-    const send = cadPreview('printer', { action: 'send', path: 'pieza.gcode', printer: 'Ender 3', start: true }, root);
+    const send = cadPreview(
+      'printer',
+      { action: 'send', path: 'pieza.gcode', printer: 'Ender 3', start: true },
+      root,
+    );
     expect(send).toMatchObject({ risk: 'high' });
     expect(send).not.toHaveProperty('allowKey');
-    expect(cadPreview('printer', { action: 'cancel', printer: 'Ender 3' }, root)).toMatchObject({ risk: 'high', action: 'CANCELAR la impresión en "Ender 3"' });
-    expect(cadPreview('printer', { action: 'send', path: '../x.gcode' }, root)).toEqual({ error: '"../x.gcode" is outside the open folder.' });
+    expect(cadPreview('printer', { action: 'cancel', printer: 'Ender 3' }, root)).toMatchObject({
+      risk: 'high',
+      action: 'CANCELAR la impresión en "Ender 3"',
+    });
+    expect(cadPreview('printer', { action: 'send', path: '../x.gcode' }, root)).toEqual({
+      error: '"../x.gcode" is outside the open folder.',
+    });
 
-    const list = await runCadTool(undefined, undefined, 'printer', {}, root, signal, { printers: store });
+    const list = await runCadTool(undefined, undefined, 'printer', {}, root, signal, {
+      printers: store,
+    });
     expect(list.content).toMatch(/Ender 3: Operational .*nozzle 215\/215 °C/);
     printing = false;
-    const sent = await runCadTool(undefined, undefined, 'printer', { action: 'send', path: 'pieza.gcode', start: true }, root, signal, { printers: store });
+    const sent = await runCadTool(
+      undefined,
+      undefined,
+      'printer',
+      { action: 'send', path: 'pieza.gcode', start: true },
+      root,
+      signal,
+      { printers: store },
+    );
     expect(sent).toMatchObject({ ok: true, summary: 'imprimiendo' });
     // Busy now: a second print is refused before uploading.
-    const again = await runCadTool(undefined, undefined, 'printer', { action: 'send', path: 'pieza.gcode', start: true }, root, signal, { printers: store });
+    const again = await runCadTool(
+      undefined,
+      undefined,
+      'printer',
+      { action: 'send', path: 'pieza.gcode', start: true },
+      root,
+      signal,
+      { printers: store },
+    );
     expect(again).toMatchObject({ ok: false, summary: 'ocupada' });
     await store.remove(p.id);
     expect(store.list()).toEqual([]);

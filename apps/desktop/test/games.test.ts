@@ -36,7 +36,8 @@ const tmp = () => {
   return d;
 };
 afterAll(() => {
-  for (const d of tmps) rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  for (const d of tmps)
+    rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
 });
 
 const write = (root: string, files: Record<string, string>) => {
@@ -57,7 +58,9 @@ describe('project.godot and scenes', () => {
     expect(info.actions).toEqual(['move_left', 'move_right', 'jump']);
     expect(info.width).toBe(960);
     expect(info.configVersion).toBe(5);
-    const auto = parseProjectGodot('config_version=5\n[application]\nconfig/name="X"\n[autoload]\nGame="*res://game.gd"\n');
+    const auto = parseProjectGodot(
+      'config_version=5\n[application]\nconfig/name="X"\n[autoload]\nGame="*res://game.gd"\n',
+    );
     expect(auto.autoloads).toEqual([{ name: 'Game', path: 'res://game.gd' }]);
   });
 
@@ -69,20 +72,35 @@ describe('project.godot and scenes', () => {
     expect(scene.ext.map((e) => e.path)).toEqual(['res://player.tscn', 'res://main.gd']);
     expect(scene.sub).toHaveLength(3);
     const main = scene.nodes[0]!;
-    expect(main).toMatchObject({ name: 'Main', type: 'Node2D', parent: null, path: '.', script: 'res://main.gd' });
+    expect(main).toMatchObject({
+      name: 'Main',
+      type: 'Node2D',
+      parent: null,
+      path: '.',
+      script: 'res://main.gd',
+    });
     const player = scene.nodes.find((n) => n.name === 'Player')!;
     expect(player.instance).toBe('res://player.tscn');
     expect(player.props.position).toBe('Vector2(200, 440)');
     const floorShape = scene.nodes.find((n) => n.path === 'Floor/Shape')!;
     expect(floorShape.props.shape).toBe('SubResource("RectangleShape2D_floor")');
-    expect(scene.connections).toEqual([{ signal: 'body_entered', from: 'Coin', to: '.', method: '_on_coin_body_entered' }]);
+    expect(scene.connections).toEqual([
+      { signal: 'body_entered', from: 'Coin', to: '.', method: '_on_coin_body_entered' },
+    ]);
     const tree = sceneTree(scene.nodes);
-    expect(tree.map((t) => `${t.depth}:${t.node.path}`).slice(0, 4)).toEqual(['0:.', '1:Sky', '1:Floor', '2:Floor/Shape']);
+    expect(tree.map((t) => `${t.depth}:${t.node.path}`).slice(0, 4)).toEqual([
+      '0:.',
+      '1:Sky',
+      '1:Floor',
+      '2:Floor/Shape',
+    ]);
     const text = describeScene(scene);
     expect(text).toContain('Player (instance of res://player.tscn)');
     expect(text).toContain('Coin.body_entered → Main._on_coin_body_entered()');
     // Multi-line values and groups.
-    const s2 = parseTscn('[gd_scene format=3]\n\n[node name="A" type="Node" groups=["enemy", "boss"]]\nmeta = {\n"k": 1\n}\n');
+    const s2 = parseTscn(
+      '[gd_scene format=3]\n\n[node name="A" type="Node" groups=["enemy", "boss"]]\nmeta = {\n"k": 1\n}\n',
+    );
     expect(s2.nodes[0]!.groups).toEqual(['enemy', 'boss']);
     expect(s2.nodes[0]!.props.meta).toBe('{\n"k": 1\n}');
   });
@@ -134,15 +152,48 @@ ERROR: Failed to load script "res://bad.gd" with error "Parse error".
 `;
     const p = parseGodotOutput(out);
     expect(p).toEqual([
-      { severity: 'warning', message: 'aviso de prueba', file: 'res://main.gd', line: 7, func: '_ready', count: 1 },
-      { severity: 'error', message: "Invalid call. Nonexistent function 'foo' in base 'Nil'.", file: 'res://main.gd', line: 14, func: '_process', count: 2 },
-      { severity: 'error', message: 'Parse error: Expected expression for variable initial value after "=".', file: 'res://bad.gd', line: 3, func: 'GDScript::reload', count: 1 },
-      { severity: 'error', message: 'Failed to load script "res://bad.gd" with error "Parse error".', file: 'res://bad.gd', line: 0, func: undefined, count: 1 },
+      {
+        severity: 'warning',
+        message: 'aviso de prueba',
+        file: 'res://main.gd',
+        line: 7,
+        func: '_ready',
+        count: 1,
+      },
+      {
+        severity: 'error',
+        message: "Invalid call. Nonexistent function 'foo' in base 'Nil'.",
+        file: 'res://main.gd',
+        line: 14,
+        func: '_process',
+        count: 2,
+      },
+      {
+        severity: 'error',
+        message: 'Parse error: Expected expression for variable initial value after "=".',
+        file: 'res://bad.gd',
+        line: 3,
+        func: 'GDScript::reload',
+        count: 1,
+      },
+      {
+        severity: 'error',
+        message: 'Failed to load script "res://bad.gd" with error "Parse error".',
+        file: 'res://bad.gd',
+        line: 0,
+        func: undefined,
+        count: 1,
+      },
     ]);
   });
 
   it('reads versions, presets, PNG sizes and other engines', () => {
-    expect(parseGodotVersion('4.7.2.stable.official.ed1daf0bf')).toEqual({ major: 4, minor: 7, text: '4.7.2', mono: false });
+    expect(parseGodotVersion('4.7.2.stable.official.ed1daf0bf')).toEqual({
+      major: 4,
+      minor: 7,
+      text: '4.7.2',
+      mono: false,
+    });
     expect(parseGodotVersion('4.3.stable.mono.official.77dcf97d8')?.mono).toBe(true);
     expect(parseGodotVersion('nope')).toBeNull();
     const presets = parseExportPresets(
@@ -155,8 +206,13 @@ ERROR: Failed to load script "res://bad.gd" with error "Parse error".
     const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000280000001680806000000', 'hex');
     expect(pngSize(png)).toEqual({ width: 640, height: 360 });
     expect(pngSize(Buffer.from('nope'))).toBeNull();
-    expect(parseUnityVersion('m_EditorVersion: 2022.3.10f1\nm_EditorVersionWithRevision: x')).toBe('2022.3.10f1');
-    expect(parseUproject('{"EngineAssociation":"5.4","Modules":[{"Name":"Shooter"}]}')).toEqual({ engine: '5.4', modules: ['Shooter'] });
+    expect(parseUnityVersion('m_EditorVersion: 2022.3.10f1\nm_EditorVersionWithRevision: x')).toBe(
+      '2022.3.10f1',
+    );
+    expect(parseUproject('{"EngineAssociation":"5.4","Modules":[{"Name":"Shooter"}]}')).toEqual({
+      engine: '5.4',
+      modules: ['Shooter'],
+    });
   });
 });
 
@@ -165,16 +221,25 @@ describe('AI tool approvals', () => {
     expect(gamePreview('game_info', {})).toBeNull();
     expect(gamePreview('godot_scene', { path: 'main.tscn' })).toBeNull();
     expect(gamePreview('web_game_url', { path: 'web' })).toBeNull();
-    expect(gamePreview('godot_run', { project: 'plat', seconds: 3 })).toMatchObject({ risk: 'medium', allowKey: 'godot_run:plat' });
+    expect(gamePreview('godot_run', { project: 'plat', seconds: 3 })).toMatchObject({
+      risk: 'medium',
+      allowKey: 'godot_run:plat',
+    });
     expect(gamePreview('godot_screenshot', {})).toMatchObject({ risk: 'medium' });
     expect(gamePreview('godot_check', {})).toMatchObject({ allowKey: 'godot_check:' });
-    expect(gamePreview('godot_export', { preset: 'Web' })).toMatchObject({ allowKey: 'godot_export::Web' });
+    expect(gamePreview('godot_export', { preset: 'Web' })).toMatchObject({
+      allowKey: 'godot_export::Web',
+    });
     expect(gamePreview('godot_export', { preset: 'x"; rm' })).toHaveProperty('error');
     expect(gamePreview('godot_run', { project: '../x' })).toHaveProperty('error');
     expect(gamePreview('godot_run', { scene: 'C:/x.tscn' })).toHaveProperty('error');
     expect(gamePreview('game_new', { template: 'nope', folder: 'a' })).toHaveProperty('error');
-    expect(gamePreview('game_new', { template: 'web-canvas', folder: '../a' })).toHaveProperty('error');
-    expect(gamePreview('game_new', { template: 'web-canvas', folder: 'a' })).toMatchObject({ risk: 'medium' });
+    expect(gamePreview('game_new', { template: 'web-canvas', folder: '../a' })).toHaveProperty(
+      'error',
+    );
+    expect(gamePreview('game_new', { template: 'web-canvas', folder: 'a' })).toMatchObject({
+      risk: 'medium',
+    });
   });
 });
 
@@ -187,7 +252,8 @@ describe('projects and web preview (no Godot needed)', () => {
       'plat/levels/two.tscn': '[gd_scene format=3]\n[node name="L" type="Node2D"]\n',
       'plat/player.gd': 'extends Node\n',
       'plat/.godot/x.tscn': 'ignored',
-      'plat/export_presets.cfg': '[preset.0]\nname="Web"\nplatform="Web"\nexport_path="build/index.html"\n',
+      'plat/export_presets.cfg':
+        '[preset.0]\nname="Web"\nplatform="Web"\nexport_path="build/index.html"\n',
       'unity/ProjectSettings/ProjectVersion.txt': 'm_EditorVersion: 2022.3.10f1\n',
       'unity/Assets/a.cs': '',
       'unreal/Shooter.uproject': '{"EngineAssociation":"5.4"}',
@@ -198,7 +264,11 @@ describe('projects and web preview (no Godot needed)', () => {
     const g = new GodotService(tmp());
     const scan = await g.scan(root);
     expect(scan.godot).toHaveLength(1);
-    expect(scan.godot[0]).toMatchObject({ dir: 'plat', scenes: ['plat/main.tscn', 'plat/levels/two.tscn'], scripts: 1 });
+    expect(scan.godot[0]).toMatchObject({
+      dir: 'plat',
+      scenes: ['plat/main.tscn', 'plat/levels/two.tscn'],
+      scripts: 1,
+    });
     expect(scan.godot[0]!.info.name).toBe('Plat');
     expect(scan.godot[0]!.presets[0]!.name).toBe('Web');
     expect(scan.others).toEqual([
@@ -210,7 +280,13 @@ describe('projects and web preview (no Godot needed)', () => {
     expect(info.content).toContain('Godot project "Plat" in "plat"');
     expect(info.content).toContain('Unity project "unity"');
     expect(info.content).toContain('Web game (three) at web/index.html');
-    const sc = await runGameTool(g, undefined, 'godot_scene', { path: 'res://levels/two.tscn' }, root);
+    const sc = await runGameTool(
+      g,
+      undefined,
+      'godot_scene',
+      { path: 'res://levels/two.tscn' },
+      root,
+    );
     expect(sc.content).toContain('L (Node2D)');
   });
 
@@ -219,7 +295,9 @@ describe('projects and web preview (no Godot needed)', () => {
     const g = new GodotService(tmp());
     const files = await g.create(root, 'cubos', 'web-three', 'Cubos');
     expect(files).toContain('cubos/lib/three.module.min.js');
-    expect(readFileSync(join(root, 'cubos/index.html'), 'utf8')).toContain('./lib/three.module.min.js');
+    expect(readFileSync(join(root, 'cubos/index.html'), 'utf8')).toContain(
+      './lib/three.module.min.js',
+    );
     await expect(g.create(root, 'cubos', 'web-canvas', 'x')).rejects.toThrow(/ya existe/);
     writeFileSync(join(root, '.env'), 'SECRET=1');
     const web = new WebGameServers();
@@ -239,7 +317,9 @@ describe('projects and web preview (no Godot needed)', () => {
       await expect(web.url(root, '../x')).rejects.toThrow();
       // A Godot web export (a .wasm next to the page) is cross-origin isolated.
       write(root, { 'exp/index.html': '<html></html>', 'exp/game.wasm': '' });
-      expect((await fetch(`${base}exp/index.html`)).headers.get('cross-origin-embedder-policy')).toBe('require-corp');
+      expect(
+        (await fetch(`${base}exp/index.html`)).headers.get('cross-origin-embedder-policy'),
+      ).toBe('require-corp');
     } finally {
       web.stop();
     }
@@ -261,7 +341,10 @@ describe('real Godot', () => {
     for (const t of ['godot-platformer', 'godot-topdown', 'godot-3d', 'godot-empty'] as const) {
       await live.create(root, t, t, `Prueba ${t}`);
       const r = await live.runFor(root, t, { seconds: 2 });
-      expect(r.problems.filter((p) => p.severity === 'error'), `${t}: ${r.output}`).toEqual([]);
+      expect(
+        r.problems.filter((p) => p.severity === 'error'),
+        `${t}: ${r.output}`,
+      ).toEqual([]);
       expect(r.exitCode, t).toBe(0);
     }
     const chk = await live.check(root, 'godot-platformer');
@@ -274,13 +357,16 @@ describe('real Godot', () => {
     await live.create(root, 'g', 'godot-empty', 'Errores');
     write(root, {
       'g/bad.gd': 'extends Node\nfunc _ready():\n\tvar x = \n',
-      'g/main.gd': 'extends Node2D\n\nfunc _ready() -> void:\n\tprint("hola desde el juego")\n\tvar a = null\n\ta.foo()\n',
+      'g/main.gd':
+        'extends Node2D\n\nfunc _ready() -> void:\n\tprint("hola desde el juego")\n\tvar a = null\n\ta.foo()\n',
     });
     const chk = await runGameTool(live, undefined, 'godot_check', { files: ['g/bad.gd'] }, root);
     expect(chk.content).toMatch(/error: g\/bad\.gd:3.*Parse error/);
     const run = await runGameTool(live, undefined, 'godot_run', { seconds: 1 }, root);
     expect(run.content).toContain('hola desde el juego');
-    expect(run.content).toMatch(/error: g\/main\.gd:6 in _ready\(\): Invalid call\. Nonexistent function 'foo' in base 'Nil'/);
+    expect(run.content).toMatch(
+      /error: g\/main\.gd:6 in _ready\(\): Invalid call\. Nonexistent function 'foo' in base 'Nil'/,
+    );
     expect(run.summary).toBe('1 errores');
   }, 180_000);
 
@@ -300,7 +386,9 @@ describe('real Godot', () => {
     await live.create(root, 'lsp', 'godot-platformer', 'LSP');
     const abs = join(root, 'lsp');
     const port = await live.lspPort(abs);
-    const bridge = spawn(process.execPath, ['-e', LSP_TCP_BRIDGE, String(port)], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const bridge = spawn(process.execPath, ['-e', LSP_TCP_BRIDGE, String(port)], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     try {
       let buf = Buffer.alloc(0);
       const msgs: Record<string, unknown>[] = [];
@@ -311,7 +399,9 @@ describe('real Godot', () => {
           if (i < 0) break;
           const n = Number(/Content-Length: (\d+)/i.exec(buf.subarray(0, i).toString())![1]);
           if (buf.length < i + 4 + n) break;
-          msgs.push(JSON.parse(buf.subarray(i + 4, i + 4 + n).toString()) as Record<string, unknown>);
+          msgs.push(
+            JSON.parse(buf.subarray(i + 4, i + 4 + n).toString()) as Record<string, unknown>,
+          );
           buf = buf.subarray(i + 4 + n);
         }
       });
@@ -329,13 +419,29 @@ describe('real Godot', () => {
         throw new Error(`no answer; got ${msgs.map((m) => m.method ?? m.id).join(',')}`);
       };
       const uri = (p: string) => `file:///${join(abs, p).replace(/\\/g, '/').replace(/^\//, '')}`;
-      send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { processId: null, rootUri: uri(''), capabilities: {} } });
+      send({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { processId: null, rootUri: uri(''), capabilities: {} },
+      });
       const init = await wait((m) => m.id === 1);
       expect(JSON.stringify(init)).toContain('completionProvider');
       send({ jsonrpc: '2.0', method: 'initialized', params: {} });
       const text = 'extends CharacterBody2D\n\nfunc _ready() -> void:\n\tmove_and\n';
-      send({ jsonrpc: '2.0', method: 'textDocument/didOpen', params: { textDocument: { uri: uri('player.gd'), languageId: 'gdscript', version: 1, text } } });
-      send({ jsonrpc: '2.0', id: 2, method: 'textDocument/completion', params: { textDocument: { uri: uri('player.gd') }, position: { line: 3, character: 9 } } });
+      send({
+        jsonrpc: '2.0',
+        method: 'textDocument/didOpen',
+        params: {
+          textDocument: { uri: uri('player.gd'), languageId: 'gdscript', version: 1, text },
+        },
+      });
+      send({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'textDocument/completion',
+        params: { textDocument: { uri: uri('player.gd') }, position: { line: 3, character: 9 } },
+      });
       const comp = await wait((m) => m.id === 2);
       expect(JSON.stringify(comp)).toContain('move_and_slide');
     } finally {
@@ -344,7 +450,7 @@ describe('real Godot', () => {
     }
   }, 180_000);
 
-  it('stops at a breakpoint through Godot\'s debug adapter', async (ctx) => {
+  it("stops at a breakpoint through Godot's debug adapter", async (ctx) => {
     if (!haveGodot) ctx.skip();
     const root = tmp();
     await live.create(root, 'd', 'godot-empty', 'Debug');
@@ -353,8 +459,10 @@ describe('real Godot', () => {
     const dbg = new DebugManager((e) => events.push(e));
     try {
       await dbg.start(root, null, 'd/main.gd', { 'd/main.gd': [{ line: 5 }] });
-      for (let t = 0; t < 300 && !events.some((e) => e.kind === 'stopped'); t++) await new Promise((r) => setTimeout(r, 100));
-      const stopped = events.find((e) => e.kind === 'stopped') as Extract<DebugEvent, { kind: 'stopped' }> | undefined;
+      for (let t = 0; t < 300 && !events.some((e) => e.kind === 'stopped'); t++)
+        await new Promise((r) => setTimeout(r, 100));
+      const stopped = events.find((e) => e.kind === 'stopped') as
+        Extract<DebugEvent, { kind: 'stopped' }> | undefined;
       expect(stopped, JSON.stringify(events).slice(0, 2000)).toBeDefined();
       expect(stopped!.frames[0]).toMatchObject({ name: '_ready', line: 5, path: 'd/main.gd' });
     } finally {

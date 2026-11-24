@@ -25,7 +25,8 @@ export const CONFIG_TEXT = {
     cfgNone: 'Sin elegir',
     cfgPrivacy: 'Privacidad',
     cfgLocal: 'Solo modelos locales (100 % local, nada sale de la PC)',
-    cfgLocalOn: '¿Usar solo modelos locales? Los modelos de internet dejan de contestar hasta que lo apagues.',
+    cfgLocalOn:
+      '¿Usar solo modelos locales? Los modelos de internet dejan de contestar hasta que lo apagues.',
     cfgLook: 'Apariencia',
     cfgTheme: 'Tema',
     cfgZoom: 'Tamaño de la interfaz',

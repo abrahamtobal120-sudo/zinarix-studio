@@ -139,7 +139,9 @@ export class DebugManager {
     if (kindOf(cfg.type) === 'godot') {
       const exe = await godotLocator?.().catch(() => null);
       if (!exe)
-        throw new DebugError('No encontré Godot 4. Descárgalo de godotengine.org y elígelo en Más → Juegos.');
+        throw new DebugError(
+          'No encontré Godot 4. Descárgalo de godotengine.org y elígelo en Más → Juegos.',
+        );
       const project = godotProjectOf(root, cfg.program);
       if (!project) throw new DebugError('No encontré project.godot en la carpeta abierta.');
       godot = { exe, project, port: await freePort() };
@@ -289,7 +291,8 @@ export class DebugManager {
     this.backend = make(ev);
     this.emit({ kind: 'state', state: 'starting', name: cfg.name });
     const map = new Map<string, Breakpoint[]>();
-    for (const [rel, bps] of Object.entries(breakpoints)) if (bps.length) map.set(this.abs(rel), bps);
+    for (const [rel, bps] of Object.entries(breakpoints))
+      if (bps.length) map.set(this.abs(rel), bps);
     try {
       await this.backend.start(map);
       if (gen === this.generation && this.backend)
@@ -336,7 +339,9 @@ export class DebugManager {
       case 'node': {
         const node = which('node');
         if (!node && !attach)
-          throw new DebugError('No encontré Node.js en el PATH. Instálalo desde https://nodejs.org.');
+          throw new DebugError(
+            'No encontré Node.js en el PATH. Instálalo desde https://nodejs.org.',
+          );
         return new CdpBackend(
           {
             request: cfg.request,
@@ -355,7 +360,9 @@ export class DebugManager {
       case 'python': {
         const py = findPython();
         if (!py)
-          throw new DebugError('No encontré Python en el PATH. Instálalo desde https://python.org.');
+          throw new DebugError(
+            'No encontré Python en el PATH. Instálalo desde https://python.org.',
+          );
         if (!hasDebugpy(py))
           throw new DebugError(
             'Falta el depurador de Python (debugpy). Instálalo con:  pip install debugpy',
@@ -463,7 +470,14 @@ export class DebugManager {
           {
             kind: 'fixedServer',
             command: godot.exe,
-            args: ['--editor', '--headless', '--path', godot.project, '--dap-port', String(godot.port)],
+            args: [
+              '--editor',
+              '--headless',
+              '--path',
+              godot.project,
+              '--dap-port',
+              String(godot.port),
+            ],
             cwd: godot.project,
             env,
             port: godot.port,
@@ -471,7 +485,11 @@ export class DebugManager {
           },
           'godot',
           'launch',
-          { project: godot.project.split(sep).join('/'), scene, ...(cfg.args?.length ? { additional_options: cfg.args.join(' ') } : {}) },
+          {
+            project: godot.project.split(sep).join('/'),
+            scene,
+            ...(cfg.args?.length ? { additional_options: cfg.args.join(' ') } : {}),
+          },
           ev,
         );
       }

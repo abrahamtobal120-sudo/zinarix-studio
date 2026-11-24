@@ -1,7 +1,7 @@
 /* Part of the old styles.css, cut without reordering a rule. Layer `reset`; the order of
  * the layers is declared once, at the top of ui/tokens.css. */
 @layer reset {
-* {
-  box-sizing: border-box;
-}
+  * {
+    box-sizing: border-box;
+  }
 }

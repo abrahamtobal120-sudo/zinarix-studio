@@ -38,12 +38,17 @@ describe('LicenseIssuer', () => {
     expect(st.keys).toHaveLength(3);
     expect(parseLicense(st.keys[0]!.key, pub).exp).toBe(1000 + 10 * 86_400_000);
     const m = iss.mark(st.keys[0]!.id, true, 'Juan');
-    expect(m.keys.find((k) => k.id === st.keys[0]!.id)).toMatchObject({ given: true, note: 'Juan' });
+    expect(m.keys.find((k) => k.id === st.keys[0]!.id)).toMatchObject({
+      given: true,
+      note: 'Juan',
+    });
   });
 
   it('refuses a private key that does not match the app', () => {
     const { keyPath } = setup();
-    const other = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    const other = generateKeyPairSync('ed25519')
+      .publicKey.export({ type: 'spki', format: 'pem' })
+      .toString();
     const iss = new LicenseIssuer({ keyPath, publicKeyPem: other });
     expect(iss.status().available).toBe(false);
     expect(() => iss.issue({ plan: 'proai' })).toThrow();

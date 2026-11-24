@@ -11,7 +11,17 @@ import {
 } from 'node:fs';
 import { homedir, release as osRelease, tmpdir } from 'node:os';
 import { mkdtemp, readFile, rm, stat as statAsync, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
+import {
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   BrowserWindow,
@@ -130,13 +140,35 @@ import { BG_MODELS, type BgStatusView } from '../shared/bgRemove.js';
 import { BlenderModelService } from './blenderModel.js';
 import { SketchupService } from './sketchup.js';
 import { readSkpHead } from './sketchupTools.js';
-import { SKETCHUP_PREVIEWABLE, SKETCHUP_UNITS, parseSkp, validateSketchupOps, type SketchupRunView, type SketchupStatusView, type SkpInfoView } from '../shared/sketchup.js';
+import {
+  SKETCHUP_PREVIEWABLE,
+  SKETCHUP_UNITS,
+  parseSkp,
+  validateSketchupOps,
+  type SketchupRunView,
+  type SketchupStatusView,
+  type SkpInfoView,
+} from '../shared/sketchup.js';
 import { SlicerService } from './slicer.js';
 import { PrinterClient, PrinterStore, normalizePrinterUrl, printerFileName } from './printers.js';
 import { TokenStore } from './token-store.js';
-import { PRINTER_KINDS, SLICEABLE, validateSlice, type SliceView, type SlicerView } from '../shared/slicer.js';
+import {
+  PRINTER_KINDS,
+  SLICEABLE,
+  validateSlice,
+  type SliceView,
+  type SlicerView,
+} from '../shared/slicer.js';
 import { gcodeGrams, gcodeTime } from '../shared/gcode.js';
-import { CAD_FORMATS, CAD_TEMPLATES, isMeshPath, parseScadParams, type CadEnginesView, type CadRenderView, type ScadLog } from '../shared/cad.js';
+import {
+  CAD_FORMATS,
+  CAD_TEMPLATES,
+  isMeshPath,
+  parseScadParams,
+  type CadEnginesView,
+  type CadRenderView,
+  type ScadLog,
+} from '../shared/cad.js';
 import { WebGameServers } from './webGame.js';
 import { setGodotLocator } from './debug/manager.js';
 import { isGameTemplate } from '../shared/games.js';
@@ -3134,7 +3166,8 @@ function registerIpc(): void {
   // The owner's key desk: only with the owner's key active AND the private key on this PC.
   const issuer = new LicenseIssuer();
   const ownerOnly = () => {
-    if (license().plan !== 'owner') throw new Error('Solo el dueño de Zinarix Studio puede hacer claves.');
+    if (license().plan !== 'owner')
+      throw new Error('Solo el dueño de Zinarix Studio puede hacer claves.');
   };
   handle('license:issuer', z.tuple([]), () => {
     ownerOnly();
@@ -3304,7 +3337,9 @@ function registerAutomationsIpc(vercel: Vercel): void {
   handle('automations:status', z.tuple([]), () => auto.status());
   handle('automations:createTask', z.tuple([taskInput]), (_w, t) => auto.createTask(t));
   handle('automations:updateTask', z.tuple([id, taskInput]), (_w, i, t) => auto.updateTask(i, t));
-  handle('automations:setEnabled', z.tuple([id, z.boolean()]), (_w, i, on) => auto.setEnabled(i, on));
+  handle('automations:setEnabled', z.tuple([id, z.boolean()]), (_w, i, on) =>
+    auto.setEnabled(i, on),
+  );
   handle('automations:deleteTask', z.tuple([id]), (_w, i) => auto.deleteTask(i));
   handle('automations:runNow', z.tuple([id]), (_w, i) => auto.runNow(i));
   handle('automations:cancel', z.tuple([id]), (_w, i) => auto.cancel(i));
@@ -3340,7 +3375,8 @@ function registerAutomationsIpc(vercel: Vercel): void {
     });
     const file = r.filePaths[0];
     if (r.canceled || !file) return null;
-    if (statSync(file).size > 1024 * 1024) throw new Error('El archivo es demasiado grande para ser un bot.');
+    if (statSync(file).size > 1024 * 1024)
+      throw new Error('El archivo es demasiado grande para ser un bot.');
     return auto.createBot(botFromFile(readFileSync(file, 'utf8')));
   });
   handle('automations:saveAsAgent', z.tuple([id]), (w, i) => {
@@ -3649,7 +3685,10 @@ function registerVideoPhase4Ipc(): void {
 let godotService: GodotService | undefined;
 const webGames = new WebGameServers();
 function godot(): GodotService {
-  return (godotService ??= new GodotService(homedir(), join(app.getPath('userData'), 'godot.json')));
+  return (godotService ??= new GodotService(
+    homedir(),
+    join(app.getPath('userData'), 'godot.json'),
+  ));
 }
 
 async function godotLspServer(
@@ -3659,22 +3698,31 @@ async function godotLspServer(
   if (command !== '@godot') return { missing: '' };
   const g = godot();
   const st = await g.status();
-  if (st.state !== 'ready') return { missing: 'Instala Godot 4 (godotengine.org) y elígelo en Más → Juegos' };
+  if (st.state !== 'ready')
+    return { missing: 'Instala Godot 4 (godotengine.org) y elígelo en Más → Juegos' };
   const project = existsSync(join(root, 'project.godot')) ? '' : (await g.scan(root)).godot[0]?.dir;
   if (project === undefined) return { missing: 'No hay un project.godot en la carpeta abierta' };
   const port = await g.lspPort(project ? join(root, project) : root);
-  return { exe: process.execPath, args: ['-e', LSP_TCP_BRIDGE, String(port)], env: { ELECTRON_RUN_AS_NODE: '1' } };
+  return {
+    exe: process.execPath,
+    args: ['-e', LSP_TCP_BRIDGE, String(port)],
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+  };
 }
 
 /** Fase 1B (plan de funciones): background removal on this PC (resources/bgremove). */
 let bgService: BgRemoveService | undefined;
 function bgRemove(): BgRemoveService {
-  const dir = app.isPackaged ? join(process.resourcesPath, 'bgremove') : join(appRoot, 'dist', 'bgremove');
+  const dir = app.isPackaged
+    ? join(process.resourcesPath, 'bgremove')
+    : join(appRoot, 'dist', 'bgremove');
   const worker = join(dir, 'bgWorker.mjs');
   return (bgService ??= new BgRemoveService(
     dir,
     join(app.getPath('userData'), 'models'),
-    existsSync(worker) ? bgViaProcess(process.execPath, worker, { ELECTRON_RUN_AS_NODE: '1' }) : null,
+    existsSync(worker)
+      ? bgViaProcess(process.execPath, worker, { ELECTRON_RUN_AS_NODE: '1' })
+      : null,
   ));
 }
 
@@ -3686,7 +3734,14 @@ function registerBgIpc(): void {
   handle('bg:download', z.tuple([id]), (w, m) => {
     // Runs on; progress and the end go to the window that asked as events.
     bg.download(m, (got, total) => send(w, { type: 'bg:progress', id: m, got, total })).then(
-      () => send(w, { type: 'bg:progress', id: m, got: BG_MODELS[m].bytes, total: BG_MODELS[m].bytes, done: true }),
+      () =>
+        send(w, {
+          type: 'bg:progress',
+          id: m,
+          got: BG_MODELS[m].bytes,
+          total: BG_MODELS[m].bytes,
+          done: true,
+        }),
       (e: unknown) =>
         send(w, {
           type: 'bg:progress',
@@ -3698,7 +3753,9 @@ function registerBgIpc(): void {
     );
   });
   handle('bg:cancelDownload', z.tuple([id]), (_w, m) => bg.cancelDownload(m));
-  const tensor = z.custom<Float32Array>((v) => v instanceof Float32Array && v.length <= 3 * 1024 * 1024);
+  const tensor = z.custom<Float32Array>(
+    (v) => v instanceof Float32Array && v.length <= 3 * 1024 * 1024,
+  );
   handle('bg:infer', z.tuple([id, tensor]), (_w, m, input) => bg.infer(m, input));
 }
 
@@ -3712,7 +3769,9 @@ function cad(): CadService {
     : join(appRoot, 'dist', 'openscad', 'cadWorker.mjs');
   return (cadService ??= new CadService(
     join(app.getPath('userData'), 'openscad.json'),
-    existsSync(worker) ? builtinViaProcess(process.execPath, worker, { ELECTRON_RUN_AS_NODE: '1' }) : null,
+    existsSync(worker)
+      ? builtinViaProcess(process.execPath, worker, { ELECTRON_RUN_AS_NODE: '1' })
+      : null,
   ));
 }
 
@@ -3721,7 +3780,11 @@ function registerCadIpc(): void {
   ai.agent.cad = c;
   const view = async (refresh = false): Promise<CadEnginesView> => {
     const e = await c.engines(refresh);
-    return { native: e.native, builtin: e.builtin, blender: await blenderVersion().catch(() => null) };
+    return {
+      native: e.native,
+      builtin: e.builtin,
+      blender: await blenderVersion().catch(() => null),
+    };
   };
   const rootOf = (w: Win) => w.workspace?.root;
   // Tabs use paths relative to the open folder.
@@ -3742,64 +3805,104 @@ function registerCadIpc(): void {
     const r = await dialog.showOpenDialog(w.win, {
       title: 'Elige el programa de OpenSCAD',
       properties: ['openFile'],
-      ...(process.platform === 'win32' ? { filters: [{ name: 'OpenSCAD', extensions: ['exe', 'com'] }] } : {}),
+      ...(process.platform === 'win32'
+        ? { filters: [{ name: 'OpenSCAD', extensions: ['exe', 'com'] }] }
+        : {}),
     });
     if (r.canceled || !r.filePaths[0]) return null;
     let exe = r.filePaths[0];
     if (exe.endsWith('.app')) exe = join(exe, 'Contents', 'MacOS', 'OpenSCAD');
     return (await c.useNative(exe)) ? view() : null;
   });
-  handle('cad:render', z.tuple([z.string().min(1).max(200), path, code, values]), async (w, key, file, src, vals): Promise<CadRenderView> => {
-    const k = `${w.id}:${key}`;
-    renders.get(k)?.abort();
-    const ac = new AbortController();
-    renders.set(k, ac);
-    const params = parseScadParams(src);
-    try {
-      const r = await c.render({ file: absOf(w, file), code: src, values: vals, root: rootOf(w), timeoutMs: 180_000 }, ac.signal);
-      return { ok: true, stl: new Uint8Array(r.data), engine: r.engine, ms: r.ms, messages: relMsgs(w, r.log), params };
-    } catch (e) {
-      const log = (e as { log?: ScadLog }).log;
-      return { ok: false, error: (e as Error).message, messages: relMsgs(w, log), params, ...(ac.signal.aborted ? { cancelled: true } : {}) };
-    } finally {
-      if (renders.get(k) === ac) renders.delete(k);
-    }
-  });
+  handle(
+    'cad:render',
+    z.tuple([z.string().min(1).max(200), path, code, values]),
+    async (w, key, file, src, vals): Promise<CadRenderView> => {
+      const k = `${w.id}:${key}`;
+      renders.get(k)?.abort();
+      const ac = new AbortController();
+      renders.set(k, ac);
+      const params = parseScadParams(src);
+      try {
+        const r = await c.render(
+          { file: absOf(w, file), code: src, values: vals, root: rootOf(w), timeoutMs: 180_000 },
+          ac.signal,
+        );
+        return {
+          ok: true,
+          stl: new Uint8Array(r.data),
+          engine: r.engine,
+          ms: r.ms,
+          messages: relMsgs(w, r.log),
+          params,
+        };
+      } catch (e) {
+        const log = (e as { log?: ScadLog }).log;
+        return {
+          ok: false,
+          error: (e as Error).message,
+          messages: relMsgs(w, log),
+          params,
+          ...(ac.signal.aborted ? { cancelled: true } : {}),
+        };
+      } finally {
+        if (renders.get(k) === ac) renders.delete(k);
+      }
+    },
+  );
   handle('cad:cancel', z.tuple([z.string().min(1).max(200)]), (w, key) => {
     renders.get(`${w.id}:${key}`)?.abort();
   });
-  handle('cad:export', z.tuple([path, code, values, z.enum(CAD_FORMATS as unknown as [string, ...string[]])]), async (w, file, src, vals, fmt) => {
-    const abs = absOf(w, file);
-    const r = await dialog.showSaveDialog(w.win, {
-      title: 'Exportar modelo 3D',
-      defaultPath: abs.replace(/\.scad$/i, `.${fmt}`),
-      filters: [{ name: fmt.toUpperCase(), extensions: [fmt] }],
-    });
-    if (r.canceled || !r.filePath) return null;
-    const out = await c.render({ file: abs, code: src, values: vals, root: rootOf(w), format: fmt as (typeof CAD_FORMATS)[number], timeoutMs: 10 * 60_000 });
-    await writeFile(r.filePath, out.data);
-    return { path: r.filePath, size: out.data.length };
-  });
-  handle('cad:create', z.tuple([z.string().min(1).max(40), z.string().min(1).max(400)]), async (w, template, rel) => {
-    const root = rootOf(w);
-    if (!root) throw new Error('Abre una carpeta primero.');
-    const t = CAD_TEMPLATES.find((x) => x.id === template);
-    if (!t) throw new Error('Plantilla desconocida.');
-    const name = rel.trim().replace(/\.scad$/i, '') + '.scad';
-    const abs = resolve(root, name);
-    const r = relative(root, abs);
-    if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error('El archivo tiene que quedar dentro de la carpeta abierta.');
-    if (existsSync(abs)) throw new Error('Ya existe un archivo con ese nombre.');
-    mkdirSync(dirname(abs), { recursive: true });
-    await writeFile(abs, t.code, 'utf8');
-    return relative(root, abs).split(sep).join('/');
-  });
+  handle(
+    'cad:export',
+    z.tuple([path, code, values, z.enum(CAD_FORMATS as unknown as [string, ...string[]])]),
+    async (w, file, src, vals, fmt) => {
+      const abs = absOf(w, file);
+      const r = await dialog.showSaveDialog(w.win, {
+        title: 'Exportar modelo 3D',
+        defaultPath: abs.replace(/\.scad$/i, `.${fmt}`),
+        filters: [{ name: fmt.toUpperCase(), extensions: [fmt] }],
+      });
+      if (r.canceled || !r.filePath) return null;
+      const out = await c.render({
+        file: abs,
+        code: src,
+        values: vals,
+        root: rootOf(w),
+        format: fmt as (typeof CAD_FORMATS)[number],
+        timeoutMs: 10 * 60_000,
+      });
+      await writeFile(r.filePath, out.data);
+      return { path: r.filePath, size: out.data.length };
+    },
+  );
+  handle(
+    'cad:create',
+    z.tuple([z.string().min(1).max(40), z.string().min(1).max(400)]),
+    async (w, template, rel) => {
+      const root = rootOf(w);
+      if (!root) throw new Error('Abre una carpeta primero.');
+      const t = CAD_TEMPLATES.find((x) => x.id === template);
+      if (!t) throw new Error('Plantilla desconocida.');
+      const name = rel.trim().replace(/\.scad$/i, '') + '.scad';
+      const abs = resolve(root, name);
+      const r = relative(root, abs);
+      if (!r || r.startsWith('..') || isAbsolute(r))
+        throw new Error('El archivo tiene que quedar dentro de la carpeta abierta.');
+      if (existsSync(abs)) throw new Error('Ya existe un archivo con ese nombre.');
+      mkdirSync(dirname(abs), { recursive: true });
+      await writeFile(abs, t.code, 'utf8');
+      return relative(root, abs).split(sep).join('/');
+    },
+  );
   // The window's CSP allows no fetch of zmedia: URLs, so the viewer gets the bytes here.
   handle('cad:readMesh', z.tuple([path]), async (w, p) => {
     const abs = absOf(w, p);
     const gcode = /\.(gcode|gco)$/i.test(abs);
-    if ((!isMeshPath(abs) && !gcode) || !existsSync(abs) || !statSync(abs).isFile()) throw new Error('No es un modelo 3D.');
-    if (statSync(abs).size > (gcode ? 400 : 300) * 1024 * 1024) throw new Error(`El archivo pesa más de ${gcode ? 400 : 300} MB.`);
+    if ((!isMeshPath(abs) && !gcode) || !existsSync(abs) || !statSync(abs).isFile())
+      throw new Error('No es un modelo 3D.');
+    if (statSync(abs).size > (gcode ? 400 : 300) * 1024 * 1024)
+      throw new Error(`El archivo pesa más de ${gcode ? 400 : 300} MB.`);
     return new Uint8Array(await readFile(abs));
   });
   registerPrintIpc(c, absOf, rootOf);
@@ -3816,7 +3919,8 @@ function registerSketchupIpc(): void {
     if (!root) throw new Error('Abre una carpeta primero.');
     const abs = resolve(root, p);
     const r = relative(root, abs);
-    if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error('El archivo tiene que estar dentro de la carpeta abierta.');
+    if (!r || r.startsWith('..') || isAbsolute(r))
+      throw new Error('El archivo tiene que estar dentro de la carpeta abierta.');
     if (ext && !ext.test(abs)) throw new Error('Ese tipo de archivo no sirve aquí.');
     return abs;
   };
@@ -3832,7 +3936,9 @@ function registerSketchupIpc(): void {
     const r = await dialog.showOpenDialog(w.win, {
       title: 'Elige SketchUp',
       properties: ['openFile'],
-      ...(process.platform === 'win32' ? { filters: [{ name: 'SketchUp', extensions: ['exe'] }] } : {}),
+      ...(process.platform === 'win32'
+        ? { filters: [{ name: 'SketchUp', extensions: ['exe'] }] }
+        : {}),
     });
     if (r.canceled || !r.filePaths[0]) return null;
     return (await su.pick(r.filePaths[0])) ? su.status() : null;
@@ -3864,21 +3970,43 @@ function registerSketchupIpc(): void {
     z.tuple([
       path.nullable(),
       z.array(z.record(z.string().max(40), z.unknown())).max(100),
-      z.object({ units: z.enum(SKETCHUP_UNITS).optional(), save: z.boolean().optional(), shot: z.boolean().optional() }),
+      z.object({
+        units: z.enum(SKETCHUP_UNITS).optional(),
+        save: z.boolean().optional(),
+        shot: z.boolean().optional(),
+      }),
     ]),
     async (w, p, raw, o): Promise<SketchupRunView> => {
       try {
         const file = p ? inside(w, p, /\.skp$/i) : undefined;
         const ops = validateSketchupOps(raw, (q) => inside(w, q));
-        for (const op of ops) if (typeof op.path === 'string' && (op.op === 'export' || op.op === 'save')) mkdirSync(dirname(op.path), { recursive: true });
+        for (const op of ops)
+          if (typeof op.path === 'string' && (op.op === 'export' || op.op === 'save'))
+            mkdirSync(dirname(op.path), { recursive: true });
         const r = await su.run(
-          { ...(file ? { path: file } : {}), units: o.units ?? 'mm', ops, save: o.save ?? false, ...(o.shot ? { shot: { path: '', width: 960, height: 600 } } : {}) },
+          {
+            ...(file ? { path: file } : {}),
+            units: o.units ?? 'mm',
+            ops,
+            save: o.save ?? false,
+            ...(o.shot ? { shot: { path: '', width: 960, height: 600 } } : {}),
+          },
           { launch: true },
         );
         const report = r.report
-          ? { ...r.report, model: relOf(w, r.report.model), exported: r.report.exported.map((x) => relOf(w, x)), ...(r.report.saved ? { saved: relOf(w, r.report.saved) } : {}) }
+          ? {
+              ...r.report,
+              model: relOf(w, r.report.model),
+              exported: r.report.exported.map((x) => relOf(w, x)),
+              ...(r.report.saved ? { saved: relOf(w, r.report.saved) } : {}),
+            }
           : undefined;
-        return { ok: r.ok, ...(r.error ? { error: r.error } : {}), ...(report ? { report } : {}), ...(r.shot ? { shot: new Uint8Array(r.shot) } : {}) };
+        return {
+          ok: r.ok,
+          ...(r.error ? { error: r.error } : {}),
+          ...(report ? { report } : {}),
+          ...(r.shot ? { shot: new Uint8Array(r.shot) } : {}),
+        };
       } catch (e) {
         return { ok: false, error: (e as Error).message };
       }
@@ -3887,7 +4015,8 @@ function registerSketchupIpc(): void {
   // Meshes exported by SketchUp (.stl/.obj/.dae) for the panel's 3D preview.
   handle('sketchup:readExport', z.tuple([path]), async (w, p) => {
     const abs = inside(w, p, SKETCHUP_PREVIEWABLE);
-    if (!existsSync(abs) || statSync(abs).size > 200 * 1024 * 1024) throw new Error('El archivo no existe o pesa más de 200 MB.');
+    if (!existsSync(abs) || statSync(abs).size > 200 * 1024 * 1024)
+      throw new Error('El archivo no existe o pesa más de 200 MB.');
     return new Uint8Array(await readFile(abs));
   });
 }
@@ -3895,18 +4024,35 @@ function registerSketchupIpc(): void {
 /** Fase 7 (mejora): slicing to G-code (PrusaSlicer) and the network 3D printers. */
 let slicerService: SlicerService | undefined;
 let printerStore: PrinterStore | undefined;
-const slicerOf = () => (slicerService ??= new SlicerService(join(app.getPath('userData'), 'slicer.json')));
-const printerSecret = (id: string) => new TokenStore(join(app.getPath('userData'), `printer-${id.replace(/[^\w-]/g, '')}.bin`), `printer:${id}`);
-const printersOf = () => (printerStore ??= new PrinterStore(join(app.getPath('userData'), 'printers.json'), printerSecret));
+const slicerOf = () =>
+  (slicerService ??= new SlicerService(join(app.getPath('userData'), 'slicer.json')));
+const printerSecret = (id: string) =>
+  new TokenStore(
+    join(app.getPath('userData'), `printer-${id.replace(/[^\w-]/g, '')}.bin`),
+    `printer:${id}`,
+  );
+const printersOf = () =>
+  (printerStore ??= new PrinterStore(
+    join(app.getPath('userData'), 'printers.json'),
+    printerSecret,
+  ));
 
-function registerPrintIpc(c: CadService, absOf: (w: Win, p: string) => string, rootOf: (w: Win) => string | undefined): void {
+function registerPrintIpc(
+  c: CadService,
+  absOf: (w: Win, p: string) => string,
+  rootOf: (w: Win) => string | undefined,
+): void {
   const sl = slicerOf();
   const ps = printersOf();
   ai.agent.slicer = sl;
   ai.agent.printers = ps;
   const view = async (refresh = false): Promise<SlicerView> => {
     const i = await sl.info(refresh);
-    return { slicer: i.slicer, profile: i.profile, desktop: i.desktop.map(({ id, name }) => ({ id, name })) };
+    return {
+      slicer: i.slicer,
+      profile: i.profile,
+      desktop: i.desktop.map(({ id, name }) => ({ id, name })),
+    };
   };
   const relOf = (w: Win, abs: string) => {
     const root = rootOf(w);
@@ -3917,25 +4063,34 @@ function registerPrintIpc(c: CadService, absOf: (w: Win, p: string) => string, r
     if (!root) throw new Error('Abre una carpeta primero.');
     const abs = absOf(w, p);
     const r = relative(root, abs);
-    if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error('El archivo tiene que estar dentro de la carpeta abierta.');
+    if (!r || r.startsWith('..') || isAbsolute(r))
+      throw new Error('El archivo tiene que estar dentro de la carpeta abierta.');
     return abs;
   };
   const slices = new Map<string, AbortController>();
   const key = z.string().min(1).max(200);
   const path = z.string().min(1).max(4096);
   const id = z.string().min(1).max(100);
-  handle('print:slicer', z.tuple([z.boolean().optional()]), (_w, refresh) => view(refresh === true));
+  handle('print:slicer', z.tuple([z.boolean().optional()]), (_w, refresh) =>
+    view(refresh === true),
+  );
   handle('print:pickSlicer', z.tuple([]), async (w) => {
     const r = await dialog.showOpenDialog(w.win, {
       title: 'Elige PrusaSlicer (prusa-slicer-console) o SuperSlicer',
       properties: ['openFile'],
-      ...(process.platform === 'win32' ? { filters: [{ name: 'PrusaSlicer', extensions: ['exe'] }] } : {}),
+      ...(process.platform === 'win32'
+        ? { filters: [{ name: 'PrusaSlicer', extensions: ['exe'] }] }
+        : {}),
     });
     if (r.canceled || !r.filePaths[0]) return null;
     let exe = r.filePaths[0];
-    if (exe.endsWith('.app')) exe = join(exe, 'Contents', 'MacOS', exe.includes('Super') ? 'SuperSlicer' : 'PrusaSlicer');
+    if (exe.endsWith('.app'))
+      exe = join(exe, 'Contents', 'MacOS', exe.includes('Super') ? 'SuperSlicer' : 'PrusaSlicer');
     // The window one opens a window: use the console one next to it.
-    if (/prusa-slicer\.exe$/i.test(exe) && existsSync(exe.replace(/prusa-slicer\.exe$/i, 'prusa-slicer-console.exe')))
+    if (
+      /prusa-slicer\.exe$/i.test(exe) &&
+      existsSync(exe.replace(/prusa-slicer\.exe$/i, 'prusa-slicer-console.exe'))
+    )
       exe = exe.replace(/prusa-slicer\.exe$/i, 'prusa-slicer-console.exe');
     return (await sl.use(exe)) ? view() : null;
   });
@@ -3955,7 +4110,13 @@ function registerPrintIpc(c: CadService, absOf: (w: Win, p: string) => string, r
   });
   handle(
     'print:slice',
-    z.tuple([key, path, z.string().max(2_000_000).nullable(), z.record(z.string().max(100), z.unknown()), z.record(z.string().max(40), z.unknown())]),
+    z.tuple([
+      key,
+      path,
+      z.string().max(2_000_000).nullable(),
+      z.record(z.string().max(100), z.unknown()),
+      z.record(z.string().max(40), z.unknown()),
+    ]),
     async (w, k, file, code, vals, settings): Promise<SliceView> => {
       const abs = inProject(w, file);
       const st = validateSlice(settings);
@@ -3968,13 +4129,31 @@ function registerPrintIpc(c: CadService, absOf: (w: Win, p: string) => string, r
       let tmp: string | undefined;
       try {
         if (/\.scad$/i.test(abs)) {
-          const r = await c.render({ file: abs, ...(code !== null ? { code } : {}), values: vals, root: rootOf(w), format: 'stl', timeoutMs: 10 * 60_000 }, ac.signal);
+          const r = await c.render(
+            {
+              file: abs,
+              ...(code !== null ? { code } : {}),
+              values: vals,
+              root: rootOf(w),
+              format: 'stl',
+              timeoutMs: 10 * 60_000,
+            },
+            ac.signal,
+          );
           tmp = await mkdtemp(join(tmpdir(), 'zinarix-slice-model-'));
           model = join(tmp, basename(abs).replace(/\.scad$/i, '.stl'));
           await writeFile(model, r.data);
         } else if (!SLICEABLE.test(abs)) throw new Error('Ese archivo no se puede rebanar.');
         const r = await sl.slice({ model, out, settings: st }, ac.signal);
-        return { path: relOf(w, out), ms: r.ms, slicer: r.slicer, warnings: r.warnings, timeS: gcodeTime(r.stats), grams: gcodeGrams(r.stats), layers: r.stats.layers };
+        return {
+          path: relOf(w, out),
+          ms: r.ms,
+          slicer: r.slicer,
+          warnings: r.warnings,
+          timeS: gcodeTime(r.stats),
+          grams: gcodeGrams(r.stats),
+          layers: r.stats.layers,
+        };
       } finally {
         if (tmp) await rm(tmp, { recursive: true, force: true }).catch(() => {});
         if (slices.get(kk) === ac) slices.delete(kk);
@@ -3996,13 +4175,19 @@ function registerPrintIpc(c: CadService, absOf: (w: Win, p: string) => string, r
     url: z.string().min(1).max(500),
     key: z.string().max(400).optional(),
   });
-  handle('printers:save', z.tuple([cfg]), (_w, p) => ps.save(p as Parameters<PrinterStore['save']>[0]));
+  handle('printers:save', z.tuple([cfg]), (_w, p) =>
+    ps.save(p as Parameters<PrinterStore['save']>[0]),
+  );
   handle('printers:remove', z.tuple([id]), (_w, pid) => ps.remove(pid));
   // Tests what is typed in the form (the saved key when none is typed).
   handle('printers:test', z.tuple([cfg]), async (_w, p) => {
     const url = normalizePrinterUrl(p.url);
-    const k = p.key !== undefined && p.key.trim() ? p.key.trim() : p.id ? printerSecret(p.id).get() : null;
-    return new PrinterClient({ id: p.id ?? 'test', name: p.name || url, kind: p.kind as 'octoprint' | 'moonraker', url }, k).test();
+    const k =
+      p.key !== undefined && p.key.trim() ? p.key.trim() : p.id ? printerSecret(p.id).get() : null;
+    return new PrinterClient(
+      { id: p.id ?? 'test', name: p.name || url, kind: p.kind as 'octoprint' | 'moonraker', url },
+      k,
+    ).test();
   });
   handle('printers:status', z.tuple([id]), (_w, pid) => ps.client(pid).status());
   handle('printers:send', z.tuple([id, path, z.boolean()]), async (w, pid, file, start) => {
@@ -4018,7 +4203,11 @@ function registerPrintIpc(c: CadService, absOf: (w: Win, p: string) => string, r
     await client.upload(name, await readFile(abs), start);
     return name;
   });
-  handle('printers:control', z.tuple([id, z.enum(['pause', 'resume', 'cancel'])]), (_w, pid, action) => ps.client(pid).control(action));
+  handle(
+    'printers:control',
+    z.tuple([id, z.enum(['pause', 'resume', 'cancel'])]),
+    (_w, pid, action) => ps.client(pid).control(action),
+  );
 }
 
 function registerGamesIpc(): void {
@@ -4033,13 +4222,19 @@ function registerGamesIpc(): void {
   const key = z.string().min(1).max(200);
   const dir = z.string().max(500);
   const scene = z.string().max(400).nullable();
-  handle('games:status', z.tuple([z.boolean().optional()]), (_w, force) => g.status(force === true));
-  handle('games:scan', z.tuple([]), (w) => (w.workspace ? g.scan(w.workspace.root) : { godot: [], others: [], web: [] }));
+  handle('games:status', z.tuple([z.boolean().optional()]), (_w, force) =>
+    g.status(force === true),
+  );
+  handle('games:scan', z.tuple([]), (w) =>
+    w.workspace ? g.scan(w.workspace.root) : { godot: [], others: [], web: [] },
+  );
   handle('games:pickExecutable', z.tuple([]), async (w) => {
     const r = await dialog.showOpenDialog(w.win, {
       title: 'Elige el ejecutable de Godot 4',
       properties: ['openFile'],
-      ...(process.platform === 'win32' ? { filters: [{ name: 'Godot', extensions: ['exe'] }] } : {}),
+      ...(process.platform === 'win32'
+        ? { filters: [{ name: 'Godot', extensions: ['exe'] }] }
+        : {}),
     });
     if (r.canceled || !r.filePaths[0]) return null;
     let exe = r.filePaths[0];
@@ -4051,10 +4246,20 @@ function registerGamesIpc(): void {
     return st;
   });
   handle('games:forgetExecutable', z.tuple([]), () => g.setExecutable(null));
-  handle('games:openEditor', z.tuple([dir, z.string().max(400).optional()]), (w, d, file) => g.openEditor(rootOf(w), d, file));
+  handle('games:openEditor', z.tuple([dir, z.string().max(400).optional()]), (w, d, file) =>
+    g.openEditor(rootOf(w), d, file),
+  );
   handle(
     'games:run',
-    z.tuple([key, dir, z.object({ scene, debugCollisions: z.boolean().optional(), debugNavigation: z.boolean().optional() })]),
+    z.tuple([
+      key,
+      dir,
+      z.object({
+        scene,
+        debugCollisions: z.boolean().optional(),
+        debugNavigation: z.boolean().optional(),
+      }),
+    ]),
     (w, k, d, opts) =>
       g.startRun(
         `${w.id}:${k}`,
@@ -4070,27 +4275,43 @@ function registerGamesIpc(): void {
   handle('games:frame', z.tuple([dir, scene, z.number().min(0).max(30)]), async (w, d, sc, at) => {
     const { frames, run } = await g.frames(rootOf(w), d, { scene: sc, at: [at] });
     const f = frames[0];
-    return { image: f ? `data:image/png;base64,${f.png.toString('base64')}` : null, problems: run.problems, output: run.output.slice(-20_000) };
+    return {
+      image: f ? `data:image/png;base64,${f.png.toString('base64')}` : null,
+      problems: run.problems,
+      output: run.output.slice(-20_000),
+    };
   });
-  handle('games:export', z.tuple([dir, z.string().min(1).max(100), z.boolean()]), async (w, d, preset, debug) => {
-    const r = await g.exportGame(rootOf(w), d, preset, debug);
-    return { ok: r.ok, path: r.path, output: r.output.slice(-20_000), problems: r.problems };
-  });
-  handle('games:create', z.tuple([z.string().min(1).max(64), z.string().min(1).max(40), z.string().max(80)]), (w, folder, template, name) => {
-    if (!isGameTemplate(template)) throw new Error('Plantilla desconocida.');
-    return g.create(rootOf(w), folder, template, name);
-  });
+  handle(
+    'games:export',
+    z.tuple([dir, z.string().min(1).max(100), z.boolean()]),
+    async (w, d, preset, debug) => {
+      const r = await g.exportGame(rootOf(w), d, preset, debug);
+      return { ok: r.ok, path: r.path, output: r.output.slice(-20_000), problems: r.problems };
+    },
+  );
+  handle(
+    'games:create',
+    z.tuple([z.string().min(1).max(64), z.string().min(1).max(40), z.string().max(80)]),
+    (w, folder, template, name) => {
+      if (!isGameTemplate(template)) throw new Error('Plantilla desconocida.');
+      return g.create(rootOf(w), folder, template, name);
+    },
+  );
   handle('games:webUrl', z.tuple([z.string().max(500)]), (w, rel) => webGames.url(rootOf(w), rel));
-  handle('games:openOther', z.tuple([z.enum(['unity', 'unreal']), dir, z.string().max(200).optional()]), async (w, kind, d, file) => {
-    const root = rootOf(w);
-    const p = (await g.scan(root)).others.find((o) => o.kind === kind && o.dir === d);
-    if (!p) throw new Error('No encontré ese proyecto.');
-    if (kind === 'unity') return g.openUnity(root, p);
-    // Unreal: the .uproject opens with the engine version it is associated with.
-    const err = await shell.openPath(join(root, p.dir, p.file ?? file ?? ''));
-    if (err) throw new Error(err);
-    return 'Unreal';
-  });
+  handle(
+    'games:openOther',
+    z.tuple([z.enum(['unity', 'unreal']), dir, z.string().max(200).optional()]),
+    async (w, kind, d, file) => {
+      const root = rootOf(w);
+      const p = (await g.scan(root)).others.find((o) => o.kind === kind && o.dir === d);
+      if (!p) throw new Error('No encontré ese proyecto.');
+      if (kind === 'unity') return g.openUnity(root, p);
+      // Unreal: the .uproject opens with the engine version it is associated with.
+      const err = await shell.openPath(join(root, p.dir, p.file ?? file ?? ''));
+      if (err) throw new Error(err);
+      return 'Unreal';
+    },
+  );
   app.on('will-quit', () => {
     g.dispose();
     webGames.stop();
@@ -4115,7 +4336,9 @@ function registerPioIpc(): void {
   };
   const key = z.string().min(1).max(200);
   const port = z.string().min(1).max(200);
-  handle('pio:status', z.tuple([z.boolean().optional()]), (_w, force) => pio.status(force === true));
+  handle('pio:status', z.tuple([z.boolean().optional()]), (_w, force) =>
+    pio.status(force === true),
+  );
   handle('pio:projects', z.tuple([]), (w) => (w.workspace ? pio.projects(w.workspace.root) : []));
   handle('pio:devices', z.tuple([]), () => pio.devices());
   handle('pio:boards', z.tuple([z.string().max(80)]), (_w, q) => pio.boards(q));
@@ -4152,8 +4375,10 @@ function registerPioIpc(): void {
     z.tuple([z.string().min(1).max(64), z.string().min(1).max(80), z.string().min(1).max(40)]),
     (w, name, board, framework) => pio.createProject(rootOf(w), name, board, framework),
   );
-  handle('pio:serialOpen', z.tuple([port, z.number().int().min(50).max(4_000_000)]), (_w, p, baud) =>
-    pio.openSerial(p, baud),
+  handle(
+    'pio:serialOpen',
+    z.tuple([port, z.number().int().min(50).max(4_000_000)]),
+    (_w, p, baud) => pio.openSerial(p, baud),
   );
   handle('pio:serialClose', z.tuple([port]), (_w, p) => pio.closeSerial(p));
   handle('pio:serialWrite', z.tuple([port, z.string().max(64 * 1024)]), (_w, p, data) =>
@@ -4163,16 +4388,26 @@ function registerPioIpc(): void {
     pio.openPorts().map((o) => ({ ...o, text: pio.serialText(o.port) ?? '' })),
   );
   handle('pio:serialClear', z.tuple([port]), (_w, p) => pio.clearSerial(p));
-  handle('pio:searchLibraries', z.tuple([z.string().min(1).max(100), z.number().int().min(1).max(100)]), (_w, q, page) =>
-    pio.searchLibraries(q, page),
+  handle(
+    'pio:searchLibraries',
+    z.tuple([z.string().min(1).max(100), z.number().int().min(1).max(100)]),
+    (_w, q, page) => pio.searchLibraries(q, page),
   );
-  handle('pio:libraries', z.tuple([z.string().max(500), z.string().max(100).nullable()]), (w, dir, env) =>
-    pio.libraries(rootOf(w), dir, env),
+  handle(
+    'pio:libraries',
+    z.tuple([z.string().max(500), z.string().max(100).nullable()]),
+    (w, dir, env) => pio.libraries(rootOf(w), dir, env),
   );
   handle(
     'pio:changeLibrary',
-    z.tuple([z.string().max(500), z.string().max(100).nullable(), z.string().min(1).max(120), z.boolean()]),
-    (w, dir, env, spec, remove) => pio.changeLibrary(rootOf(w), dir, env, spec, remove).then(() => undefined),
+    z.tuple([
+      z.string().max(500),
+      z.string().max(100).nullable(),
+      z.string().min(1).max(120),
+      z.boolean(),
+    ]),
+    (w, dir, env, spec, remove) =>
+      pio.changeLibrary(rootOf(w), dir, env, spec, remove).then(() => undefined),
   );
   app.on('will-quit', () => pio.dispose());
 }
@@ -4187,10 +4422,14 @@ function registerMobileIpc(): void {
   handle('mobile:devices', z.tuple([]), () => m.devices());
   handle('mobile:avds', z.tuple([]), () => m.avds());
   handle('mobile:projects', z.tuple([]), (w) => (w.workspace ? m.projects(w.workspace.root) : []));
-  handle('mobile:startEmulator', z.tuple([z.string().min(1).max(100)]), (_w, avd) => m.startEmulator(avd));
+  handle('mobile:startEmulator', z.tuple([z.string().min(1).max(100)]), (_w, avd) =>
+    m.startEmulator(avd),
+  );
   handle('mobile:mirror', z.tuple([serial]), (_w, s) => m.mirror(s));
-  handle('mobile:screenshot', z.tuple([serial]), async (_w, s) =>
-    `data:image/png;base64,${(await m.screenshot(s)).toString('base64')}`,
+  handle(
+    'mobile:screenshot',
+    z.tuple([serial]),
+    async (_w, s) => `data:image/png;base64,${(await m.screenshot(s)).toString('base64')}`,
   );
   handle('mobile:followLogcat', z.tuple([key, serial]), (w, k, s) =>
     m.followLogcat(
@@ -4227,13 +4466,18 @@ function registerMobileIpc(): void {
   handle('mobile:apks', z.tuple([]), (w) => (w.workspace ? m.apks(w.workspace.root) : []));
   handle('mobile:install', z.tuple([serial, z.string().min(1).max(1000)]), async (w, s, rel) => {
     if (!w.workspace) throw new Error('No hay carpeta abierta');
-    if (!(await m.apks(w.workspace.root)).includes(rel)) throw new Error('Ese .apk no está en la carpeta.');
+    if (!(await m.apks(w.workspace.root)).includes(rel))
+      throw new Error('Ese .apk no está en la carpeta.');
     await m.install(s, join(w.workspace.root, rel));
   });
-  handle('mobile:connect', z.tuple([z.string().min(3).max(300), z.string().max(6).nullable()]), (_w, addr, code) =>
-    m.connect(addr, code ?? undefined).then((out) => out.trim()),
+  handle(
+    'mobile:connect',
+    z.tuple([z.string().min(3).max(300), z.string().max(6).nullable()]),
+    (_w, addr, code) => m.connect(addr, code ?? undefined).then((out) => out.trim()),
   );
-  handle('mobile:disconnect', z.tuple([z.string().min(3).max(300)]), (_w, addr) => m.disconnect(addr));
+  handle('mobile:disconnect', z.tuple([z.string().min(3).max(300)]), (_w, addr) =>
+    m.disconnect(addr),
+  );
   handle(
     'mobile:command',
     z.tuple([z.string().max(500), z.enum(['run', 'build', 'ios']), serial.nullable()]),

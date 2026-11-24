@@ -1,9 +1,5 @@
 import { posix } from 'node:path';
-import type {
-  ExtLanguageData,
-  ExtSnippetData,
-  ExtThemeData,
-} from '../../shared/devtools.js';
+import type { ExtLanguageData, ExtSnippetData, ExtThemeData } from '../../shared/devtools.js';
 import { parseJsonc } from '../debug/config.js';
 import { extractEntry, readZip, safeEntryPath, type ZipEntry } from './zip.js';
 
@@ -121,7 +117,8 @@ export function parseVsix(buf: Buffer): ParsedVsix {
       } catch {
         // a broken config only loses brackets/comments for that language
       }
-    const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : undefined);
+    const strs = (v: unknown) =>
+      Array.isArray(v) ? v.filter((x) => typeof x === 'string') : undefined;
     languages.push({
       id: l.id,
       extensions: strs(l.extensions),
@@ -138,7 +135,10 @@ export function parseVsix(buf: Buffer): ParsedVsix {
     if (!s.path) continue;
     try {
       const data = json<Record<string, unknown>>(s.path);
-      for (const lang of (s.language ?? '').split(',').map((x) => x.trim()).filter(Boolean))
+      for (const lang of (s.language ?? '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean))
         snippets.push({ language: lang, snippets: data });
     } catch {
       // unreadable snippet file: skipped

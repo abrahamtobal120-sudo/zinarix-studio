@@ -43,10 +43,14 @@ function indexOf(buf: Uint8Array, pat: readonly number[], from = 0, to = buf.len
   return -1;
 }
 
-const u32 = (b: Uint8Array, i: number) => ((b[i]! << 24) | (b[i + 1]! << 16) | (b[i + 2]! << 8) | b[i + 3]!) >>> 0;
+const u32 = (b: Uint8Array, i: number) =>
+  ((b[i]! << 24) | (b[i + 1]! << 16) | (b[i + 2]! << 8) | b[i + 3]!) >>> 0;
 
 /** A whole PNG starting at "at" (signature … IEND), or null when it is cut or broken. */
-export function pngAt(buf: Uint8Array, at: number): { png: Uint8Array; width: number; height: number } | null {
+export function pngAt(
+  buf: Uint8Array,
+  at: number,
+): { png: Uint8Array; width: number; height: number } | null {
   if (indexOf(buf, PNG_SIG, at, at + 8) !== at) return null;
   let p = at + 8;
   let width = 0;
@@ -119,7 +123,18 @@ export function sketchupYear(path: string): number | null {
 export const SKETCHUP_UNITS = ['mm', 'cm', 'm', 'in', 'ft'] as const;
 export type SketchupUnits = (typeof SKETCHUP_UNITS)[number];
 export const SKETCHUP_VIEWS = ['iso', 'top', 'bottom', 'front', 'back', 'left', 'right'] as const;
-export const SKETCHUP_EXPORTS = ['dae', 'obj', 'stl', 'fbx', 'dwg', 'dxf', '3ds', 'kmz', 'png', 'jpg'] as const;
+export const SKETCHUP_EXPORTS = [
+  'dae',
+  'obj',
+  'stl',
+  'fbx',
+  'dwg',
+  'dxf',
+  '3ds',
+  'kmz',
+  'png',
+  'jpg',
+] as const;
 /** What the panel's 3D preview can show (exported by SketchUp). */
 export const SKETCHUP_PREVIEWABLE = /\.(stl|obj|dae)$/i;
 export const SKETCHUP_OP_NAMES = [
@@ -150,19 +165,35 @@ const MAX_OPS = 100;
 const MAX_LEN = 1e6;
 
 /** Absolute path of a file the op reads or writes (throws when it is not allowed). */
-export type SketchupPathResolver = (p: string, why: 'component' | 'texture' | 'save' | 'export' | 'open') => string;
+export type SketchupPathResolver = (
+  p: string,
+  why: 'component' | 'texture' | 'save' | 'export' | 'open',
+) => string;
 
 function err(i: number, op: string, msg: string): never {
   throw new Error(`op #${i + 1} (${op}): ${msg}`);
 }
 
-function num(v: unknown, i: number, op: string, key: string, min = -MAX_LEN, max = MAX_LEN): number {
+function num(
+  v: unknown,
+  i: number,
+  op: string,
+  key: string,
+  min = -MAX_LEN,
+  max = MAX_LEN,
+): number {
   if (typeof v !== 'number' || !Number.isFinite(v)) err(i, op, `"${key}" must be a number`);
   if (v < min || v > max) err(i, op, `"${key}" must be between ${min} and ${max}`);
   return v;
 }
 
-function vec3(v: unknown, i: number, op: string, key: string, max = MAX_LEN): [number, number, number] {
+function vec3(
+  v: unknown,
+  i: number,
+  op: string,
+  key: string,
+  max = MAX_LEN,
+): [number, number, number] {
   if (!Array.isArray(v) || v.length !== 3) err(i, op, `"${key}" must be [x, y, z]`);
   return v.map((n, k) => num(n, i, op, `${key}[${k}]`, -max, max)) as [number, number, number];
 }
@@ -187,10 +218,12 @@ export function validateSketchupOps(raw: unknown, resolve: SketchupPathResolver)
     let op = String(a.op ?? '');
     if (op === 'set_layer' || op === 'set_tag') op = 'tag';
     if (op === 'face') op = 'add_face';
-    if (!(SKETCHUP_OP_NAMES as readonly string[]).includes(op)) err(i, op || '?', `unknown op; use ${SKETCHUP_OP_NAMES.join(', ')}`);
+    if (!(SKETCHUP_OP_NAMES as readonly string[]).includes(op))
+      err(i, op || '?', `unknown op; use ${SKETCHUP_OP_NAMES.join(', ')}`);
     const out: SketchupOp = { op: op as SketchupOpName };
     if (a.units !== undefined) {
-      if (!(SKETCHUP_UNITS as readonly string[]).includes(String(a.units))) err(i, op, `"units" must be ${SKETCHUP_UNITS.join('|')}`);
+      if (!(SKETCHUP_UNITS as readonly string[]).includes(String(a.units)))
+        err(i, op, `"units" must be ${SKETCHUP_UNITS.join('|')}`);
       out.units = a.units as SketchupUnits;
     }
     const opt = (key: string, f: (v: unknown) => unknown) => {
@@ -227,7 +260,8 @@ export function validateSketchupOps(raw: unknown, resolve: SketchupPathResolver)
       case 'add_face': {
         named();
         const pts = a.points;
-        if (!Array.isArray(pts) || pts.length < 3 || pts.length > 500) err(i, op, '"points" must be 3 to 500 [x, y, z] points');
+        if (!Array.isArray(pts) || pts.length < 3 || pts.length > 500)
+          err(i, op, '"points" must be 3 to 500 [x, y, z] points');
         out.points = pts.map((p, k) => vec3(p, i, op, `points[${k}]`));
         break;
       }
@@ -247,7 +281,8 @@ export function validateSketchupOps(raw: unknown, resolve: SketchupPathResolver)
         target();
         opt('to', (v) => vec3(v, i, op, 'to'));
         opt('by', (v) => vec3(v, i, op, 'by'));
-        if (!out.to === !out.by) err(i, op, 'give "to" (new corner position) or "by" (offset), not both');
+        if (!out.to === !out.by)
+          err(i, op, 'give "to" (new corner position) or "by" (offset), not both');
         break;
       case 'rotate':
         target();
@@ -260,13 +295,17 @@ export function validateSketchupOps(raw: unknown, resolve: SketchupPathResolver)
         break;
       case 'scale':
         target();
-        out.factor = Array.isArray(a.factor) ? vec3(a.factor, i, op, 'factor', 1e4) : num(a.factor, i, op, 'factor', -1e4, 1e4);
-        if ((Array.isArray(out.factor) ? out.factor : [out.factor]).some((f) => f === 0)) err(i, op, '"factor" cannot be 0');
+        out.factor = Array.isArray(a.factor)
+          ? vec3(a.factor, i, op, 'factor', 1e4)
+          : num(a.factor, i, op, 'factor', -1e4, 1e4);
+        if ((Array.isArray(out.factor) ? out.factor : [out.factor]).some((f) => f === 0))
+          err(i, op, '"factor" cannot be 0');
         opt('about', (v) => vec3(v, i, op, 'about'));
         break;
       case 'group': {
         const ts = a.targets;
-        if (!Array.isArray(ts) || !ts.length || ts.length > 200) err(i, op, '"targets" must be 1 to 200 names');
+        if (!Array.isArray(ts) || !ts.length || ts.length > 200)
+          err(i, op, '"targets" must be 1 to 200 names');
         out.targets = ts.map((t, k) => label(t, i, op, `targets[${k}]`));
         out.name = label(a.name, i, op, 'name');
         break;
@@ -282,8 +321,10 @@ export function validateSketchupOps(raw: unknown, resolve: SketchupPathResolver)
           return v.toLowerCase();
         });
         opt('alpha', (v) => num(v, i, op, 'alpha', 0, 1));
-        if (a.texture !== undefined) out.texture = pathOf('texture', 'texture', /\.(png|jpe?g|bmp|tiff?|tga)$/i);
-        if (!out.color && !out.texture && !out.name) err(i, op, 'give "color", "texture" or "name"');
+        if (a.texture !== undefined)
+          out.texture = pathOf('texture', 'texture', /\.(png|jpe?g|bmp|tiff?|tga)$/i);
+        if (!out.color && !out.texture && !out.name)
+          err(i, op, 'give "color", "texture" or "name"');
         break;
       case 'tag':
         target();
@@ -305,7 +346,8 @@ export function validateSketchupOps(raw: unknown, resolve: SketchupPathResolver)
         break;
       case 'view': {
         const v = String(a.preset ?? a.view ?? 'iso');
-        if (!(SKETCHUP_VIEWS as readonly string[]).includes(v)) err(i, op, `"preset" must be ${SKETCHUP_VIEWS.join('|')}`);
+        if (!(SKETCHUP_VIEWS as readonly string[]).includes(v))
+          err(i, op, `"preset" must be ${SKETCHUP_VIEWS.join('|')}`);
         out.preset = v;
         opt('perspective', (x) => x === true);
         out.zoom_extents = a.zoom_extents !== false;
@@ -330,7 +372,9 @@ export function validateSketchupOps(raw: unknown, resolve: SketchupPathResolver)
 
 /** Files the ops write. */
 export function sketchupWrites(ops: SketchupOp[]): string[] {
-  return ops.filter((o) => (o.op === 'export' || o.op === 'save') && typeof o.path === 'string').map((o) => o.path as string);
+  return ops
+    .filter((o) => (o.op === 'export' || o.op === 'save') && typeof o.path === 'string')
+    .map((o) => o.path as string);
 }
 
 const OP_ES: Record<SketchupOpName, string> = {

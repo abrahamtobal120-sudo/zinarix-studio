@@ -19,11 +19,56 @@ export interface Palette {
 }
 
 export const PALETTES: Palette[] = [
-  { id: 'ocean', name: { es: 'Océano', en: 'Ocean' }, bg1: '#0f4c81', bg2: '#1aa6b7', accent: '#ffd166', text: '#ffffff', soft: '#d6f1f5', light: '#ffffff' },
-  { id: 'sunset', name: { es: 'Atardecer', en: 'Sunset' }, bg1: '#ff6b6b', bg2: '#feca57', accent: '#2d3436', text: '#ffffff', soft: '#fff3e0', light: '#ffffff' },
-  { id: 'forest', name: { es: 'Bosque', en: 'Forest' }, bg1: '#1b4332', bg2: '#40916c', accent: '#d8f3dc', text: '#ffffff', soft: '#b7e4c7', light: '#d8f3dc' },
-  { id: 'night', name: { es: 'Noche', en: 'Night' }, bg1: '#14102b', bg2: '#4b2c82', accent: '#ff4fa3', text: '#ffffff', soft: '#cfc6f5', light: '#8f7bff' },
-  { id: 'mono', name: { es: 'Minimal', en: 'Minimal' }, bg1: '#f7f7f5', bg2: '#e9e9e4', accent: '#111111', text: '#111111', soft: '#555555', light: '#111111' },
+  {
+    id: 'ocean',
+    name: { es: 'Océano', en: 'Ocean' },
+    bg1: '#0f4c81',
+    bg2: '#1aa6b7',
+    accent: '#ffd166',
+    text: '#ffffff',
+    soft: '#d6f1f5',
+    light: '#ffffff',
+  },
+  {
+    id: 'sunset',
+    name: { es: 'Atardecer', en: 'Sunset' },
+    bg1: '#ff6b6b',
+    bg2: '#feca57',
+    accent: '#2d3436',
+    text: '#ffffff',
+    soft: '#fff3e0',
+    light: '#ffffff',
+  },
+  {
+    id: 'forest',
+    name: { es: 'Bosque', en: 'Forest' },
+    bg1: '#1b4332',
+    bg2: '#40916c',
+    accent: '#d8f3dc',
+    text: '#ffffff',
+    soft: '#b7e4c7',
+    light: '#d8f3dc',
+  },
+  {
+    id: 'night',
+    name: { es: 'Noche', en: 'Night' },
+    bg1: '#14102b',
+    bg2: '#4b2c82',
+    accent: '#ff4fa3',
+    text: '#ffffff',
+    soft: '#cfc6f5',
+    light: '#8f7bff',
+  },
+  {
+    id: 'mono',
+    name: { es: 'Minimal', en: 'Minimal' },
+    bg1: '#f7f7f5',
+    bg2: '#e9e9e4',
+    accent: '#111111',
+    text: '#111111',
+    soft: '#555555',
+    light: '#111111',
+  },
 ];
 
 export interface TemplateText {
@@ -74,7 +119,9 @@ function text(
     lines.length === 1
       ? xmlEscape(content)
       : lines
-          .map((l, i) => `<tspan x="${n(x)}" dy="${i === 0 ? 0 : '1.15em'}">${xmlEscape(l)}</tspan>`)
+          .map(
+            (l, i) => `<tspan x="${n(x)}" dy="${i === 0 ? 0 : '1.15em'}">${xmlEscape(l)}</tspan>`,
+          )
           .join('');
   return (
     `<text data-name="${xmlEscape(name)}" x="${n(x)}" y="${n(y)}" font-family="${FONT}" font-size="${n(size)}"` +
@@ -161,7 +208,10 @@ export const TEMPLATES: DesignTemplate[] = [
         `<rect data-name="Foto" x="${n(w * 0.56)}" y="${n(h * 0.08)}" width="${n(w * 0.4)}" height="${n(h * 0.84)}" rx="24" fill="${p.light}" opacity="0.25"/>`,
         `<text data-name="Título" x="${n(w * 0.05)}" y="${n(h * 0.42)}" font-family="Impact, ${FONT}" font-size="${n(h * 0.2)}" font-weight="900" fill="${p.text}" stroke="${p.accent === p.text ? '#000000' : '#000000'}" stroke-width="8" paint-order="stroke" text-anchor="start">${t.title
           .split('\n')
-          .map((l, i) => `<tspan x="${n(w * 0.05)}" dy="${i === 0 ? 0 : '1.05em'}">${xmlEscape(l)}</tspan>`)
+          .map(
+            (l, i) =>
+              `<tspan x="${n(w * 0.05)}" dy="${i === 0 ? 0 : '1.05em'}">${xmlEscape(l)}</tspan>`,
+          )
           .join('')}</text>`,
         `<rect data-name="Etiqueta" x="${n(w * 0.05)}" y="${n(h * 0.78)}" width="${n(w * 0.16)}" height="${n(h * 0.11)}" rx="10" fill="${p.accent}"/>`,
         text('Episodio', w * 0.13, h * 0.857, h * 0.065, p.bg1, t.subtitle, { weight: 800 }),
@@ -181,8 +231,19 @@ export const TEMPLATES: DesignTemplate[] = [
         `<rect data-name="Fondo" width="${w}" height="${h}" fill="${p.light === '#ffffff' ? '#ffffff' : p.soft}"/>`,
         `<rect data-name="Banda" width="${n(w * 0.34)}" height="${h}" fill="url(#bg)"/>`,
         `<circle data-name="Logo" cx="${n(w * 0.17)}" cy="${n(h / 2)}" r="${n(h * 0.17)}" fill="none" stroke="${p.text === '#111111' ? '#111111' : '#ffffff'}" stroke-width="10"/>`,
-        text('Inicial', w * 0.17, h * 0.565, h * 0.17, p.text === '#111111' ? '#111111' : '#ffffff', t.title.slice(0, 1).toUpperCase(), { weight: 800 }),
-        text('Nombre', w * 0.41, h * 0.42, h * 0.1, '#1f2933', t.title, { weight: 800, anchor: 'start' }),
+        text(
+          'Inicial',
+          w * 0.17,
+          h * 0.565,
+          h * 0.17,
+          p.text === '#111111' ? '#111111' : '#ffffff',
+          t.title.slice(0, 1).toUpperCase(),
+          { weight: 800 },
+        ),
+        text('Nombre', w * 0.41, h * 0.42, h * 0.1, '#1f2933', t.title, {
+          weight: 800,
+          anchor: 'start',
+        }),
         `<rect data-name="Línea" x="${n(w * 0.41)}" y="${n(h * 0.48)}" width="${n(w * 0.12)}" height="6" fill="${p.bg1}"/>`,
         text('Datos', w * 0.41, h * 0.6, h * 0.045, '#52606d', t.subtitle, { anchor: 'start' }),
       ]),
@@ -202,7 +263,9 @@ export const TEMPLATES: DesignTemplate[] = [
           `<circle cx="${n(w / 2)}" cy="${n(h * 0.36)}" r="${n(w * 0.2)}" fill="url(#mark)"/>` +
           `<path d="M ${n(w * 0.41)} ${n(h * 0.44)} L ${n(w / 2)} ${n(h * 0.26)} L ${n(w * 0.59)} ${n(h * 0.44)} Z" fill="#ffffff"/>` +
           `</g>`,
-        text('Nombre', w / 2, h * 0.72, w * 0.1, p.bg1 === '#f7f7f5' ? '#111111' : p.bg1, t.title, { weight: 800 }),
+        text('Nombre', w / 2, h * 0.72, w * 0.1, p.bg1 === '#f7f7f5' ? '#111111' : p.bg1, t.title, {
+          weight: 800,
+        }),
         text('Lema', w / 2, h * 0.8, w * 0.034, '#6b7280', t.subtitle, { weight: 600, spacing: 6 }),
       ]),
   },
@@ -212,7 +275,10 @@ export const TEMPLATES: DesignTemplate[] = [
     width: 1240,
     height: 1754,
     text: {
-      es: { title: 'FESTIVAL\nDE VERANO', subtitle: '20 de julio · Parque Central · Entrada libre' },
+      es: {
+        title: 'FESTIVAL\nDE VERANO',
+        subtitle: '20 de julio · Parque Central · Entrada libre',
+      },
       en: { title: 'SUMMER\nFESTIVAL', subtitle: 'July 20 · Central Park · Free entry' },
     },
     build: (p, t, w, h) =>
@@ -237,7 +303,10 @@ export const TEMPLATES: DesignTemplate[] = [
       svgDoc(w, h, grad('bg', p, false), [
         `<rect data-name="Fondo" width="${w}" height="${h}" fill="url(#bg)"/>`,
         `<rect data-name="Barra" x="${n(w * 0.08)}" y="${n(h * 0.36)}" width="12" height="${n(h * 0.28)}" fill="${p.accent}"/>`,
-        text('Título', w * 0.11, h * 0.47, h * 0.09, p.text, t.title, { weight: 800, anchor: 'start' }),
+        text('Título', w * 0.11, h * 0.47, h * 0.09, p.text, t.title, {
+          weight: 800,
+          anchor: 'start',
+        }),
         text('Subtítulo', w * 0.11, h * 0.59, h * 0.04, p.soft, t.subtitle, { anchor: 'start' }),
       ]),
   },
@@ -264,8 +333,14 @@ export const TEMPLATES: DesignTemplate[] = [
     width: 1500,
     height: 2100,
     text: {
-      es: { title: 'Sofía\ncumple 15', subtitle: 'Sábado 14 de marzo · 19:00 h\nSalón Las Flores\nConfirma tu asistencia' },
-      en: { title: "Sofia's\n15th birthday", subtitle: 'Saturday, March 14 · 7 pm\nLas Flores Hall\nPlease RSVP' },
+      es: {
+        title: 'Sofía\ncumple 15',
+        subtitle: 'Sábado 14 de marzo · 19:00 h\nSalón Las Flores\nConfirma tu asistencia',
+      },
+      en: {
+        title: "Sofia's\n15th birthday",
+        subtitle: 'Saturday, March 14 · 7 pm\nLas Flores Hall\nPlease RSVP',
+      },
     },
     build: (p, t, w, h) =>
       svgDoc(w, h, grad('bg', p), [
@@ -274,7 +349,15 @@ export const TEMPLATES: DesignTemplate[] = [
         `<rect data-name="Marco interior" x="${n(w * 0.085)}" y="${n(h * 0.063)}" width="${n(w * 0.83)}" height="${n(h * 0.874)}" fill="none" stroke="${p.bg1}" stroke-width="${n(w * 0.002)}" opacity="0.6"/>`,
         `<circle data-name="Adorno" cx="${n(w / 2)}" cy="${n(h * 0.2)}" r="${n(w * 0.12)}" fill="url(#bg)"/>`,
         `<path data-name="Estrella" d="${shapePath('star', { x: w * 0.42, y: h * 0.143, w: w * 0.16, h: w * 0.16 })}" fill="${p.light === '#111111' ? '#ffffff' : p.light}"/>`,
-        text('Título', w / 2, h * 0.43, w * 0.11, p.bg1 === '#f7f7f5' ? '#111111' : p.bg1, t.title, { weight: 800 }),
+        text(
+          'Título',
+          w / 2,
+          h * 0.43,
+          w * 0.11,
+          p.bg1 === '#f7f7f5' ? '#111111' : p.bg1,
+          t.title,
+          { weight: 800 },
+        ),
         `<rect data-name="Línea" x="${n(w * 0.4)}" y="${n(h * 0.6)}" width="${n(w * 0.2)}" height="${n(h * 0.003)}" fill="${p.bg2}"/>`,
         text('Detalles', w / 2, h * 0.69, w * 0.04, '#374151', t.subtitle, { weight: 500 }),
       ]),
@@ -287,18 +370,23 @@ export const TEMPLATES: DesignTemplate[] = [
     text: {
       es: {
         title: 'MENÚ',
-        subtitle: 'Tacos al pastor — $65\nEnchiladas verdes — $90\nPozole rojo — $110\nAgua de horchata — $35\nFlan napolitano — $45',
+        subtitle:
+          'Tacos al pastor — $65\nEnchiladas verdes — $90\nPozole rojo — $110\nAgua de horchata — $35\nFlan napolitano — $45',
       },
       en: {
         title: 'MENU',
-        subtitle: 'Pastor tacos — $6.50\nGreen enchiladas — $9\nRed pozole — $11\nHorchata — $3.50\nFlan — $4.50',
+        subtitle:
+          'Pastor tacos — $6.50\nGreen enchiladas — $9\nRed pozole — $11\nHorchata — $3.50\nFlan — $4.50',
       },
     },
     build: (p, t, w, h) =>
       svgDoc(w, h, grad('bg', p), [
         `<rect data-name="Fondo" width="${w}" height="${h}" fill="#fffdf8"/>`,
         `<rect data-name="Encabezado" width="${w}" height="${n(h * 0.24)}" fill="url(#bg)"/>`,
-        text('Título', w / 2, h * 0.15, w * 0.12, p.text, t.title, { weight: 800, spacing: w * 0.012 }),
+        text('Título', w / 2, h * 0.15, w * 0.12, p.text, t.title, {
+          weight: 800,
+          spacing: w * 0.012,
+        }),
         `<rect data-name="Línea" x="${n(w * 0.12)}" y="${n(h * 0.3)}" width="${n(w * 0.76)}" height="3" fill="${p.bg1}" opacity="0.5"/>`,
         text('Platillos', w / 2, h * 0.38, w * 0.045, '#1f2933', t.subtitle, { weight: 500 }),
         `<rect data-name="Pie" y="${n(h * 0.94)}" width="${w}" height="${n(h * 0.06)}" fill="${p.bg1}"/>`,
@@ -310,15 +398,29 @@ export const TEMPLATES: DesignTemplate[] = [
     width: 1754,
     height: 1240,
     text: {
-      es: { title: 'Reconocimiento', subtitle: 'Otorgado a Ana López\npor su excelente desempeño · 2026' },
-      en: { title: 'Certificate', subtitle: 'Awarded to Ana López\nfor outstanding performance · 2026' },
+      es: {
+        title: 'Reconocimiento',
+        subtitle: 'Otorgado a Ana López\npor su excelente desempeño · 2026',
+      },
+      en: {
+        title: 'Certificate',
+        subtitle: 'Awarded to Ana López\nfor outstanding performance · 2026',
+      },
     },
     build: (p, t, w, h) =>
       svgDoc(w, h, grad('bg', p, false), [
         `<rect data-name="Fondo" width="${w}" height="${h}" fill="#ffffff"/>`,
         `<rect data-name="Borde" x="${n(w * 0.03)}" y="${n(h * 0.04)}" width="${n(w * 0.94)}" height="${n(h * 0.92)}" fill="none" stroke="url(#bg)" stroke-width="${n(w * 0.014)}"/>`,
         `<rect data-name="Borde fino" x="${n(w * 0.055)}" y="${n(h * 0.077)}" width="${n(w * 0.89)}" height="${n(h * 0.846)}" fill="none" stroke="${p.bg1}" stroke-width="2" opacity="0.5"/>`,
-        text('Título', w / 2, h * 0.32, h * 0.12, p.bg1 === '#f7f7f5' ? '#111111' : p.bg1, t.title, { weight: 800 }),
+        text(
+          'Título',
+          w / 2,
+          h * 0.32,
+          h * 0.12,
+          p.bg1 === '#f7f7f5' ? '#111111' : p.bg1,
+          t.title,
+          { weight: 800 },
+        ),
         text('Texto', w / 2, h * 0.5, h * 0.045, '#374151', t.subtitle, { weight: 500 }),
         `<rect data-name="Firma" x="${n(w * 0.38)}" y="${n(h * 0.78)}" width="${n(w * 0.24)}" height="2" fill="#374151"/>`,
         text('Firma (texto)', w / 2, h * 0.83, h * 0.03, '#6b7280', 'Firma', { weight: 500 }),
@@ -338,9 +440,25 @@ export const TEMPLATES: DesignTemplate[] = [
       svgDoc(w, h, grad('bg', p, false), [
         `<rect data-name="Fondo" width="${w}" height="${h}" fill="url(#bg)"/>`,
         `<path data-name="Estallido" d="${burst(w / 2, h * 0.45, w * 0.36, w * 0.3, 16)}" fill="${p.accent}"/>`,
-        text('Descuento', w / 2, h * 0.52, w * 0.2, p.accent === '#111111' || p.accent === '#2d3436' ? '#ffffff' : p.bg1, t.title, { weight: 900 }),
+        text(
+          'Descuento',
+          w / 2,
+          h * 0.52,
+          w * 0.2,
+          p.accent === '#111111' || p.accent === '#2d3436' ? '#ffffff' : p.bg1,
+          t.title,
+          { weight: 900 },
+        ),
         `<rect data-name="Cinta" x="0" y="${n(h * 0.8)}" width="${w}" height="${n(h * 0.1)}" fill="${p.text}" opacity="0.92"/>`,
-        text('Llamada', w / 2, h * 0.867, w * 0.045, p.bg1 === '#f7f7f5' ? '#ffffff' : p.bg1, t.subtitle, { weight: 800, spacing: 4 }),
+        text(
+          'Llamada',
+          w / 2,
+          h * 0.867,
+          w * 0.045,
+          p.bg1 === '#f7f7f5' ? '#ffffff' : p.bg1,
+          t.subtitle,
+          { weight: 800, spacing: 4 },
+        ),
       ]),
   },
   {
@@ -369,14 +487,24 @@ export interface NewDesign {
 /** The SVG text of a new design from a template (throws on an unknown template). */
 export function buildTemplate(o: NewDesign): string {
   const tpl = TEMPLATES.find((x) => x.id === o.template);
-  if (!tpl) throw new Error(`Unknown template "${o.template}". Use one of: ${TEMPLATES.map((x) => x.id).join(', ')}.`);
+  if (!tpl)
+    throw new Error(
+      `Unknown template "${o.template}". Use one of: ${TEMPLATES.map((x) => x.id).join(', ')}.`,
+    );
   const pal = PALETTES.find((x) => x.id === o.palette) ?? PALETTES[0]!;
   const side = (v: number | undefined, d: number): number =>
-    typeof v === 'number' && Number.isFinite(v) ? Math.min(MAX_DESIGN_SIDE, Math.max(16, Math.round(v))) : d;
+    typeof v === 'number' && Number.isFinite(v)
+      ? Math.min(MAX_DESIGN_SIDE, Math.max(16, Math.round(v)))
+      : d;
   const w = side(o.width, tpl.width);
   const h = side(o.height, tpl.height);
   const def = tpl.text[o.lang ?? 'es'];
-  return tpl.build(pal, { title: o.title ?? def.title, subtitle: o.subtitle ?? def.subtitle }, w, h);
+  return tpl.build(
+    pal,
+    { title: o.title ?? def.title, subtitle: o.subtitle ?? def.subtitle },
+    w,
+    h,
+  );
 }
 
 /** "Post de Instagram" -> "post-de-instagram" (file names). */
@@ -418,7 +546,10 @@ export function svgSize(svg: string): { width: number; height: number } {
   const tag = /<svg\b[^>]*>/i.exec(svg)?.[0];
   if (!tag) throw new Error('This is not an SVG file (no <svg> element).');
   const attr = (k: string): string | undefined =>
-    new RegExp(`\\s${k}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i').exec(tag)?.slice(1).find((x) => x !== undefined);
+    new RegExp(`\\s${k}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i')
+      .exec(tag)
+      ?.slice(1)
+      .find((x) => x !== undefined);
   const vb = attr('viewBox')
     ?.trim()
     .split(/[\s,]+/)
@@ -502,7 +633,12 @@ const r4 = (v: number): number => {
 /** "matrix(…)" for the transform attribute; '' for the identity. */
 export function matString(m: Mat): string {
   if (m.every((v, i) => Math.abs(v - IDENTITY[i]!) < 1e-9)) return '';
-  if (Math.abs(m[0] - 1) < 1e-9 && Math.abs(m[3] - 1) < 1e-9 && Math.abs(m[1]) < 1e-9 && Math.abs(m[2]) < 1e-9)
+  if (
+    Math.abs(m[0] - 1) < 1e-9 &&
+    Math.abs(m[3] - 1) < 1e-9 &&
+    Math.abs(m[1]) < 1e-9 &&
+    Math.abs(m[2]) < 1e-9
+  )
     return `translate(${r4(m[4])} ${r4(m[5])})`;
   return `matrix(${m.map(r4).join(' ')})`;
 }
@@ -533,7 +669,12 @@ export function pointsBox(pts: Pt[]): Box {
 
 export function unionBox(boxes: Box[]): Box | null {
   if (!boxes.length) return null;
-  return pointsBox(boxes.flatMap((b) => [{ x: b.x, y: b.y }, { x: b.x + b.w, y: b.y + b.h }]));
+  return pointsBox(
+    boxes.flatMap((b) => [
+      { x: b.x, y: b.y },
+      { x: b.x + b.w, y: b.y + b.h },
+    ]),
+  );
 }
 
 export function boxesTouch(a: Box, b: Box): boolean {
@@ -548,7 +689,14 @@ export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
  * New box when a handle of `b` is dragged to `p` (all in the same space). keepRatio keeps
  * the proportion (corners), fromCenter grows both sides. Sizes never go below `min`.
  */
-export function resizeBox(b: Box, h: Handle, p: Pt, keepRatio: boolean, fromCenter: boolean, min = 1): Box {
+export function resizeBox(
+  b: Box,
+  h: Handle,
+  p: Pt,
+  keepRatio: boolean,
+  fromCenter: boolean,
+  min = 1,
+): Box {
   let x0 = b.x;
   let y0 = b.y;
   let x1 = b.x + b.w;
@@ -696,7 +844,8 @@ export function penPath(pts: PenPoint[], closed: boolean): string {
   const seg = (a: PenPoint, b: PenPoint): string => {
     const aOut = a.hx !== undefined && a.hy !== undefined ? { x: a.hx, y: a.hy } : null;
     // Incoming handle of b: the mirror of its outgoing one.
-    const bIn = b.hx !== undefined && b.hy !== undefined ? { x: 2 * b.x - b.hx, y: 2 * b.y - b.hy } : null;
+    const bIn =
+      b.hx !== undefined && b.hy !== undefined ? { x: 2 * b.x - b.hx, y: 2 * b.y - b.hy } : null;
     if (!aOut && !bIn) return `L ${f(b.x)} ${f(b.y)}`;
     const c1 = aOut ?? a;
     const c2 = bIn ?? b;
@@ -787,7 +936,8 @@ export function toHexColor(v: string | null | undefined): string | null {
   if (/^#[0-9a-f]{6}$/.test(s)) return s;
   if (/^#[0-9a-f]{3}$/.test(s)) return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
   const m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(s);
-  if (m) return `#${[m[1], m[2], m[3]].map((x) => Math.min(255, Number(x)).toString(16).padStart(2, '0')).join('')}`;
+  if (m)
+    return `#${[m[1], m[2], m[3]].map((x) => Math.min(255, Number(x)).toString(16).padStart(2, '0')).join('')}`;
   const named: Record<string, string> = {
     black: '#000000',
     white: '#ffffff',
@@ -810,7 +960,8 @@ export function toHexColor(v: string | null | undefined): string | null {
 export function isTypingTarget(t: EventTarget | null, mod: boolean): boolean {
   if (!(t instanceof Element)) return false;
   if (t.closest('textarea, [contenteditable]')) return true;
-  if (t instanceof HTMLInputElement) return !['range', 'checkbox', 'radio', 'color', 'button'].includes(t.type) || !mod;
+  if (t instanceof HTMLInputElement)
+    return !['range', 'checkbox', 'radio', 'color', 'button'].includes(t.type) || !mod;
   if (t instanceof HTMLSelectElement) return !mod;
   return false;
 }
@@ -828,7 +979,11 @@ export interface WrappedLine {
  * `measure` (the renderer measures with the real font). A word wider than the box is cut
  * by letters. width <= 0 keeps the lines as they are.
  */
-export function wrapText(value: string, width: number, measure: (s: string) => number): WrappedLine[] {
+export function wrapText(
+  value: string,
+  width: number,
+  measure: (s: string) => number,
+): WrappedLine[] {
   const paras = value.replace(/\r/g, '').split('\n');
   const out: WrappedLine[] = [];
   for (const p of paras) {

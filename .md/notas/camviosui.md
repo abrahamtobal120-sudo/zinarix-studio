@@ -10,6 +10,7 @@ Método: código (la app no se ejecutó; ver "Lo que no se pudo revisar")
 ## Resumen
 
 La interfaz tiene una base sólida en seguridad:
+
 - Markdown no usa `innerHTML` y solo enlaza https.
 - El correo se muestra en un iframe sin scripts.
 - El navegador está aislado.
@@ -18,6 +19,7 @@ La interfaz tiene una base sólida en seguridad:
 - Las dos lenguas tienen exactamente las mismas claves (1313).
 
 Los problemas se concentran en cuatro áreas:
+
 1. **Accesibilidad de teclado.** Ningún modal propio tiene `role="dialog"`, Esc, foco atrapado ni devolución del foco. Muchas acciones solo aparecen con `:hover` y las pestañas no se pueden enfocar.
 2. **Temas.** Los 6 temas personalizados no definen `--status-fg`, `--brand`, `--danger`, etc., así que la barra de estado queda a 1,7:1 de contraste. El anillo de foco no llega a 3:1 en ningún tema.
 3. **Confirmaciones.** Hay acciones peligrosas sin confirmación o con detección débil: SQL multi-sentencia en Supabase, BigQuery DML, permitir el control desde WhatsApp a otra persona y borrar proveedores o memorias.
@@ -118,14 +120,14 @@ Los problemas se concentran en cuatro áreas:
   - Dónde: `themes.ts:21-214`. La base está en `styles.css:6667` (`#9a9aa4`) y `:6687` (`#5b5b65`), y se usa en `styles.css:1603`.
   - Problema: todos los temas cambian `--status`, pero ninguno cambia `--status-fg`. Contrastes resultantes:
 
-    | Tema | Contraste |
-    |---|---|
-    | Medianoche | 1,66:1 |
-    | Drácula | 1,69:1 |
-    | Monokai | 1,76:1 |
-    | Solarized | 2,09:1 |
-    | GitHub claro | 2,18:1 |
-    | Nord | 2,65:1 |
+    | Tema         | Contraste |
+    | ------------ | --------- |
+    | Medianoche   | 1,66:1    |
+    | Drácula      | 1,69:1    |
+    | Monokai      | 1,76:1    |
+    | Solarized    | 2,09:1    |
+    | GitHub claro | 2,18:1    |
+    | Nord         | 2,65:1    |
 
   - Cambio propuesto: añadir `'--status-fg': '#ffffff'` (o `#f8f8f2` en Monokai) en cada tema.
   - Esfuerzo: pequeño.
@@ -180,7 +182,13 @@ Los problemas se concentran en cuatro áreas:
     function ModalShell({ labelledBy, onClose, children }) {
       // guarda document.activeElement al montar, foco al primer control,
       // Tab/Shift+Tab atrapados, Esc → onClose, restaura el foco al desmontar
-      return <div className="modal-backdrop"><div role="dialog" aria-modal="true" aria-labelledby={labelledBy}>{children}</div></div>;
+      return (
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
+            {children}
+          </div>
+        </div>
+      );
     }
     ```
   - Esfuerzo: medio.
@@ -193,7 +201,12 @@ Los problemas se concentran en cuatro áreas:
     - El `box-shadow` de `button.primary` gana al de `:focus-visible` porque tiene la misma especificidad y va después.
   - Cambio propuesto:
     ```css
-    button:focus-visible,[role='button']:focus-visible,[role='tab']:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+    button:focus-visible,
+    [role='button']:focus-visible,
+    [role='tab']:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 1px;
+    }
     ```
   - Esfuerzo: pequeño.
 
@@ -204,8 +217,15 @@ Los problemas se concentran en cuatro áreas:
   - Problema: con `display:none` no se llega con Tab. Sin `:focus-within`, Copiar, Regenerar, cerrar pestaña, borrar del historial, preparar, descartar o borrar rama quedan fuera del alcance del teclado.
   - Cambio propuesto:
     ```css
-    .git-row:focus-within .git-row-actions, .ch-item:focus-within .ch-actions { display:flex; }
-    .turn:focus-within .turn-actions, .chat-tab:focus-within .chat-tab-x, .chat-list-folder:focus-within button { opacity:1; }
+    .git-row:focus-within .git-row-actions,
+    .ch-item:focus-within .ch-actions {
+      display: flex;
+    }
+    .turn:focus-within .turn-actions,
+    .chat-tab:focus-within .chat-tab-x,
+    .chat-list-folder:focus-within button {
+      opacity: 1;
+    }
     ```
   - Esfuerzo: pequeño.
 
@@ -304,7 +324,15 @@ Los problemas se concentran en cuatro áreas:
   - Dónde: no existe la regla en `styles.css`. Hay 10 animaciones `infinite`: `:759`, `:1306`, `:1352`, `:2029`, `:3177`, `:3203`, `:3226`, `:5016`, `:5347` y `:7228`.
   - Cambio propuesto:
     ```css
-    @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
     ```
   - Esfuerzo: pequeño.
 
@@ -654,7 +682,10 @@ Los problemas se concentran en cuatro áreas:
   - Dónde: `components/MailPanel.tsx:103-105`. El bloqueo de imágenes remotas depende de heredar `img-src` de `index.html:7`.
   - Cambio propuesto: declararla en el `srcDoc`:
     ```html
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data: cid:; style-src 'unsafe-inline'"
+    />
     ```
     Y añadir un botón "Mostrar imágenes de este remitente".
   - Esfuerzo: pequeño.
@@ -680,50 +711,50 @@ Los problemas se concentran en cuatro áreas:
 
 ## Revisión por componente
 
-| Componente | Estado | Nº de hallazgos | Nota breve |
-|---|---|---|---|
-| App.tsx | mejorable | 6 | Error de arrastre de los separadores, re-renders globales, límites de los paneles |
-| Chrome.tsx | mejorable | 5 | La barra de actividad se desborda; faltan `aria-pressed` y atajos visibles |
-| themes.ts | mal | 3 | Faltan variables base; contraste por debajo de AA |
-| styles.css | mal | 12 | Capa de rediseño duplicada, colores fijos, sin escala, foco débil |
-| a11y.ts | bien | 0 | Correcto, pero poco usado (solo StatusBar, Welcome y Git) |
-| keys.ts / commands.ts | mejorable | 3 | Conflictos con Monaco y el terminal; Ctrl+\` en teclado ES |
-| Chat.tsx | mejorable | 10 | Pestañas sin teclado, sin `aria-live`, errores crudos, botones de envío |
-| ChatHistory.tsx | mejorable | 2 | Acciones solo con hover; botón dentro de botón |
-| Markdown.tsx | bien | 3 | Seguro; falta `danger` al ejecutar y un mensaje es incorrecto |
-| ModelPicker.tsx | mejorable | 4 | Esc parcial, columnas fijas, `aria-pressed` |
-| Plan.tsx | mejorable | 4 | Modales sin Esc; onboarding mejorable |
-| Usage.tsx | mejorable | 3 | El presupuesto se borra sin aviso; colores |
-| AccountSwitch.tsx | bien | 1 | Confirmación de cierre de sesión a confirmar |
-| ProviderLogo.tsx / Icon.tsx / icons.tsx | bien | 3 | Iconos duplicados; insignia TX repetida |
-| Editor.tsx | mejorable | 2 | Pestañas sin teclado; "sin guardar" no se anuncia |
-| Explorer.tsx | mal | 4 | Sin roles de árbol; menú sin teclado; errores silenciosos; sin virtualizar |
-| Search.tsx | mejorable | 5 | Filtros tras el tope; reemplazar sin deshacer; O(n²) |
-| SemanticSearch.tsx | mejorable | 2 | Filas no enfocables; "archivos" cuenta fragmentos |
-| QuickPick.tsx | mejorable | 1 | Sin combobox ni listbox |
-| GitPanel.tsx | mal | 5 | Acciones solo con hover; borrado forzado engañoso |
-| GitModals.tsx | mal | 4 | Sin Esc; publica todo; diff sin límite |
-| RunPanel.tsx | mejorable | 3 | Ejecuta scripts sin mostrarlos; reescaneo constante |
-| Terminal.tsx | bien | 2 | Sigue el tema; fuente fija; pestañas sin teclado |
-| WatchPanel.tsx | bien | 1 | Unidades fuera de i18n |
-| Scanner.tsx | mejorable | 3 | Cerrar no detiene el escaneo; glifos |
-| OfflineGames.tsx | mejorable | 3 | No se pausa; colores fijos; canvas sin nombre |
-| Settings.tsx | mejorable | 6 | Sin Esc; se desborda a 600 px; idioma fuera de Ajustes |
-| KnowledgeSettings.tsx | mejorable | 3 | Borra sin confirmar; la edición se pierde al perder el foco |
-| McpSettings.tsx | mejorable | 3 | Confiar en `mcp.json` con un clic |
-| SecurityCenter.tsx | mejorable | 1 | Modal no accesible |
-| SecuritySection.tsx | mal | 5 | Español fijo; error de estado; colores |
-| Modals.tsx | mejorable | 6 | Sin `role="dialog"`; borrar proveedor sin confirmación |
-| ConfirmDialog.tsx | bien | 2 | El mejor modal; falta foco en Cancelar cuando hay peligro |
-| i18n.ts / i18nLsp.ts | bien / mal | 3 | Claves completas; `i18nLsp` sin uso |
-| Browser.tsx | bien | 3 | Aislado; pestañas sin teclado; el botón de detener recarga |
-| MailPanel.tsx | mejorable | 4 | Error como "vacío"; CSP implícita; etiquetas |
-| SupabasePanel.tsx | mejorable | 5 | SQL multi-sentencia; `prompt()` roto; secretos visibles |
-| VercelPanel.tsx | mejorable | 6 | Variable vacía; secretos visibles; textos en inglés |
-| GCloudPanel.tsx | mejorable | 4 | BigQuery sin confirmar; estados en crudo |
-| WhatsApp.tsx | mal | 5 | Control ajeno sin confirmar; colores; etiquetas |
-| main/phonePage.ts | mejorable | 3 | Segura; solo en español; redibujo completo |
-| preload/preload.ts | bien | 0 | Canales tipados, sin `invoke` genérico |
+| Componente                              | Estado     | Nº de hallazgos | Nota breve                                                                        |
+| --------------------------------------- | ---------- | --------------- | --------------------------------------------------------------------------------- |
+| App.tsx                                 | mejorable  | 6               | Error de arrastre de los separadores, re-renders globales, límites de los paneles |
+| Chrome.tsx                              | mejorable  | 5               | La barra de actividad se desborda; faltan `aria-pressed` y atajos visibles        |
+| themes.ts                               | mal        | 3               | Faltan variables base; contraste por debajo de AA                                 |
+| styles.css                              | mal        | 12              | Capa de rediseño duplicada, colores fijos, sin escala, foco débil                 |
+| a11y.ts                                 | bien       | 0               | Correcto, pero poco usado (solo StatusBar, Welcome y Git)                         |
+| keys.ts / commands.ts                   | mejorable  | 3               | Conflictos con Monaco y el terminal; Ctrl+\` en teclado ES                        |
+| Chat.tsx                                | mejorable  | 10              | Pestañas sin teclado, sin `aria-live`, errores crudos, botones de envío           |
+| ChatHistory.tsx                         | mejorable  | 2               | Acciones solo con hover; botón dentro de botón                                    |
+| Markdown.tsx                            | bien       | 3               | Seguro; falta `danger` al ejecutar y un mensaje es incorrecto                     |
+| ModelPicker.tsx                         | mejorable  | 4               | Esc parcial, columnas fijas, `aria-pressed`                                       |
+| Plan.tsx                                | mejorable  | 4               | Modales sin Esc; onboarding mejorable                                             |
+| Usage.tsx                               | mejorable  | 3               | El presupuesto se borra sin aviso; colores                                        |
+| AccountSwitch.tsx                       | bien       | 1               | Confirmación de cierre de sesión a confirmar                                      |
+| ProviderLogo.tsx / Icon.tsx / icons.tsx | bien       | 3               | Iconos duplicados; insignia TX repetida                                           |
+| Editor.tsx                              | mejorable  | 2               | Pestañas sin teclado; "sin guardar" no se anuncia                                 |
+| Explorer.tsx                            | mal        | 4               | Sin roles de árbol; menú sin teclado; errores silenciosos; sin virtualizar        |
+| Search.tsx                              | mejorable  | 5               | Filtros tras el tope; reemplazar sin deshacer; O(n²)                              |
+| SemanticSearch.tsx                      | mejorable  | 2               | Filas no enfocables; "archivos" cuenta fragmentos                                 |
+| QuickPick.tsx                           | mejorable  | 1               | Sin combobox ni listbox                                                           |
+| GitPanel.tsx                            | mal        | 5               | Acciones solo con hover; borrado forzado engañoso                                 |
+| GitModals.tsx                           | mal        | 4               | Sin Esc; publica todo; diff sin límite                                            |
+| RunPanel.tsx                            | mejorable  | 3               | Ejecuta scripts sin mostrarlos; reescaneo constante                               |
+| Terminal.tsx                            | bien       | 2               | Sigue el tema; fuente fija; pestañas sin teclado                                  |
+| WatchPanel.tsx                          | bien       | 1               | Unidades fuera de i18n                                                            |
+| Scanner.tsx                             | mejorable  | 3               | Cerrar no detiene el escaneo; glifos                                              |
+| OfflineGames.tsx                        | mejorable  | 3               | No se pausa; colores fijos; canvas sin nombre                                     |
+| Settings.tsx                            | mejorable  | 6               | Sin Esc; se desborda a 600 px; idioma fuera de Ajustes                            |
+| KnowledgeSettings.tsx                   | mejorable  | 3               | Borra sin confirmar; la edición se pierde al perder el foco                       |
+| McpSettings.tsx                         | mejorable  | 3               | Confiar en `mcp.json` con un clic                                                 |
+| SecurityCenter.tsx                      | mejorable  | 1               | Modal no accesible                                                                |
+| SecuritySection.tsx                     | mal        | 5               | Español fijo; error de estado; colores                                            |
+| Modals.tsx                              | mejorable  | 6               | Sin `role="dialog"`; borrar proveedor sin confirmación                            |
+| ConfirmDialog.tsx                       | bien       | 2               | El mejor modal; falta foco en Cancelar cuando hay peligro                         |
+| i18n.ts / i18nLsp.ts                    | bien / mal | 3               | Claves completas; `i18nLsp` sin uso                                               |
+| Browser.tsx                             | bien       | 3               | Aislado; pestañas sin teclado; el botón de detener recarga                        |
+| MailPanel.tsx                           | mejorable  | 4               | Error como "vacío"; CSP implícita; etiquetas                                      |
+| SupabasePanel.tsx                       | mejorable  | 5               | SQL multi-sentencia; `prompt()` roto; secretos visibles                           |
+| VercelPanel.tsx                         | mejorable  | 6               | Variable vacía; secretos visibles; textos en inglés                               |
+| GCloudPanel.tsx                         | mejorable  | 4               | BigQuery sin confirmar; estados en crudo                                          |
+| WhatsApp.tsx                            | mal        | 5               | Control ajeno sin confirmar; colores; etiquetas                                   |
+| main/phonePage.ts                       | mejorable  | 3               | Segura; solo en español; redibujo completo                                        |
+| preload/preload.ts                      | bien       | 0               | Canales tipados, sin `invoke` genérico                                            |
 
 ## Mejoras sugeridas (no son errores)
 

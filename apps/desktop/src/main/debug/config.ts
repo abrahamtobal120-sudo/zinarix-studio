@@ -27,8 +27,16 @@ export function autoConfig(file: string): DebugConfig | null {
   if (ext === '.py') return { name, type: 'python', request: 'launch', program: '${file}' };
   if (ext === '.go') return { name, type: 'go', request: 'launch', program: '${fileDirname}' };
   // Godot: the game (or this scene) runs from a headless editor that serves the debug adapter.
-  if (ext === '.gd') return { name: 'Godot', type: 'godot', request: 'launch', program: '${file}', scene: 'main' };
-  if (ext === '.tscn') return { name: `Godot: ${name}`, type: 'godot', request: 'launch', program: '${file}', scene: '${file}' };
+  if (ext === '.gd')
+    return { name: 'Godot', type: 'godot', request: 'launch', program: '${file}', scene: 'main' };
+  if (ext === '.tscn')
+    return {
+      name: `Godot: ${name}`,
+      type: 'godot',
+      request: 'launch',
+      program: '${file}',
+      scene: '${file}',
+    };
   return null;
 }
 
@@ -78,7 +86,7 @@ export function parseLaunchJson(text: string): DebugConfig[] {
       typeof c.port === 'number'
         ? c.port
         : typeof (c.connect as { port?: unknown })?.port === 'number'
-          ? ((c.connect as { port: number }).port)
+          ? (c.connect as { port: number }).port
           : undefined;
     const host =
       typeof c.host === 'string'

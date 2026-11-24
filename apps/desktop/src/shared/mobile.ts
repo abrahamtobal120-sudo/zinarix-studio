@@ -45,8 +45,7 @@ export interface LogLine {
 }
 
 export type MobileEvent =
-  | { kind: 'logcat'; key: string; chunk: string }
-  | { kind: 'logcat-end'; key: string };
+  { kind: 'logcat'; key: string; chunk: string } | { kind: 'logcat-end'; key: string };
 
 /** `adb devices -l` → devices (skips the header and daemon messages). */
 export function parseAdbDevices(text: string): MobileDevice[] {
@@ -54,9 +53,14 @@ export function parseAdbDevices(text: string): MobileDevice[] {
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || /^List of devices|^\*/.test(line)) continue;
-    const m = /^(\S+)\s+(device|offline|unauthorized|recovery|sideload|bootloader|no permissions|authorizing|connecting)\b(.*)$/.exec(line);
+    const m =
+      /^(\S+)\s+(device|offline|unauthorized|recovery|sideload|bootloader|no permissions|authorizing|connecting)\b(.*)$/.exec(
+        line,
+      );
     if (!m) continue;
-    const props = Object.fromEntries([...m[3]!.matchAll(/(\w+):(\S+)/g)].map((x) => [x[1]!, x[2]!]));
+    const props = Object.fromEntries(
+      [...m[3]!.matchAll(/(\w+):(\S+)/g)].map((x) => [x[1]!, x[2]!]),
+    );
     out.push({
       serial: m[1]!,
       state: m[2]!,
@@ -77,9 +81,16 @@ export function parseAvds(text: string): string[] {
 
 /** "11-20 21:30:01.123  1234  1250 E Tag   : message" (logcat -v threadtime). */
 export function parseLogLine(line: string): LogLine | null {
-  const m = /^(\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d{3})\s+(\d+)\s+\d+\s+([VDIWEF])\s+(.*?)\s*:\s(.*)$/.exec(line);
+  const m =
+    /^(\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d{3})\s+(\d+)\s+\d+\s+([VDIWEF])\s+(.*?)\s*:\s(.*)$/.exec(line);
   if (!m) return null;
-  return { time: m[1]!, pid: Number(m[2]), level: m[3] as LogLevel, tag: m[4]!.trim(), message: m[5]! };
+  return {
+    time: m[1]!,
+    pid: Number(m[2]),
+    level: m[3] as LogLevel,
+    tag: m[4]!.trim(),
+    message: m[5]!,
+  };
 }
 
 export interface LogFilter {
@@ -113,11 +124,18 @@ export function filterLog(lines: string[], f: LogFilter): string[] {
 }
 
 /** What kind of phone project a folder is, from its files. */
-export function projectKind(files: { pubspec?: string | null; packageJson?: string | null; gradle?: boolean }): MobileKind | null {
+export function projectKind(files: {
+  pubspec?: string | null;
+  packageJson?: string | null;
+  gradle?: boolean;
+}): MobileKind | null {
   if (files.pubspec && /^\s*flutter\s*:/m.test(files.pubspec)) return 'flutter';
   if (files.packageJson) {
     try {
-      const p = JSON.parse(files.packageJson) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+      const p = JSON.parse(files.packageJson) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
       const deps = { ...p.dependencies, ...p.devDependencies };
       if ('expo' in deps) return 'expo';
       if ('react-native' in deps) return 'react-native';
@@ -145,7 +163,11 @@ export function projectCommand(
   const serial = opts.serial && validSerial(opts.serial) ? opts.serial : null;
   if (p.kind === 'android') {
     const gradlew = win ? '.\\gradlew.bat' : './gradlew';
-    const env = serial ? (win ? `$env:ANDROID_SERIAL="${serial}"; ` : `ANDROID_SERIAL=${serial} `) : '';
+    const env = serial
+      ? win
+        ? `$env:ANDROID_SERIAL="${serial}"; `
+        : `ANDROID_SERIAL=${serial} `
+      : '';
     if (action === 'build') return `${cd}${gradlew} assembleDebug`;
     return `${cd}${env}${gradlew} installDebug`;
   }
@@ -155,7 +177,10 @@ export function projectCommand(
     return `${cd}flutter run${serial ? ` -d ${serial}` : ''}`;
   }
   if (p.kind === 'expo') {
-    if (action === 'ios') return opts.platform === 'darwin' ? `${cd}npx expo run:ios` : `${cd}npx eas build -p ios --profile development`;
+    if (action === 'ios')
+      return opts.platform === 'darwin'
+        ? `${cd}npx expo run:ios`
+        : `${cd}npx eas build -p ios --profile development`;
     if (action === 'build') return `${cd}npx expo run:android`;
     return `${cd}npx expo start${serial ? ' --android' : ''}`;
   }
@@ -176,8 +201,10 @@ export function validAvd(s: unknown): s is string {
 
 /** Width and height of a PNG from its header (0 when it is not one). */
 export function pngSize(b: Uint8Array): { width: number; height: number } {
-  if (b.length < 24 || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47) return { width: 0, height: 0 };
-  const at = (i: number) => ((b[i]! << 24) | (b[i + 1]! << 16) | (b[i + 2]! << 8) | b[i + 3]!) >>> 0;
+  if (b.length < 24 || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47)
+    return { width: 0, height: 0 };
+  const at = (i: number) =>
+    ((b[i]! << 24) | (b[i + 1]! << 16) | (b[i + 2]! << 8) | b[i + 3]!) >>> 0;
   return { width: at(16), height: at(20) };
 }
 
@@ -212,7 +239,8 @@ export type MobileInput =
   | { kind: 'text'; text: string }
   | { kind: 'key'; key: MobileKey };
 
-const coord = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 20_000;
+const coord = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 20_000;
 
 /**
  * Checks an input and gives what goes after `adb -s SERIAL shell`. adb joins those words
@@ -221,7 +249,12 @@ const coord = (v: unknown): v is number => typeof v === 'number' && Number.isFin
  */
 export function inputArgs(i: MobileInput): string[] {
   const n = (v: number) => String(Math.round(v));
-  const dur = (ms: unknown, def: number) => String(Math.round(Math.max(1, Math.min(10_000, typeof ms === 'number' && Number.isFinite(ms) ? ms : def))));
+  const dur = (ms: unknown, def: number) =>
+    String(
+      Math.round(
+        Math.max(1, Math.min(10_000, typeof ms === 'number' && Number.isFinite(ms) ? ms : def)),
+      ),
+    );
   if (i.kind === 'tap') {
     if (!coord(i.x) || !coord(i.y)) throw new Error('Coordenadas no válidas.');
     return ['input', 'tap', n(i.x), n(i.y)];
@@ -243,7 +276,8 @@ export function inputArgs(i: MobileInput): string[] {
     const t = String(i.text ?? '');
     if (!t || t.length > 1000) throw new Error('Texto vacío o muy largo.');
     // `input text` only types ASCII; a space must be written %s.
-    if (/[^\x20-\x7e]/.test(t)) throw new Error('El teclado de adb solo escribe letras sin acentos (ASCII).');
+    if (/[^\x20-\x7e]/.test(t))
+      throw new Error('El teclado de adb solo escribe letras sin acentos (ASCII).');
     return ['input', 'text', `'${t.replace(/ /g, '%s').replace(/'/g, `'\\''`)}'`];
   }
   throw new Error('Acción no válida.');
@@ -296,5 +330,8 @@ export function toDevicePoint(
 ): { x: number; y: number } {
   const x = Math.round((px / Math.max(1, shown.width)) * device.width);
   const y = Math.round((py / Math.max(1, shown.height)) * device.height);
-  return { x: Math.max(0, Math.min(device.width - 1, x)), y: Math.max(0, Math.min(device.height - 1, y)) };
+  return {
+    x: Math.max(0, Math.min(device.width - 1, x)),
+    y: Math.max(0, Math.min(device.height - 1, y)),
+  };
 }

@@ -176,7 +176,9 @@ export class DesignSession {
     const list = await this.files.listFiles().catch(() => this.list);
     this.builtList = builtPages(list, app.built);
     if (!this.builtList.length)
-      throw new EditError(`La carpeta ${app.built}/ ya no tiene páginas. Vuelve a compilar el proyecto.`);
+      throw new EditError(
+        `La carpeta ${app.built}/ ya no tiene páginas. Vuelve a compilar el proyecto.`,
+      );
     this.target = { mode: 'built', app };
     return this.view();
   }
@@ -218,8 +220,10 @@ export class DesignSession {
       if (file === '' || file.endsWith('/')) file += 'index.html';
       if (!existsSync(at(file)) && !extname(file)) {
         // /precios → precios.html or precios/index.html; else the app's own router (SPA).
-        file = [`${file}.html`, `${file}/index.html`].find((f) => existsSync(at(f))) ?? 'index.html';
-      } else if (existsSync(at(file)) && statSync(at(file)).isDirectory()) file = `${file}/index.html`;
+        file =
+          [`${file}.html`, `${file}/index.html`].find((f) => existsSync(at(f))) ?? 'index.html';
+      } else if (existsSync(at(file)) && statSync(at(file)).isDirectory())
+        file = `${file}/index.html`;
       const ext = extname(file).toLowerCase();
       const body = await readFile(at(file));
       const headers = {
@@ -266,7 +270,9 @@ export class DesignSession {
   apply(op: DesignOp): Promise<DesignApplyResult> {
     return this.serial(async () => {
       if (!this.profile?.editable || this.mode !== 'edit')
-        throw new EditError('En este tipo de proyecto los cambios no se escriben desde el panel: pídeselos a la IA (cuadro «Dime qué quieres cambiar»).');
+        throw new EditError(
+          'En este tipo de proyecto los cambios no se escriben desde el panel: pídeselos a la IA (cuadro «Dime qué quieres cambiar»).',
+        );
       const at = parseSrc(op.src);
       if (!at || !this.profile.pages.some((p) => p.file === at.file))
         throw new EditError('Este elemento no pertenece a una página del proyecto.');

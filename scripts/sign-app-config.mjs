@@ -29,7 +29,12 @@ JSON.parse(body); // refuse to sign broken JSON
 const data = Buffer.from(DOMAIN + body, 'utf8');
 
 if (process.argv[2] === 'verify') {
-  const ok = verify(null, data, appPublicKey(), Buffer.from(readFileSync(`${file}.sig`, 'utf8').trim(), 'base64'));
+  const ok = verify(
+    null,
+    data,
+    appPublicKey(),
+    Buffer.from(readFileSync(`${file}.sig`, 'utf8').trim(), 'base64'),
+  );
   console.log(ok ? 'firma OK' : 'firma INVÁLIDA');
   process.exit(ok ? 0 : 1);
 }

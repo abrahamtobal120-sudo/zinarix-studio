@@ -4,10 +4,19 @@
  * export (shared/videoColor.ts): 8-bit tables for the wheels, trilinear LUT, strength mixed in.
  */
 import type { ColorGrade, Lut3D } from '../../../shared/videoColor';
-import { cleanGrade, gradeHasCurves, gradePixels, gradeTables, lutKey, mixLut, parseCube } from '../../../shared/videoColor';
+import {
+  cleanGrade,
+  gradeHasCurves,
+  gradePixels,
+  gradeTables,
+  lutKey,
+  mixLut,
+  parseCube,
+} from '../../../shared/videoColor';
 import { api } from '../../store';
 
-type Entry = { state: 'loading' } | { state: 'ready'; lut: Lut3D } | { state: 'error'; error: string };
+type Entry =
+  { state: 'loading' } | { state: 'ready'; lut: Lut3D } | { state: 'error'; error: string };
 const files = new Map<string, Entry>();
 /** lutKey → the LUT at that strength. */
 const mixed = new Map<string, Lut3D>();

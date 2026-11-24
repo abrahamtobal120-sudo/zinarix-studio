@@ -11,7 +11,14 @@ export { Tooltip, TooltipProvider } from './Tooltip';
 export { Menu } from './Menu';
 export type { MenuItem } from './Menu';
 export { Dialog, DialogClose, DialogDescription } from './Dialog';
-export { ToastViewport, pushToast, dismissToast, clearToasts, useToasts, MAX_TOASTS } from './Toast';
+export {
+  ToastViewport,
+  pushToast,
+  dismissToast,
+  clearToasts,
+  useToasts,
+  MAX_TOASTS,
+} from './Toast';
 export type { ToastItem, ToastKind } from './Toast';
 export { Badge } from './Badge';
 export type { BadgeTone } from './Badge';

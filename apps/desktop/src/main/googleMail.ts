@@ -86,7 +86,9 @@ export class GoogleAuth {
     const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
     if (!r.ok) {
       if (j.error === 'invalid_grant')
-        throw new Error('La sesión de Google caducó o se revocó: vuelve a iniciar sesión con Google.');
+        throw new Error(
+          'La sesión de Google caducó o se revocó: vuelve a iniciar sesión con Google.',
+        );
       throw new Error(`Google: ${String(j.error_description ?? j.error ?? r.status)}`);
     }
     return j;
@@ -124,7 +126,10 @@ export class GoogleAuth {
         );
         done();
         if (ok) resolve(ok);
-        else reject(new Error(`Google: ${u.searchParams.get('error') ?? 'inicio de sesión cancelado'}`));
+        else
+          reject(
+            new Error(`Google: ${u.searchParams.get('error') ?? 'inicio de sesión cancelado'}`),
+          );
       });
       const timer = setTimeout(() => {
         done();

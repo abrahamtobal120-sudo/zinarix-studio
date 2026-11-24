@@ -19,16 +19,21 @@ const es = {
   // Tasks
   newTask: 'Nueva tarea',
   tasksIntro: 'La IA hace algo sola a la hora que elijas y te avisa con el resultado.',
-  tasksOpenOnly: 'Las tareas se ejecutan mientras Zinarix está abierto (si estaba cerrado, se pone al día al abrirlo, hasta 6 h después).',
+  tasksOpenOnly:
+    'Las tareas se ejecutan mientras Zinarix está abierto (si estaba cerrado, se pone al día al abrirlo, hasta 6 h después).',
   noTasks: 'Todavía no hay tareas. Empieza con una de estas:',
   tplMail: 'Resumen del correo',
-  tplMailPrompt: 'Revisa los correos sin leer de mi bandeja de entrada de las últimas 24 horas y hazme un resumen: lo importante primero, qué necesita respuesta y qué es publicidad.',
+  tplMailPrompt:
+    'Revisa los correos sin leer de mi bandeja de entrada de las últimas 24 horas y hazme un resumen: lo importante primero, qué necesita respuesta y qué es publicidad.',
   tplDeps: 'Dependencias vulnerables',
-  tplDepsPrompt: 'Revisa el proyecto y dime si alguna dependencia tiene vulnerabilidades conocidas o está muy desactualizada. Lista solo lo que importa y cómo arreglarlo.',
+  tplDepsPrompt:
+    'Revisa el proyecto y dime si alguna dependencia tiene vulnerabilidades conocidas o está muy desactualizada. Lista solo lo que importa y cómo arreglarlo.',
   tplVercel: 'Estado de Vercel',
-  tplVercelPrompt: 'Revisa mis proyectos de Vercel y dime si algún despliegue reciente falló. Si falló, lee el log y explica la causa en pocas líneas.',
+  tplVercelPrompt:
+    'Revisa mis proyectos de Vercel y dime si algún despliegue reciente falló. Si falló, lee el log y explica la causa en pocas líneas.',
   tplNews: 'Noticias del día',
-  tplNewsPrompt: 'Busca en la web las 5 noticias más importantes de hoy sobre inteligencia artificial y resúmelas en una línea cada una, con su enlace.',
+  tplNewsPrompt:
+    'Busca en la web las 5 noticias más importantes de hoy sobre inteligencia artificial y resúmelas en una línea cada una, con su enlace.',
   name: 'Nombre',
   prompt: 'Qué tiene que hacer',
   promptPh: 'Ej.: revisa mi correo y hazme un resumen de lo importante',
@@ -49,14 +54,16 @@ const es = {
   tools: 'Qué puede usar',
   toolsNone: 'Nada: solo responde',
   toolsRead: 'Solo leer (correo, web, Vercel, archivos…)',
-  toolsReadHint: 'Nadie la vigila: cualquier acción que cambie algo (enviar, escribir, borrar, ejecutar) se rechaza sola.',
+  toolsReadHint:
+    'Nadie la vigila: cualquier acción que cambie algo (enviar, escribir, borrar, ejecutar) se rechaza sola.',
   folder: 'Carpeta que puede leer',
   folderNone: 'Ninguna',
   folderPick: 'Elegir…',
   folderCurrent: 'La carpeta abierta',
   deliver: 'Enviar también a',
   deliverOff: '(no conectado)',
-  deliverHint: 'Telegram, Discord y WhatsApp necesitan el control desde el celular encendido (Configuración → Celular).',
+  deliverHint:
+    'Telegram, Discord y WhatsApp necesitan el control desde el celular encendido (Configuración → Celular).',
   enabled: 'Activa',
   save: 'Guardar',
   create: 'Crear',
@@ -85,18 +92,23 @@ const es = {
   // Bots
   newBot: 'Nuevo bot',
   importBot: 'Importar',
-  botsIntro: 'Asistentes a tu medida: con su papel, su tono y lo que sabe. Úsalos en el chat, en tareas o en tu sitio web.',
+  botsIntro:
+    'Asistentes a tu medida: con su papel, su tono y lo que sabe. Úsalos en el chat, en tareas o en tu sitio web.',
   noBots: 'Todavía no tienes bots. Empieza con uno de estos:',
   tplSupport: 'Atención a clientes',
   tplSupportDesc: 'Contesta dudas de clientes con tus datos',
-  tplSupportInstr: 'Eres el asistente de atención a clientes del negocio. Responde con amabilidad, breve y claro. Usa solo los datos que tienes; si no sabes algo, dilo y ofrece el contacto humano. No inventes precios ni promesas.',
-  tplSupportKnow: 'Horario: lunes a viernes de 9:00 a 18:00.\nContacto: (pon aquí tu correo o WhatsApp)\nPrecios: (pon aquí tus productos y precios)\nEnvíos: (cómo y cuánto tardan)',
+  tplSupportInstr:
+    'Eres el asistente de atención a clientes del negocio. Responde con amabilidad, breve y claro. Usa solo los datos que tienes; si no sabes algo, dilo y ofrece el contacto humano. No inventes precios ni promesas.',
+  tplSupportKnow:
+    'Horario: lunes a viernes de 9:00 a 18:00.\nContacto: (pon aquí tu correo o WhatsApp)\nPrecios: (pon aquí tus productos y precios)\nEnvíos: (cómo y cuánto tardan)',
   tplReviewer: 'Revisor de código',
   tplReviewerDesc: 'Revisa cambios con ojo crítico',
-  tplReviewerInstr: 'Eres un revisor de código senior. Busca errores reales, problemas de seguridad y casos que fallan. Sé concreto: archivo, línea y cómo arreglarlo. No comentes estilo salvo que cause errores.',
+  tplReviewerInstr:
+    'Eres un revisor de código senior. Busca errores reales, problemas de seguridad y casos que fallan. Sé concreto: archivo, línea y cómo arreglarlo. No comentes estilo salvo que cause errores.',
   tplTutor: 'Tutor paciente',
   tplTutorDesc: 'Explica paso a paso, sin jerga',
-  tplTutorInstr: 'Eres un tutor paciente. Explica paso a paso con ejemplos simples y sin jerga. Al final, haz una pregunta corta para comprobar que se entendió.',
+  tplTutorInstr:
+    'Eres un tutor paciente. Explica paso a paso con ejemplos simples y sin jerga. Al final, haz una pregunta corta para comprobar que se entendió.',
   icon: 'Ícono',
   description: 'Descripción',
   instructions: 'Instrucciones',
@@ -119,7 +131,8 @@ const es = {
   removeBotAsk: '¿Borrar el bot "{name}"? Las tareas que lo usan siguen, sin bot.',
   botSaved: 'Bot guardado',
   // Widget
-  widgetIntro: 'Un chat con tu bot para pegar en cualquier sitio web. La función que contesta corre en Vercel; tu clave nunca va en los archivos.',
+  widgetIntro:
+    'Un chat con tu bot para pegar en cualquier sitio web. La función que contesta corre en Vercel; tu clave nunca va en los archivos.',
   widgetNoBots: 'Primero crea un bot en "Mis bots".',
   widgetBot: 'Bot',
   wTitle: 'Título del chat',
@@ -138,14 +151,18 @@ const es = {
   wPublishing: 'Publicando…',
   wPublished: 'Publicado en {url}',
   wSendKey: 'Guardar mi clave del proveedor en Vercel (cifrada, como BOT_API_KEY)',
-  wSendKeyHint: 'Sin esto, el chat no contesta hasta que pongas BOT_API_KEY tú mismo en Vercel → Settings → Environment Variables. Zinarix te pide confirmarlo antes de enviarla.',
+  wSendKeyHint:
+    'Sin esto, el chat no contesta hasta que pongas BOT_API_KEY tú mismo en Vercel → Settings → Environment Variables. Zinarix te pide confirmarlo antes de enviarla.',
   wKeyMissing: 'Falta BOT_API_KEY: ponla en Vercel para que el chat conteste.',
   wSnippet: 'Pega esto en tu página, antes de </body>:',
   wTest: 'Probar',
-  wCost: 'Cada mensaje de un visitante se cobra en tu cuenta del proveedor: ponle un límite de gasto.',
+  wCost:
+    'Cada mensaje de un visitante se cobra en tu cuenta del proveedor: ponle un límite de gasto.',
   modelAppDefault: 'el modelo predeterminado',
-  wModelNote: 'Usa el modelo del bot ({model}). Funciona con OpenAI, Anthropic, Gemini y proveedores compatibles con OpenAI en la nube.',
-  wDocsNote: '@Docs solo funciona dentro de Zinarix: para el sitio, copia lo importante en "Conocimiento".',
+  wModelNote:
+    'Usa el modelo del bot ({model}). Funciona con OpenAI, Anthropic, Gemini y proveedores compatibles con OpenAI en la nube.',
+  wDocsNote:
+    '@Docs solo funciona dentro de Zinarix: para el sitio, copia lo importante en "Conocimiento".',
   wNoVercel: 'Conecta tu cuenta de Vercel (panel Vercel en "Más") para publicar.',
 };
 
@@ -166,16 +183,21 @@ const en: typeof es = {
   restartManual: 'Close Zinarix completely and open it again.',
   newTask: 'New task',
   tasksIntro: 'The AI does something by itself at the time you choose and tells you the result.',
-  tasksOpenOnly: 'Tasks run while Zinarix is open (if it was closed, it catches up when opened, up to 6 h later).',
+  tasksOpenOnly:
+    'Tasks run while Zinarix is open (if it was closed, it catches up when opened, up to 6 h later).',
   noTasks: 'No tasks yet. Start with one of these:',
   tplMail: 'Mail summary',
-  tplMailPrompt: 'Check the unread emails of my inbox from the last 24 hours and summarise them: important first, what needs an answer and what is advertising.',
+  tplMailPrompt:
+    'Check the unread emails of my inbox from the last 24 hours and summarise them: important first, what needs an answer and what is advertising.',
   tplDeps: 'Vulnerable dependencies',
-  tplDepsPrompt: 'Check the project and tell me if any dependency has known vulnerabilities or is badly outdated. List only what matters and how to fix it.',
+  tplDepsPrompt:
+    'Check the project and tell me if any dependency has known vulnerabilities or is badly outdated. List only what matters and how to fix it.',
   tplVercel: 'Vercel status',
-  tplVercelPrompt: 'Check my Vercel projects and tell me if a recent deployment failed. If it did, read the log and explain the cause in a few lines.',
+  tplVercelPrompt:
+    'Check my Vercel projects and tell me if a recent deployment failed. If it did, read the log and explain the cause in a few lines.',
   tplNews: 'Daily news',
-  tplNewsPrompt: 'Search the web for the 5 most important news of today about artificial intelligence and summarise each in one line, with its link.',
+  tplNewsPrompt:
+    'Search the web for the 5 most important news of today about artificial intelligence and summarise each in one line, with its link.',
   name: 'Name',
   prompt: 'What it has to do',
   promptPh: 'E.g. check my mail and summarise what matters',
@@ -196,7 +218,8 @@ const en: typeof es = {
   tools: 'What it may use',
   toolsNone: 'Nothing: it only answers',
   toolsRead: 'Read only (mail, web, Vercel, files…)',
-  toolsReadHint: 'Nobody watches it: any action that changes something (send, write, delete, run) is refused automatically.',
+  toolsReadHint:
+    'Nobody watches it: any action that changes something (send, write, delete, run) is refused automatically.',
   folder: 'Folder it may read',
   folderNone: 'None',
   folderPick: 'Choose…',
@@ -231,18 +254,23 @@ const en: typeof es = {
   started: 'Task started',
   newBot: 'New bot',
   importBot: 'Import',
-  botsIntro: 'Assistants made to measure: their role, tone and what they know. Use them in the chat, in tasks or on your website.',
+  botsIntro:
+    'Assistants made to measure: their role, tone and what they know. Use them in the chat, in tasks or on your website.',
   noBots: 'No bots yet. Start with one of these:',
   tplSupport: 'Customer support',
   tplSupportDesc: 'Answers customers with your data',
-  tplSupportInstr: 'You are the customer support assistant of the business. Answer kindly, briefly and clearly. Use only the data you have; if you do not know something, say so and offer human contact. Never invent prices or promises.',
-  tplSupportKnow: 'Hours: Monday to Friday, 9:00 to 18:00.\nContact: (your email or WhatsApp here)\nPrices: (your products and prices here)\nShipping: (how and how long)',
+  tplSupportInstr:
+    'You are the customer support assistant of the business. Answer kindly, briefly and clearly. Use only the data you have; if you do not know something, say so and offer human contact. Never invent prices or promises.',
+  tplSupportKnow:
+    'Hours: Monday to Friday, 9:00 to 18:00.\nContact: (your email or WhatsApp here)\nPrices: (your products and prices here)\nShipping: (how and how long)',
   tplReviewer: 'Code reviewer',
   tplReviewerDesc: 'Reviews changes with a critical eye',
-  tplReviewerInstr: 'You are a senior code reviewer. Look for real bugs, security problems and failing cases. Be concrete: file, line and how to fix it. Do not comment on style unless it causes bugs.',
+  tplReviewerInstr:
+    'You are a senior code reviewer. Look for real bugs, security problems and failing cases. Be concrete: file, line and how to fix it. Do not comment on style unless it causes bugs.',
   tplTutor: 'Patient tutor',
   tplTutorDesc: 'Explains step by step, no jargon',
-  tplTutorInstr: 'You are a patient tutor. Explain step by step with simple examples and no jargon. At the end, ask a short question to check it was understood.',
+  tplTutorInstr:
+    'You are a patient tutor. Explain step by step with simple examples and no jargon. At the end, ask a short question to check it was understood.',
   icon: 'Icon',
   description: 'Description',
   instructions: 'Instructions',
@@ -264,7 +292,8 @@ const en: typeof es = {
   asAgentDone: 'Saved to {path}',
   removeBotAsk: 'Delete the bot "{name}"? Tasks using it keep running, without a bot.',
   botSaved: 'Bot saved',
-  widgetIntro: 'A chat with your bot to paste on any website. The function that answers runs on Vercel; your key is never in the files.',
+  widgetIntro:
+    'A chat with your bot to paste on any website. The function that answers runs on Vercel; your key is never in the files.',
   widgetNoBots: 'Create a bot in "My bots" first.',
   widgetBot: 'Bot',
   wTitle: 'Chat title',
@@ -283,13 +312,15 @@ const en: typeof es = {
   wPublishing: 'Publishing…',
   wPublished: 'Published at {url}',
   wSendKey: 'Store my provider key in Vercel (encrypted, as BOT_API_KEY)',
-  wSendKeyHint: 'Without it, the chat does not answer until you set BOT_API_KEY yourself in Vercel → Settings → Environment Variables. Zinarix asks you to confirm before sending it.',
+  wSendKeyHint:
+    'Without it, the chat does not answer until you set BOT_API_KEY yourself in Vercel → Settings → Environment Variables. Zinarix asks you to confirm before sending it.',
   wKeyMissing: 'BOT_API_KEY is missing: set it in Vercel so the chat answers.',
   wSnippet: 'Paste this on your page, before </body>:',
   wTest: 'Test',
   wCost: 'Every visitor message is billed to your provider account: set a spending limit.',
   modelAppDefault: 'the default model',
-  wModelNote: 'Uses the bot’s model ({model}). Works with OpenAI, Anthropic, Gemini and OpenAI-compatible cloud providers.',
+  wModelNote:
+    'Uses the bot’s model ({model}). Works with OpenAI, Anthropic, Gemini and OpenAI-compatible cloud providers.',
   wDocsNote: '@Docs only works inside Zinarix: for the site, copy what matters into "Knowledge".',
   wNoVercel: 'Connect your Vercel account (Vercel panel in "More") to publish.',
 };

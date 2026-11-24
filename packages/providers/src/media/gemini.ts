@@ -182,10 +182,14 @@ export function geminiMediaBody(req: MediaRequest): {
       warnings,
     };
   }
-  throw new OmniError('unsupported', `Gemini todavía no genera ${req.kind === 'sound' ? 'efectos de sonido' : 'música'} desde Zinarix.`, {
-    provider: 'google-gemini',
-    retryable: false,
-  });
+  throw new OmniError(
+    'unsupported',
+    `Gemini todavía no genera ${req.kind === 'sound' ? 'efectos de sonido' : 'música'} desde Zinarix.`,
+    {
+      provider: 'google-gemini',
+      retryable: false,
+    },
+  );
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {

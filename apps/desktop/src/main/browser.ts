@@ -343,10 +343,7 @@ export class BrowserTab {
         e.preventDefault();
     });
     wc.on('will-redirect', (e, url, _inPlace, isMainFrame) => {
-      if (
-        isMainFrame &&
-        (!/^https?:/i.test(url) || !this.allowed(url) || this.divertSignIn(url))
-      )
+      if (isMainFrame && (!/^https?:/i.test(url) || !this.allowed(url) || this.divertSignIn(url)))
         e.preventDefault();
     });
     // Any other page clears the notice.

@@ -26,8 +26,14 @@ describe('image tools (no FFmpeg needed)', () => {
   });
 
   it('reads the size FFmpeg reports', () => {
-    expect(parseSize('  Stream #0:0: Video: png, rgba(pc, gbr/unknown/unknown), 640x480, 25 tbr')).toEqual({ w: 640, h: 480 });
-    expect(parseSize('  Stream #0:0: Video: mjpeg (Baseline), yuvj420p(pc), 1920x1080 [SAR 1:1 DAR 16:9]')).toEqual({ w: 1920, h: 1080 });
+    expect(
+      parseSize('  Stream #0:0: Video: png, rgba(pc, gbr/unknown/unknown), 640x480, 25 tbr'),
+    ).toEqual({ w: 640, h: 480 });
+    expect(
+      parseSize(
+        '  Stream #0:0: Video: mjpeg (Baseline), yuvj420p(pc), 1920x1080 [SAR 1:1 DAR 16:9]',
+      ),
+    ).toEqual({ w: 1920, h: 1080 });
     expect(parseSize('nothing')).toBeNull();
   });
 
@@ -47,7 +53,9 @@ describe('image tools (no FFmpeg needed)', () => {
     expect(p && !('error' in p) && p.action).toContain('foto-editada.png');
     expect(p && !('error' in p) && p.allowKey).toBe('image_edit:new');
     expect(imagePreview('image_info', { path: 'foto.png' }, root)).toBeNull();
-    expect(imagePreview('image_edit', { path: 'x.gif' }, root)).toEqual({ error: expect.any(String) });
+    expect(imagePreview('image_edit', { path: 'x.gif' }, root)).toEqual({
+      error: expect.any(String),
+    });
   });
 });
 
@@ -56,7 +64,8 @@ describe.skipIf(!ffmpeg)('image tools with FFmpeg', () => {
 
   it('writes and reads back png, jpg and webp', async () => {
     const data = new Uint8ClampedArray(40 * 20 * 4);
-    for (let i = 0; i < data.length; i += 4) data.set([200, 50, 10, i < data.length / 2 ? 255 : 128], i);
+    for (let i = 0; i < data.length; i += 4)
+      data.set([200, 50, 10, i < data.length / 2 ? 255 : 128], i);
     const img = { width: 40, height: 20, data };
     for (const ext of ['png', 'jpg', 'webp']) {
       const p = join(root, `base.${ext}`);
@@ -76,7 +85,14 @@ describe.skipIf(!ffmpeg)('image tools with FFmpeg', () => {
     const r = await runImageTool(
       svc,
       'image_edit',
-      { path: 'base.png', rotate: 90, crop: { x: 0, y: 0, w: 20, h: 30 }, width: 10, grayscale: 100, out: 'sal/gris.webp' },
+      {
+        path: 'base.png',
+        rotate: 90,
+        crop: { x: 0, y: 0, w: 20, h: 30 },
+        width: 10,
+        grayscale: 100,
+        out: 'sal/gris.webp',
+      },
       root,
     );
     expect(r.ok, r.content).toBe(true);

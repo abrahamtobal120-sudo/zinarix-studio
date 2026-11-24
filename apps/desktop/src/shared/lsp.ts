@@ -15,14 +15,18 @@ export interface LspCandidate {
 }
 
 /** Package managers whose commands can run as they are in a terminal. */
-const RUNNABLE = /^(npm|pnpm|pip|pip3|pipx|gem|go|rustup|dotnet|composer|cs|ghcup|winget|brew|apt|sudo apt|scoop|choco)\s+\S/;
+const RUNNABLE =
+  /^(npm|pnpm|pip|pip3|pipx|gem|go|rustup|dotnet|composer|cs|ghcup|winget|brew|apt|sudo apt|scoop|choco)\s+\S/;
 
 /**
  * The command that installs a server on this platform, taken from its install hint
  * ("npm i -g pyright", "winget install LLVM.LLVM · apt install clangd"); null when the hint is
  * only a description or a web page (then the user follows it by hand).
  */
-export function installCommand(install: string, platform: 'win32' | 'darwin' | 'linux'): string | null {
+export function installCommand(
+  install: string,
+  platform: 'win32' | 'darwin' | 'linux',
+): string | null {
   const inner = /\(([^)]*)\)/.exec(install)?.[1];
   const parts = (inner ?? install)
     .split(/\s+·\s+/)
@@ -278,7 +282,12 @@ export const LSP_LANGUAGES: LspLanguage[] = [
     ids: ['zig'],
     label: 'Zig',
     candidates: [
-      { command: 'zls', args: [], name: 'zls', install: 'winget install zigtools.zls · brew install zls' },
+      {
+        command: 'zls',
+        args: [],
+        name: 'zls',
+        install: 'winget install zigtools.zls · brew install zls',
+      },
     ],
   },
   {
@@ -416,7 +425,10 @@ export interface NextEditView {
  * Tolerates code fences and text around the JSON object. Returns null when there is no
  * usable edit (missing fields, line outside the window, no change).
  */
-export function parseNextEdit(text: string, req: Pick<NextEditRequestView, 'startLine' | 'lines'>): NextEditView | null {
+export function parseNextEdit(
+  text: string,
+  req: Pick<NextEditRequestView, 'startLine' | 'lines'>,
+): NextEditView | null {
   const s = text.trim();
   if (!s || /^(none|null|\{\s*\})$/i.test(s)) return null;
   const start = s.indexOf('{');

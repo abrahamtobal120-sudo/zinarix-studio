@@ -44,14 +44,17 @@ export function logpointCondition(message: string, condition?: string): string {
     }
     tpl += literal(message.slice(i, open));
     const expr = message.slice(open + 1, close).trim();
-    tpl += expr ? `\${(() => { try { return (${expr}); } catch (e) { return '<' + e + '>'; } })()}` : '{}';
+    tpl += expr
+      ? `\${(() => { try { return (${expr}); } catch (e) { return '<' + e + '>'; } })()}`
+      : '{}';
     i = close + 1;
   }
   const log = `(console.log(\`${tpl}\`), false)`;
   return condition?.trim() ? `(${condition.trim()}) && ${log}` : log;
 }
 
-const literal = (s: string) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+const literal = (s: string) =>
+  s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 
 export interface DebugFrame {
   id: number;

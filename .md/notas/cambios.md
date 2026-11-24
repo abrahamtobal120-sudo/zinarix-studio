@@ -4,32 +4,32 @@ Revisión del código de `apps/desktop` (proceso principal e interfaz). Antes de
 
 ## Seguridad (proceso principal)
 
-| # | Problema | Arreglo | Archivos |
-|---|---|---|---|
-| 1 | En Windows, `git` y `rg` se lanzaban por nombre con la carpeta del proyecto como directorio de trabajo, y Windows busca ahí antes que en el PATH. Un `git.exe` escondido en un repo descargado se ejecutaba con solo abrir la carpeta. | Nuevo `main/bin.ts`: `bin('git' \| 'rg' \| 'gh')` busca la ruta absoluta del `.exe` solo en el PATH. | `bin.ts`, `workspace.ts`, `git.ts`, `security.ts` |
-| 2 | Los servidores de lenguaje y MCP que se instalan como `.cmd` (npm) arrancan con shell, y el shim llama a `node` por nombre. cmd.exe tomaba el `node.bat` que hubiera en el proyecto. | `NoDefaultCurrentDirectoryInExePath=1` en el entorno de esos procesos. | `lsp.ts`, `mcp.ts` |
-| 3 | La protección de escritura de hooks de git, `package.json`, CI, etc. distinguía mayúsculas. `.GIT/hooks/pre-commit` o `Package.json` se aprobaban solos si antes se eligió "siempre". | Todas las reglas de `EXECUTES` ignoran mayúsculas/minúsculas. | `guard.ts` |
-| 4 | El Vigilante mandaba al proveedor de IA el diff de `.env`, claves, etc. (y en proyectos sin git, el archivo completo). | Esos archivos se excluyen del diff (`:(exclude,literal)`) y de los archivos recientes. | `watch.ts` |
-| 5 | El mensaje de commit con IA y "ver commit" corrían los `textconv` que define el propio repo. Además, git recibía las claves de los proveedores en su entorno. | `--no-textconv`/`--no-ext-diff` en `patch()` y `show()`. git usa `childEnv` (gh conserva el entorno completo, puede usar `GH_TOKEN`). | `git.ts` |
-| 6 | Un `launch.json` con `${env:ANTHROPIC_API_KEY}` le pasaba la clave al programa depurado con otro nombre. | `${env:X}` devuelve vacío si `X` es una credencial. | `debug/config.ts` |
-| 7 | En Windows, detener un comando del agente solo cerraba `powershell.exe`. Un `npm run dev` seguía vivo con su puerto ocupado. | `taskkill /T /F` cierra todo el árbol de procesos. | `agent.ts` |
-| 8 | "Terminal de administrador" solo escapaba la comilla `'`. PowerShell también acepta `‘ ’ ‚ ‛` como comillas, así que una carpeta con esos caracteres podía inyectar comandos elevados. | Se duplican las cuatro variantes. | `terminal.ts` |
-| 9 | Los comandos de administrador fallaban si la ruta temporal tenía un apóstrofo (usuario "O'Brien"). | Ruta escapada antes de ponerla entre comillas. | `system.ts` |
-| 10 | Las imágenes pegadas en el chat (para agentes CLI) iban a una carpeta temporal fija y compartida, y nunca se borraban. | Carpeta privada (o aleatoria si otro usuario la creó primero); se borran las de más de 24 h. | `chatImages.ts` |
-| 11 | El indexador de documentación leía la respuesta completa en memoria cuando no había `content-length`. | Lectura en streaming con tope de `DOC_MAX_BYTES`. | `knowledge.ts` |
+| #   | Problema                                                                                                                                                                                                                               | Arreglo                                                                                                                               | Archivos                                          |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 1   | En Windows, `git` y `rg` se lanzaban por nombre con la carpeta del proyecto como directorio de trabajo, y Windows busca ahí antes que en el PATH. Un `git.exe` escondido en un repo descargado se ejecutaba con solo abrir la carpeta. | Nuevo `main/bin.ts`: `bin('git' \| 'rg' \| 'gh')` busca la ruta absoluta del `.exe` solo en el PATH.                                  | `bin.ts`, `workspace.ts`, `git.ts`, `security.ts` |
+| 2   | Los servidores de lenguaje y MCP que se instalan como `.cmd` (npm) arrancan con shell, y el shim llama a `node` por nombre. cmd.exe tomaba el `node.bat` que hubiera en el proyecto.                                                   | `NoDefaultCurrentDirectoryInExePath=1` en el entorno de esos procesos.                                                                | `lsp.ts`, `mcp.ts`                                |
+| 3   | La protección de escritura de hooks de git, `package.json`, CI, etc. distinguía mayúsculas. `.GIT/hooks/pre-commit` o `Package.json` se aprobaban solos si antes se eligió "siempre".                                                  | Todas las reglas de `EXECUTES` ignoran mayúsculas/minúsculas.                                                                         | `guard.ts`                                        |
+| 4   | El Vigilante mandaba al proveedor de IA el diff de `.env`, claves, etc. (y en proyectos sin git, el archivo completo).                                                                                                                 | Esos archivos se excluyen del diff (`:(exclude,literal)`) y de los archivos recientes.                                                | `watch.ts`                                        |
+| 5   | El mensaje de commit con IA y "ver commit" corrían los `textconv` que define el propio repo. Además, git recibía las claves de los proveedores en su entorno.                                                                          | `--no-textconv`/`--no-ext-diff` en `patch()` y `show()`. git usa `childEnv` (gh conserva el entorno completo, puede usar `GH_TOKEN`). | `git.ts`                                          |
+| 6   | Un `launch.json` con `${env:ANTHROPIC_API_KEY}` le pasaba la clave al programa depurado con otro nombre.                                                                                                                               | `${env:X}` devuelve vacío si `X` es una credencial.                                                                                   | `debug/config.ts`                                 |
+| 7   | En Windows, detener un comando del agente solo cerraba `powershell.exe`. Un `npm run dev` seguía vivo con su puerto ocupado.                                                                                                           | `taskkill /T /F` cierra todo el árbol de procesos.                                                                                    | `agent.ts`                                        |
+| 8   | "Terminal de administrador" solo escapaba la comilla `'`. PowerShell también acepta `‘ ’ ‚ ‛` como comillas, así que una carpeta con esos caracteres podía inyectar comandos elevados.                                                 | Se duplican las cuatro variantes.                                                                                                     | `terminal.ts`                                     |
+| 9   | Los comandos de administrador fallaban si la ruta temporal tenía un apóstrofo (usuario "O'Brien").                                                                                                                                     | Ruta escapada antes de ponerla entre comillas.                                                                                        | `system.ts`                                       |
+| 10  | Las imágenes pegadas en el chat (para agentes CLI) iban a una carpeta temporal fija y compartida, y nunca se borraban.                                                                                                                 | Carpeta privada (o aleatoria si otro usuario la creó primero); se borran las de más de 24 h.                                          | `chatImages.ts`                                   |
+| 11  | El indexador de documentación leía la respuesta completa en memoria cuando no había `content-length`.                                                                                                                                  | Lectura en streaming con tope de `DOC_MAX_BYTES`.                                                                                     | `knowledge.ts`                                    |
 
 ## Interfaz (errores)
 
-| # | Problema | Arreglo | Archivos |
-|---|---|---|---|
-| 12 | Renombrar un archivo con cambios sin guardar perdía esos cambios. Renombrar una carpeta cerraba todas sus pestañas menos una. | `renamePath` conserva el texto sin guardar y reabre todas las pestañas. | `renderer/store.ts`, `Explorer.tsx` |
-| 13 | Un doble clic rápido abría el mismo archivo dos veces: pestaña duplicada y doble autoguardado. | `openFile` espera a la carga que ya esté en curso. | `renderer/store.ts` |
-| 14 | Juegos sin conexión: mantener la tecla o el botón del ratón reiniciaba la partida justo al perder. Al perder el foco la tecla quedaba "pegada" y el juego seguía corriendo. | Se ignora la autorrepetición, arrastrar ya no cuenta como pulsación nueva, y al perder el foco se sueltan las teclas y el juego se pausa. | `OfflineGames.tsx` |
-| 15 | Búsqueda: una búsqueda vieja y lenta podía pisar los resultados de una nueva. En "por nombre", la selección no volvía al inicio y Enter no hacía nada. | Respuestas viejas descartadas; el cursor vuelve a 0 y nunca queda en -1. | `Search.tsx` |
-| 16 | Correo: el refresco cada 60 s podía mostrar la carpeta anterior después de cambiar de carpeta. | Mismo control de respuestas viejas que `loadList`. | `MailPanel.tsx` |
-| 17 | Git: al cambiar de rama rápido podía aparecer el PR de la rama anterior. | La consulta se cancela al cambiar. | `GitPanel.tsx` |
-| 18 | Al grabar un atajo en Ajustes, una combinación ya asignada ejecutaba su comando en vez de grabarse. | El atajo global no actúa dentro de `.key-recorder`. | `App.tsx` |
-| 19 | Selector de modelos: con la lista vacía, la flecha abajo dejaba el índice en -1. | Índice mínimo 0. | `ModelPicker.tsx` |
+| #   | Problema                                                                                                                                                                    | Arreglo                                                                                                                                   | Archivos                            |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| 12  | Renombrar un archivo con cambios sin guardar perdía esos cambios. Renombrar una carpeta cerraba todas sus pestañas menos una.                                               | `renamePath` conserva el texto sin guardar y reabre todas las pestañas.                                                                   | `renderer/store.ts`, `Explorer.tsx` |
+| 13  | Un doble clic rápido abría el mismo archivo dos veces: pestaña duplicada y doble autoguardado.                                                                              | `openFile` espera a la carga que ya esté en curso.                                                                                        | `renderer/store.ts`                 |
+| 14  | Juegos sin conexión: mantener la tecla o el botón del ratón reiniciaba la partida justo al perder. Al perder el foco la tecla quedaba "pegada" y el juego seguía corriendo. | Se ignora la autorrepetición, arrastrar ya no cuenta como pulsación nueva, y al perder el foco se sueltan las teclas y el juego se pausa. | `OfflineGames.tsx`                  |
+| 15  | Búsqueda: una búsqueda vieja y lenta podía pisar los resultados de una nueva. En "por nombre", la selección no volvía al inicio y Enter no hacía nada.                      | Respuestas viejas descartadas; el cursor vuelve a 0 y nunca queda en -1.                                                                  | `Search.tsx`                        |
+| 16  | Correo: el refresco cada 60 s podía mostrar la carpeta anterior después de cambiar de carpeta.                                                                              | Mismo control de respuestas viejas que `loadList`.                                                                                        | `MailPanel.tsx`                     |
+| 17  | Git: al cambiar de rama rápido podía aparecer el PR de la rama anterior.                                                                                                    | La consulta se cancela al cambiar.                                                                                                        | `GitPanel.tsx`                      |
+| 18  | Al grabar un atajo en Ajustes, una combinación ya asignada ejecutaba su comando en vez de grabarse.                                                                         | El atajo global no actúa dentro de `.key-recorder`.                                                                                       | `App.tsx`                           |
+| 19  | Selector de modelos: con la lista vacía, la flecha abajo dejaba el índice en -1.                                                                                            | Índice mínimo 0.                                                                                                                          | `ModelPicker.tsx`                   |
 
 ## Lint (los 10 errores)
 
@@ -62,54 +62,55 @@ Las rutas son relativas a `apps/desktop/src/` salvo que digan otra cosa.
 
 ## Resumen y orden sugerido
 
-| # | Petición | Impacto | Esfuerzo | Base que ya existe |
-|---|---|---|---|---|
-| 1 | Pegar imágenes en el chat (**en curso**: `main/chatImages.ts`, sin commit) | Alto | Bajo | Los adaptadores ya mandan imágenes |
-| 2 | Soporte MCP para el agente | Alto | Medio | Patrón de herramientas de `cloudTools.ts` |
-| 3 | Búsqueda por significado en el proyecto | Alto | Medio | `embed()` ya existe en 3 adaptadores |
-| 4 | Memorias entre conversaciones | Medio | Bajo | Base SQLite y bloque de reglas |
-| 5 | Copia aislada (worktree) por chat | Medio | Medio | Los chats ya aceptan una carpeta propia |
-| 6 | Documentación externa (`@Docs`) | Medio | Medio | Depende de la #3 |
-| 7 | Tab que predice la siguiente edición | Alto | Medio-alto | Texto fantasma en `inline.ts` |
-| 8 | Revisión automática de PRs | Medio | Medio | `gh` y el Vigilante (`watch.ts`) |
-| 9 | Servidores de lenguaje (LSP) | Alto | Alto | Nada |
-| 10 | Panel de Problemas | Medio | Bajo | Nada (va junto con la #9) |
-| 11 | Depurador (DAP) | Medio | Alto | Panel Ejecutar (`RunPanel.tsx`) |
-| ~~12~~ | ~~Agentes en la nube~~ (quitada: depende de servidores; la parte local pasó a la #38) | — | — | — |
-| 13 | Temas externos y extensiones | Bajo-medio | Alto | Temas fijos en `themes.ts` |
-| 14 | Modos Preguntar / Planear / Depurar / propios | Alto | Medio | Interruptor agente/chat (`Chat.tsx:888`) |
-| 15 | Lista de tareas del agente | Medio | Bajo | Nada |
-| 16 | Dirigir al agente mientras trabaja | Medio | Medio | Cola de mensajes (`Chat.tsx:1394`) |
-| 17 | Restaurar a cualquier mensaje | Alto | Bajo | `Checkpoint` (`agent.ts:544`) |
-| 18 | Medidor de contexto y resumen del chat | Medio | Bajo | `compactToolResults` (`agent.ts:1993`) |
-| 19 | Más tipos de `@` | Alto | Medio | `mentionedFiles` (`Chat.tsx:147`) |
-| 20 | Reglas con frontmatter, anidadas y globales | Alto | Bajo | `RULES_FILES` (`ai.ts:63`) |
-| 21 | Skills (`SKILL.md`) | Alto | Medio | Nada |
-| 22 | Subagentes propios | Medio | Medio | `delegate_to_ai` (`agent.ts:298`) |
-| 23 | Hooks | Medio | Medio | Nada |
-| 24 | Comandos `/` propios | Medio | Bajo | 12 comandos fijos (`Chat.tsx:129`) |
-| 25 | Plugins de agente | Medio | Medio | Depende de #2, #20-#24 |
-| 26 | Archivo `.zinarixignore` | Medio | Bajo | `isSecretFile` (`guard.ts:23`) |
-| 27 | Permisos guardados y modos de ejecución | Alto | Medio | `approvalKey` (`agent.ts:365`) |
-| 28 | Sandbox para comandos | Medio | Alto | Nada |
-| 29 | Revisar cambios por bloque y revisión local | Alto | Medio | `DiffView` (`Chat.tsx:523`) |
-| 30 | Chats laterales y bifurcar | Medio | Medio | Editar/regenerar el último mensaje |
-| 31 | Búsqueda de conversaciones mejorada | Bajo | Bajo | `LIKE` en `history.ts:80` |
-| 32 | Dictado por voz local | Medio | Medio | Nada |
-| 33 | IA en la terminal y en Git | Medio | Bajo | Mensaje de commit con IA (`ai.ts:772`) |
-| 34 | Notebooks Jupyter | Medio | Alto | Nada |
-| 35 | Importar configuración de VS Code / Cursor | Medio | Bajo | Atajos editables (`Settings.tsx:539`) |
-| 36 | Enlaces `zinarix://` | Bajo | Bajo | Nada |
-| 37 | Modelo automático y contexto máximo | Medio | Medio | Roles por modelo (`omni.ts:217`) |
-| 38 | Agente en la CLI y protocolo ACP | Medio | Medio | `omni ask` (`apps/cli/src/commands/ask.ts:140`) |
-| 39 | Canvas (artefactos interactivos) | Medio | Medio | Markdown del chat |
-| 40 | Modo diseño en el navegador | Alto | Medio | Localizar elementos (`browser.ts:90`) |
-| 41 | Navegador del agente: consola, red, capturas | Alto | Bajo | Herramientas `browser_*` (`agent.ts:238`) |
-| 42 | Preguntar al usuario y generar imágenes | Medio | Bajo | Nada |
-| 43 | Objetivos largos y tareas repetidas | Medio | Medio | Vigilante (`watch.ts`) |
-| 44 | Editor y Git más completos | Medio | Medio | `Editor.tsx`, `GitModals.tsx` |
+| #      | Petición                                                                              | Impacto    | Esfuerzo   | Base que ya existe                              |
+| ------ | ------------------------------------------------------------------------------------- | ---------- | ---------- | ----------------------------------------------- |
+| 1      | Pegar imágenes en el chat (**en curso**: `main/chatImages.ts`, sin commit)            | Alto       | Bajo       | Los adaptadores ya mandan imágenes              |
+| 2      | Soporte MCP para el agente                                                            | Alto       | Medio      | Patrón de herramientas de `cloudTools.ts`       |
+| 3      | Búsqueda por significado en el proyecto                                               | Alto       | Medio      | `embed()` ya existe en 3 adaptadores            |
+| 4      | Memorias entre conversaciones                                                         | Medio      | Bajo       | Base SQLite y bloque de reglas                  |
+| 5      | Copia aislada (worktree) por chat                                                     | Medio      | Medio      | Los chats ya aceptan una carpeta propia         |
+| 6      | Documentación externa (`@Docs`)                                                       | Medio      | Medio      | Depende de la #3                                |
+| 7      | Tab que predice la siguiente edición                                                  | Alto       | Medio-alto | Texto fantasma en `inline.ts`                   |
+| 8      | Revisión automática de PRs                                                            | Medio      | Medio      | `gh` y el Vigilante (`watch.ts`)                |
+| 9      | Servidores de lenguaje (LSP)                                                          | Alto       | Alto       | Nada                                            |
+| 10     | Panel de Problemas                                                                    | Medio      | Bajo       | Nada (va junto con la #9)                       |
+| 11     | Depurador (DAP)                                                                       | Medio      | Alto       | Panel Ejecutar (`RunPanel.tsx`)                 |
+| ~~12~~ | ~~Agentes en la nube~~ (quitada: depende de servidores; la parte local pasó a la #38) | —          | —          | —                                               |
+| 13     | Temas externos y extensiones                                                          | Bajo-medio | Alto       | Temas fijos en `themes.ts`                      |
+| 14     | Modos Preguntar / Planear / Depurar / propios                                         | Alto       | Medio      | Interruptor agente/chat (`Chat.tsx:888`)        |
+| 15     | Lista de tareas del agente                                                            | Medio      | Bajo       | Nada                                            |
+| 16     | Dirigir al agente mientras trabaja                                                    | Medio      | Medio      | Cola de mensajes (`Chat.tsx:1394`)              |
+| 17     | Restaurar a cualquier mensaje                                                         | Alto       | Bajo       | `Checkpoint` (`agent.ts:544`)                   |
+| 18     | Medidor de contexto y resumen del chat                                                | Medio      | Bajo       | `compactToolResults` (`agent.ts:1993`)          |
+| 19     | Más tipos de `@`                                                                      | Alto       | Medio      | `mentionedFiles` (`Chat.tsx:147`)               |
+| 20     | Reglas con frontmatter, anidadas y globales                                           | Alto       | Bajo       | `RULES_FILES` (`ai.ts:63`)                      |
+| 21     | Skills (`SKILL.md`)                                                                   | Alto       | Medio      | Nada                                            |
+| 22     | Subagentes propios                                                                    | Medio      | Medio      | `delegate_to_ai` (`agent.ts:298`)               |
+| 23     | Hooks                                                                                 | Medio      | Medio      | Nada                                            |
+| 24     | Comandos `/` propios                                                                  | Medio      | Bajo       | 12 comandos fijos (`Chat.tsx:129`)              |
+| 25     | Plugins de agente                                                                     | Medio      | Medio      | Depende de #2, #20-#24                          |
+| 26     | Archivo `.zinarixignore`                                                              | Medio      | Bajo       | `isSecretFile` (`guard.ts:23`)                  |
+| 27     | Permisos guardados y modos de ejecución                                               | Alto       | Medio      | `approvalKey` (`agent.ts:365`)                  |
+| 28     | Sandbox para comandos                                                                 | Medio      | Alto       | Nada                                            |
+| 29     | Revisar cambios por bloque y revisión local                                           | Alto       | Medio      | `DiffView` (`Chat.tsx:523`)                     |
+| 30     | Chats laterales y bifurcar                                                            | Medio      | Medio      | Editar/regenerar el último mensaje              |
+| 31     | Búsqueda de conversaciones mejorada                                                   | Bajo       | Bajo       | `LIKE` en `history.ts:80`                       |
+| 32     | Dictado por voz local                                                                 | Medio      | Medio      | Nada                                            |
+| 33     | IA en la terminal y en Git                                                            | Medio      | Bajo       | Mensaje de commit con IA (`ai.ts:772`)          |
+| 34     | Notebooks Jupyter                                                                     | Medio      | Alto       | Nada                                            |
+| 35     | Importar configuración de VS Code / Cursor                                            | Medio      | Bajo       | Atajos editables (`Settings.tsx:539`)           |
+| 36     | Enlaces `zinarix://`                                                                  | Bajo       | Bajo       | Nada                                            |
+| 37     | Modelo automático y contexto máximo                                                   | Medio      | Medio      | Roles por modelo (`omni.ts:217`)                |
+| 38     | Agente en la CLI y protocolo ACP                                                      | Medio      | Medio      | `omni ask` (`apps/cli/src/commands/ask.ts:140`) |
+| 39     | Canvas (artefactos interactivos)                                                      | Medio      | Medio      | Markdown del chat                               |
+| 40     | Modo diseño en el navegador                                                           | Alto       | Medio      | Localizar elementos (`browser.ts:90`)           |
+| 41     | Navegador del agente: consola, red, capturas                                          | Alto       | Bajo       | Herramientas `browser_*` (`agent.ts:238`)       |
+| 42     | Preguntar al usuario y generar imágenes                                               | Medio      | Bajo       | Nada                                            |
+| 43     | Objetivos largos y tareas repetidas                                                   | Medio      | Medio      | Vigilante (`watch.ts`)                          |
+| 44     | Editor y Git más completos                                                            | Medio      | Medio      | `Editor.tsx`, `GitModals.tsx`                   |
 
 Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contract.test.ts` falla si no coinciden:
+
 1. Tipo en `OmniApi` (`shared/api.ts`).
 2. Nombre en `CHANNELS` (`shared/api.ts`, ~:1225).
 3. Exponerlo en `preload/preload.ts` con `call('ns:nombre')`.
@@ -120,12 +121,14 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 ## 1. Crear: pegar y arrastrar imágenes en el chat
 
 **Hoy.** El tipo `ContentPart` ya acepta imágenes (`packages/shared/src/schemas.ts:181-205`). Los adaptadores ya las convierten al formato de cada proveedor: `anthropic.ts:46`, `openai-compatible.ts:10`, `openai-responses.ts:29`, `google-gemini.ts:58`, `aws-bedrock.ts:528` y `replicate.ts`. Pero ninguna parte de la app las crea:
+
 - El cuadro de texto del chat (`renderer/components/Chat.tsx:1856`) no tiene `onPaste` ni manejo de soltar archivos.
 - El clip (`Chat.tsx:1891`) solo inserta `@`.
 - `buildContextMessages` (`packages/core/src/context.ts:18`) siempre devuelve texto.
 - El esquema de `ai:chat` (`main/main.ts:492`) solo acepta texto.
 
 **Crear:**
+
 1. En `Chat.tsx`, `onPaste` y `onDrop` en el cuadro de texto que lean imágenes (`png`, `jpg`, `webp`, `gif`) y las guarden como adjuntos con vista previa en miniatura y botón de quitar.
 2. Que el clip abra un selector de archivos que también acepte imágenes.
 3. Ampliar `ChatContext` (`shared/api.ts:513`) o el pedido del chat con `images: {mediaType, data}[]`, y el esquema zod en `main.ts`.
@@ -143,6 +146,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** No hay cliente MCP. Lo único es `packages/providers/src/adapters/cli-agent.ts:549`, que muestra las llamadas MCP que hace Codex. Las herramientas del agente son una lista fija (`TOOLS`, `main/agent.ts:111-294`).
 
 **Crear:**
+
 1. Un módulo `main/mcp.ts` que use `@modelcontextprotocol/sdk` como cliente y soporte servidores `stdio` (lanzar un comando) y `http` (Streamable HTTP, con cabeceras para tokens).
 2. Configuración en `.zinarix/mcp.json` (por proyecto) y en el inicio de Zinarix (global), con el mismo formato que usan Cursor y Claude Code (`{"mcpServers": {"nombre": {"command", "args", "env"} | {"url", "headers"}}}`). Así se pueden reusar las configuraciones que el usuario ya tiene.
 3. Guardar los tokens y las variables `env` secretas en el almacén cifrado que ya usan Vercel y Supabase (`main/token-store.ts`), no en texto plano.
@@ -177,6 +181,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** Las herramientas `search` y `glob` (`agent.ts:1573`, `:1666`) usan ripgrep por texto (`main/workspace.ts:121`). La interfaz `embed()` ya existe (`packages/providers/src/types.ts:54`) y está hecha en `openai-compatible.ts:290`, `openai-responses.ts:201` y `google-gemini.ts:334`. Pero `OmniCore` no la expone, aunque ya hay un rol `'embeddings'` en `packages/core/src/config.ts:23`.
 
 **Crear:**
+
 1. `OmniCore.embed(texts)` en `packages/core` que use el modelo del rol `embeddings`. Que también acepte Ollama local para que funcione sin internet y sin costo.
 2. Un indexador en el proceso principal:
    - Recorre `listFiles` respetando `.gitignore`.
@@ -198,6 +203,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** Solo existen las reglas de proyecto (`RULES_FILES`, `main/ai.ts:62`), que se agregan al prompt en `rulesBlock()` (`ai.ts:690`). La app no recuerda nada por sí sola.
 
 **Crear:**
+
 1. Una tabla `memories` en SQLite (`packages/core/src/db.ts`) con texto, alcance (global o proyecto), fecha y origen (qué chat la creó).
 2. Una herramienta del agente `remember(text, scope)`: el agente la usa cuando el usuario dice "recuerda que…" o corrige algo que se repite.
 3. Agregar las memorias relevantes al prompt junto a `rulesBlock()`, con un límite de tamaño. Si hay muchas, elegirlas con la búsqueda de la petición #3.
@@ -213,6 +219,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** Los chats ya corren en paralelo (`main.ts:1049`, `Agent.sessions` :93) y cada uno puede tener carpeta propia (`ChatTab.folder`, `renderer/store.ts:117`; `scope()`, `main.ts:410`). Pero `git.ts` no maneja worktrees, así que dos agentes en el mismo proyecto editan los mismos archivos.
 
 **Crear:**
+
 1. En `main/git.ts`: `worktreeAdd(path, branch)`, `worktreeList()`, `worktreeRemove(path)`, usando la validación de nombres de rama que ya existe (`checkBranch`, :58).
 2. Una opción "Trabajar en copia aislada" al crear un chat. Crea la rama `zinarix/<nombre-chat>` y un worktree en una carpeta fuera del proyecto (por ejemplo, `<inicio Zinarix>/worktrees/<repo>/<chat>`), y pasa esa ruta como `folder` del chat.
 3. Al terminar, botones en el chat:
@@ -238,6 +245,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** No existe. Los `@` del chat solo buscan archivos del proyecto (`mentionedFiles`, `Chat.tsx:113`).
 
 **Crear (depende de la #3):**
+
 1. "Agregar documentación": el usuario da una URL. La app descarga esa página y las que cuelgan de ella (mismo dominio y ruta, con límite de páginas). Puede usar el navegador que ya existe (`main/browser.ts`) o `fetch` normal, y convierte el HTML a texto.
 2. Guardar los trozos y vectores con el mismo indexador de la #3, marcados con el nombre de la documentación.
 3. En el chat, `@Docs` muestra la lista de documentaciones guardadas. Al elegir una, se buscan los trozos más parecidos a la pregunta y se agregan como contexto, citando la URL.
@@ -253,6 +261,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** `renderer/inline.ts` registra un solo proveedor de texto fantasma (:47). Espera 550 ms (:36), manda el texto antes y después del cursor (main lo corta a 4000/1500 caracteres, `main/ai.ts:708-738`) y siempre inserta en el cursor. No usa los cambios recientes ni puede saltar a otra línea.
 
 **Crear:**
+
 1. Guardar los últimos ~10 cambios del usuario (diffs pequeños por archivo) desde `onDidChangeContent` (`renderer/store.ts:276`).
 2. Un modo "siguiente edición": mandar al modelo los cambios recientes y una ventana de ~40 líneas alrededor del cursor, y pedirle la ventana reescrita.
 3. Comparar la ventana original con la nueva. Si el cambio está en el cursor, se muestra como texto fantasma normal. Si está en otra línea, se muestra una marca en esa línea ("Tab para ir"):
@@ -276,6 +285,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** `git.ts` usa `gh` (`pr()` :323, `githubStatus()` :419). El comando `ai.review` (`renderer/commands.ts:319`) solo manda un prompt al chat. El Vigilante (`main/watch.ts`) ya hace revisiones automáticas, pero de cambios locales sin commit.
 
 **Crear:**
+
 1. En `git.ts`, con `gh`:
    - `prDiff(n)` (`gh pr diff`).
    - `prList()`.
@@ -295,6 +305,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** Monaco solo trae inteligencia para TS/JS, JSON, CSS y HTML (`renderer/monaco.ts:2-16`). En el resto de los lenguajes solo hay colores. No hay `registerDefinitionProvider` ni marcadores de error. Los modelos usan URIs relativas (`file:///<ruta-relativa>`, `renderer/store.ts:270`), y un LSP necesita rutas absolutas reales.
 
 **Crear:**
+
 1. Un gestor en el proceso principal (`main/lsp.ts`) que lance servidores de lenguaje por stdio según el lenguaje del archivo:
    - Python: `pyright` o `basedpyright`.
    - Go: `gopls`.
@@ -325,6 +336,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** El panel de abajo solo tiene terminales (`renderer/App.tsx:336`) y nada llama a `setModelMarkers`.
 
 **Crear:**
+
 1. Pestañas en el panel de abajo: Terminal, Problemas, Salida (y Consola de depuración cuando exista la #11).
 2. En Problemas, la lista de errores y avisos de todos los archivos (de Monaco y de los LSP de la #9), agrupada por archivo. Clic lleva a la línea.
 3. Contador en la barra de estado.
@@ -339,6 +351,7 @@ Para cualquier canal IPC nuevo se siguen 4 pasos, y `apps/desktop/test/ipc-contr
 **Hoy.** No hay. El panel Ejecutar (`renderer/components/RunPanel.tsx:192-205`) detecta scripts y los escribe en la terminal.
 
 **Crear:**
+
 1. Un cliente del Debug Adapter Protocol en el proceso principal (`main/debug.ts`). Primeros adaptadores:
    - Node/TS: `js-debug`.
    - Python: `debugpy`.
@@ -365,6 +378,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Los temas son una lista fija (`THEME_IDS`, `shared/api.ts:~130`, validada con `z.enum` en `main.ts:641`), y no hay sistema de extensiones. Ser compatible con las extensiones de VS Code no es realista sin basarse en VS Code. La recomendación es un sistema propio y pequeño.
 
 **Crear:**
+
 1. **Temas de VS Code.**
    - Importar un archivo `.json` de tema (o un `.vsix` y sacar el tema de adentro).
    - Convertir `colors` a las variables CSS de Zinarix y `tokenColors` a reglas de Monaco. El parecido no será exacto, porque Monaco usa Monarch y no TextMate.
@@ -386,6 +400,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Cómo lo hace Cursor.** Un selector de modo junto al cuadro de texto, Shift+Tab para pasar al siguiente y Ctrl+. para abrir el menú. Las reglas se aplican en todos los modos.
 
 **Crear:**
+
 1. **Preguntar:** solo lectura. El agente usa `read_file`, `search`, `glob` y el navegador, pero no edita ni corre comandos. Se arma quitando de `TOOLS` lo que no está en `READ_ONLY` (`agent.ts:347`).
 2. **Planear:**
    - El agente hace preguntas para aclarar el pedido, investiga el código en modo solo lectura y escribe un plan en Markdown con pasos y archivos.
@@ -410,6 +425,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** No hay. El prompt solo dice "planea brevemente".
 
 **Crear:**
+
 1. Una herramienta `update_todos(items, merge)` con estados `pendiente`, `en curso`, `hecha` y `cancelada` (los mismos de Cursor).
 2. Mostrar la lista fija arriba del chat mientras el agente trabaja, tachando lo que termina.
 3. Guardarla con la conversación, para verla al reabrir el chat.
@@ -424,6 +440,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Existe una cola visible que se puede editar y borrar, y se manda al terminar la respuesta actual (`sendQueued`, `Chat.tsx:1394`; `enqueue`, `:1642`). No se puede meter un mensaje en una respuesta que ya está corriendo.
 
 **Crear:**
+
 1. **Enviar ahora** (Ctrl+Enter): el mensaje entra en el bucle del agente (`loop`, `agent.ts:790`) antes de la siguiente llamada a una herramienta, sin detenerlo.
 2. Reordenar la cola arrastrando.
 3. Indicar en el chat dónde entró el mensaje.
@@ -437,6 +454,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Se guarda cada escritura (`Checkpoint`, `agent.ts:544`), pero el botón "revertir" deshace toda la conversación de una vez (`agent.ts:1779`, `Chat.tsx:1755`).
 
 **Crear:**
+
 1. Agrupar los puntos de restauración por mensaje del usuario.
 2. En cada mensaje, un botón "Restaurar aquí" que devuelva los archivos a como estaban antes de ese mensaje. Los mensajes del chat se quedan.
 3. Vista previa de qué archivos cambian antes de restaurar.
@@ -452,6 +470,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Los resultados viejos de herramientas se recortan solos pasando 250 000 caracteres (`compactToolResults`, `agent.ts:1993`). Se ven los tokens y el costo de cada turno (`Chat.tsx:357`), pero no cuánto del límite del modelo se ha usado.
 
 **Crear:**
+
 1. Un anillo junto al cuadro de texto con el porcentaje del contexto usado. Al hacer clic, el desglose: prompt del sistema, herramientas, reglas, skills, MCP, conversación y resumen.
 2. Resumen automático cuando se acerca al límite: un modelo barato resume los mensajes viejos y se guardan los últimos completos.
 3. Comando `/resumir` (en Cursor `/summarize` o `/compress`) para hacerlo a mano.
@@ -466,6 +485,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** `@` solo acepta archivos que existen (`mentionedFiles`, `Chat.tsx:147`). La salida de la terminal se puede mandar al chat con un botón (`Terminal.tsx:94`), pero no con `@`.
 
 **Crear:**
+
 1. `@carpeta/`: al escribir `/` se entra a la carpeta. Agrega la lista de archivos y los más importantes.
 2. `@terminal`: la salida reciente de una terminal abierta.
 3. `@chat`: un resumen de otra conversación.
@@ -483,6 +503,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Usa solo el primer archivo que encuentra entre `.zinarix/rules.md`, `AGENTS.md`, `CLAUDE.md` y `.cursorrules`, y solo en la raíz (`RULES_FILES`, `ai.ts:63`; `rulesBlock()`, `:707-736`).
 
 **Crear (igual que Cursor, para que sus reglas sirvan sin cambios):**
+
 1. Carpeta `.zinarix/rules/**/*.mdc`, y leer también `.cursor/rules/**/*.mdc`. Frontmatter:
    - `alwaysApply: true`: siempre.
    - `globs: "src/**/*.ts"`: solo cuando el agente lee o edita archivos que coinciden.
@@ -506,6 +527,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Cómo lo hace Cursor.** Una skill es una carpeta con un `SKILL.md` y, si hace falta, `scripts/`, `references/` y `assets/`. El agente ve el nombre y la descripción de todas, y lee el contenido completo solo cuando la necesita.
 
 **Crear:**
+
 1. Buscar skills, también dentro de subcarpetas (en un monorepo cada una aplica a su parte):
    - Del proyecto: `.zinarix/skills/`, `.agents/skills/`, `.cursor/skills/`, `.claude/skills/`, `.codex/skills/`.
    - Del usuario: las mismas carpetas en el inicio del usuario.
@@ -529,6 +551,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** `delegate_to_ai` (`agent.ts:298-319`) le pasa una tarea a otro modelo. No hay agentes definidos por el usuario ni varios en paralelo.
 
 **Crear:**
+
 1. Archivos Markdown en `.zinarix/agents/`, y leer también `.cursor/agents/`, `.claude/agents/` y `.codex/agents/`, del proyecto y del usuario. Si dos tienen el mismo nombre, gana el del proyecto. El texto es el prompt del sistema. Frontmatter:
    - `name` y `description` (con "úsalo de forma proactiva" el agente lo llama solo).
    - `model`: `inherit` o un modelo de los que el usuario tiene conectados.
@@ -549,6 +572,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** No hay.
 
 **Crear (con el formato de Cursor para que sus `hooks.json` funcionen):**
+
 1. Archivos:
    - Del proyecto: `.zinarix/hooks.json`, y leer `.cursor/hooks.json`. Solo si el usuario confió en el proyecto.
    - Del usuario: en el inicio de Zinarix.
@@ -559,9 +583,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
    {
      "version": 1,
      "hooks": {
-       "<evento>": [
-         { "command": "...", "timeout": 30, "matcher": "regex", "failClosed": false }
-       ]
+       "<evento>": [{ "command": "...", "timeout": 30, "matcher": "regex", "failClosed": false }]
      }
    }
    ```
@@ -593,6 +615,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Hay 12 comandos fijos (`Chat.tsx:129-144`).
 
 **Crear:**
+
 1. Archivos Markdown en `.zinarix/commands/`, y leer también `.cursor/commands/` y `.claude/commands/`. El nombre del archivo es el comando y el contenido es el prompt.
 2. Soportar `$ARGUMENTS` para lo que se escribe después del comando.
 3. Que aparezcan en el autocompletado de `/` junto a los fijos y a las skills (#21).
@@ -606,6 +629,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Están los tipos de extensión en `shared/devtools.ts:67-115`, sin commit, y la carpeta `main/extensions/` vacía.
 
 **Crear (junto con la #13):**
+
 1. Un plugin es una carpeta con `plugin.json` (`name`, `description`, `version`, `author`) que puede traer reglas, skills, subagentes, comandos, hooks y `mcp.json`.
 2. Leer también el formato de Cursor (`.cursor-plugin/plugin.json`) y el estándar abierto (`plugin.json` con `$schema` de agent-plugins.org).
 3. Instalar desde una carpeta local o un repo de Git, para todos los proyectos o solo para uno. Carpeta de desarrollo: `<inicio Zinarix>/plugins/local/<nombre>/`.
@@ -621,6 +645,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Solo existe el filtro de archivos secretos (`isSecretFile`, `guard.ts:23`) y lo que ignora `.gitignore` en las búsquedas.
 
 **Crear:**
+
 1. Un archivo `.zinarixignore` en la raíz con el formato de `.gitignore`. Leer también `.cursorignore`.
 2. El agente no puede leer, buscar, editar ni mencionar con `@` lo que coincide, y el Tab tampoco lo manda.
 3. Proteger el propio archivo para que el agente no lo cambie sin aprobación.
@@ -635,6 +660,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Cada acción pide aprobación, con una opción "siempre" que solo dura esa conversación (`approvalKey`, `agent.ts:365`; `:1154-1383`).
 
 **Crear:**
+
 1. Listas de permitir y de negar que se guarden, por proyecto (`.zinarix/permissions.json`) y por usuario, con el formato de la CLI de Cursor:
    - `Shell(npm test)` o `Shell(git:*)`.
    - `Read(glob)` y `Write(glob)`.
@@ -666,6 +692,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Cómo lo hace Cursor.** En Mac usa Seatbelt y en Linux Landlock. En Windows no documenta sandbox. Configura en `sandbox.json` la red (solo lo permitido, lo permitido más los registros de paquetes, o todo) y rutas extra para leer y escribir.
 
 **Crear:**
+
 1. En Windows, la opción más realista: correr los comandos en un proceso con un token restringido o un AppContainer, con un Job Object que limite procesos hijos. Si el usuario tiene WSL, ofrecer correrlos ahí.
 2. `.zinarix/sandbox.json` y uno global:
    - Red: ninguna, solo registros de paquetes (npm, PyPI, crates…) o toda.
@@ -683,6 +710,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Cada edición se aprueba o se rechaza completa, viendo el diff antes (`DiffView`, `Chat.tsx:523`). El Vigilante (`watch.ts`) revisa cambios locales en automático.
 
 **Crear:**
+
 1. Aceptar o rechazar cada bloque de un cambio por separado, en la tarjeta del chat y en el editor (con botones sobre cada bloque, como en un merge).
 2. Un panel "Cambios del agente" con todo lo que cambió en la conversación: archivos, `+/-` y "Aceptar todo" / "Rechazar todo".
 3. **Revisión del agente** (Agent Review en Cursor):
@@ -701,6 +729,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Solo se puede editar o regenerar el último mensaje.
 
 **Crear:**
+
 1. **Chat lateral** (`/lado` o Ctrl+Shift+S, y "Preguntar en chat lateral" sobre una selección):
    - Una pregunta rápida que ve el chat principal como referencia, pero no lo ensucia.
    - Solo lectura. Se cierra con X y se puede traer su respuesta al chat principal con `@`.
@@ -715,6 +744,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Se busca en títulos y contenido con `LIKE` (`history.ts:80-91`), y se puede exportar a Markdown.
 
 **Crear:**
+
 1. Un índice de texto completo en SQLite (FTS5) para que sea rápido con miles de chats.
 2. Ctrl+F dentro de una conversación, con contador de coincidencias.
 3. Una herramienta del agente `search_chats(query)` para buscar en conversaciones anteriores cuando el usuario dice "como lo hicimos la otra vez".
@@ -728,6 +758,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** No hay.
 
 **Crear:**
+
 1. Un botón de micrófono en el chat y el atajo Ctrl+Shift+Space.
 2. Transcribir en la PC con `whisper.cpp` o un modelo Whisper local: se descarga una vez y funciona sin internet. Como opción, usar el proveedor de transcripción del usuario si tiene uno conectado. La API de voz de Chromium no sirve porque en Electron depende de servidores de Google.
 3. Ver el texto mientras se habla y poder corregirlo antes de mandar.
@@ -742,6 +773,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Ya hay mensaje de commit con IA (`ai.ts:772`, `GitPanel.tsx:169`). Los conflictos solo se marcan (`git.ts:149`).
 
 **Crear:**
+
 1. **Ctrl+K en la terminal:** escribir en lenguaje normal ("borra las ramas ya fusionadas") y recibir el comando para PowerShell o bash, que se revisa antes de correrlo.
 2. **"Resolver en el chat"** para conflictos de merge: manda los dos lados y el ancestro común al agente, y muestra el resultado como diff para aceptar.
 3. **"Arreglar con IA"** sobre un comando que falló en la terminal (manda el comando y el error).
@@ -756,6 +788,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Un `.ipynb` se abre como JSON.
 
 **Crear:**
+
 1. Una vista de notebook con celdas de código y Markdown, y salidas (texto, tablas, imágenes).
 2. Correr celdas con un kernel local (`jupyter` o `ipykernel` instalado por el usuario), con la misma oferta de instalar que tienen los LSP (#9).
 3. Que el agente pueda editar celdas por número y leer las salidas.
@@ -770,6 +803,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Los atajos se pueden cambiar (`Settings.tsx:539-580`), pero no se puede importar nada.
 
 **Crear:**
+
 1. Un botón "Importar de VS Code / Cursor" que lea los `settings.json` y `keybindings.json` del usuario y traduzca:
    - Atajos.
    - Fuente y tamaño.
@@ -787,6 +821,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** La app no registra ningún protocolo.
 
 **Crear:**
+
 1. Registrar `zinarix://` en el instalador de Windows y con `app.setAsDefaultProtocolClient`.
 2. Enlaces:
    - `zinarix://prompt?text=`: abre un chat con ese texto.
@@ -804,6 +839,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Se elige un modelo por rol (chat, agente, inline, commit…) y hay una cadena de respaldo (`omni.ts:217-224`, `:350`).
 
 **Crear:**
+
 1. Un modelo "Automático" que corre en la PC y elige entre los modelos que el usuario tiene conectados según el tipo de tarea:
    - Pregunta corta: el más barato.
    - Cambio grande o muchos archivos: el más capaz.
@@ -823,6 +859,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** `omni ask` (`apps/cli/src/commands/ask.ts:140-151`) contesta una vez sin interfaz y acepta `--json`, pero no tiene herramientas: no edita ni corre comandos.
 
 **Crear:**
+
 1. Separar el agente de Electron (`packages/agent`), con navegador, correo y nube como partes opcionales.
 2. `omni agent "tarea"` con herramientas de archivos y terminal. Opciones:
    - `-p` para correr sin preguntas.
@@ -848,6 +885,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** El chat solo muestra Markdown y código.
 
 **Crear:**
+
 1. Que el agente pueda crear un "canvas": un archivo HTML/React que se muestra junto al chat en un `iframe` aislado (`sandbox`, sin acceso a Node ni a la red salvo que se permita).
 2. Diagramas `mermaid` dentro del Markdown del chat.
 3. Lista de canvas del proyecto y comando "Abrir canvas". Se puede editar el código a mano.
@@ -862,6 +900,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** El navegador puede localizar elementos (`browser.ts:90-102`), pero solo para que el agente haga clic.
 
 **Crear:**
+
 1. Un botón "Diseño" (Ctrl+Shift+D) en el navegador.
    - Al pasar el mouse se resalta el elemento.
    - Clic lo selecciona. Flechas arriba y abajo van al padre o al hijo. Shift+clic agrega más.
@@ -883,6 +922,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** El agente puede abrir, leer, hacer clic, escribir, desplazarse y volver (`agent.ts:238-289`).
 
 **Crear:**
+
 1. `browser_console()`: los mensajes y errores de la consola de la página.
 2. `browser_network()`: las peticiones con método, URL, estado y tiempo. Sin cuerpos con contraseñas ni cookies.
 3. `browser_screenshot()`: una captura que va al modelo como imagen (depende de la #1).
@@ -899,6 +939,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** El agente solo puede preguntar terminando su respuesta.
 
 **Crear:**
+
 1. Herramienta `ask_question(pregunta, opciones)`: muestra botones en el chat. El agente puede seguir trabajando en otra cosa mientras el usuario contesta.
 2. Herramienta `generate_image(prompt, referencia?)` con el proveedor de imágenes que tenga conectado el usuario. Guarda en `assets/` y la muestra en el chat.
 
@@ -911,6 +952,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** El Vigilante (`watch.ts`) revisa cambios en automático, con un límite diario.
 
 **Crear (todo corre en la PC mientras Zinarix está abierto):**
+
 1. `/objetivo <meta>`: el agente sigue trabajando, mensaje tras mensaje, hasta cumplir la meta o hasta el límite de pasos y de gasto. Se puede pausar.
 2. `/repetir <intervalo> <prompt>`: corre un prompt o una skill cada cierto tiempo (por ejemplo, "cada 30 min revisa si pasaron los tests"). Con aviso al teléfono cuando hay algo importante (`phone.ts`, `bots.ts`).
 3. `/multitarea`: manda varios pedidos a subagentes (#22) en paralelo en lugar de hacer cola.
@@ -924,6 +966,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 **Hoy.** Hay minimapa (`Editor.tsx:31`), buscar y reemplazar en varios archivos (`Search.tsx`) y Git con diff, preparar por archivo, ramas, stash, merge y PRs (`shared/api.ts:926-951`). Solo se pueden dividir los chats, no el editor, y la ventana abre una sola carpeta.
 
 **Crear:**
+
 1. Dividir el editor a la derecha y abajo.
 2. Abrir varias carpetas en la misma ventana (multi-raíz).
 3. Buscar símbolos en todo el proyecto (Ctrl+T) y en el archivo (Ctrl+Shift+O), con el LSP de la #9 o con el índice de la #3.
@@ -953,6 +996,7 @@ En Cursor estos agentes corren en sus servidores. Zinarix es local, así que no 
 ## Lo que no hace falta copiar
 
 Zinarix ya tiene cosas que Cursor no. Hay que cuidarlas al hacer estos cambios:
+
 - 62 proveedores, modelos locales y presupuesto por proveedor.
 - Navegador que controla la IA.
 - Centro de seguridad.

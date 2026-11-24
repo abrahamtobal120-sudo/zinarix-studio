@@ -39,13 +39,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       data-ui="button"
-      className={cls('ui-btn', `ui-btn-${variant}`, `ui-btn-${size}`, loading && 'is-loading', className)}
+      className={cls(
+        'ui-btn',
+        `ui-btn-${variant}`,
+        `ui-btn-${size}`,
+        loading && 'is-loading',
+        className,
+      )}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...rest}
     >
       {loading ? <span className="ui-spinner" aria-hidden="true" /> : start}
-      {children !== undefined && children !== null && <span className="ui-btn-label">{children}</span>}
+      {children !== undefined && children !== null && (
+        <span className="ui-btn-label">{children}</span>
+      )}
     </button>
   );
 });

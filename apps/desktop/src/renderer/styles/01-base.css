@@ -1,23 +1,23 @@
 /* Part of the old styles.css, cut without reordering a rule. Layer `base`; the order of
  * the layers is declared once, at the top of ui/tokens.css. */
 @layer base {
-html,
-body,
-#root {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
-}
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font:
-    13px/1.4 system-ui,
-    -apple-system,
-    'Segoe UI',
-    Ubuntu,
-    'Noto Sans',
-    sans-serif;
-  user-select: none;
-}
+  html,
+  body,
+  #root {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font:
+      13px/1.4 system-ui,
+      -apple-system,
+      'Segoe UI',
+      Ubuntu,
+      'Noto Sans',
+      sans-serif;
+    user-select: none;
+  }
 }

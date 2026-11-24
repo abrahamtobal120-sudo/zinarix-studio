@@ -189,8 +189,11 @@ class JupyterServer {
     if (!this.alive) return;
     if (process.platform === 'win32' && this.proc.pid)
       // Kernels are children of the server: take the whole tree down.
-      execFile('taskkill', ['/pid', String(this.proc.pid), '/T', '/F'], { windowsHide: true }, () =>
-        undefined,
+      execFile(
+        'taskkill',
+        ['/pid', String(this.proc.pid), '/T', '/F'],
+        { windowsHide: true },
+        () => undefined,
       );
     else this.proc.kill('SIGTERM');
   }
@@ -263,7 +266,9 @@ export class NotebookKernels {
    * Interpreters found for this folder and whether each one has jupyter_server + ipykernel
    * (Python of the project venv, conda, PATH…).
    */
-  async interpreters(root: string | null): Promise<{ cmd: string; label: string; ok: boolean; version?: string }[]> {
+  async interpreters(
+    root: string | null,
+  ): Promise<{ cmd: string; label: string; ok: boolean; version?: string }[]> {
     const cands = pythonCandidates(root);
     if (this.prefer && !cands.some((c) => c.cmd === this.prefer))
       cands.unshift({ cmd: this.prefer, pre: [], label: this.prefer });
@@ -271,7 +276,12 @@ export class NotebookKernels {
       cands.map(async (r) => {
         try {
           const out = (await run(r.cmd, [...r.pre, '-c', PROBE], 15_000)).trim().split(/\r?\n/);
-          return { cmd: out[1]?.trim() || r.cmd, label: r.label, ok: true, version: out[0]?.trim() };
+          return {
+            cmd: out[1]?.trim() || r.cmd,
+            label: r.label,
+            ok: true,
+            version: out[0]?.trim(),
+          };
         } catch {
           return { cmd: r.cmd, label: r.label, ok: false };
         }
@@ -297,7 +307,13 @@ export class NotebookKernels {
     // The interpreter the user picked is the only one tried (a fallback would hide its problem).
     const all = pythonCandidates(root);
     const cands = this.prefer
-      ? [all.find((c) => c.cmd === this.prefer) ?? { cmd: this.prefer, pre: [], label: this.prefer }]
+      ? [
+          all.find((c) => c.cmd === this.prefer) ?? {
+            cmd: this.prefer,
+            pre: [],
+            label: this.prefer,
+          },
+        ]
       : all;
     for (const r of cands) {
       tried.push(r.label);
@@ -325,7 +341,9 @@ export class NotebookKernels {
     const st = await this.status(root);
     if (!st.ok || !this.runner)
       throw new Error(
-        st.ok ? 'Jupyter no disponible' : 'Jupyter no está instalado (falta jupyter_server o ipykernel).',
+        st.ok
+          ? 'Jupyter no disponible'
+          : 'Jupyter no está instalado (falta jupyter_server o ipykernel).',
       );
     const p = JupyterServer.start(this.runner, root);
     this.server = p;
@@ -340,7 +358,10 @@ export class NotebookKernels {
     const srv = await this.serverFor(root);
     const r = await srv.req<{
       default: string;
-      kernelspecs: Record<string, { name: string; spec: { display_name: string; language: string } }>;
+      kernelspecs: Record<
+        string,
+        { name: string; spec: { display_name: string; language: string } }
+      >;
     }>('GET', '/api/kernelspecs');
     return {
       default: r.default,
@@ -443,8 +464,7 @@ export class NotebookKernels {
     if (type === 'status' && m.channel === 'iopub') {
       const st = m.content.execution_state;
       // Only the kernel's own state changes (any request) drive the indicator.
-      if (st === 'busy' || st === 'idle')
-        this.emit({ kind: 'kernel', path: s.path, state: st });
+      if (st === 'busy' || st === 'idle') this.emit({ kind: 'kernel', path: s.path, state: st });
       else if (st === 'restarting' || st === 'dead') {
         this.failPending(s);
         this.emit({ kind: 'kernel', path: s.path, state: st });
@@ -473,7 +493,13 @@ export class NotebookKernels {
       return;
     }
     if (m.channel === 'iopub' && type !== 'execute_input')
-      this.emit({ kind: 'output', path: s.path, cellId, msgType: type, content: m.content as JsonObject });
+      this.emit({
+        kind: 'output',
+        path: s.path,
+        cellId,
+        msgType: type,
+        content: m.content as JsonObject,
+      });
   }
 
   private async session(rel: string): Promise<Session> {
@@ -495,7 +521,12 @@ export class NotebookKernels {
    * A shell request answered by one reply (complete, inspect, a silent execute). Null when the
    * notebook has no kernel or it does not answer in time (busy with a long cell).
    */
-  private async ask(rel: string, type: string, content: JsonObject, timeout: number): Promise<JsonObject | null> {
+  private async ask(
+    rel: string,
+    type: string,
+    content: JsonObject,
+    timeout: number,
+  ): Promise<JsonObject | null> {
     const p = this.sessions.get(rel);
     if (!p) return null;
     const s = await p.catch(() => null);
@@ -517,7 +548,12 @@ export class NotebookKernels {
   /** Completions of the kernel at a cursor (UTF-16 offset) of a cell's code. */
   async complete(rel: string, code: string, cursor: number): Promise<NbCompletions | null> {
     // The first completion of a kernel loads jedi (several seconds); later ones take ms.
-    const r = await this.ask(rel, 'complete_request', { code, cursor_pos: toCodePoints(code, cursor) }, 12_000);
+    const r = await this.ask(
+      rel,
+      'complete_request',
+      { code, cursor_pos: toCodePoints(code, cursor) },
+      12_000,
+    );
     return r ? parseCompleteReply(code, r) : null;
   }
 
@@ -531,7 +567,8 @@ export class NotebookKernels {
     );
     if (!r || r.status !== 'ok' || r.found !== true) return null;
     const data = r.data as JsonObject | undefined;
-    const text = data && typeof data['text/plain'] === 'string' ? stripAnsi(data['text/plain']) : '';
+    const text =
+      data && typeof data['text/plain'] === 'string' ? stripAnsi(data['text/plain']) : '';
     return text.trim() ? text.trim().slice(0, 6000) : null;
   }
 
@@ -591,7 +628,9 @@ export class NotebookKernels {
       // closed
     }
     const srv = this.server ? await this.server.catch(() => null) : null;
-    await srv?.req('DELETE', `/api/sessions/${encodeURIComponent(s.sessionId)}`).catch(() => undefined);
+    await srv
+      ?.req('DELETE', `/api/sessions/${encodeURIComponent(s.sessionId)}`)
+      .catch(() => undefined);
     this.emit({ kind: 'kernel', path: rel, state: 'dead' });
   }
 

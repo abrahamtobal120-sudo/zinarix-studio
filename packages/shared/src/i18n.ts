@@ -17,7 +17,8 @@ const es = {
   'err.not_found': 'No encontrado en {provider}: {detail}',
   'err.aborted': 'Cancelado.',
   'err.config': 'Error de configuración: {detail}',
-  'err.no_model': 'No hay un modelo elegido. Elige uno en «Elige un modelo», debajo del mensaje, o conecta un proveedor en IA → Proveedores.',
+  'err.no_model':
+    'No hay un modelo elegido. Elige uno en «Elige un modelo», debajo del mensaje, o conecta un proveedor en IA → Proveedores.',
   'err.budget': 'Presupuesto agotado: {detail}',
   'err.privacy': 'Bloqueado por el modo 100 % local: {detail}',
   'err.unsupported': 'No soportado: {detail}',
@@ -77,7 +78,8 @@ const en: Record<MessageKey, string> = {
   'err.not_found': 'Not found on {provider}: {detail}',
   'err.aborted': 'Cancelled.',
   'err.config': 'Configuration error: {detail}',
-  'err.no_model': 'No model selected. Pick one in "Pick a model" below the message box, or connect a provider in AI → Providers.',
+  'err.no_model':
+    'No model selected. Pick one in "Pick a model" below the message box, or connect a provider in AI → Providers.',
   'err.budget': 'Budget exhausted: {detail}',
   'err.privacy': 'Blocked by 100% local mode: {detail}',
   'err.unsupported': 'Not supported: {detail}',

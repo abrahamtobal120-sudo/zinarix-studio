@@ -484,7 +484,12 @@ function parseArgs(json: string): unknown {
 
 /** Converse document names allow letters, digits, spaces, hyphens, parentheses and brackets. */
 function docName(name: string | undefined): string {
-  return (name ?? '').replace(/[^\w\s()[\]-]+/g, ' ').trim().slice(0, 60) || 'document';
+  return (
+    (name ?? '')
+      .replace(/[^\w\s()[\]-]+/g, ' ')
+      .trim()
+      .slice(0, 60) || 'document'
+  );
 }
 
 function imageFormat(mediaType: string): string {
@@ -534,7 +539,15 @@ export function toConverse(
                   : p.type === 'image'
                     ? [{ image: { format: imageFormat(p.mediaType), source: { bytes: p.data } } }]
                     : isPdf(p)
-                      ? [{ document: { format: 'pdf', name: docName(p.name), source: { bytes: p.data } } }]
+                      ? [
+                          {
+                            document: {
+                              format: 'pdf',
+                              name: docName(p.name),
+                              source: { bytes: p.data },
+                            },
+                          },
+                        ]
                       : [{ text: isTextual(p) ? decodeText(p) : unsupportedPart(p, 'Bedrock') }],
               ),
         );

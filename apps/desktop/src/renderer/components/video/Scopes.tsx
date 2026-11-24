@@ -22,7 +22,13 @@ const CH_R: Rgb = [255, 82, 82];
 const CH_G: Rgb = [82, 220, 110];
 const CH_B: Rgb = [90, 140, 255];
 
-export function Scopes({ source, playing }: { source: () => HTMLCanvasElement | null; playing: boolean }) {
+export function Scopes({
+  source,
+  playing,
+}: {
+  source: () => HTMLCanvasElement | null;
+  playing: boolean;
+}) {
   const [kind, setKind] = useState<ScopeKind>('waveform');
   const [result, setResult] = useState<ScopeResult | null>(null);
   const [exact, setExact] = useState(false);
@@ -84,7 +90,14 @@ export function Scopes({ source, playing }: { source: () => HTMLCanvasElement | 
     const img = ctx.getImageData(0, 0, sw, sh);
     const id = ++seq.current;
     exactOf.current.set(id, sw === src.width);
-    const req: ScopeRequest = { id, kind: kindRef.current, data: img.data.buffer, w: sw, h: sh, maxWidth: sw };
+    const req: ScopeRequest = {
+      id,
+      kind: kindRef.current,
+      data: img.data.buffer,
+      w: sw,
+      h: sh,
+      maxWidth: sw,
+    };
     inflight.current = true;
     w.postMessage(req, [img.data.buffer]);
   }, []);
@@ -192,9 +205,15 @@ export function Scopes({ source, playing }: { source: () => HTMLCanvasElement | 
 }
 
 /** Cheap hash of a 32×18 downscale of the source, to notice a new frame while paused. */
-function fingerprint(src: HTMLCanvasElement | null, ref: { current: HTMLCanvasElement | null }): number {
+function fingerprint(
+  src: HTMLCanvasElement | null,
+  ref: { current: HTMLCanvasElement | null },
+): number {
   if (!src || !src.width || !src.height) return -1;
-  const cv = (ref.current ??= Object.assign(document.createElement('canvas'), { width: 32, height: 18 }));
+  const cv = (ref.current ??= Object.assign(document.createElement('canvas'), {
+    width: 32,
+    height: 18,
+  }));
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   if (!ctx) return -1;
   ctx.drawImage(src, 0, 0, 32, 18);
@@ -220,7 +239,10 @@ const probe: { cv: HTMLCanvasElement | null } = { cv: null };
 
 /** Resolves a CSS colour (any syntax) to RGB by painting it on a 1×1 canvas. */
 function cssRgb(value: string, fallback: Rgb): Rgb {
-  const cv = (probe.cv ??= Object.assign(document.createElement('canvas'), { width: 1, height: 1 }));
+  const cv = (probe.cv ??= Object.assign(document.createElement('canvas'), {
+    width: 1,
+    height: 1,
+  }));
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   if (!ctx || !value) return fallback;
   ctx.clearRect(0, 0, 1, 1);
@@ -268,7 +290,8 @@ function draw(cv: HTMLCanvasElement, r: ScopeResult): void {
       const third = W / 3;
       const img = [r.r, r.g, r.b];
       const tints = [CH_R, CH_G, CH_B];
-      for (let i = 0; i < 3; i++) blit(ctx, densityImage([img[i]!], [tints[i]!], r.cols, r.peak), i * third, 0, third, H);
+      for (let i = 0; i < 3; i++)
+        blit(ctx, densityImage([img[i]!], [tints[i]!], r.cols, r.peak), i * third, 0, third, H);
       ctx.strokeStyle = t.grid;
       for (let i = 1; i < 3; i++) line(ctx, i * third, 0, i * third, H);
       levelGuides(ctx, t, 0, W, H);
@@ -310,7 +333,14 @@ function densityImage(layers: Uint32Array[], tints: Rgb[], cols: number, peak: n
 
 const offscreen: { cv: HTMLCanvasElement | null } = { cv: null };
 
-function blit(ctx: CanvasRenderingContext2D, img: ImageData, x: number, y: number, w: number, h: number): void {
+function blit(
+  ctx: CanvasRenderingContext2D,
+  img: ImageData,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
   const off = (offscreen.cv ??= document.createElement('canvas'));
   off.width = img.width;
   off.height = img.height;
@@ -327,7 +357,13 @@ function line(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number,
 }
 
 /** Graticule at 0/64/128/192/255 and dashed legal-range lines at 16 and 235. */
-function levelGuides(ctx: CanvasRenderingContext2D, t: Theme, x0: number, W: number, H: number): void {
+function levelGuides(
+  ctx: CanvasRenderingContext2D,
+  t: Theme,
+  x0: number,
+  W: number,
+  H: number,
+): void {
   const y = (lv: number) => ((255.5 - lv) / 256) * H;
   ctx.lineWidth = 1;
   ctx.strokeStyle = t.grid;
@@ -342,7 +378,12 @@ function levelGuides(ctx: CanvasRenderingContext2D, t: Theme, x0: number, W: num
   ctx.fillText(String(legalRange.lo), x0 + 3, y(legalRange.lo) + 6);
 }
 
-function drawVector(ctx: CanvasRenderingContext2D, bins: Uint32Array, peak: number, t: Theme): void {
+function drawVector(
+  ctx: CanvasRenderingContext2D,
+  bins: Uint32Array,
+  peak: number,
+  t: Theme,
+): void {
   // Density: each bin painted with its own hue so the trace reads like the colours it holds.
   const img = new ImageData(256, 256);
   const out = img.data;

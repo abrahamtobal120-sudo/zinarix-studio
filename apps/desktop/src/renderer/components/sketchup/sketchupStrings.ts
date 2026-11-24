@@ -9,14 +9,16 @@ const es = {
   found: 'SketchUp {v} instalado',
   foundNoYear: 'SketchUp instalado',
   notFound: 'SketchUp no está instalado',
-  notFoundHint: 'Sin SketchUp puedes ver la versión y la miniatura de los .skp, y revisar modelos exportados (.stl, .obj, .dae).',
+  notFoundHint:
+    'Sin SketchUp puedes ver la versión y la miniatura de los .skp, y revisar modelos exportados (.stl, .obj, .dae).',
   download: 'Descargar SketchUp',
   pick: 'Elegir SketchUp…',
   notSketchup: 'Ese programa no es SketchUp.',
   extOk: 'Extensión de Zinarix instalada',
   extOld: 'La extensión de Zinarix está desactualizada',
   extMissing: 'Falta la extensión de Zinarix',
-  extHint: 'Con la extensión, la IA puede crear y cambiar modelos en tu SketchUp. Reinicia SketchUp después de instalarla.',
+  extHint:
+    'Con la extensión, la IA puede crear y cambiar modelos en tu SketchUp. Reinicia SketchUp después de instalarla.',
   install: 'Instalar extensión',
   update: 'Actualizar extensión',
   installed: 'Extensión instalada. Cierra y vuelve a abrir SketchUp.',
@@ -69,14 +71,16 @@ const en: typeof es = {
   found: 'SketchUp {v} installed',
   foundNoYear: 'SketchUp installed',
   notFound: 'SketchUp is not installed',
-  notFoundHint: 'Without SketchUp you can still see the version and thumbnail of .skp files, and check exported models (.stl, .obj, .dae).',
+  notFoundHint:
+    'Without SketchUp you can still see the version and thumbnail of .skp files, and check exported models (.stl, .obj, .dae).',
   download: 'Download SketchUp',
   pick: 'Pick SketchUp…',
   notSketchup: 'That program is not SketchUp.',
   extOk: 'Zinarix extension installed',
   extOld: 'The Zinarix extension is outdated',
   extMissing: 'The Zinarix extension is missing',
-  extHint: 'With the extension, the AI can create and change models in your SketchUp. Restart SketchUp after installing it.',
+  extHint:
+    'With the extension, the AI can create and change models in your SketchUp. Restart SketchUp after installing it.',
   install: 'Install extension',
   update: 'Update extension',
   installed: 'Extension installed. Close SketchUp and open it again.',
@@ -116,9 +120,11 @@ const en: typeof es = {
   size: '{s}',
   noThumb: 'No thumbnail',
   newerFile: 'The file is from {f}: your SketchUp {i} may not open it.',
-  noSketchupOpen: 'Without SketchUp it cannot be opened; here you see the thumbnail stored in the file.',
+  noSketchupOpen:
+    'Without SketchUp it cannot be opened; here you see the thumbnail stored in the file.',
   checkAi: 'Check with the AI',
-  checkAiPrompt: 'Look at the SketchUp model {file} (sketchup_inspect) and tell me what it contains.',
+  checkAiPrompt:
+    'Look at the SketchUp model {file} (sketchup_inspect) and tell me what it contains.',
 };
 
 export type KeySketchup = keyof typeof es;

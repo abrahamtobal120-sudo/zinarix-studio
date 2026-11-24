@@ -32,7 +32,10 @@ type View =
   | { kind: 'apps'; device: MobileDevice };
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']+': (Error: )?/,
+    '',
+  );
 const fail = (e: unknown) => toast(tm('error', { err: errText(e) }));
 
 export function MobilePanel() {
@@ -45,12 +48,24 @@ export function MobilePanel() {
   const [view, setView] = useState<View>({ kind: 'main' });
 
   const load = useCallback(async (force = false) => {
-    const t = await api().mobile.tools(force).catch(() => null);
+    const t = await api()
+      .mobile.tools(force)
+      .catch(() => null);
     setTools(t);
     const [d, a, p] = await Promise.all([
-      t?.adb ? api().mobile.devices().catch(() => [] as MobileDevice[]) : Promise.resolve([] as MobileDevice[]),
-      t?.emulator ? api().mobile.avds().catch(() => [] as string[]) : Promise.resolve([] as string[]),
-      api().mobile.projects().catch(() => [] as MobileProject[]),
+      t?.adb
+        ? api()
+            .mobile.devices()
+            .catch(() => [] as MobileDevice[])
+        : Promise.resolve([] as MobileDevice[]),
+      t?.emulator
+        ? api()
+            .mobile.avds()
+            .catch(() => [] as string[])
+        : Promise.resolve([] as string[]),
+      api()
+        .mobile.projects()
+        .catch(() => [] as MobileProject[]),
     ]);
     setDevices(d);
     setAvds(a);
@@ -64,17 +79,30 @@ export function MobilePanel() {
     if (!tools?.adb || view.kind !== 'main') return;
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible')
-        void api().mobile.devices().then(setDevices).catch(() => undefined);
+        void api()
+          .mobile.devices()
+          .then(setDevices)
+          .catch(() => undefined);
     }, 4000);
     return () => clearInterval(timer);
   }, [tools?.adb, view.kind]);
 
   const ready = devices.filter((d) => d.state === 'device');
-  const chosen = ready.find((d) => d.serial === target) ?? (ready.length === 1 ? ready[0] : undefined);
+  const chosen =
+    ready.find((d) => d.serial === target) ?? (ready.length === 1 ? ready[0] : undefined);
 
-  if (view.kind === 'logcat') return <LogcatView device={view.device} onBack={() => setView({ kind: 'main' })} />;
-  if (view.kind === 'screen') return <ScreenView device={view.device} scrcpy={!!tools?.scrcpy} onBack={() => setView({ kind: 'main' })} />;
-  if (view.kind === 'apps') return <AppsView device={view.device} onBack={() => setView({ kind: 'main' })} />;
+  if (view.kind === 'logcat')
+    return <LogcatView device={view.device} onBack={() => setView({ kind: 'main' })} />;
+  if (view.kind === 'screen')
+    return (
+      <ScreenView
+        device={view.device}
+        scrcpy={!!tools?.scrcpy}
+        onBack={() => setView({ kind: 'main' })}
+      />
+    );
+  if (view.kind === 'apps')
+    return <AppsView device={view.device} onBack={() => setView({ kind: 'main' })} />;
 
   const runProject = async (p: MobileProject, action: MobileAction) => {
     try {
@@ -118,33 +146,59 @@ export function MobilePanel() {
               <div className="hw-hint">{tm('noDevices')}</div>
             ) : (
               devices.map((d) => (
-                <div className={`mb-device ${chosen?.serial === d.serial ? 'on' : ''}`} key={d.serial}>
+                <div
+                  className={`mb-device ${chosen?.serial === d.serial ? 'on' : ''}`}
+                  key={d.serial}
+                >
                   <label className="mb-dname" title={d.serial}>
                     {ready.length > 1 && d.state === 'device' && (
-                      <input type="radio" name="mb-target" checked={chosen?.serial === d.serial} onChange={() => setTarget(d.serial)} />
+                      <input
+                        type="radio"
+                        name="mb-target"
+                        checked={chosen?.serial === d.serial}
+                        onChange={() => setTarget(d.serial)}
+                      />
                     )}
                     <Icon name={d.emulator ? 'monitor' : 'smartphone'} size={13} />
                     <span>{d.model}</span>
                     <span className="hw-dim">
                       {d.emulator ? tm('emulator') : d.serial}
-                      {d.state !== 'device' ? ` · ${d.state === 'offline' ? tm('offline') : d.state}` : ''}
+                      {d.state !== 'device'
+                        ? ` · ${d.state === 'offline' ? tm('offline') : d.state}`
+                        : ''}
                     </span>
                   </label>
-                  {d.state === 'unauthorized' && <div className="hw-hint">{tm('unauthorized')}</div>}
+                  {d.state === 'unauthorized' && (
+                    <div className="hw-hint">{tm('unauthorized')}</div>
+                  )}
                   {d.state === 'device' && (
                     <div className="hw-row-btns">
                       {tools.scrcpy && (
-                        <button className="btn hw-small" title={tm('mirrorTip')} onClick={() => void api().mobile.mirror(d.serial).catch(fail)}>
+                        <button
+                          className="btn hw-small"
+                          title={tm('mirrorTip')}
+                          onClick={() => void api().mobile.mirror(d.serial).catch(fail)}
+                        >
                           <Icon name="eye" size={12} /> {tm('mirror')}
                         </button>
                       )}
-                      <button className="btn ghost hw-small" title={tm('screenTip')} onClick={() => setView({ kind: 'screen', device: d })}>
+                      <button
+                        className="btn ghost hw-small"
+                        title={tm('screenTip')}
+                        onClick={() => setView({ kind: 'screen', device: d })}
+                      >
                         <Icon name="smartphone" size={12} /> {tm('screen')}
                       </button>
-                      <button className="btn ghost hw-small" onClick={() => setView({ kind: 'apps', device: d })}>
+                      <button
+                        className="btn ghost hw-small"
+                        onClick={() => setView({ kind: 'apps', device: d })}
+                      >
                         <Icon name="apps" size={12} /> {tm('apps')}
                       </button>
-                      <button className="btn ghost hw-small" onClick={() => setView({ kind: 'logcat', device: d })}>
+                      <button
+                        className="btn ghost hw-small"
+                        onClick={() => setView({ kind: 'logcat', device: d })}
+                      >
                         <Icon name="scroll" size={12} /> {tm('logcat')}
                       </button>
                     </div>
@@ -205,7 +259,10 @@ export function MobilePanel() {
                       <button className="btn hw-small" onClick={() => void runProject(p, 'run')}>
                         <Icon name="continue" size={12} /> {tm('run')}
                       </button>
-                      <button className="btn ghost hw-small" onClick={() => void runProject(p, 'build')}>
+                      <button
+                        className="btn ghost hw-small"
+                        onClick={() => void runProject(p, 'build')}
+                      >
                         <Icon name="wrench" size={12} /> {tm('build')}
                       </button>
                       {p.kind !== 'android' && (
@@ -220,7 +277,9 @@ export function MobilePanel() {
                     </div>
                   </div>
                 ))}
-                <div className="hw-dim">{tm('runOn', { device: chosen?.model ?? tm('anyDevice') })}</div>
+                <div className="hw-dim">
+                  {tm('runOn', { device: chosen?.model ?? tm('anyDevice') })}
+                </div>
               </>
             )}
           </div>
@@ -239,22 +298,36 @@ export function MobilePanel() {
             {!tools.adb && <div className="hw-hint">{tm('sdkHelp')}</div>}
             <div className="hw-row-btns">
               {!tools.sdk && (
-                <button className="btn ghost hw-small" onClick={() => openLink('https://developer.android.com/studio')}>
+                <button
+                  className="btn ghost hw-small"
+                  onClick={() => openLink('https://developer.android.com/studio')}
+                >
                   {tm('getStudio')}
                 </button>
               )}
               {!tools.adb && (
-                <button className="btn ghost hw-small" onClick={() => openLink('https://developer.android.com/tools/releases/platform-tools')}>
+                <button
+                  className="btn ghost hw-small"
+                  onClick={() =>
+                    openLink('https://developer.android.com/tools/releases/platform-tools')
+                  }
+                >
                   {tm('getTools')}
                 </button>
               )}
               {!tools.scrcpy && (
-                <button className="btn ghost hw-small" onClick={() => openLink('https://github.com/Genymobile/scrcpy#get-the-app')}>
+                <button
+                  className="btn ghost hw-small"
+                  onClick={() => openLink('https://github.com/Genymobile/scrcpy#get-the-app')}
+                >
                   {tm('getScrcpy')}
                 </button>
               )}
               {!tools.flutter && projects.some((p) => p.kind === 'flutter') && (
-                <button className="btn ghost hw-small" onClick={() => openLink('https://docs.flutter.dev/get-started/install')}>
+                <button
+                  className="btn ghost hw-small"
+                  onClick={() => openLink('https://docs.flutter.dev/get-started/install')}
+                >
                   {tm('getFlutter')}
                 </button>
               )}
@@ -280,7 +353,9 @@ let logSeq = 0;
 /** Live logcat of one device, with level / text filters and pause. */
 function LogcatView({ device, onBack }: { device: MobileDevice; onBack: () => void }) {
   const [lines, setLines] = useState<string[]>([]);
-  const [level, setLevel] = useState<LogLevel>(() => (localStorage.getItem('zs.mb.level') as LogLevel) || 'I');
+  const [level, setLevel] = useState<LogLevel>(
+    () => (localStorage.getItem('zs.mb.level') as LogLevel) || 'I',
+  );
   const [query, setQuery] = useState('');
   const [paused, setPaused] = useState(false);
   const [ended, setEnded] = useState(false);
@@ -303,17 +378,24 @@ function LogcatView({ device, onBack }: { device: MobileDevice; onBack: () => vo
         return next.length > MAX_LOG ? next.slice(next.length - MAX_LOG) : next;
       });
     });
-    void api().mobile.followLogcat(key, device.serial).catch((e) => {
-      fail(e);
-      setEnded(true);
-    });
+    void api()
+      .mobile.followLogcat(key, device.serial)
+      .catch((e) => {
+        fail(e);
+        setEnded(true);
+      });
     return () => {
       off();
-      void api().mobile.stopLogcat(key).catch(() => undefined);
+      void api()
+        .mobile.stopLogcat(key)
+        .catch(() => undefined);
     };
   }, [device.serial]);
 
-  const shown = useMemo(() => filterLog(lines, { level, query }).slice(-3000), [lines, level, query]);
+  const shown = useMemo(
+    () => filterLog(lines, { level, query }).slice(-3000),
+    [lines, level, query],
+  );
   useEffect(() => {
     if (!paused && pre.current) pre.current.scrollTop = pre.current.scrollHeight;
   }, [shown, paused]);
@@ -328,10 +410,20 @@ function LogcatView({ device, onBack }: { device: MobileDevice; onBack: () => vo
           {tm('logcat')} · {device.model}
         </span>
         <div className="spacer" />
-        <button className="icon-btn" title={paused ? tm('resume') : tm('pause')} aria-label={paused ? tm('resume') : tm('pause')} onClick={() => setPaused(!paused)}>
+        <button
+          className="icon-btn"
+          title={paused ? tm('resume') : tm('pause')}
+          aria-label={paused ? tm('resume') : tm('pause')}
+          onClick={() => setPaused(!paused)}
+        >
           <Icon name={paused ? 'continue' : 'pause'} size={14} />
         </button>
-        <button className="icon-btn" title={tm('clear')} aria-label={tm('clear')} onClick={() => setLines([])}>
+        <button
+          className="icon-btn"
+          title={tm('clear')}
+          aria-label={tm('clear')}
+          onClick={() => setLines([])}
+        >
           <Icon name="trash" size={14} />
         </button>
       </div>
@@ -350,7 +442,12 @@ function LogcatView({ device, onBack }: { device: MobileDevice; onBack: () => vo
             </option>
           ))}
         </select>
-        <input value={query} placeholder={tm('search')} aria-label={tm('search')} onChange={(e) => setQuery(e.target.value)} />
+        <input
+          value={query}
+          placeholder={tm('search')}
+          aria-label={tm('search')}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
       <div className="mb-log" ref={pre} role="log">
         {shown.map((l, i) => {
@@ -359,7 +456,8 @@ function LogcatView({ device, onBack }: { device: MobileDevice; onBack: () => vo
             <div key={i} className={`mb-line lv-${p?.level ?? 'x'}`}>
               {p ? (
                 <>
-                  <span className="mb-ltime">{p.time.slice(6)}</span> <span className="mb-llevel">{p.level}</span>{' '}
+                  <span className="mb-ltime">{p.time.slice(6)}</span>{' '}
+                  <span className="mb-llevel">{p.level}</span>{' '}
                   <span className="mb-ltag">{p.tag}</span> {p.message}
                 </>
               ) : (

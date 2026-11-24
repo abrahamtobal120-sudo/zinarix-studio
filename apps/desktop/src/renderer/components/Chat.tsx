@@ -23,13 +23,7 @@ import type {
 } from '../../shared/api';
 import { expandCommand, skillPrompt } from '../../shared/agentKit';
 import { AgentKitMenu, type KitKind } from './AgentKitMenu';
-import {
-  NEW_TASK_EVENT,
-  TasksPanel,
-  taskBadge,
-  useTasks,
-  type NewTaskSeed,
-} from './TasksPanel';
+import { NEW_TASK_EVENT, TasksPanel, taskBadge, useTasks, type NewTaskSeed } from './TasksPanel';
 import { pressable } from '../a11y';
 import { confirmDialog } from '../confirm';
 import { errText } from '../errText';
@@ -1153,7 +1147,9 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   const workspace = useStore((s) => s.workspace);
   const meta = useStore((s) => s.chats.find((c) => c.id === id));
   // "Mis bots": the bot this chat talks as (its greeting shows while the chat is empty).
-  const chatBot = useStore((s) => (meta?.bot ? s.automations?.bots.find((b) => b.id === meta.bot) : undefined));
+  const chatBot = useStore((s) =>
+    meta?.bot ? s.automations?.bots.find((b) => b.id === meta.bot) : undefined,
+  );
   const focusedPane = useStore((s) => s.chatFocus);
   const [turns, setTurns] = useState<Turn[]>([]);
   const turnsNow = useRef(turns);
@@ -3111,28 +3107,29 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
                 {tasksNow.active > 0 && <span className="add-menu-hint">{tasksNow.active}</span>}
               </button>
             )}
-            {kit && (!noFolder || kitCommands.length + kitSkills.length + kit.agents.length > 0) && (
-              <button
-                role="menuitem"
-                className="add-menu-item"
-                title={t('kitChip', {
-                  agents: kit.agents.length,
-                  skills: kit.skills.length,
-                  commands: kit.commands.length,
-                  hooks: kit.hooks.length,
-                })}
-                onClick={() => {
-                  setTermMenu(null);
-                  setKitMenu(true);
-                }}
-              >
-                <Icon name="package" size={14} />
-                <span className="add-menu-label">{t('kitPanel')}</span>
-                {kit.agents.length + kit.skills.length > 0 && (
-                  <span className="add-menu-hint">{kit.agents.length + kit.skills.length}</span>
-                )}
-              </button>
-            )}
+            {kit &&
+              (!noFolder || kitCommands.length + kitSkills.length + kit.agents.length > 0) && (
+                <button
+                  role="menuitem"
+                  className="add-menu-item"
+                  title={t('kitChip', {
+                    agents: kit.agents.length,
+                    skills: kit.skills.length,
+                    commands: kit.commands.length,
+                    hooks: kit.hooks.length,
+                  })}
+                  onClick={() => {
+                    setTermMenu(null);
+                    setKitMenu(true);
+                  }}
+                >
+                  <Icon name="package" size={14} />
+                  <span className="add-menu-label">{t('kitPanel')}</span>
+                  {kit.agents.length + kit.skills.length > 0 && (
+                    <span className="add-menu-hint">{kit.agents.length + kit.skills.length}</span>
+                  )}
+                </button>
+              )}
             {rulesView?.enabled && rulesView.active.length + rulesView.available.length > 0 && (
               <button
                 role="menuitem"
@@ -3668,68 +3665,68 @@ function ChatProject({
             items={items}
             keep={({ c }) => c.id === focusedId || c.id === activeChat || c.id === split}
           >
-          {({ c, n }) => {
-            const label = c.title || t('chatTabN', { n });
-            const status = chatStatusText(c);
-            const shown = c.id === activeChat || c.id === split;
-            const modelName = c.model ? c.model.split('/').pop() : t('chatNoModel');
-            return (
-              <div
-                key={c.id}
-                className={`chat-list-item ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
-                title={`${label}\n${status ? `${status} · ` : ''}${modelName}`}
-                draggable={Boolean(folder)}
-                onDragStart={(e) => startChatDrag(e, { chat: c.id, from: folder })}
-                // Mouse: the whole row. Keyboard: the name is the button (the row holds the
-                // close button, and a button cannot hold another).
-                onClick={() => selectChat(c.id)}
-                onAuxClick={(e) => {
-                  if (e.button === 1) void requestCloseChat(c.id);
-                }}
-              >
-                {(c.busy || c.waiting || c.unread) && (
-                  <span className="chat-list-state">
-                    <ChatStatus c={c} />
-                  </span>
-                )}
-                <span
-                  className="chat-list-main"
-                  role="button"
-                  tabIndex={0}
-                  aria-current={shown ? 'true' : undefined}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      selectChat(c.id);
-                    } else if (e.key === 'Delete' && chats.length > 1) {
-                      e.preventDefault();
-                      void requestCloseChat(c.id);
-                    }
+            {({ c, n }) => {
+              const label = c.title || t('chatTabN', { n });
+              const status = chatStatusText(c);
+              const shown = c.id === activeChat || c.id === split;
+              const modelName = c.model ? c.model.split('/').pop() : t('chatNoModel');
+              return (
+                <div
+                  key={c.id}
+                  className={`chat-list-item ${shown ? 'on' : ''} ${c.id === focusedId ? 'focus' : ''} ${c.waiting ? 'waiting' : ''}`}
+                  title={`${label}\n${status ? `${status} · ` : ''}${modelName}`}
+                  draggable={Boolean(folder)}
+                  onDragStart={(e) => startChatDrag(e, { chat: c.id, from: folder })}
+                  // Mouse: the whole row. Keyboard: the name is the button (the row holds the
+                  // close button, and a button cannot hold another).
+                  onClick={() => selectChat(c.id)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) void requestCloseChat(c.id);
                   }}
                 >
-                  <span className="chat-tab-label">{label}</span>
-                </span>
-                {c.queued.length > 0 && (
-                  <em className="chat-list-count" title={t('chatQueued')}>
-                    +{c.queued.length}
-                  </em>
-                )}
-                {chats.length > 1 && (
-                  <button
-                    className="chat-tab-x"
-                    aria-label={t('chatCloseTab')}
-                    title={t('chatCloseTab')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void requestCloseChat(c.id);
+                  {(c.busy || c.waiting || c.unread) && (
+                    <span className="chat-list-state">
+                      <ChatStatus c={c} />
+                    </span>
+                  )}
+                  <span
+                    className="chat-list-main"
+                    role="button"
+                    tabIndex={0}
+                    aria-current={shown ? 'true' : undefined}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectChat(c.id);
+                      } else if (e.key === 'Delete' && chats.length > 1) {
+                        e.preventDefault();
+                        void requestCloseChat(c.id);
+                      }
                     }}
                   >
-                    <Icon name="x" size={11} />
-                  </button>
-                )}
-              </div>
-            );
-          }}
+                    <span className="chat-tab-label">{label}</span>
+                  </span>
+                  {c.queued.length > 0 && (
+                    <em className="chat-list-count" title={t('chatQueued')}>
+                      +{c.queued.length}
+                    </em>
+                  )}
+                  {chats.length > 1 && (
+                    <button
+                      className="chat-tab-x"
+                      aria-label={t('chatCloseTab')}
+                      title={t('chatCloseTab')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void requestCloseChat(c.id);
+                      }}
+                    >
+                      <Icon name="x" size={11} />
+                    </button>
+                  )}
+                </div>
+              );
+            }}
           </LimitedList>
           {/* Saved chats under date headers (Hoy, Ayer, Últimos 7 días...). */}
           <RecentChats items={past}>

@@ -1,117 +1,117 @@
 /* Part of the old styles.css, cut without reordering a rule. Layer `features`; the order of
  * the layers is declared once, at the top of ui/tokens.css. */
 @layer features {
-/* ---------- accessibility and responsive fixes (UI review) ---------- */
+  /* ---------- accessibility and responsive fixes (UI review) ---------- */
 
-/* Separators: the visible line stays 4px, the grab zone is 10px. */
-.sash {
-  position: relative;
-}
-.sash::before {
-  content: '';
-  position: absolute;
-}
-.sash-x::before {
-  top: 0;
-  bottom: 0;
-  left: -3px;
-  right: -3px;
-}
-.sash-y::before {
-  left: 0;
-  right: 0;
-  top: -3px;
-  bottom: -3px;
-}
-.sash:focus-visible {
-  background: var(--focus);
-}
-body.dragging-y,
-body.dragging-y * {
-  cursor: row-resize !important;
-  user-select: none;
-}
+  /* Separators: the visible line stays 4px, the grab zone is 10px. */
+  .sash {
+    position: relative;
+  }
+  .sash::before {
+    content: '';
+    position: absolute;
+  }
+  .sash-x::before {
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    right: -3px;
+  }
+  .sash-y::before {
+    left: 0;
+    right: 0;
+    top: -3px;
+    bottom: -3px;
+  }
+  .sash:focus-visible {
+    background: var(--focus);
+  }
+  body.dragging-y,
+  body.dragging-y * {
+    cursor: row-resize !important;
+    user-select: none;
+  }
 
-/* Row actions that appear on hover also appear when the keyboard focus is in the row. */
-.git-row:focus-within .git-row-actions,
-.git-commit-row:focus-within .git-commit-actions,
-.ch-item:focus-within .ch-actions {
-  display: flex;
-}
-.turn:focus-within .turn-actions,
-.chat-tab:focus-within .chat-tab-x,
-.chat-list-item:focus-within .chat-tab-x,
-.chat-list-folder:focus-within button,
-.sv-finding:focus-within .sv-finding-actions button,
-.term-tab:focus-within .term-tab-close {
-  opacity: 1;
-}
-.tab:focus-within .tab-close,
-.sx-head:focus-within .sx-mini {
-  visibility: visible;
-}
+  /* Row actions that appear on hover also appear when the keyboard focus is in the row. */
+  .git-row:focus-within .git-row-actions,
+  .git-commit-row:focus-within .git-commit-actions,
+  .ch-item:focus-within .ch-actions {
+    display: flex;
+  }
+  .turn:focus-within .turn-actions,
+  .chat-tab:focus-within .chat-tab-x,
+  .chat-list-item:focus-within .chat-tab-x,
+  .chat-list-folder:focus-within button,
+  .sv-finding:focus-within .sv-finding-actions button,
+  .term-tab:focus-within .term-tab-close {
+    opacity: 1;
+  }
+  .tab:focus-within .tab-close,
+  .sx-head:focus-within .sx-mini {
+    visibility: visible;
+  }
 
-/* Visible focus on controls drawn by a sibling or without a native ring. */
-.wa-switch input:focus-visible + span,
-.offline-game-canvas:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
+  /* Visible focus on controls drawn by a sibling or without a native ring. */
+  .wa-switch input:focus-visible + span,
+  .offline-game-canvas:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 
-/* Severity badges: a faint tint of the severity color (set inline) with a border of that
+  /* Severity badges: a faint tint of the severity color (set inline) with a border of that
    color, and strong text on it, instead of white text on yellow / orange / blue. */
-.sv-badge,
-.sv-nav-count {
-  color: var(--fg-strong);
-  border: 1px solid transparent;
-  background-image:
-    linear-gradient(
-      color-mix(in srgb, var(--bg) 78%, transparent),
-      color-mix(in srgb, var(--bg) 78%, transparent)
-    ),
-    linear-gradient(transparent, transparent);
-  background-clip: padding-box, border-box;
-}
-.sv-nav-count {
-  line-height: 15px;
-}
+  .sv-badge,
+  .sv-nav-count {
+    color: var(--fg-strong);
+    border: 1px solid transparent;
+    background-image:
+      linear-gradient(
+        color-mix(in srgb, var(--bg) 78%, transparent),
+        color-mix(in srgb, var(--bg) 78%, transparent)
+      ),
+      linear-gradient(transparent, transparent);
+    background-clip: padding-box, border-box;
+  }
+  .sv-nav-count {
+    line-height: 15px;
+  }
 
-/* Settings and Providers fit under the backdrop's 8vh top padding. */
-.settings,
-.providers {
-  max-height: calc(92vh - 16px);
-}
-@media (max-width: 1000px) {
-  .settings-nav {
-    width: 200px;
+  /* Settings and Providers fit under the backdrop's 8vh top padding. */
+  .settings,
+  .providers {
+    max-height: calc(92vh - 16px);
   }
-  .settings-body {
-    padding: 20px;
+  @media (max-width: 1000px) {
+    .settings-nav {
+      width: 200px;
+    }
+    .settings-body {
+      padding: 20px;
+    }
   }
-}
 
-/* Model table: on a narrow picker the output price and the capabilities give way. */
-.mp-list {
-  container-type: inline-size;
-}
-@container (max-width: 760px) {
-  .mp-row {
-    grid-template-columns: 28px minmax(0, 1fr) 72px 86px 104px;
+  /* Model table: on a narrow picker the output price and the capabilities give way. */
+  .mp-list {
+    container-type: inline-size;
   }
-  .mp-row > :nth-child(5),
-  .mp-row > :nth-child(6) {
-    display: none;
+  @container (max-width: 760px) {
+    .mp-row {
+      grid-template-columns: 28px minmax(0, 1fr) 72px 86px 104px;
+    }
+    .mp-row > :nth-child(5),
+    .mp-row > :nth-child(6) {
+      display: none;
+    }
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
-}
 }

@@ -41,9 +41,9 @@ export function tabKeyDown(
   // Keys pressed on a control inside the tab (its close button) belong to that control.
   if (e.target !== e.currentTarget) return;
   const tabs = [
-    ...(e.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLElement>(
-      '[role="tab"]',
-    ) ?? []),
+    ...(e.currentTarget
+      .closest('[role="tablist"]')
+      ?.querySelectorAll<HTMLElement>('[role="tab"]') ?? []),
   ];
   const i = tabs.indexOf(e.currentTarget);
   const move = (j: number) => tabs[(j + tabs.length) % tabs.length]?.focus();
@@ -52,7 +52,10 @@ export function tabKeyDown(
   else if (e.key === 'Home') move(0);
   else if (e.key === 'End') move(tabs.length - 1);
   else if (e.key === 'Enter' || e.key === ' ') activate();
-  else if (close && (e.key === 'Delete' || (e.key.toLowerCase() === 'w' && (e.ctrlKey || e.metaKey)))) {
+  else if (
+    close &&
+    (e.key === 'Delete' || (e.key.toLowerCase() === 'w' && (e.ctrlKey || e.metaKey)))
+  ) {
     // The focus goes to a neighbour, so the keyboard user is not dropped to <body>.
     (tabs[i + 1] ?? tabs[i - 1])?.focus();
     close();

@@ -270,15 +270,11 @@ export type GenErrorKind = 'quota' | 'refused' | 'access' | 'auth' | 'network' |
  */
 export function genErrorKind(message: string): GenErrorKind {
   const m = message.toLowerCase();
-  if (
-    /\b(429|quota|insufficient_quota|rate.?limit|resource.?exhausted|credits?|billing)\b/.test(m)
-  )
+  if (/\b(429|quota|insufficient_quota|rate.?limit|resource.?exhausted|credits?|billing)\b/.test(m))
     return 'quota';
   if (/(safety|moderation|content.?policy|blocked|refus|prohibited|violat)/.test(m))
     return 'refused';
-  if (
-    /\b(403|404)\b|not have access|model.*not.*found|not.*found.*model|permission/.test(m)
-  )
+  if (/\b(403|404)\b|not have access|model.*not.*found|not.*found.*model|permission/.test(m))
     return 'access';
   if (/\b401\b|invalid.*(key|api)|unauthori[sz]ed|authentication/.test(m)) return 'auth';
   if (/network|econnrefused|enotfound|timeout|no responde/.test(m)) return 'network';

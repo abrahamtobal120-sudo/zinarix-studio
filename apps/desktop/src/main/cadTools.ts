@@ -9,7 +9,12 @@ import type { SystemPreview } from './system.js';
 import type { CadService } from './cad.js';
 import type { BlenderModelService } from './blenderModel.js';
 import type { SlicerService } from './slicer.js';
-import { describeStatus, printerFileName, type PrinterAction, type PrinterStore } from './printers.js';
+import {
+  describeStatus,
+  printerFileName,
+  type PrinterAction,
+  type PrinterStore,
+} from './printers.js';
 import { describeGcode, gcodeTris, parseGcode } from '../shared/gcode.js';
 import {
   INFILL_PATTERNS,
@@ -21,7 +26,13 @@ import {
   describeSlice,
   validateSlice,
 } from '../shared/slicer.js';
-import { CAD_FORMATS, CAD_TEMPLATES, parseScadParams, type CadFormat, type ScadLog } from '../shared/cad.js';
+import {
+  CAD_FORMATS,
+  CAD_TEMPLATES,
+  parseScadParams,
+  type CadFormat,
+  type ScadLog,
+} from '../shared/cad.js';
 import {
   BLENDER_EXPORTS,
   BLENDER_IMPORTS,
@@ -35,7 +46,15 @@ import {
   validateBlenderOps,
   type BlenderOp,
 } from '../shared/blenderOps.js';
-import { analyzeMesh, checkPrint, describeMesh, parseObj, parseOff, parseStl, type Tris } from '../shared/mesh3d.js';
+import {
+  analyzeMesh,
+  checkPrint,
+  describeMesh,
+  parseObj,
+  parseOff,
+  parseStl,
+  type Tris,
+} from '../shared/mesh3d.js';
 import { encodePng, rasterViews } from '../shared/meshRaster.js';
 
 /**
@@ -52,7 +71,9 @@ export const CAD_TOOLS: ToolDefinition[] = [
       'CAD with OpenSCAD: which engine is available (installed OpenSCAD or the built-in one), the starter templates, the .scad files of the project, and the Customizer parameters (name, value, range, options) of one file when "path" is given.',
     parameters: {
       type: 'object',
-      properties: { path: { type: 'string', description: '.scad file, relative to the open folder' } },
+      properties: {
+        path: { type: 'string', description: '.scad file, relative to the open folder' },
+      },
     },
   },
   {
@@ -64,7 +85,10 @@ export const CAD_TOOLS: ToolDefinition[] = [
       properties: {
         path: { type: 'string' },
         code: { type: 'string', description: 'OpenSCAD source (at most 200000 characters)' },
-        params: { type: 'object', description: 'Customizer values, e.g. {"ancho": 80, "con_tapa": false}' },
+        params: {
+          type: 'object',
+          description: 'Customizer values, e.g. {"ancho": 80, "con_tapa": false}',
+        },
         color: { type: 'string', description: 'Picture colour "#rrggbb"' },
       },
     },
@@ -143,7 +167,11 @@ export const CAD_TOOLS: ToolDefinition[] = [
           type: 'array',
           minItems: 1,
           maxItems: 60,
-          items: { type: 'object', properties: { op: { type: 'string', enum: [...BLENDER_OP_NAMES] } }, required: ['op'] },
+          items: {
+            type: 'object',
+            properties: { op: { type: 'string', enum: [...BLENDER_OP_NAMES] } },
+            required: ['op'],
+          },
         },
         preview: { type: 'boolean', description: 'Render a picture (default true)' },
       },
@@ -220,18 +248,25 @@ export function projectFile(root: string | undefined, p: unknown, exts?: RegExp)
   if (!v) throw new Error('"path" is required.');
   const abs = isAbsolute(v) ? resolve(v) : resolve(root, v);
   const rel = relative(root, abs);
-  if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw new Error(`"${v}" is outside the open folder.`);
+  if (!rel || rel.startsWith('..') || isAbsolute(rel))
+    throw new Error(`"${v}" is outside the open folder.`);
   if (exts && !exts.test(abs)) throw new Error(`"${v}" has the wrong type.`);
   return abs;
 }
 
-const rel = (root: string | undefined, p: string) => (root ? relative(root, p).split(sep).join('/') : p);
+const rel = (root: string | undefined, p: string) =>
+  root ? relative(root, p).split(sep).join('/') : p;
 
 /** Picture of 4 views for the agent. */
 export function meshShot(t: Tris, color?: string, size = 520): ComputerShot {
   const v = rasterViews(t, size, color);
   const png = encodePng(v.rgba, v.width, v.height, (b) => deflateSync(b, { level: 6 }));
-  return { mediaType: 'image/png', data: Buffer.from(png).toString('base64'), width: v.width, height: v.height };
+  return {
+    mediaType: 'image/png',
+    data: Buffer.from(png).toString('base64'),
+    width: v.width,
+    height: v.height,
+  };
 }
 
 export function meshOf(data: Buffer, ext: string): Tris {
@@ -246,14 +281,21 @@ function logText(log: ScadLog, root: string | undefined): string {
   const lines = log.messages
     .filter((m) => m.severity !== 'trace')
     .slice(0, 40)
-    .map((m) => `${m.severity.toUpperCase()}${m.line ? ` line ${m.line}` : ''}${m.file ? ` (${rel(root, m.file)})` : ''}: ${m.message}`);
+    .map(
+      (m) =>
+        `${m.severity.toUpperCase()}${m.line ? ` line ${m.line}` : ''}${m.file ? ` (${rel(root, m.file)})` : ''}: ${m.message}`,
+    );
   return lines.join('\n');
 }
 
 const BLEND = /\.blend$/i;
 const OPENABLE = /\.(blend|glb|gltf|fbx|obj|stl|ply)$/i;
 
-export function cadPreview(name: string, a: Record<string, unknown>, root: string | undefined): SystemPreview | { error: string } | null {
+export function cadPreview(
+  name: string,
+  a: Record<string, unknown>,
+  root: string | undefined,
+): SystemPreview | { error: string } | null {
   try {
     switch (name) {
       case 'cad_info':
@@ -294,7 +336,12 @@ export function cadPreview(name: string, a: Record<string, unknown>, root: strin
           return {
             risk: 'high',
             action: `${act === 'pause' ? 'pausar' : act === 'resume' ? 'reanudar' : 'CANCELAR'} la impresión en "${s(a.printer) || '?'}"`,
-            warning: act === 'cancel' ? 'La pieza a medio imprimir se pierde.' : act === 'resume' ? 'La impresora vuelve a moverse.' : 'La impresora se detiene donde va.',
+            warning:
+              act === 'cancel'
+                ? 'La pieza a medio imprimir se pierde.'
+                : act === 'resume'
+                  ? 'La impresora vuelve a moverse.'
+                  : 'La impresora se detiene donde va.',
           };
         return { error: `Unknown action "${act}".` };
       }
@@ -305,20 +352,35 @@ export function cadPreview(name: string, a: Record<string, unknown>, root: strin
         return {
           risk: 'medium',
           action: `exportar ${rel(root, src)} a ${rel(root, out)}`,
-          warning: existsSync(out) ? `Se reemplaza ${rel(root, out)}.` : 'Se crea un archivo nuevo en el proyecto.',
+          warning: existsSync(out)
+            ? `Se reemplaza ${rel(root, out)}.`
+            : 'Se crea un archivo nuevo en el proyecto.',
           path: out,
           allowKey: 'cad_export',
         };
       }
       case 'cad_new': {
         const p = projectFile(root, a.path, /\.scad$/i);
-        if (!CAD_TEMPLATES.some((t) => t.id === s(a.template))) return { error: 'Unknown template.' };
+        if (!CAD_TEMPLATES.some((t) => t.id === s(a.template)))
+          return { error: 'Unknown template.' };
         if (existsSync(p)) return { error: `${s(a.path)} already exists; pick another name.` };
-        return { risk: 'medium', action: `crear ${rel(root, p)} con la plantilla "${s(a.template)}"`, warning: 'Se crea un archivo nuevo en el proyecto.', path: p, allowKey: 'cad_new' };
+        return {
+          risk: 'medium',
+          action: `crear ${rel(root, p)} con la plantilla "${s(a.template)}"`,
+          warning: 'Se crea un archivo nuevo en el proyecto.',
+          path: p,
+          allowKey: 'cad_new',
+        };
       }
       case 'blender_model': {
         const p = projectFile(root, a.path, BLEND);
-        const ops = validateBlenderOps(a.ops, (q, why) => projectFile(root, q, why === 'texture' ? /\.(png|jpe?g|webp|tga|exr|hdr|bmp|tiff?)$/i : undefined));
+        const ops = validateBlenderOps(a.ops, (q, why) =>
+          projectFile(
+            root,
+            q,
+            why === 'texture' ? /\.(png|jpe?g|webp|tga|exr|hdr|bmp|tiff?)$/i : undefined,
+          ),
+        );
         const outs = exportsOf(ops).map((o) => rel(root, o));
         return {
           risk: 'medium',
@@ -335,7 +397,12 @@ export function cadPreview(name: string, a: Record<string, unknown>, root: strin
   return null;
 }
 
-async function scadFiles(root: string, dir = root, out: string[] = [], depth = 0): Promise<string[]> {
+async function scadFiles(
+  root: string,
+  dir = root,
+  out: string[] = [],
+  depth = 0,
+): Promise<string[]> {
   if (depth > 6 || out.length >= 200) return out;
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
     if (e.name.startsWith('.') || e.name === 'node_modules') continue;
@@ -379,7 +446,12 @@ export function gcodeShot(text: string, size = 520): ComputerShot | undefined {
   if (!p.extrude.length) return undefined;
   const v = rasterViews(gcodeTris(p), size, '#e8a33d', true);
   const png = encodePng(v.rgba, v.width, v.height, (b) => deflateSync(b, { level: 6 }));
-  return { mediaType: 'image/png', data: Buffer.from(png).toString('base64'), width: v.width, height: v.height };
+  return {
+    mediaType: 'image/png',
+    data: Buffer.from(png).toString('base64'),
+    width: v.width,
+    height: v.height,
+  };
 }
 
 export interface PrintDeps {
@@ -397,32 +469,57 @@ async function runPrintTool(
 ): Promise<CadToolResult> {
   if (name === 'gcode_info') {
     const p = projectFile(root, a.path, GCODE);
-    if (!existsSync(p)) return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
-    if (statSync(p).size > 400 * 1024 * 1024) return { ok: false, content: 'The file is larger than 400 MB.', summary: 'muy grande' };
+    if (!existsSync(p))
+      return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
+    if (statSync(p).size > 400 * 1024 * 1024)
+      return { ok: false, content: 'The file is larger than 400 MB.', summary: 'muy grande' };
     const text = await readFile(p, 'utf8');
     const st = parseGcode(text, { maxSegments: 1 }).stats;
     const bed =
-      Array.isArray(a.bed) && a.bed.length === 3 && a.bed.every((n) => typeof n === 'number' && n > 0) ? (a.bed as [number, number, number]) : undefined;
+      Array.isArray(a.bed) &&
+      a.bed.length === 3 &&
+      a.bed.every((n) => typeof n === 'number' && n > 0)
+        ? (a.bed as [number, number, number])
+        : undefined;
     const img = a.picture === false ? undefined : gcodeShot(text);
-    return { ok: true, content: describeGcode({ ...st, truncated: false }, bed), summary: `${st.layers} capas`, ...(img ? { image: img } : {}) };
+    return {
+      ok: true,
+      content: describeGcode({ ...st, truncated: false }, bed),
+      summary: `${st.layers} capas`,
+      ...(img ? { image: img } : {}),
+    };
   }
   if (name === 'slice_model') {
-    if (!deps.slicer) return { ok: false, content: 'Slicing is not available.', summary: 'sin rebanador' };
+    if (!deps.slicer)
+      return { ok: false, content: 'Slicing is not available.', summary: 'sin rebanador' };
     const src = projectFile(root, a.path, MODEL_IN);
-    if (!existsSync(src)) return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
+    if (!existsSync(src))
+      return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
     const settings = validateSlice(sliceArgs(a));
     const out = gcodeOut(root, a, src);
     let model = src;
     let tmp: string | undefined;
     try {
       if (/\.scad$/i.test(src)) {
-        if (!cad) return { ok: false, content: 'CAD (OpenSCAD) is not available to render the .scad.', summary: 'sin CAD' };
-        const params = a.params && typeof a.params === 'object' && !Array.isArray(a.params) ? (a.params as Record<string, unknown>) : {};
-        const r = await cad.render({ file: src, values: params, format: 'stl', root, timeoutMs: 10 * 60_000 }, signal);
+        if (!cad)
+          return {
+            ok: false,
+            content: 'CAD (OpenSCAD) is not available to render the .scad.',
+            summary: 'sin CAD',
+          };
+        const params =
+          a.params && typeof a.params === 'object' && !Array.isArray(a.params)
+            ? (a.params as Record<string, unknown>)
+            : {};
+        const r = await cad.render(
+          { file: src, values: params, format: 'stl', root, timeoutMs: 10 * 60_000 },
+          signal,
+        );
         tmp = await mkdtemp(join(tmpdir(), 'zinarix-slice-model-'));
         model = join(tmp, basename(src).replace(/\.scad$/i, '.stl'));
         await writeFile(model, r.data);
-      } else if (!SLICEABLE.test(src)) return { ok: false, content: 'That file type cannot be sliced.', summary: 'tipo' };
+      } else if (!SLICEABLE.test(src))
+        return { ok: false, content: 'That file type cannot be sliced.', summary: 'tipo' };
       const r = await deps.slicer.slice({ model, out, settings }, signal);
       const img = gcodeShot(await readFile(out, 'utf8'));
       return {
@@ -431,8 +528,12 @@ async function runPrintTool(
           `Sliced ${rel(root, src)} with ${r.slicer} in ${(r.ms / 1000).toFixed(1)} s → ${rel(root, out)}.`,
           `Settings: ${describeSlice(settings, 'en')}.`,
           describeGcode(r.stats, bedOf(settings)),
-          ...(r.warnings.length ? [`Slicer warnings:\n${r.warnings.map((w) => `- ${w}`).join('\n')}`] : []),
-          ...(img ? ['Picture: the toolpaths (isometric left; front, right and top on the right).'] : []),
+          ...(r.warnings.length
+            ? [`Slicer warnings:\n${r.warnings.map((w) => `- ${w}`).join('\n')}`]
+            : []),
+          ...(img
+            ? ['Picture: the toolpaths (isometric left; front, right and top on the right).']
+            : []),
         ].join('\n\n'),
         summary: rel(root, out),
         changed: out,
@@ -443,7 +544,8 @@ async function runPrintTool(
     }
   }
   // printer
-  if (!deps.printers) return { ok: false, content: 'Printers are not available.', summary: 'sin impresoras' };
+  if (!deps.printers)
+    return { ok: false, content: 'Printers are not available.', summary: 'sin impresoras' };
   const printers = deps.printers;
   const act = s(a.action) || 'list';
   const all = printers.list();
@@ -451,14 +553,25 @@ async function runPrintTool(
     if (!all.length)
       return {
         ok: true,
-        content: 'No printers yet. The user adds them in the CAD 3D panel → Printers (OctoPrint or Klipper/Moonraker address and API key).',
+        content:
+          'No printers yet. The user adds them in the CAD 3D panel → Printers (OctoPrint or Klipper/Moonraker address and API key).',
         summary: 'sin impresoras',
       };
-    const lines = await Promise.all(all.map(async (p) => `- ${describeStatus(p.name, await printers.client(p.id).status(), 'en')} [${p.kind}, id ${p.id}]`));
+    const lines = await Promise.all(
+      all.map(
+        async (p) =>
+          `- ${describeStatus(p.name, await printers.client(p.id).status(), 'en')} [${p.kind}, id ${p.id}]`,
+      ),
+    );
     return { ok: true, content: lines.join('\n'), summary: `${all.length} impresoras` };
   }
   const who = s(a.printer) || (all.length === 1 ? all[0]!.id : '');
-  if (!who) return { ok: false, content: 'Say which printer ("printer": name or id from action list).', summary: 'falta impresora' };
+  if (!who)
+    return {
+      ok: false,
+      content: 'Say which printer ("printer": name or id from action list).',
+      summary: 'falta impresora',
+    };
   const cfg = printers.get(who);
   const client = printers.client(cfg.id);
   if (act === 'status') {
@@ -467,9 +580,15 @@ async function runPrintTool(
   }
   if (act === 'send') {
     const p = projectFile(root, a.path, GCODE);
-    if (!existsSync(p)) return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
+    if (!existsSync(p))
+      return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
     const before = await client.status();
-    if (!before.online) return { ok: false, content: describeStatus(cfg.name, before, 'en'), summary: 'sin conexión' };
+    if (!before.online)
+      return {
+        ok: false,
+        content: describeStatus(cfg.name, before, 'en'),
+        summary: 'sin conexión',
+      };
     if (a.start === true && (before.printing || before.paused))
       return {
         ok: false,
@@ -478,12 +597,20 @@ async function runPrintTool(
       };
     const fname = printerFileName(p);
     await client.upload(fname, await readFile(p), a.start === true);
-    return { ok: true, content: `Uploaded ${fname} to ${cfg.name}${a.start === true ? ' and started the print' : ''}.`, summary: a.start === true ? 'imprimiendo' : 'subido' };
+    return {
+      ok: true,
+      content: `Uploaded ${fname} to ${cfg.name}${a.start === true ? ' and started the print' : ''}.`,
+      summary: a.start === true ? 'imprimiendo' : 'subido',
+    };
   }
   if (act === 'pause' || act === 'resume' || act === 'cancel') {
     await client.control(act as PrinterAction);
     const st = await client.status();
-    return { ok: true, content: `Done (${act}). ${describeStatus(cfg.name, st, 'en')}`, summary: act };
+    return {
+      ok: true,
+      content: `Done (${act}). ${describeStatus(cfg.name, st, 'en')}`,
+      summary: act,
+    };
   }
   return { ok: false, content: `Unknown action "${act}".`, summary: 'acción' };
 }
@@ -506,15 +633,27 @@ export async function runCadTool(
   print: PrintDeps = {},
 ): Promise<CadToolResult> {
   try {
-    if (name === 'slice_model' || name === 'gcode_info' || name === 'printer') return await runPrintTool(cad, print, name, a, root, signal);
-    const params = a.params && typeof a.params === 'object' && !Array.isArray(a.params) ? (a.params as Record<string, unknown>) : {};
+    if (name === 'slice_model' || name === 'gcode_info' || name === 'printer')
+      return await runPrintTool(cad, print, name, a, root, signal);
+    const params =
+      a.params && typeof a.params === 'object' && !Array.isArray(a.params)
+        ? (a.params as Record<string, unknown>)
+        : {};
     if (name === 'blender_inspect' || name === 'blender_model') {
-      if (!blender) return { ok: false, content: 'Blender is not available.', summary: 'sin Blender' };
+      if (!blender)
+        return { ok: false, content: 'Blender is not available.', summary: 'sin Blender' };
       const isEdit = name === 'blender_model';
       const p = projectFile(root, a.path, isEdit ? BLEND : OPENABLE);
-      if (!isEdit && !existsSync(p)) return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
+      if (!isEdit && !existsSync(p))
+        return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
       const ops: BlenderOp[] = isEdit
-        ? validateBlenderOps(a.ops, (q, why) => projectFile(root, q, why === 'texture' ? /\.(png|jpe?g|webp|tga|exr|hdr|bmp|tiff?)$/i : undefined))
+        ? validateBlenderOps(a.ops, (q, why) =>
+            projectFile(
+              root,
+              q,
+              why === 'texture' ? /\.(png|jpe?g|webp|tga|exr|hdr|bmp|tiff?)$/i : undefined,
+            ),
+          )
         : [];
       const exists = existsSync(p);
       if (isEdit) await mkdir(dirname(p), { recursive: true });
@@ -540,21 +679,50 @@ export async function runCadTool(
       }
       return {
         ok: true,
-        content: [describeBlenderReport({ ...r.report, exported: r.report.exported.map((x) => rel(root, x)), ...(r.report.saved ? { saved: rel(root, r.report.saved) } : {}) }), ...notes, `(${(r.ms / 1000).toFixed(1)} s)`].join('\n\n'),
+        content: [
+          describeBlenderReport({
+            ...r.report,
+            exported: r.report.exported.map((x) => rel(root, x)),
+            ...(r.report.saved ? { saved: rel(root, r.report.saved) } : {}),
+          }),
+          ...notes,
+          `(${(r.ms / 1000).toFixed(1)} s)`,
+        ].join('\n\n'),
         summary: isEdit ? `${ops.length} operaciones` : `${r.report.objects.length} objetos`,
-        ...(r.preview ? { image: { mediaType: 'image/png' as const, data: r.preview.toString('base64'), width: 640, height: 640 } } : {}),
+        ...(r.preview
+          ? {
+              image: {
+                mediaType: 'image/png' as const,
+                data: r.preview.toString('base64'),
+                width: 640,
+                height: 640,
+              },
+            }
+          : {}),
         ...(isEdit ? { changed: r.report.exported[0] ?? p } : {}),
       };
     }
     if (name === 'mesh_check') {
       const p = projectFile(root, a.path, /\.(stl|obj|off)$/i);
-      if (!existsSync(p)) return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
-      if (statSync(p).size > 300 * 1024 * 1024) return { ok: false, content: 'The file is larger than 300 MB.', summary: 'muy grande' };
+      if (!existsSync(p))
+        return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
+      if (statSync(p).size > 300 * 1024 * 1024)
+        return { ok: false, content: 'The file is larger than 300 MB.', summary: 'muy grande' };
       const t = meshOf(await readFile(p), extname(p));
       const m = analyzeMesh(t);
-      const bed = Array.isArray(a.bed) && a.bed.length === 3 && a.bed.every((n) => typeof n === 'number' && n > 0) ? (a.bed as [number, number, number]) : undefined;
+      const bed =
+        Array.isArray(a.bed) &&
+        a.bed.length === 3 &&
+        a.bed.every((n) => typeof n === 'number' && n > 0)
+          ? (a.bed as [number, number, number])
+          : undefined;
       const c = checkPrint(m, { units: a.units === 'm' ? 'm' : 'mm', ...(bed ? { bed } : {}) });
-      return { ok: true, content: describeMesh(m, c), summary: c.ok ? 'imprimible' : `${c.errors.length} problemas`, image: meshShot(t) };
+      return {
+        ok: true,
+        content: describeMesh(m, c),
+        summary: c.ok ? 'imprimible' : `${c.errors.length} problemas`,
+        image: meshShot(t),
+      };
     }
     if (!cad) return { ok: false, content: 'CAD (OpenSCAD) is not available.', summary: 'sin CAD' };
     if (name === 'cad_info') {
@@ -569,7 +737,11 @@ export async function runCadTool(
       ];
       if (root) {
         const files = await scadFiles(root);
-        lines.push(files.length ? `.scad files:\n${files.map((f) => `- ${f}`).join('\n')}` : 'No .scad files in the project yet.');
+        lines.push(
+          files.length
+            ? `.scad files:\n${files.map((f) => `- ${f}`).join('\n')}`
+            : 'No .scad files in the project yet.',
+        );
       }
       if (a.path) {
         const p = projectFile(root, a.path, /\.scad$/i);
@@ -585,13 +757,18 @@ export async function runCadTool(
             : `${s(a.path)} has no Customizer parameters (top-level "name = value;" lines before the first module).`,
         );
       }
-      return { ok: true, content: lines.join('\n\n'), summary: e.native ? `OpenSCAD ${e.native.version}` : 'OpenSCAD incluido' };
+      return {
+        ok: true,
+        content: lines.join('\n\n'),
+        summary: e.native ? `OpenSCAD ${e.native.version}` : 'OpenSCAD incluido',
+      };
     }
     if (name === 'cad_new') {
       const p = projectFile(root, a.path, /\.scad$/i);
       const t = CAD_TEMPLATES.find((x) => x.id === s(a.template));
       if (!t) return { ok: false, content: 'Unknown template.', summary: 'sin plantilla' };
-      if (existsSync(p)) return { ok: false, content: `${s(a.path)} already exists.`, summary: 'ya existe' };
+      if (existsSync(p))
+        return { ok: false, content: `${s(a.path)} already exists.`, summary: 'ya existe' };
       await mkdir(dirname(p), { recursive: true });
       await writeFile(p, t.code, 'utf8');
       const ps = parseScadParams(t.code);
@@ -604,12 +781,28 @@ export async function runCadTool(
     }
     if (name === 'cad_render') {
       const code = s(a.code) ? String(a.code) : undefined;
-      if (code && code.length > 200_000) return { ok: false, content: 'The code is longer than 200000 characters.', summary: 'muy largo' };
+      if (code && code.length > 200_000)
+        return {
+          ok: false,
+          content: 'The code is longer than 200000 characters.',
+          summary: 'muy largo',
+        };
       const file = a.path ? projectFile(root, a.path, /\.scad$/i) : undefined;
-      if (!file && !code) return { ok: false, content: 'Give "path" or "code".', summary: 'sin modelo' };
-      if (file && !code && !existsSync(file)) return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
+      if (!file && !code)
+        return { ok: false, content: 'Give "path" or "code".', summary: 'sin modelo' };
+      if (file && !code && !existsSync(file))
+        return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
       try {
-        const r = await cad.render({ ...(file ? { file } : {}), ...(code ? { code } : {}), values: params, root, timeoutMs: 180_000 }, signal);
+        const r = await cad.render(
+          {
+            ...(file ? { file } : {}),
+            ...(code ? { code } : {}),
+            values: params,
+            root,
+            timeoutMs: 180_000,
+          },
+          signal,
+        );
         const t = parseStl(r.data);
         const m = analyzeMesh(t);
         const c = checkPrint(m);
@@ -619,11 +812,17 @@ export async function runCadTool(
           content: [
             `Rendered with ${r.engine === 'native' ? 'the installed OpenSCAD' : 'the built-in OpenSCAD'} in ${(r.ms / 1000).toFixed(1)} s. Size in mm (x × y × z).`,
             describeMesh(m, c),
-            ...(r.params.length ? [`Parameters: ${r.params.map((x) => `${x.name}=${JSON.stringify(x.name in params ? params[x.name] : x.value)}`).join(', ')}`] : []),
+            ...(r.params.length
+              ? [
+                  `Parameters: ${r.params.map((x) => `${x.name}=${JSON.stringify(x.name in params ? params[x.name] : x.value)}`).join(', ')}`,
+                ]
+              : []),
             ...(msgs ? [msgs] : []),
             'Picture: isometric (left), front, right and top (right column). Red faces are inside-out or open.',
           ].join('\n\n'),
-          summary: c.ok ? `${m.bounds.size.map((v) => v.toFixed(0)).join('×')} mm` : `${c.errors.length} problemas`,
+          summary: c.ok
+            ? `${m.bounds.size.map((v) => v.toFixed(0)).join('×')} mm`
+            : `${c.errors.length} problemas`,
           image: meshShot(t, s(a.color) || undefined),
         };
       } catch (e) {
@@ -637,11 +836,18 @@ export async function runCadTool(
     }
     if (name === 'cad_export') {
       const src = projectFile(root, a.path, /\.scad$/i);
-      if (!existsSync(src)) return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
-      const fmt = ((CAD_FORMATS as readonly string[]).includes(s(a.format)) ? s(a.format) : 'stl') as CadFormat;
+      if (!existsSync(src))
+        return { ok: false, content: `${s(a.path)} does not exist.`, summary: 'no existe' };
+      const fmt = (
+        (CAD_FORMATS as readonly string[]).includes(s(a.format)) ? s(a.format) : 'stl'
+      ) as CadFormat;
       const out = a.out ? projectFile(root, a.out) : src.replace(/\.scad$/i, `.${fmt}`);
-      if (extname(out).toLowerCase() !== `.${fmt}`) return { ok: false, content: `"out" must end in .${fmt}.`, summary: 'extensión' };
-      const r = await cad.render({ file: src, values: params, format: fmt, root, timeoutMs: 10 * 60_000 }, signal);
+      if (extname(out).toLowerCase() !== `.${fmt}`)
+        return { ok: false, content: `"out" must end in .${fmt}.`, summary: 'extensión' };
+      const r = await cad.render(
+        { file: src, values: params, format: fmt, root, timeoutMs: 10 * 60_000 },
+        signal,
+      );
       await mkdir(dirname(out), { recursive: true });
       await writeFile(out, r.data);
       let check = '';
@@ -651,7 +857,13 @@ export async function runCadTool(
       }
       return {
         ok: true,
-        content: [`Exported ${rel(root, out)} (${(r.data.length / 1024).toFixed(0)} KB).`, check, logText(r.log, root)].filter(Boolean).join('\n\n'),
+        content: [
+          `Exported ${rel(root, out)} (${(r.data.length / 1024).toFixed(0)} KB).`,
+          check,
+          logText(r.log, root),
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
         summary: basename(out),
         changed: out,
       };

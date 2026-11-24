@@ -109,7 +109,9 @@ export default async function handler(req, res) {
   if (!secret || !key || !known.length)
     return send(503, { error: 'La tienda aún no está configurada. Escríbenos y te ayudamos.' });
   if (revoked().has(id))
-    return send(403, { error: 'Esta compra fue reembolsada o cancelada. Escríbenos si es un error.' });
+    return send(403, {
+      error: 'Esta compra fue reembolsada o cancelada. Escríbenos si es un error.',
+    });
 
   let session;
   try {
@@ -134,19 +136,23 @@ export default async function handler(req, res) {
   if (!paid) return send(402, { error: 'Tu pago aún no se confirma. Recarga en unos segundos.' });
 
   // Stripe keeps payment_status "paid" after a refund: check the charge itself.
-  const pi = session.payment_intent && typeof session.payment_intent === 'object'
-    ? session.payment_intent
-    : null;
+  const pi =
+    session.payment_intent && typeof session.payment_intent === 'object'
+      ? session.payment_intent
+      : null;
   const charge = pi && typeof pi.latest_charge === 'object' ? pi.latest_charge : null;
   if (pi && pi.status !== 'succeeded')
     return send(402, { error: 'Tu pago aún no se confirma. Recarga en unos segundos.' });
   if (charge && (charge.refunded || charge.amount_refunded > 0 || charge.disputed))
-    return send(403, { error: 'Esta compra fue reembolsada o está en disputa. Escríbenos si es un error.' });
-  const sub = session.subscription && typeof session.subscription === 'object'
-    ? session.subscription
-    : null;
+    return send(403, {
+      error: 'Esta compra fue reembolsada o está en disputa. Escríbenos si es un error.',
+    });
+  const sub =
+    session.subscription && typeof session.subscription === 'object' ? session.subscription : null;
   if (sub && !['active', 'trialing'].includes(sub.status))
-    return send(403, { error: 'Tu suscripción no está activa. Renuévala para obtener tu licencia.' });
+    return send(403, {
+      error: 'Tu suscripción no está activa. Renuévala para obtener tu licencia.',
+    });
   if (session.mode === 'payment' && !pi && session.payment_status !== 'no_payment_required')
     return send(502, { error: 'No pudimos revisar el pago. Recarga la página en un momento.' });
 
@@ -156,7 +162,8 @@ export default async function handler(req, res) {
   const createdMs = Number(session.created) * 1000;
   if (claimHours > 0 && Date.now() - createdMs > claimHours * 3_600_000)
     return send(410, {
-      error: 'Este enlace de compra ya expiró. Escríbenos con tu correo de compra y te reenviamos la licencia.',
+      error:
+        'Este enlace de compra ya expiró. Escríbenos con tu correo de compra y te reenviamos la licencia.',
     });
 
   const email = (session.customer_details && session.customer_details.email) || '';

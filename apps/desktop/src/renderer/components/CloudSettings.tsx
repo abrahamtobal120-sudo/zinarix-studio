@@ -21,7 +21,10 @@ export function CloudSection() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void api().cloud.status().then(setStatus).catch(() => undefined);
+    void api()
+      .cloud.status()
+      .then(setStatus)
+      .catch(() => undefined);
     return api().on((ev) => {
       if (ev.type === 'cloud:status') setStatus(ev.status);
     });
@@ -49,7 +52,10 @@ export function CloudSection() {
       setStatus(await fn());
     } catch (e) {
       toast(errText(e));
-      void api().cloud.status().then(setStatus).catch(() => undefined);
+      void api()
+        .cloud.status()
+        .then(setStatus)
+        .catch(() => undefined);
     } finally {
       setBusy(false);
     }

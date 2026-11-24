@@ -7,8 +7,25 @@ export const PAINT_EXT = 'zdraw';
 export const MAX_PAINT_SIDE = 8192;
 export const MAX_LAYERS = 32;
 
-export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'color-dodge' | 'color-burn';
-export const BLEND_MODES: BlendMode[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn'];
+export type BlendMode =
+  | 'normal'
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'color-dodge'
+  | 'color-burn';
+export const BLEND_MODES: BlendMode[] = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+];
 
 /** globalCompositeOperation of a blend mode. */
 export const compositeOf = (b: BlendMode): string => (b === 'normal' ? 'source-over' : b);
@@ -44,12 +61,14 @@ export function parsePaintFile(text: string): PaintFile {
   if (!o || o.format !== 'zinarix-draw') throw new Error('This is not a Zinarix drawing (.zdraw).');
   const side = (v: unknown): number => {
     const x = Math.round(Number(v));
-    if (!Number.isFinite(x) || x < 1 || x > MAX_PAINT_SIDE) throw new Error('The size of the drawing is not valid.');
+    if (!Number.isFinite(x) || x < 1 || x > MAX_PAINT_SIDE)
+      throw new Error('The size of the drawing is not valid.');
     return x;
   };
   const width = side(o.width);
   const height = side(o.height);
-  if (!Array.isArray(o.layers) || o.layers.length === 0) throw new Error('The drawing has no layers.');
+  if (!Array.isArray(o.layers) || o.layers.length === 0)
+    throw new Error('The drawing has no layers.');
   const layers = o.layers.slice(0, MAX_LAYERS).map((l, i): PaintLayerFile => ({
     name: typeof l?.name === 'string' && l.name.trim() ? l.name.slice(0, 60) : `Capa ${i + 1}`,
     visible: l?.visible !== false,
@@ -61,7 +80,13 @@ export function parsePaintFile(text: string): PaintFile {
 }
 
 export function serializePaintFile(f: Omit<PaintFile, 'format' | 'version'>): string {
-  return JSON.stringify({ format: 'zinarix-draw', version: 1, width: f.width, height: f.height, layers: f.layers });
+  return JSON.stringify({
+    format: 'zinarix-draw',
+    version: 1,
+    width: f.width,
+    height: f.height,
+    layers: f.layers,
+  });
 }
 
 // ------------------------------------------------------------------ colors
@@ -80,7 +105,13 @@ export function hexToRgba(hex: string, a = 255): Rgba8 {
 }
 
 export function rgbToHex(r: number, g: number, b: number): string {
-  return `#${[r, g, b].map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('')}`;
+  return `#${[r, g, b]
+    .map((x) =>
+      Math.max(0, Math.min(255, Math.round(x)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 }
 
 // ------------------------------------------------------------------ bucket fill
@@ -272,7 +303,13 @@ export function mulberry32(seed: number): () => number {
 }
 
 /** `n` points spread evenly inside a circle (spray and chalk dabs). */
-export function diskPoints(cx: number, cy: number, r: number, n: number, rand: () => number): { x: number; y: number }[] {
+export function diskPoints(
+  cx: number,
+  cy: number,
+  r: number,
+  n: number,
+  rand: () => number,
+): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   for (let i = 0; i < n; i++) {
     const a = rand() * Math.PI * 2;
@@ -285,7 +322,13 @@ export function diskPoints(cx: number, cy: number, r: number, n: number, rand: (
 export type Symmetry = 'none' | 'x' | 'y' | 'xy';
 
 /** The point and its mirrors across the middle of the canvas (x: left ↔ right, y: top ↕ bottom). */
-export function mirrorPoints(sym: Symmetry, x: number, y: number, w: number, h: number): { x: number; y: number }[] {
+export function mirrorPoints(
+  sym: Symmetry,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): { x: number; y: number }[] {
   const out = [{ x, y }];
   if (sym === 'x' || sym === 'xy') out.push({ x: w - x, y });
   if (sym === 'y' || sym === 'xy') out.push({ x, y: h - y });
@@ -316,7 +359,12 @@ export function pixelBox(pts: { x: number; y: number }[], w: number, h: number):
  * Affine map (a, b, c, d, e, f as in canvas setTransform) that puts the box `src` onto
  * `dst`, flipped when asked.
  */
-export function rectMap(src: Rect, dst: Rect, flipX = false, flipY = false): [number, number, number, number, number, number] {
+export function rectMap(
+  src: Rect,
+  dst: Rect,
+  flipX = false,
+  flipY = false,
+): [number, number, number, number, number, number] {
   const sx = src.w ? dst.w / src.w : 1;
   const sy = src.h ? dst.h / src.h : 1;
   const a = flipX ? -sx : sx;
@@ -329,7 +377,13 @@ export function rectMap(src: Rect, dst: Rect, flipX = false, flipY = false): [nu
 export type Corner = 'nw' | 'ne' | 'se' | 'sw';
 
 /** Box after dragging a corner to (px, py): the opposite corner stays; keepRatio keeps the shape. */
-export function scaleRect(r: Rect, corner: Corner, px: number, py: number, keepRatio: boolean): Rect {
+export function scaleRect(
+  r: Rect,
+  corner: Corner,
+  px: number,
+  py: number,
+  keepRatio: boolean,
+): Rect {
   const ax = corner.includes('w') ? r.x + r.w : r.x;
   const ay = corner.includes('n') ? r.y + r.h : r.y;
   let w = Math.max(1, Math.abs(px - ax));

@@ -212,7 +212,13 @@ export function trackCues(p: VideoProject): Cue[] {
   for (const c of clips) {
     const end = round(c.start + (c.out - c.in));
     const last = out[out.length - 1];
-    if (c.text!.hl && c.text!.hl.word > 0 && last && last.text === c.text!.content && Math.abs(last.end - c.start) < 1e-3)
+    if (
+      c.text!.hl &&
+      c.text!.hl.word > 0 &&
+      last &&
+      last.text === c.text!.content &&
+      Math.abs(last.end - c.start) < 1e-3
+    )
       last.end = end;
     else out.push({ start: round(c.start), end, text: c.text!.content });
   }
@@ -233,7 +239,9 @@ const ASS_FONT: Record<string, string> = {
 export function assColor(hex: string, alpha = 0): string {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   const [r, g, b] = m ? [m[1]!, m[2]!, m[3]!] : ['ff', 'ff', 'ff'];
-  const a = Math.max(0, Math.min(255, Math.round(alpha))).toString(16).padStart(2, '0');
+  const a = Math.max(0, Math.min(255, Math.round(alpha)))
+    .toString(16)
+    .padStart(2, '0');
   return `&H${a}${b}${g}${r}`.toUpperCase();
 }
 
@@ -265,7 +273,11 @@ export function toAss(
   const s = st.spec;
   const size = Math.round(s.size * H);
   const box = !!s.bg;
-  const outline = box ? Math.round(size * 0.3) : s.stroke ? Math.round(s.stroke.width * size * 0.5 * 10) / 10 : 0;
+  const outline = box
+    ? Math.round(size * 0.3)
+    : s.stroke
+      ? Math.round(s.stroke.width * size * 0.5 * 10) / 10
+      : 0;
   const tall = H > W;
   const y = tall ? safeCaptionY(st.yTall, s) : st.y;
   const px = Math.round(W / 2);
@@ -308,9 +320,12 @@ export function toAss(
         const body = words
           .map((w, i) => (i === pc.word ? `{\\c${assColor(hl)}}${w}{\\c${assColor(s.color)}}` : w))
           .join(' ');
-        lines.push(`Dialogue: 0,${assTime(pc.start)},${assTime(pc.end)},Default,,0,0,0,,${pos}${body}`);
+        lines.push(
+          `Dialogue: 0,${assTime(pc.start)},${assTime(pc.end)},Default,,0,0,0,,${pos}${body}`,
+        );
       }
-    } else lines.push(`Dialogue: 0,${assTime(q.start)},${assTime(q.end)},Default,,0,0,0,,${pos}${text}`);
+    } else
+      lines.push(`Dialogue: 0,${assTime(q.start)},${assTime(q.end)},Default,,0,0,0,,${pos}${text}`);
   }
   return [
     '[Script Info]',
@@ -419,7 +434,8 @@ export function timelineCutZones(
     for (const r of cuts) {
       const a = Math.max(r[0], c.in);
       const b = Math.min(r[1], c.out);
-      if (b - a > 1e-6) out.push([round(c.start + (a - c.in) / sp), round(c.start + (b - c.in) / sp)]);
+      if (b - a > 1e-6)
+        out.push([round(c.start + (a - c.in) / sp), round(c.start + (b - c.in) / sp)]);
     }
   }
   return mergeRanges(out);
@@ -465,7 +481,11 @@ export function parseSceneScores(log: string): [number, number][] {
 }
 
 /** Scene starts over a threshold, at least `gap` seconds apart (the strongest one wins). */
-export function scenesOver(scores: readonly [number, number][], threshold: number, gap = 0.5): number[] {
+export function scenesOver(
+  scores: readonly [number, number][],
+  threshold: number,
+  gap = 0.5,
+): number[] {
   const hits = scores.filter((s) => s[1] > threshold).sort((a, b) => b[1] - a[1]);
   const kept: number[] = [];
   for (const [t] of hits) if (kept.every((k) => Math.abs(k - t) >= gap)) kept.push(t);

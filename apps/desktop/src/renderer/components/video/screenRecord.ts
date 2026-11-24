@@ -316,7 +316,10 @@ export function pauseRecording(): void {
   const s = sess;
   if (!s || rs.phase !== 'recording') return;
   for (const t of [s.screen, s.cam]) if (t?.rec.state === 'recording') t.rec.pause();
-  if (s.screen) void api().video.recPause(s.screen.fileId, true).catch(() => undefined);
+  if (s.screen)
+    void api()
+      .video.recPause(s.screen.fileId, true)
+      .catch(() => undefined);
   set({ phase: 'paused', pausedAt: Date.now() });
 }
 
@@ -324,7 +327,10 @@ export function resumeRecording(): void {
   const s = sess;
   if (!s || rs.phase !== 'paused') return;
   for (const t of [s.screen, s.cam]) if (t?.rec.state === 'paused') t.rec.resume();
-  if (s.screen) void api().video.recPause(s.screen.fileId, false).catch(() => undefined);
+  if (s.screen)
+    void api()
+      .video.recPause(s.screen.fileId, false)
+      .catch(() => undefined);
   set({ phase: 'recording', pausedMs: rs.pausedMs + (Date.now() - rs.pausedAt), pausedAt: 0 });
 }
 

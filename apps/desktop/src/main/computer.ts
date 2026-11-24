@@ -54,7 +54,10 @@ export class Computer implements ComputerService {
 
   async screenshot(): Promise<ComputerShot> {
     const d = screen.getPrimaryDisplay();
-    const px = { width: Math.round(d.size.width * d.scaleFactor), height: Math.round(d.size.height * d.scaleFactor) };
+    const px = {
+      width: Math.round(d.size.width * d.scaleFactor),
+      height: Math.round(d.size.height * d.scaleFactor),
+    };
     const want = shotSize(px.width, px.height);
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: want });
     const src = sources.find((s) => s.display_id === String(d.id)) ?? sources[0];
@@ -118,7 +121,10 @@ export class Computer implements ComputerService {
 
   async zoom(x: number, y: number, width: number, height: number): Promise<ComputerShot> {
     const d = screen.getPrimaryDisplay();
-    const px = { width: Math.round(d.size.width * d.scaleFactor), height: Math.round(d.size.height * d.scaleFactor) };
+    const px = {
+      width: Math.round(d.size.width * d.scaleFactor),
+      height: Math.round(d.size.height * d.scaleFactor),
+    };
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: px });
     const src = sources.find((s) => s.display_id === String(d.id)) ?? sources[0];
     if (!src || src.thumbnail.isEmpty()) throw new Error('Could not capture the screen.');
@@ -143,7 +149,12 @@ export class Computer implements ComputerService {
         quality: 'best',
       });
     const z = crop.getSize();
-    return { mediaType: 'image/png', data: crop.toPNG().toString('base64'), width: z.width, height: z.height };
+    return {
+      mediaType: 'image/png',
+      data: crop.toPNG().toString('base64'),
+      width: z.width,
+      height: z.height,
+    };
   }
 
   async open(target: OpenTarget) {
@@ -158,7 +169,9 @@ export class Computer implements ComputerService {
   async windows(): Promise<WindowInfo[]> {
     // Zinarix's own windows (the chat, the bar) are not the AI's to switch to.
     const list = await this.driver.windows();
-    return list.filter((w) => w.pid !== process.pid).map(({ id, app, title }) => ({ id, app, title }));
+    return list
+      .filter((w) => w.pid !== process.pid)
+      .map(({ id, app, title }) => ({ id, app, title }));
   }
 
   focus(id: string) {

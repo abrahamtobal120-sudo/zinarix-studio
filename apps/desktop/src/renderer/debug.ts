@@ -128,7 +128,10 @@ function paintBreakpoints(model: monaco.editor.ITextModel): void {
   const bps = (view.breakpoints[path] ?? []).filter((b) => b.line <= model.getLineCount());
   const ids = model.deltaDecorations(
     bpDecorations.get(model)?.ids ?? [],
-    bps.map((b) => ({ range: new monaco.Range(b.line, 1, b.line, 1), options: bpOptions(path, b) })),
+    bps.map((b) => ({
+      range: new monaco.Range(b.line, 1, b.line, 1),
+      options: bpOptions(path, b),
+    })),
   );
   bpDecorations.set(model, { ids, bps });
 }
@@ -251,7 +254,10 @@ export async function selectFrame(frame: DebugFrame): Promise<void> {
 // ---------------- session ----------------
 
 function showError(e: unknown): void {
-  const msg = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e);
+  const msg =
+    e instanceof Error
+      ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+      : String(e);
   toast(msg);
   log('error', msg);
 }
@@ -293,7 +299,10 @@ export async function startDebug(): Promise<void> {
 /** Debugs a test of the Test Explorer (main builds the runner command). */
 export async function startTestDebug(req: TestRunRequest): Promise<void> {
   if (!getState().workspace) return toast(td('dbgIdle'));
-  if (view.state !== 'idle') await api().debug.stop().catch(() => undefined);
+  if (view.state !== 'idle')
+    await api()
+      .debug.stop()
+      .catch(() => undefined);
   await saveAll();
   setState({ panelOpen: true, panelView: 'debug' });
   clearConsole();
@@ -372,7 +381,10 @@ export async function refreshWatches(): Promise<void> {
       continue;
     }
     try {
-      out.push({ expression, value: await api().debug.evaluate(expression, view.frameId ?? undefined) });
+      out.push({
+        expression,
+        value: await api().debug.evaluate(expression, view.frameId ?? undefined),
+      });
     } catch (e) {
       out.push({ expression, error: e instanceof Error ? e.message.split('\n')[0] : String(e) });
     }
@@ -446,7 +458,12 @@ export function attachDebugToEditor(ed: monaco.editor.IStandaloneCodeEditor): mo
       hover = ed.deltaDecorations(
         hover,
         inGutter && line && !has
-          ? [{ range: new monaco.Range(line, 1, line, 1), options: { glyphMarginClassName: 'dbg-bp-hint' } }]
+          ? [
+              {
+                range: new monaco.Range(line, 1, line, 1),
+                options: { glyphMarginClassName: 'dbg-bp-hint' },
+              },
+            ]
           : [],
       );
     }),
@@ -459,7 +476,8 @@ export function attachDebugToEditor(ed: monaco.editor.IStandaloneCodeEditor): mo
 
 /** Line of the cursor in the active editor, for F9. */
 export function toggleBreakpointAtCursor(): void {
-  const ed = monaco.editor.getEditors().find((e) => e.hasTextFocus()) ?? monaco.editor.getEditors()[0];
+  const ed =
+    monaco.editor.getEditors().find((e) => e.hasTextFocus()) ?? monaco.editor.getEditors()[0];
   const model = ed?.getModel();
   const path = model && modelPath(model);
   const line = ed?.getPosition()?.lineNumber;

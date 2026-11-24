@@ -121,8 +121,7 @@ export function BrowserSection() {
       <p className="dim small">{t('browserCookiesHint')}</p>
       <div className="phone-card">
         <p>
-          <Icon name="key" size={14} />{' '}
-          {info ? t('browserCookiesStatus', { n: info.count }) : '…'}
+          <Icon name="key" size={14} /> {info ? t('browserCookiesStatus', { n: info.count }) : '…'}
         </p>
         <p className="dim small">
           {info?.importedAt

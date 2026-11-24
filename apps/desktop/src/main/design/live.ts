@@ -14,7 +14,10 @@ const LOCAL_HOST = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\]|0\.0\.0\.0)$/i;
  */
 export function localOrigin(input: string): string {
   const s = input.trim();
-  if (!s) throw new EditError('Escribe la dirección donde funciona tu proyecto, por ejemplo http://localhost:5173');
+  if (!s)
+    throw new EditError(
+      'Escribe la dirección donde funciona tu proyecto, por ejemplo http://localhost:5173',
+    );
   let url: URL;
   try {
     url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `http://${s}`);
@@ -22,7 +25,9 @@ export function localOrigin(input: string): string {
     throw new EditError(`«${s}» no es una dirección válida. Usa algo como http://localhost:5173`);
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:')
-    throw new EditError('La dirección debe empezar con http:// (por ejemplo http://localhost:5173).');
+    throw new EditError(
+      'La dirección debe empezar con http:// (por ejemplo http://localhost:5173).',
+    );
   if (!LOCAL_HOST.test(url.hostname))
     throw new EditError(
       'El Panel de Edición solo muestra proyectos que funcionan en esta computadora (localhost). Para ver un sitio publicado usa el Navegador.',
@@ -78,7 +83,9 @@ const PORTS = [5173, 5174, 5175, 3000, 3001, 4321, 4200, 8080, 8000, 5000, 4173,
 
 /** First address of this computer with a web page answering (the expected one first). */
 export async function findServer(prefer: string | null): Promise<string | null> {
-  const list = [...new Set([...(prefer ? [prefer] : []), ...PORTS.map((p) => `http://localhost:${p}`)])];
+  const list = [
+    ...new Set([...(prefer ? [prefer] : []), ...PORTS.map((p) => `http://localhost:${p}`)]),
+  ];
   const results = await Promise.all(list.map((o) => probe(o, 1500).then((r) => r.ok)));
   const i = results.indexOf(true);
   return i >= 0 ? list[i]! : null;
@@ -103,7 +110,17 @@ const DROP = new Set([
 ]);
 
 /** Request headers worth passing on to the dev server. */
-const PASS = ['accept', 'accept-language', 'content-type', 'range', 'x-requested-with', 'rsc', 'next-router-state-tree', 'next-router-prefetch', 'next-url'];
+const PASS = [
+  'accept',
+  'accept-language',
+  'content-type',
+  'range',
+  'x-requested-with',
+  'rsc',
+  'next-router-state-tree',
+  'next-router-prefetch',
+  'next-url',
+];
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -148,7 +165,8 @@ export async function proxy(origin: string, req: Request, tag: string): Promise<
     if (!DROP.has(k.toLowerCase())) out.set(k, v);
   });
   out.set('cache-control', 'no-store');
-  if ([101, 204, 205, 304].includes(r.status)) return new Response(null, { status: r.status, headers: out });
+  if ([101, 204, 205, 304].includes(r.status))
+    return new Response(null, { status: r.status, headers: out });
   const type = r.headers.get('content-type') ?? '';
   if (/text\/html/i.test(type) && req.method === 'GET') {
     const html = await r.text();
@@ -162,6 +180,9 @@ export function page(status: number, title: string, text: string): Response {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   return new Response(
     `<!doctype html><meta charset="utf-8"><body style="font-family:system-ui,sans-serif;padding:40px;color:#444;max-width:640px"><h2>${esc(title)}</h2><p style="line-height:1.5">${esc(text)}</p></body>`,
-    { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...CORS } },
+    {
+      status,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...CORS },
+    },
   );
 }

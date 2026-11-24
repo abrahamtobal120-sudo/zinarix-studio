@@ -29,7 +29,15 @@ import {
   type OtherEngineProject,
   type WebGameProject,
 } from '../shared/games.js';
-import { hasPlaytest, overrideWithPlaytest, parsePlaytestOutput, PLAYTEST_GD, stripPlaytest, type PlayOutput, type PlayPlan } from '../shared/godotPlaytest.js';
+import {
+  hasPlaytest,
+  overrideWithPlaytest,
+  parsePlaytestOutput,
+  PLAYTEST_GD,
+  stripPlaytest,
+  type PlayOutput,
+  type PlayPlan,
+} from '../shared/godotPlaytest.js';
 
 export type { GamesScan, GodotProject, GodotStatus, WebGameProject };
 
@@ -69,14 +77,32 @@ const OUT_KEEP = 512 * 1024;
 export const LSP_TCP_BRIDGE =
   "const s=require('net').connect(+process.argv[1],'127.0.0.1');process.stdin.pipe(s);s.pipe(process.stdout);" +
   "s.on('error',e=>{process.stderr.write(String(e));process.exit(1)});s.on('close',()=>process.exit(0));process.stdin.on('end',()=>s.end());";
-const SKIP_DIRS = new Set(['.godot', '.import', 'node_modules', '.git', 'Library', 'Temp', 'Intermediate', 'Saved', 'DerivedDataCache', 'Binaries', 'build', 'dist']);
+const SKIP_DIRS = new Set([
+  '.godot',
+  '.import',
+  'node_modules',
+  '.git',
+  'Library',
+  'Temp',
+  'Intermediate',
+  'Saved',
+  'DerivedDataCache',
+  'Binaries',
+  'build',
+  'dist',
+]);
 
 function exec(file: string, args: string[], timeout: number): Promise<string> {
   return new Promise((ok, fail) => {
-    execFile(file, args, { timeout, windowsHide: true, env: childEnv(process.env), maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err && !stdout) fail(err);
-      else ok(`${stdout}${stderr}`);
-    });
+    execFile(
+      file,
+      args,
+      { timeout, windowsHide: true, env: childEnv(process.env), maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err && !stdout) fail(err);
+        else ok(`${stdout}${stderr}`);
+      },
+    );
   });
 }
 
@@ -94,7 +120,9 @@ export function freePort(): Promise<number> {
 }
 
 function onPath(names: string[]): string | null {
-  const dirs = (process.env.PATH ?? '').split(process.platform === 'win32' ? ';' : ':').filter(Boolean);
+  const dirs = (process.env.PATH ?? '')
+    .split(process.platform === 'win32' ? ';' : ':')
+    .filter(Boolean);
   const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
   for (const d of dirs)
     for (const n of names)
@@ -122,7 +150,11 @@ function godotIn(dir: string, depth = 1): string[] {
   for (const e of entries) {
     const full = join(dir, e.name);
     if (e.isFile()) {
-      if (win ? /^godot.*\.exe$/i.test(e.name) && !/_console\.exe$/i.test(e.name) : /^godot[\w.-]*$/i.test(e.name) && !/\.(zip|txt|tpz)$/i.test(e.name))
+      if (
+        win
+          ? /^godot.*\.exe$/i.test(e.name) && !/_console\.exe$/i.test(e.name)
+          : /^godot[\w.-]*$/i.test(e.name) && !/\.(zip|txt|tpz)$/i.test(e.name)
+      )
         out.push(full);
     } else if (e.isDirectory() && depth > 0 && /godot/i.test(e.name)) {
       if (process.platform === 'darwin' && e.name.endsWith('.app')) {
@@ -182,27 +214,47 @@ export class GodotService {
     const scan: string[] = [];
     if (process.platform === 'win32') {
       const local = process.env.LOCALAPPDATA ?? join(h, 'AppData', 'Local');
-      const pf = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(Boolean) as string[];
-      for (const link of [join(local, 'Microsoft', 'WinGet', 'Links', 'godot.exe'), join(h, 'scoop', 'shims', 'godot.exe')])
+      const pf = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(
+        Boolean,
+      ) as string[];
+      for (const link of [
+        join(local, 'Microsoft', 'WinGet', 'Links', 'godot.exe'),
+        join(h, 'scoop', 'shims', 'godot.exe'),
+      ])
         if (existsSync(link)) out.push({ exe: link, source: 'scan' });
-      scan.push(join(local, 'Programs'), join(local, 'Godot'), ...pf, ...pf.map((x) => join(x, 'Godot')));
+      scan.push(
+        join(local, 'Programs'),
+        join(local, 'Godot'),
+        ...pf,
+        ...pf.map((x) => join(x, 'Godot')),
+      );
       for (const s of pf) {
         const steam = join(s, 'Steam', 'steamapps', 'common', 'Godot Engine');
         if (existsSync(steam)) scan.push(steam);
       }
       scan.push(join(local, 'Microsoft', 'WinGet', 'Packages'));
     } else if (process.platform === 'darwin') {
-      for (const app of ['/Applications/Godot.app', '/Applications/Godot_mono.app', join(h, 'Applications', 'Godot.app')]) {
+      for (const app of [
+        '/Applications/Godot.app',
+        '/Applications/Godot_mono.app',
+        join(h, 'Applications', 'Godot.app'),
+      ]) {
         const exe = join(app, 'Contents', 'MacOS', 'Godot');
         if (existsSync(exe)) out.push({ exe, source: 'scan' });
       }
     } else {
-      for (const exe of [join(h, '.local', 'bin', 'godot'), '/usr/local/bin/godot', '/var/lib/flatpak/exports/bin/org.godotengine.Godot'])
+      for (const exe of [
+        join(h, '.local', 'bin', 'godot'),
+        '/usr/local/bin/godot',
+        '/var/lib/flatpak/exports/bin/org.godotengine.Godot',
+      ])
         if (existsSync(exe)) out.push({ exe, source: 'scan' });
       scan.push(join(h, '.local', 'share'), '/opt');
     }
     scan.push(join(h, 'Downloads'), join(h, 'Desktop'), join(h, 'Godot'), join(h, 'Applications'));
-    for (const d of scan) for (const exe of godotIn(d, d.endsWith('Packages') ? 2 : 1)) out.push({ exe, source: 'scan' });
+    for (const d of scan)
+      for (const exe of godotIn(d, d.endsWith('Packages') ? 2 : 1))
+        out.push({ exe, source: 'scan' });
     return out;
   }
 
@@ -218,7 +270,13 @@ export class GodotService {
       const v = parseGodotVersion(out);
       // Godot 3 has a different command line and project format: keep looking for a 4.
       if (v && v.major >= 4) {
-        this.found = { state: 'ready', exe: c.exe, version: v.text, mono: v.mono, source: c.source };
+        this.found = {
+          state: 'ready',
+          exe: c.exe,
+          version: v.text,
+          mono: v.mono,
+          source: c.source,
+        };
         return this.found;
       }
     }
@@ -229,7 +287,9 @@ export class GodotService {
   private async exe(): Promise<string> {
     const st = await this.status();
     if (st.state !== 'ready' || !st.exe)
-      throw new Error('Godot 4 no está instalado o no lo encontré. Descárgalo de godotengine.org y elígelo en Más → Juegos.');
+      throw new Error(
+        'Godot 4 no está instalado o no lo encontré. Descárgalo de godotengine.org y elígelo en Más → Juegos.',
+      );
     return st.exe;
   }
 
@@ -254,11 +314,24 @@ export class GodotService {
       const uproject = [...files].find((f) => f.toLowerCase().endsWith('.uproject'));
       if (uproject) {
         const u = parseUproject(await readFile(join(dir, uproject), 'utf8').catch(() => ''));
-        res.others.push({ kind: 'unreal', dir: rel, name: uproject.replace(/\.uproject$/i, ''), version: u.engine, file: uproject });
+        res.others.push({
+          kind: 'unreal',
+          dir: rel,
+          name: uproject.replace(/\.uproject$/i, ''),
+          version: u.engine,
+          file: uproject,
+        });
         return;
       }
-      if (entries.some((e) => e.isDirectory() && e.name === 'ProjectSettings') && entries.some((e) => e.isDirectory() && e.name === 'Assets')) {
-        const v = parseUnityVersion(await readFile(join(dir, 'ProjectSettings', 'ProjectVersion.txt'), 'utf8').catch(() => ''));
+      if (
+        entries.some((e) => e.isDirectory() && e.name === 'ProjectSettings') &&
+        entries.some((e) => e.isDirectory() && e.name === 'Assets')
+      ) {
+        const v = parseUnityVersion(
+          await readFile(join(dir, 'ProjectSettings', 'ProjectVersion.txt'), 'utf8').catch(
+            () => '',
+          ),
+        );
         res.others.push({ kind: 'unity', dir: rel, name: basename(dir), version: v });
         return;
       }
@@ -268,7 +341,8 @@ export class GodotService {
       }
       if (depth > 0)
         for (const e of entries)
-          if (e.isDirectory() && !e.name.startsWith('.') && !SKIP_DIRS.has(e.name)) await look(join(dir, e.name), depth - 1);
+          if (e.isDirectory() && !e.name.startsWith('.') && !SKIP_DIRS.has(e.name))
+            await look(join(dir, e.name), depth - 1);
     };
     await look(root, 3);
     return res;
@@ -288,22 +362,29 @@ export class GodotService {
       }
       for (const e of entries) {
         if (e.isDirectory()) {
-          if (depth > 0 && !e.name.startsWith('.') && e.name !== 'addons' && !SKIP_DIRS.has(e.name)) await walk(join(d, e.name), depth - 1);
-        } else if (/\.tscn$/i.test(e.name) && scenes.length < 500) scenes.push(relative(root, join(d, e.name)).replace(/\\/g, '/'));
+          if (depth > 0 && !e.name.startsWith('.') && e.name !== 'addons' && !SKIP_DIRS.has(e.name))
+            await walk(join(d, e.name), depth - 1);
+        } else if (/\.tscn$/i.test(e.name) && scenes.length < 500)
+          scenes.push(relative(root, join(d, e.name)).replace(/\\/g, '/'));
         else if (/\.(gd|cs)$/i.test(e.name)) scripts++;
       }
     };
     await walk(abs, 6);
-    const main = info.mainScene.startsWith('res://') ? (dir ? `${dir}/` : '') + info.mainScene.slice(6) : '';
+    const main = info.mainScene.startsWith('res://')
+      ? (dir ? `${dir}/` : '') + info.mainScene.slice(6)
+      : '';
     scenes.sort((a, b) => (a === main ? -1 : b === main ? 1 : a.localeCompare(b)));
-    const presets = parseExportPresets(await readFile(join(abs, 'export_presets.cfg'), 'utf8').catch(() => ''));
+    const presets = parseExportPresets(
+      await readFile(join(abs, 'export_presets.cfg'), 'utf8').catch(() => ''),
+    );
     return { dir, info, scenes, scripts, presets };
   }
 
   private absDir(root: string, dir: string): string {
     if (!validProjectDir(dir)) throw new Error('Carpeta de proyecto no válida.');
     const abs = dir ? join(root, dir) : root;
-    if (!existsSync(join(abs, 'project.godot'))) throw new Error('Esa carpeta no tiene project.godot.');
+    if (!existsSync(join(abs, 'project.godot')))
+      throw new Error('Esa carpeta no tiene project.godot.');
     return abs;
   }
 
@@ -323,7 +404,12 @@ export class GodotService {
     const abs = this.absDir(root, dir);
     const args = ['--editor', '--path', abs];
     if (file && validScene(file)) args.push(...this.sceneArg(dir, file));
-    const p = spawn(await this.exe(), args, { cwd: abs, detached: true, stdio: 'ignore', env: childEnv(process.env) });
+    const p = spawn(await this.exe(), args, {
+      cwd: abs,
+      detached: true,
+      stdio: 'ignore',
+      env: childEnv(process.env),
+    });
     p.on('error', () => undefined);
     p.unref();
   }
@@ -343,7 +429,11 @@ export class GodotService {
     const args = ['--path', abs, ...this.sceneArg(dir, opts.scene)];
     if (opts.debugCollisions) args.push('--debug-collisions');
     if (opts.debugNavigation) args.push('--debug-navigation');
-    const p = spawn(await this.exe(), args, { cwd: abs, env: childEnv(process.env), windowsHide: false });
+    const p = spawn(await this.exe(), args, {
+      cwd: abs,
+      env: childEnv(process.env),
+      windowsHide: false,
+    });
     this.runs.set(key, p);
     p.stdout?.on('data', (d: Buffer) => onData(d.toString('utf8')));
     p.stderr?.on('data', (d: Buffer) => onData(d.toString('utf8')));
@@ -398,7 +488,13 @@ export class GodotService {
     return this.capture(await this.exe(), args, abs, secs * 4 + 30, signal);
   }
 
-  private capture(exe: string, args: string[], cwd: string, limitSecs: number, signal?: AbortSignal): Promise<GodotRunResult> {
+  private capture(
+    exe: string,
+    args: string[],
+    cwd: string,
+    limitSecs: number,
+    signal?: AbortSignal,
+  ): Promise<GodotRunResult> {
     const t0 = Date.now();
     return new Promise((ok) => {
       const p = spawn(exe, args, { cwd, env: childEnv(process.env), windowsHide: true });
@@ -450,7 +546,9 @@ export class GodotService {
   ): Promise<{ frames: GodotFrame[]; run: GodotRunResult }> {
     const abs = this.absDir(root, dir);
     const fps = 30;
-    const at = (opts.at?.length ? opts.at : [2]).map((s) => Math.max(0, Math.min(30, s))).slice(0, 6);
+    const at = (opts.at?.length ? opts.at : [2])
+      .map((s) => Math.max(0, Math.min(30, s)))
+      .slice(0, 6);
     const last = Math.max(...at);
     const tmp = await mkdtemp(join(tmpdir(), 'zx-godot-shot-'));
     try {
@@ -506,7 +604,8 @@ export class GodotService {
     signal?: AbortSignal,
   ): Promise<{ run: GodotRunResult; play: PlayOutput; frames: GodotFrame[] }> {
     const abs = this.absDir(root, dir);
-    if (this.playing.has(abs)) throw new Error('Ya hay una prueba automática en curso en ese proyecto.');
+    if (this.playing.has(abs))
+      throw new Error('Ya hay una prueba automática en curso en ese proyecto.');
     const sceneArgs = this.sceneArg(dir, opts.scene);
     const exe = await this.exe();
     await this.cleanStale(abs);
@@ -520,7 +619,11 @@ export class GodotService {
       const driver = join(tmp, 'zs_playtest.gd');
       await writeFile(driver, PLAYTEST_GD, 'utf8');
       const planFile = join(tmp, 'plan.json');
-      await writeFile(planFile, JSON.stringify({ fps: 60, shots: shots.replace(/\\/g, '/'), events: opts.plan.events }), 'utf8');
+      await writeFile(
+        planFile,
+        JSON.stringify({ fps: 60, shots: shots.replace(/\\/g, '/'), events: opts.plan.events }),
+        'utf8',
+      );
       await writeFile(cfg, overrideWithPlaytest(before, driver), 'utf8');
       const headless = opts.headless !== false && opts.plan.shots === 0;
       const frames = Math.round((opts.plan.seconds + 2) * 60);
@@ -556,7 +659,12 @@ export class GodotService {
   }
 
   /** Parses scripts without running the game (--check-only). files: res:// or relative; default every .gd. */
-  async check(root: string, dir: string, files?: string[], signal?: AbortSignal): Promise<{ checked: number; problems: (GodotProblem & { count: number })[] }> {
+  async check(
+    root: string,
+    dir: string,
+    files?: string[],
+    signal?: AbortSignal,
+  ): Promise<{ checked: number; problems: (GodotProblem & { count: number })[] }> {
     const abs = this.absDir(root, dir);
     let list: string[];
     if (files?.length) {
@@ -571,21 +679,40 @@ export class GodotService {
       const walk = async (d: string, depth: number) => {
         for (const e of await readdir(d, { withFileTypes: true }).catch(() => [])) {
           if (e.isDirectory()) {
-            if (depth > 0 && !e.name.startsWith('.') && e.name !== 'addons' && !SKIP_DIRS.has(e.name)) await walk(join(d, e.name), depth - 1);
-          } else if (e.name.endsWith('.gd')) list.push(`res://${relative(abs, join(d, e.name)).replace(/\\/g, '/')}`);
+            if (
+              depth > 0 &&
+              !e.name.startsWith('.') &&
+              e.name !== 'addons' &&
+              !SKIP_DIRS.has(e.name)
+            )
+              await walk(join(d, e.name), depth - 1);
+          } else if (e.name.endsWith('.gd'))
+            list.push(`res://${relative(abs, join(d, e.name)).replace(/\\/g, '/')}`);
         }
       };
       await walk(abs, 8);
     }
-    list = list.filter((f) => /^res:\/\/[^"]+\.gd$/.test(f) && !f.split('/').includes('..')).slice(0, 200);
+    list = list
+      .filter((f) => /^res:\/\/[^"]+\.gd$/.test(f) && !f.split('/').includes('..'))
+      .slice(0, 200);
     const exe = await this.exe();
     const problems: (GodotProblem & { count: number })[] = [];
     let i = 0;
     const worker = async () => {
       while (i < list.length && !signal?.aborted) {
         const f = list[i++]!;
-        const r = await this.capture(exe, ['--headless', '--path', abs, '--check-only', '--script', f], abs, 60, signal);
-        for (const p of r.problems) if (!problems.some((x) => x.file === p.file && x.line === p.line && x.message === p.message)) problems.push(p);
+        const r = await this.capture(
+          exe,
+          ['--headless', '--path', abs, '--check-only', '--script', f],
+          abs,
+          60,
+          signal,
+        );
+        for (const p of r.problems)
+          if (
+            !problems.some((x) => x.file === p.file && x.line === p.line && x.message === p.message)
+          )
+            problems.push(p);
       }
     };
     await Promise.all([worker(), worker(), worker()]);
@@ -603,36 +730,64 @@ export class GodotService {
     const abs = this.absDir(root, dir);
     if (!validPresetName(preset)) throw new Error('Nombre de preset no válido.');
     const p = (await this.project(root, dir)).presets.find((x) => x.name === preset);
-    if (!p) throw new Error(`No hay un preset "${preset}" en export_presets.cfg. Créalo en Godot: Proyecto → Exportar.`);
-    const out = p.exportPath ? join(abs, p.exportPath) : join(abs, 'build', preset.replace(/[^\w.-]+/g, '_'));
+    if (!p)
+      throw new Error(
+        `No hay un preset "${preset}" en export_presets.cfg. Créalo en Godot: Proyecto → Exportar.`,
+      );
+    const out = p.exportPath
+      ? join(abs, p.exportPath)
+      : join(abs, 'build', preset.replace(/[^\w.-]+/g, '_'));
     await mkdir(dirname(out), { recursive: true });
-    const r = await this.capture(await this.exe(), ['--headless', '--path', abs, debug ? '--export-debug' : '--export-release', preset, out], abs, 900, signal);
-    const missing = /export templates?.*(not found|missing)|No export template found/i.test(r.output);
+    const r = await this.capture(
+      await this.exe(),
+      ['--headless', '--path', abs, debug ? '--export-debug' : '--export-release', preset, out],
+      abs,
+      900,
+      signal,
+    );
+    const missing = /export templates?.*(not found|missing)|No export template found/i.test(
+      r.output,
+    );
     return {
       ...r,
       ok: r.exitCode === 0 && existsSync(out) && !missing,
-      output: missing ? `${r.output}\nFaltan las plantillas de exportación de Godot: en el editor, Editor → Administrar plantillas de exportación → Descargar.` : r.output,
+      output: missing
+        ? `${r.output}\nFaltan las plantillas de exportación de Godot: en el editor, Editor → Administrar plantillas de exportación → Descargar.`
+        : r.output,
       path: out,
     };
   }
 
   /** Creates a new project from a template in <root>/<folder>. Returns the files written. */
-  async create(root: string, folder: string, template: GameTemplate, name: string): Promise<string[]> {
+  async create(
+    root: string,
+    folder: string,
+    template: GameTemplate,
+    name: string,
+  ): Promise<string[]> {
     if (!validNewFolder(folder)) throw new Error('Nombre de carpeta no válido.');
     const abs = join(root, folder);
-    if (existsSync(abs) && (await readdir(abs)).length) throw new Error(`La carpeta "${folder}" ya existe y no está vacía.`);
+    if (existsSync(abs) && (await readdir(abs)).length)
+      throw new Error(`La carpeta "${folder}" ya existe y no está vacía.`);
     const files = gameTemplateFiles(template, name.trim().slice(0, 80) || folder);
     if (template === 'web-phaser') {
       const lib = await phaserBuild();
       if (lib) files['lib/phaser.min.js'] = lib;
-      else files['index.html'] = files['index.html']!.replace('lib/phaser.min.js', 'https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js');
+      else
+        files['index.html'] = files['index.html']!.replace(
+          'lib/phaser.min.js',
+          'https://cdn.jsdelivr.net/npm/phaser@4.2.1/dist/phaser.min.js',
+        );
     }
     if (template === 'web-three') {
       const lib = await threeModule();
       if (lib) files['lib/three.module.min.js'] = lib.module;
       if (lib?.core) files['lib/three.core.min.js'] = lib.core;
       if (!lib)
-        files['index.html'] = files['index.html']!.replace('./lib/three.module.min.js', 'https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.min.js');
+        files['index.html'] = files['index.html']!.replace(
+          './lib/three.module.min.js',
+          'https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.min.js',
+        );
     }
     const written: string[] = [];
     for (const [rel, text] of Object.entries(files)) {
@@ -665,7 +820,8 @@ export class GodotService {
     const ready = (async () => {
       const until = Date.now() + 90_000;
       while (Date.now() < until) {
-        if (proc.exitCode !== null) throw new Error('El editor de Godot se cerró al iniciar el servidor de GDScript.');
+        if (proc.exitCode !== null)
+          throw new Error('El editor de Godot se cerró al iniciar el servidor de GDScript.');
         if (await canConnect(port)) return port;
         await new Promise((r) => setTimeout(r, 400));
       }
@@ -699,7 +855,9 @@ export class GodotService {
     const out: Record<string, string> = {};
     const bases =
       process.platform === 'win32'
-        ? [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(Boolean).map((p) => join(p!, 'Unity', 'Hub', 'Editor'))
+        ? [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]
+            .filter(Boolean)
+            .map((p) => join(p!, 'Unity', 'Hub', 'Editor'))
         : process.platform === 'darwin'
           ? ['/Applications/Unity/Hub/Editor']
           : [join(this.home, 'Unity', 'Hub', 'Editor')];
@@ -727,9 +885,16 @@ export class GodotService {
   openUnity(root: string, p: OtherEngineProject): string {
     if (!validProjectDir(p.dir)) throw new Error('Carpeta no válida.');
     const eds = this.unityEditors();
-    const exe = eds[p.version] ?? Object.entries(eds).sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true }))[0]?.[1];
+    const exe =
+      eds[p.version] ??
+      Object.entries(eds).sort((a, b) =>
+        b[0].localeCompare(a[0], undefined, { numeric: true }),
+      )[0]?.[1];
     if (!exe) throw new Error('No encontré Unity instalado con Unity Hub.');
-    const c = spawn(exe, ['-projectPath', p.dir ? join(root, p.dir) : root], { detached: true, stdio: 'ignore' });
+    const c = spawn(exe, ['-projectPath', p.dir ? join(root, p.dir) : root], {
+      detached: true,
+      stdio: 'ignore',
+    });
     c.on('error', () => undefined);
     c.unref();
     return exe;
@@ -755,13 +920,16 @@ function canConnect(port: number): Promise<boolean> {
 async function webLib(dir: string, files: Set<string>): Promise<WebGameProject['lib'] | null> {
   let text = await readFile(join(dir, 'index.html'), 'utf8').catch(() => '');
   for (const f of ['game.js', 'main.js', 'src/main.js', 'src/game.js', 'main.ts', 'src/main.ts'])
-    if (files.has(f.split('/')[0]!) || existsSync(join(dir, f))) text += await readFile(join(dir, f), 'utf8').catch(() => '');
-  if (existsSync(join(dir, 'package.json'))) text += await readFile(join(dir, 'package.json'), 'utf8').catch(() => '');
+    if (files.has(f.split('/')[0]!) || existsSync(join(dir, f)))
+      text += await readFile(join(dir, f), 'utf8').catch(() => '');
+  if (existsSync(join(dir, 'package.json')))
+    text += await readFile(join(dir, 'package.json'), 'utf8').catch(() => '');
   if (/\bphaser\b/i.test(text)) return 'phaser';
   if (/\bpixi(\.js)?\b/i.test(text)) return 'pixi';
   if (/\bbabylon(js)?\b/i.test(text)) return 'babylon';
   if (/\bthree(\.module)?(\.min)?(\.js)?\b|from ['"]three['"]/i.test(text)) return 'three';
-  if (/<canvas\b/i.test(text) && /requestAnimationFrame|getContext\(['"](2d|webgl)/.test(text)) return 'canvas';
+  if (/<canvas\b/i.test(text) && /requestAnimationFrame|getContext\(['"](2d|webgl)/.test(text))
+    return 'canvas';
   return null;
 }
 
@@ -771,7 +939,10 @@ async function webLib(dir: string, files: Set<string>): Promise<WebGameProject['
  */
 async function phaserBuild(): Promise<string | null> {
   const here = dirname(fileURLToPath(import.meta.url));
-  for (const p of [join(here, '..', 'vendor', 'phaser.min.js'), join(here, '..', '..', 'node_modules', 'phaser', 'dist', 'phaser.min.js')]) {
+  for (const p of [
+    join(here, '..', 'vendor', 'phaser.min.js'),
+    join(here, '..', '..', 'node_modules', 'phaser', 'dist', 'phaser.min.js'),
+  ]) {
     const text = await readFile(p, 'utf8').catch(() => null);
     if (text) return text;
   }
@@ -785,7 +956,9 @@ async function threeModule(): Promise<{ module: string; core: string | null } | 
     const build = dirname(createRequire(import.meta.url).resolve('three'));
     const module = await readFile(join(build, 'three.module.min.js'), 'utf8');
     // r16x+ splits the build: three.module imports ./three.core.min.js.
-    const core = module.includes('three.core') ? await readFile(join(build, 'three.core.min.js'), 'utf8').catch(() => null) : null;
+    const core = module.includes('three.core')
+      ? await readFile(join(build, 'three.core.min.js'), 'utf8').catch(() => null)
+      : null;
     return { module, core };
   } catch {
     return null;

@@ -387,7 +387,8 @@ function electronGlow(): GlowHandle | null {
     // Clicks, the wheel and the AI's own input go to the programs below.
     glow.setIgnoreMouseEvents(true);
     glow.setContentProtection(true);
-    if (process.platform === 'darwin') glow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    if (process.platform === 'darwin')
+      glow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     glow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     glow.webContents.on('will-navigate', (e) => e.preventDefault());
     let want = true;

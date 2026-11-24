@@ -5,7 +5,12 @@
 import type { VideoProject } from '../../../shared/video';
 import { mediaOf, updateClip } from '../../../shared/video';
 import type { CursorTrack, ZoomOptions } from '../../../shared/videoZoom';
-import { autoZoomKeys, parseCursorTrack, withAutoZoom, withoutZoom } from '../../../shared/videoZoom';
+import {
+  autoZoomKeys,
+  parseCursorTrack,
+  withAutoZoom,
+  withoutZoom,
+} from '../../../shared/videoZoom';
 import { api } from '../../store';
 
 const cache = new Map<string, Promise<CursorTrack | null>>();
@@ -28,8 +33,7 @@ export function cursorTrackOf(path: string): Promise<CursorTrack | null> {
 }
 
 export type ZoomResult =
-  | { project: VideoProject; rests: number }
-  | { error: 'noClip' | 'noTrack' | 'none' };
+  { project: VideoProject; rests: number } | { error: 'noClip' | 'noTrack' | 'none' };
 
 /** The project with the auto zoom on a clip (its scale / x / y keys replaced). */
 export async function zoomClip(
@@ -44,7 +48,10 @@ export async function zoomClip(
   if (!track) return { error: 'noTrack' };
   const keys = autoZoomKeys(p, c, track, opts);
   if (!keys) return { error: 'none' };
-  return { project: updateClip(p, c.id, { keyframes: withAutoZoom(c, keys).keyframes }), rests: keys.rests };
+  return {
+    project: updateClip(p, c.id, { keyframes: withAutoZoom(c, keys).keyframes }),
+    rests: keys.rests,
+  };
 }
 
 /** The project without the zoom keys of a clip. */

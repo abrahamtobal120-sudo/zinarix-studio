@@ -5,7 +5,14 @@
  */
 import { useRef, useState } from 'react';
 import type { ColorGrade, CurveKey, CurvePoint } from '../../../shared/videoColor';
-import { CURVE_KEYS, CURVE_MAX_POINTS, CURVE_PRESETS, cleanCurve, curveSegments, splineAt } from '../../../shared/videoColor';
+import {
+  CURVE_KEYS,
+  CURVE_MAX_POINTS,
+  CURVE_PRESETS,
+  cleanCurve,
+  curveSegments,
+  splineAt,
+} from '../../../shared/videoColor';
 import { type ProKey, tp } from './proStrings';
 
 const S = 256;
@@ -66,7 +73,11 @@ export function CurvesBlock({
     const last = next.length - 1;
     // The ends stay at x = 0 / 1; the others between their neighbours.
     const nx =
-      d.i === 0 ? 0 : d.i === last ? 1 : Math.min(next[d.i + 1]![0] - GAP, Math.max(next[d.i - 1]![0] + GAP, x));
+      d.i === 0
+        ? 0
+        : d.i === last
+          ? 1
+          : Math.min(next[d.i + 1]![0] - GAP, Math.max(next[d.i - 1]![0] + GAP, x));
     next[d.i] = [nx, y];
     d.pts = next;
     set(next, true);
@@ -158,7 +169,14 @@ export function CurvesBlock({
         <line className="vs-curve-diag" x1={0} y1={S} x2={S} y2={0} />
         {any &&
           CURVE_KEYS.filter((k) => k !== key && grade?.curves?.[k]).map((k) => (
-            <path key={k} d={pathOf(pointsOf(grade, k))} fill="none" stroke={STROKE[k]} strokeOpacity={0.35} strokeWidth={1.5} />
+            <path
+              key={k}
+              d={pathOf(pointsOf(grade, k))}
+              fill="none"
+              stroke={STROKE[k]}
+              strokeOpacity={0.35}
+              strokeWidth={1.5}
+            />
           ))}
         <path d={pathOf(pts)} fill="none" stroke={STROKE[key]} strokeWidth={2.2} />
         {pts.map((p, i) => (

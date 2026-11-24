@@ -13,7 +13,11 @@ export const MAX_LOCK_MS = 24 * 60 * 60_000;
 
 export type PinCheck =
   | { ok: true }
-  | { ok: false; error: string; /** The PIN was rotated (the desktop must show the new one). */ rotated?: boolean };
+  | {
+      ok: false;
+      error: string;
+      /** The PIN was rotated (the desktop must show the new one). */ rotated?: boolean;
+    };
 
 /** Constant-time comparison of two strings of any length (hashes first, so lengths never leak). */
 export function sameSecret(a: string, b: string): boolean {
@@ -65,7 +69,11 @@ export class PairingGuard {
         // A lock never lasts longer than MAX_LOCK_MS from now (a clock moved back cannot
         // make it endless).
         const until = Math.min(num(v.until), this.now() + MAX_LOCK_MS);
-        this.state.set(ch, { fails: Math.min(num(v.fails), MAX_TRIES), locks: Math.min(num(v.locks), 32), until });
+        this.state.set(ch, {
+          fails: Math.min(num(v.fails), MAX_TRIES),
+          locks: Math.min(num(v.locks), 32),
+          until,
+        });
       }
     } catch {
       /* no file yet, or unreadable: start clean */

@@ -265,7 +265,14 @@ async function vscodeTasks(all: Set<string>): Promise<RunTask[]> {
         command: x.command,
         file: VSCODE_TASKS,
         // The default build task first, then the other build / test tasks.
-        priority: x.isDefault && x.group === 'build' ? 0.5 : x.group === 'build' ? 3 : x.group === 'test' ? 6 : 4,
+        priority:
+          x.isDefault && x.group === 'build'
+            ? 0.5
+            : x.group === 'build'
+              ? 3
+              : x.group === 'test'
+                ? 6
+                : 4,
         ...(notes.length ? { detail: `${x.command} (${notes.join(' · ')})` } : {}),
       };
     });
@@ -340,7 +347,6 @@ function rememberConfirmed(root: string): void {
   }
 }
 
-
 // ---------------- runs: started from here, followed in their own terminal ----------------
 
 /** How a run is going. 'sent': typed into a terminal we cannot follow (no exit code). */
@@ -398,7 +404,8 @@ function wrapCommand(cmd: string, kind: ShellKind): string {
   }
 }
 
-const ANSI = /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-Z\\-_]|\r/g;
+const ANSI =
+  /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-Z\\-_]|\r/g;
 
 let runs: RunRecord[] = [];
 const runListeners = new Set<() => void>();
@@ -576,7 +583,13 @@ async function startRun(task: RunTask, reuse?: number): Promise<void> {
   setRuns(
     runs.map((r) =>
       r.id === rec.id
-        ? { ...r, status: 'running', termId: id, tracked: kind !== 'unknown', startedAt: Date.now() }
+        ? {
+            ...r,
+            status: 'running',
+            termId: id,
+            tracked: kind !== 'unknown',
+            startedAt: Date.now(),
+          }
         : r,
     ),
   );
@@ -613,7 +626,8 @@ export function runTask(task: RunTask): void {
 /** The run of this task still going in the workspace, if any. */
 function liveRunOf(task: RunTask, list: RunRecord[], root: string): RunRecord | undefined {
   return list.find(
-    (r) => r.root === root && isLive(r) && r.task.command === task.command && r.task.file === task.file,
+    (r) =>
+      r.root === root && isLive(r) && r.task.command === task.command && r.task.file === task.file,
   );
 }
 
@@ -702,7 +716,9 @@ function statusText(r: RunRecord, now: number): string {
     case 'ok':
       return t('runStatusOk', { time });
     case 'failed':
-      return r.code === undefined ? t('runStatusError') : t('runStatusFailed', { code: r.code, time });
+      return r.code === undefined
+        ? t('runStatusError')
+        : t('runStatusFailed', { code: r.code, time });
     case 'stopped':
       return t('runStatusStopped', { time });
     default:
@@ -714,7 +730,13 @@ function StatusIcon({ status }: { status: RunStatus }) {
   if (status === 'starting' || status === 'running')
     return <span className="rp-spinner" aria-hidden="true" />;
   const icon: IconName =
-    status === 'ok' ? 'check' : status === 'failed' ? 'x' : status === 'stopped' ? 'stop' : 'terminal';
+    status === 'ok'
+      ? 'check'
+      : status === 'failed'
+        ? 'x'
+        : status === 'stopped'
+          ? 'stop'
+          : 'terminal';
   return <Icon name={icon} size={13} />;
 }
 
@@ -773,9 +795,7 @@ function RunStatusCard({ run, now }: { run: RunRecord; now: number }) {
           {run.task.command}
         </code>
       </div>
-      {run.status === 'running' && !run.tracked && (
-        <p className="rp-note">{t('runUntracked')}</p>
-      )}
+      {run.status === 'running' && !run.tracked && <p className="rp-note">{t('runUntracked')}</p>}
       <div className="rp-status-actions">
         {live ? (
           <>
@@ -999,9 +1019,7 @@ export function RunPanel() {
               <button className="primary" onClick={() => askAiHowToRun(files)}>
                 <Icon name="sparkle" size={14} /> {t('runAskAi')}
               </button>
-              <button
-                onClick={() => setState({ panelOpen: true, panelView: 'terminal' })}
-              >
+              <button onClick={() => setState({ panelOpen: true, panelView: 'terminal' })}>
                 <Icon name="terminal" size={14} /> {t('runOpenTerminal')}
               </button>
             </div>
@@ -1080,7 +1098,11 @@ export function RunPanel() {
             </h4>
             <div className="rp-list">
               {history.map((r) => (
-                <div key={r.id} className={`rp-recent rp-st-${r.status}`} title={describeTask(r.task)}>
+                <div
+                  key={r.id}
+                  className={`rp-recent rp-st-${r.status}`}
+                  title={describeTask(r.task)}
+                >
                   <span className="rp-recent-icon">
                     <StatusIcon status={r.status} />
                   </span>

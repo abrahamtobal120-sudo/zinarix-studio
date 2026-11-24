@@ -399,7 +399,9 @@ export function TerminalPanel() {
 
   const openMenu = (e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
-    void api().terminal.profiles().then(setProfiles, () => toast(t('termProfilesError')));
+    void api()
+      .terminal.profiles()
+      .then(setProfiles, () => toast(t('termProfilesError')));
     const r = e.currentTarget.getBoundingClientRect();
     setMenu((m) => (m ? null : { x: r.right, y: r.top }));
   };
@@ -409,92 +411,96 @@ export function TerminalPanel() {
       <div className="panel-header">
         <PanelViews />
         {view === 'terminal' ? (
-        <>
-        <div
-          className="term-tabs"
-          role="tablist"
-          onDoubleClick={(e) => e.target === e.currentTarget && void create()}
-        >
-          {ids.map((id, i) => {
-            const name = terms.get(id)?.name ?? 'shell';
-            const admin = /admin/i.test(name);
-            return (
-              <span
-                key={id}
-                role="tab"
-                aria-selected={id === active}
-                className={`term-tab ${id === active ? 'active' : ''} ${admin ? 'admin' : ''}`}
-                title={`${i + 1}: ${name}`}
-                onClick={() => setActive(id)}
-                onAuxClick={(e) => e.button === 1 && kill(id)}
+          <>
+            <div
+              className="term-tabs"
+              role="tablist"
+              onDoubleClick={(e) => e.target === e.currentTarget && void create()}
+            >
+              {ids.map((id, i) => {
+                const name = terms.get(id)?.name ?? 'shell';
+                const admin = /admin/i.test(name);
+                return (
+                  <span
+                    key={id}
+                    role="tab"
+                    aria-selected={id === active}
+                    className={`term-tab ${id === active ? 'active' : ''} ${admin ? 'admin' : ''}`}
+                    title={`${i + 1}: ${name}`}
+                    onClick={() => setActive(id)}
+                    onAuxClick={(e) => e.button === 1 && kill(id)}
+                  >
+                    <Icon name={admin ? 'shield' : 'terminal'} size={12} />
+                    <span className="term-tab-name">
+                      <span className="term-tab-n">{i + 1}</span> {name}
+                    </span>
+                    <button
+                      className="term-tab-close"
+                      aria-label={t('termKill')}
+                      title={t('termKill')}
+                      onClick={(e) => (e.stopPropagation(), kill(id))}
+                    >
+                      <Icon name="x" size={11} />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+            <span className="sidebar-actions">
+              <button
+                className="term-to-chat"
+                title={t('termToChatTitle')}
+                disabled={active === null}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => sendTerminalToChat(active)}
               >
-                <Icon name={admin ? 'shield' : 'terminal'} size={12} />
-                <span className="term-tab-name">
-                  <span className="term-tab-n">{i + 1}</span> {name}
-                </span>
+                <Icon name="agent" size={13} /> {t('termToChat')}
+              </button>
+              <span className="term-split">
                 <button
-                  className="term-tab-close"
-                  aria-label={t('termKill')}
-                  title={t('termKill')}
-                  onClick={(e) => (e.stopPropagation(), kill(id))}
+                  title={t('termNew')}
+                  aria-label={t('termNew')}
+                  onClick={() => void create()}
                 >
-                  <Icon name="x" size={11} />
+                  <Icon name="plus" size={15} />
+                </button>
+                <button
+                  className={maximized ? 'on' : ''}
+                  title={maximized ? t('restoreSize') : t('maximize')}
+                  aria-label={maximized ? t('restoreSize') : t('maximize')}
+                  onClick={() => toggleMaximized('panel')}
+                >
+                  <Icon name={maximized ? 'minimize' : 'maximize'} size={14} />
+                </button>
+                <button
+                  className={`term-profile-picker ${menu ? 'on' : ''}`}
+                  title={t('termPickShell')}
+                  aria-label={t('termPickShell')}
+                  aria-expanded={Boolean(menu)}
+                  onClick={openMenu}
+                >
+                  {t('termProfiles')}
+                  <Icon name="chevronDown" size={11} />
                 </button>
               </span>
-            );
-          })}
-        </div>
-        <span className="sidebar-actions">
-          <button
-            className="term-to-chat"
-            title={t('termToChatTitle')}
-            disabled={active === null}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => sendTerminalToChat(active)}
-          >
-            <Icon name="agent" size={13} /> {t('termToChat')}
-          </button>
-          <span className="term-split">
-            <button title={t('termNew')} aria-label={t('termNew')} onClick={() => void create()}>
-              <Icon name="plus" size={15} />
-            </button>
-            <button
-              className={maximized ? 'on' : ''}
-              title={maximized ? t('restoreSize') : t('maximize')}
-              aria-label={maximized ? t('restoreSize') : t('maximize')}
-              onClick={() => toggleMaximized('panel')}
-            >
-              <Icon name={maximized ? 'minimize' : 'maximize'} size={14} />
-            </button>
               <button
-                className={`term-profile-picker ${menu ? 'on' : ''}`}
-                title={t('termPickShell')}
-                aria-label={t('termPickShell')}
-                aria-expanded={Boolean(menu)}
-                onClick={openMenu}
+                className="term-admin"
+                title={isWindows ? t('termAdminWin') : t('termAdmin')}
+                aria-label={isWindows ? t('termAdminWin') : t('termAdmin')}
+                onClick={() => void create(true)}
               >
-                {t('termProfiles')}
-                <Icon name="chevronDown" size={11} />
+                <Icon name="shield" size={14} />
               </button>
-          </span>
-          <button
-            className="term-admin"
-            title={isWindows ? t('termAdminWin') : t('termAdmin')}
-            aria-label={isWindows ? t('termAdminWin') : t('termAdmin')}
-            onClick={() => void create(true)}
-          >
-            <Icon name="shield" size={14} />
-          </button>
-          <span className="term-sep" />
-          <button
-            title={t('termHide')}
-            aria-label={t('termHide')}
-            onClick={() => setState({ panelOpen: false })}
-          >
-            <Icon name="x" size={14} />
-          </button>
-        </span>
-        </>
+              <span className="term-sep" />
+              <button
+                title={t('termHide')}
+                aria-label={t('termHide')}
+                onClick={() => setState({ panelOpen: false })}
+              >
+                <Icon name="x" size={14} />
+              </button>
+            </span>
+          </>
         ) : (
           <span className="sidebar-actions panel-other-actions">
             <button

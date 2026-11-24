@@ -42,7 +42,9 @@ export async function runBgModel(req: BgRequest, wasmDir: string): Promise<BgRes
   const out = res[session.outputNames[0]!]!.data as Float32Array;
   if (out.length < req.side * req.side) return { error: 'The model gave an unexpected output.' };
   const first = out.subarray(0, req.side * req.side);
-  return { output: Buffer.from(first.buffer, first.byteOffset, first.byteLength).toString('base64') };
+  return {
+    output: Buffer.from(first.buffer, first.byteOffset, first.byteLength).toString('base64'),
+  };
 }
 
 async function main(): Promise<void> {

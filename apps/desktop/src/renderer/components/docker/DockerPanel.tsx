@@ -42,7 +42,10 @@ type View =
 type Act = (label: string, fn: () => Promise<unknown>) => Promise<void>;
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']+': (Error: )?/,
+    '',
+  );
 
 export function DockerPanel() {
   const [status, setStatus] = useState<DockerStatus | null>(null);
@@ -58,15 +61,25 @@ export function DockerPanel() {
   const [query, setQuery] = useState('');
 
   const refresh = useCallback(async () => {
-    const st = await api().docker.status().catch((): DockerStatus => ({ state: 'missing' }));
+    const st = await api()
+      .docker.status()
+      .catch((): DockerStatus => ({ state: 'missing' }));
     setStatus(st);
     if (st.state !== 'running') return;
     setStarting(false);
     const [c, i, v, n] = await Promise.all([
-      api().docker.containers().catch(() => []),
-      api().docker.images().catch(() => []),
-      api().docker.volumes().catch(() => []),
-      api().docker.networks().catch(() => []),
+      api()
+        .docker.containers()
+        .catch(() => []),
+      api()
+        .docker.images()
+        .catch(() => []),
+      api()
+        .docker.volumes()
+        .catch(() => []),
+      api()
+        .docker.networks()
+        .catch(() => []),
     ]);
     setContainers(c);
     setImages(i);
@@ -78,9 +91,12 @@ export function DockerPanel() {
   // every 3 s while waiting for Docker Desktop to start.
   useEffect(() => {
     void refresh();
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh();
-    }, starting ? 3000 : 5000);
+    const timer = setInterval(
+      () => {
+        if (document.visibilityState === 'visible') void refresh();
+      },
+      starting ? 3000 : 5000,
+    );
     return () => clearInterval(timer);
   }, [refresh, starting]);
 
@@ -94,7 +110,9 @@ export function DockerPanel() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
       if (document.visibilityState === 'visible') {
-        const list = await api().docker.stats().catch(() => null);
+        const list = await api()
+          .docker.stats()
+          .catch(() => null);
         if (!alive) return;
         if (list) setStats(new Map(list.map((s) => [s.name, s])));
       }
@@ -126,7 +144,13 @@ export function DockerPanel() {
   };
   if (view.kind === 'logs') return <LogsView container={view.name} onBack={back} />;
   if (view.kind === 'details')
-    return <DetailsView name={view.name} onBack={back} onLogs={() => setView({ kind: 'logs', name: view.name })} />;
+    return (
+      <DetailsView
+        name={view.name}
+        onBack={back}
+        onLogs={() => setView({ kind: 'logs', name: view.name })}
+      />
+    );
   if (view.kind === 'run') return <RunView image={view.image} onBack={back} />;
   if (view.kind === 'job') return <JobView title={view.title} job={view.job} onBack={back} />;
 
@@ -142,7 +166,9 @@ export function DockerPanel() {
       <div className="sidebar-title">
         <span className="panel-title">
           DOCKER
-          {status?.state === 'running' && <span className="dk-version">{tk('version', { v: status.server })}</span>}
+          {status?.state === 'running' && (
+            <span className="dk-version">{tk('version', { v: status.server })}</span>
+          )}
         </span>
         <span className="sidebar-actions">
           <button title={tk('refresh')} aria-label={tk('refresh')} onClick={() => void refresh()}>
@@ -155,7 +181,10 @@ export function DockerPanel() {
       ) : status.state === 'missing' ? (
         <div className="dk-empty">
           <p>{tk('missing')}</p>
-          <button className="btn" onClick={() => openLink('https://www.docker.com/products/docker-desktop/')}>
+          <button
+            className="btn"
+            onClick={() => openLink('https://www.docker.com/products/docker-desktop/')}
+          >
             {tk('getDocker')}
           </button>
         </div>
@@ -179,22 +208,24 @@ export function DockerPanel() {
       ) : (
         <>
           <div className="dk-tabs" role="tablist">
-            {(['containers', 'images', 'volumes', 'networks', 'compose', 'disk'] as Tab[]).map((k) => (
-              <button
-                key={k}
-                role="tab"
-                aria-selected={tab === k}
-                className={`dk-tab ${tab === k ? 'on' : ''}`}
-                onClick={() => setTab(k)}
-              >
-                {tk(k)}
-                {k === 'containers' && containers.length ? (
-                  <span className="dk-count">
-                    {containers.filter((c) => c.state === 'running').length}/{containers.length}
-                  </span>
-                ) : null}
-              </button>
-            ))}
+            {(['containers', 'images', 'volumes', 'networks', 'compose', 'disk'] as Tab[]).map(
+              (k) => (
+                <button
+                  key={k}
+                  role="tab"
+                  aria-selected={tab === k}
+                  className={`dk-tab ${tab === k ? 'on' : ''}`}
+                  onClick={() => setTab(k)}
+                >
+                  {tk(k)}
+                  {k === 'containers' && containers.length ? (
+                    <span className="dk-count">
+                      {containers.filter((c) => c.state === 'running').length}/{containers.length}
+                    </span>
+                  ) : null}
+                </button>
+              ),
+            )}
           </div>
           {searchable && (
             <div className="dk-search">
@@ -208,7 +239,11 @@ export function DockerPanel() {
               />
             </div>
           )}
-          {busy && <div className="dk-busy">{tk('working')} {busy}</div>}
+          {busy && (
+            <div className="dk-busy">
+              {tk('working')} {busy}
+            </div>
+          )}
           <div className="dk-body">
             {tab === 'containers' &&
               (containers.length && !cs.length ? (
@@ -239,7 +274,9 @@ export function DockerPanel() {
                   <div className="dk-row" key={v.name}>
                     <Icon name="database" size={14} />
                     <div className="dk-main">
-                      <div className="dk-name" title={v.name}>{v.name}</div>
+                      <div className="dk-name" title={v.name}>
+                        {v.name}
+                      </div>
                       <div className="dk-sub">{v.driver}</div>
                     </div>
                     <RowBtn
@@ -247,8 +284,14 @@ export function DockerPanel() {
                       label={tk('remove')}
                       disabled={!!busy}
                       onClick={async () => {
-                        if (await confirmDialog(tk('confirmVolume', { name: v.name }), { danger: true }))
-                          await act(`${tk('remove')} ${v.name}`, () => api().docker.action('volume-rm', v.name));
+                        if (
+                          await confirmDialog(tk('confirmVolume', { name: v.name }), {
+                            danger: true,
+                          })
+                        )
+                          await act(`${tk('remove')} ${v.name}`, () =>
+                            api().docker.action('volume-rm', v.name),
+                          );
                       }}
                     />
                   </div>
@@ -289,7 +332,13 @@ function RowBtn({
   disabled?: boolean;
 }) {
   return (
-    <button className="icon-btn dk-btn" title={label} aria-label={label} disabled={disabled} onClick={onClick}>
+    <button
+      className="icon-btn dk-btn"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
       <Icon name={icon} size={14} />
     </button>
   );
@@ -327,8 +376,11 @@ function Containers({
     groups.set(k, [...(groups.get(k) ?? []), c]);
   }
   const keys = [...groups.keys()].sort((a, b) => (a ? (b ? a.localeCompare(b) : -1) : 1));
-  const action = (c: DockerContainer, a: 'start' | 'stop' | 'restart' | 'pause' | 'unpause', key: KeyDk) =>
-    act(`${tk(key)} ${c.name}`, () => api().docker.action(a, c.name));
+  const action = (
+    c: DockerContainer,
+    a: 'start' | 'stop' | 'restart' | 'pause' | 'unpause',
+    key: KeyDk,
+  ) => act(`${tk(key)} ${c.name}`, () => api().docker.action(a, c.name));
   return (
     <>
       {keys.map((k) => (
@@ -347,16 +399,25 @@ function Containers({
               <div className="dk-row" key={c.id}>
                 <span className={`dk-dot dk-${c.state}`} title={c.state} />
                 <div className="dk-main">
-                  <button className="dk-name dk-link" title={`${tk('details')}: ${c.name} (${c.id})`} onClick={() => onDetails(c.name)}>
+                  <button
+                    className="dk-name dk-link"
+                    title={`${tk('details')}: ${c.name} (${c.id})`}
+                    onClick={() => onDetails(c.name)}
+                  >
                     {c.name}
                   </button>
                   <div className="dk-sub" title={c.command}>
                     {c.image} · {c.status}
                   </div>
                   {st && (
-                    <div className="dk-stats" title={`${st.mem} · net ${st.net} · disk ${st.block}`}>
+                    <div
+                      className="dk-stats"
+                      title={`${st.mem} · net ${st.net} · disk ${st.block}`}
+                    >
                       <span className="dk-meter" aria-hidden>
-                        <span style={{ width: `${Math.min(100, Number.isFinite(cpu) ? cpu : 0)}%` }} />
+                        <span
+                          style={{ width: `${Math.min(100, Number.isFinite(cpu) ? cpu : 0)}%` }}
+                        />
                       </span>
                       {tk('cpu')} {st.cpu} · {tk('mem')} {memUsed(st.mem)}
                     </div>
@@ -378,13 +439,33 @@ function Containers({
                 </div>
                 <div className="dk-actions">
                   {running ? (
-                    <RowBtn icon="stop" label={tk('stop')} disabled={disabled} onClick={() => void action(c, 'stop', 'stop')} />
+                    <RowBtn
+                      icon="stop"
+                      label={tk('stop')}
+                      disabled={disabled}
+                      onClick={() => void action(c, 'stop', 'stop')}
+                    />
                   ) : paused ? (
-                    <RowBtn icon="play" label={tk('unpause')} disabled={disabled} onClick={() => void action(c, 'unpause', 'unpause')} />
+                    <RowBtn
+                      icon="play"
+                      label={tk('unpause')}
+                      disabled={disabled}
+                      onClick={() => void action(c, 'unpause', 'unpause')}
+                    />
                   ) : (
-                    <RowBtn icon="play" label={tk('start')} disabled={disabled} onClick={() => void action(c, 'start', 'start')} />
+                    <RowBtn
+                      icon="play"
+                      label={tk('start')}
+                      disabled={disabled}
+                      onClick={() => void action(c, 'start', 'start')}
+                    />
                   )}
-                  <RowBtn icon="refresh" label={tk('restart')} disabled={disabled} onClick={() => void action(c, 'restart', 'restart')} />
+                  <RowBtn
+                    icon="refresh"
+                    label={tk('restart')}
+                    disabled={disabled}
+                    onClick={() => void action(c, 'restart', 'restart')}
+                  />
                   <RowBtn icon="scroll" label={tk('logs')} onClick={() => onLogs(c.name)} />
                   {running && (
                     <RowBtn
@@ -399,7 +480,9 @@ function Containers({
                     disabled={disabled}
                     onClick={async () => {
                       if (await confirmDialog(tk('confirmRm', { name: c.name }), { danger: true }))
-                        await act(`${tk('remove')} ${c.name}`, () => api().docker.action('rm', c.name));
+                        await act(`${tk('remove')} ${c.name}`, () =>
+                          api().docker.action('rm', c.name),
+                        );
                     }}
                   />
                 </div>
@@ -449,7 +532,14 @@ function Images({
   useEffect(() => {
     if (tag || !root) return;
     const base = root.split(/[\\/]/).pop() ?? 'app';
-    setTag(`${base.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '') || 'app'}:dev`);
+    setTag(
+      `${
+        base
+          .toLowerCase()
+          .replace(/[^a-z0-9._-]+/g, '-')
+          .replace(/^[^a-z0-9]+/, '') || 'app'
+      }:dev`,
+    );
   }, [root, tag]);
   const doPull = () => {
     const image = pull.trim();
@@ -481,11 +571,22 @@ function Images({
                 </option>
               ))}
             </select>
-            <input value={tag} aria-label={tk('buildTag')} title={tk('buildTag')} onChange={(e) => setTag(e.target.value)} />
+            <input
+              value={tag}
+              aria-label={tk('buildTag')}
+              title={tk('buildTag')}
+              onChange={(e) => setTag(e.target.value)}
+            />
             <button
               className="btn"
               disabled={!file || !tag.trim()}
-              onClick={() => onJob(`${tk('build1')} ${tag.trim()}`, { kind: 'build', dockerfile: file, tag: tag.trim() })}
+              onClick={() =>
+                onJob(`${tk('build1')} ${tag.trim()}`, {
+                  kind: 'build',
+                  dockerfile: file,
+                  tag: tag.trim(),
+                })
+              }
             >
               <Icon name="package" size={12} /> {tk('build1')}
             </button>
@@ -576,17 +677,35 @@ function RunView({ image, onBack }: { image: string; onBack: () => void }) {
         </label>
         <label>
           {tk('rPorts')}
-          <input value={ports} onChange={(e) => setPorts(e.target.value)} placeholder={tk('rPortsPh')} />
+          <input
+            value={ports}
+            onChange={(e) => setPorts(e.target.value)}
+            placeholder={tk('rPortsPh')}
+          />
         </label>
         <label>
           {tk('rEnv')}
-          <textarea rows={3} value={env} onChange={(e) => setEnv(e.target.value)} placeholder="POSTGRES_PASSWORD=dev" spellCheck={false} />
+          <textarea
+            rows={3}
+            value={env}
+            onChange={(e) => setEnv(e.target.value)}
+            placeholder="POSTGRES_PASSWORD=dev"
+            spellCheck={false}
+          />
         </label>
         <label>
           {tk('rVolumes')}
-          <textarea rows={2} value={vols} onChange={(e) => setVols(e.target.value)} placeholder="datos:/var/lib/data" spellCheck={false} />
+          <textarea
+            rows={2}
+            value={vols}
+            onChange={(e) => setVols(e.target.value)}
+            placeholder="datos:/var/lib/data"
+            spellCheck={false}
+          />
         </label>
-        {mounts.length > 0 && <div className="dk-warn">{tk('rHostWarn', { list: mounts.join(', ') })}</div>}
+        {mounts.length > 0 && (
+          <div className="dk-warn">{tk('rHostWarn', { list: mounts.join(', ') })}</div>
+        )}
         <label>
           {tk('rCommand')}
           <input value={command} onChange={(e) => setCommand(e.target.value)} spellCheck={false} />
@@ -602,7 +721,8 @@ function RunView({ image, onBack }: { image: string; onBack: () => void }) {
           </select>
         </label>
         <label className="dk-inline">
-          <input type="checkbox" checked={rm} onChange={(e) => setRm(e.target.checked)} /> {tk('rRm')}
+          <input type="checkbox" checked={rm} onChange={(e) => setRm(e.target.checked)} />{' '}
+          {tk('rRm')}
         </label>
         <div className="dk-form-btns">
           <button className="btn" disabled={working} onClick={() => void start()}>
@@ -619,7 +739,15 @@ function RunView({ image, onBack }: { image: string; onBack: () => void }) {
 
 // ------------------------------------------------------------------ details
 
-function DetailsView({ name, onBack, onLogs }: { name: string; onBack: () => void; onLogs: () => void }) {
+function DetailsView({
+  name,
+  onBack,
+  onLogs,
+}: {
+  name: string;
+  onBack: () => void;
+  onLogs: () => void;
+}) {
   const [d, setD] = useState<DockerDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reveal, setReveal] = useState(false);
@@ -680,8 +808,11 @@ function DetailsView({ name, onBack, onLogs }: { name: string; onBack: () => voi
               {d.state !== 'running' && d.exitCode != null ? ` · ${tk('dExit')} ${d.exitCode}` : ''}
             </>,
           )}
-          {d.health && row(tk('dHealth'), <span className={`dk-health dk-h-${d.health}`}>{d.health}</span>)}
-          {d.startedAt && !d.startedAt.startsWith('0001') && row(tk('dStarted'), new Date(d.startedAt).toLocaleString())}
+          {d.health &&
+            row(tk('dHealth'), <span className={`dk-health dk-h-${d.health}`}>{d.health}</span>)}
+          {d.startedAt &&
+            !d.startedAt.startsWith('0001') &&
+            row(tk('dStarted'), new Date(d.startedAt).toLocaleString())}
           {row(tk('dCommand'), d.command ? <code>{d.command}</code> : none)}
           {d.workdir && row(tk('dWorkdir'), <code>{d.workdir}</code>)}
           {row(tk('dRestart'), d.restart)}
@@ -694,7 +825,11 @@ function DetailsView({ name, onBack, onLogs }: { name: string; onBack: () => voi
                   <div className="dk-kv" key={p.container + p.host}>
                     <span className="dk-v">
                       {p.host ? (
-                        <button className="dk-port" title={tk('openPort')} onClick={() => openLink(`http://localhost:${host}`)}>
+                        <button
+                          className="dk-port"
+                          title={tk('openPort')}
+                          onClick={() => openLink(`http://localhost:${host}`)}
+                        >
                           {p.host}
                         </button>
                       ) : (
@@ -711,7 +846,8 @@ function DetailsView({ name, onBack, onLogs }: { name: string; onBack: () => voi
             ? d.mounts.map((m) => (
                 <div className="dk-kv" key={m.destination}>
                   <span className="dk-v">
-                    <span className="dk-dim">{m.type}</span> <code title={m.source}>{m.source}</code> → <code>{m.destination}</code>
+                    <span className="dk-dim">{m.type}</span>{' '}
+                    <code title={m.source}>{m.source}</code> → <code>{m.destination}</code>
                     {!m.rw && <span className="dk-dim"> ({tk('readOnly')})</span>}
                   </span>
                 </div>
@@ -732,7 +868,9 @@ function DetailsView({ name, onBack, onLogs }: { name: string; onBack: () => voi
           {d.env.length
             ? d.env.map((e) => (
                 <div className="dk-kv dk-env" key={e.key}>
-                  <span className="dk-k" title={e.key}>{e.key}</span>
+                  <span className="dk-k" title={e.key}>
+                    {e.key}
+                  </span>
                   <span className="dk-v">
                     <code>{reveal || !secretKey(e.key) ? e.value : '••••••'}</code>
                   </span>
@@ -766,9 +904,12 @@ function Disk({ act, disabled }: { act: Act; disabled: boolean }) {
   useEffect(load, [load]);
   const prune = async (kind: DockerPrune, key: KeyDk) => {
     const what = tk(key).toLowerCase();
-    const ok = await confirmDialog(kind === 'volumes' ? tk('pruneAskVolumes') : tk('pruneAsk', { what }), {
-      danger: true,
-    });
+    const ok = await confirmDialog(
+      kind === 'volumes' ? tk('pruneAskVolumes') : tk('pruneAsk', { what }),
+      {
+        danger: true,
+      },
+    );
     if (!ok) return;
     await act(`${tk('pruneTitle')}: ${what}`, async () => {
       const out = await api().docker.prune(kind);
@@ -818,7 +959,12 @@ function Disk({ act, disabled }: { act: Act; disabled: boolean }) {
             ['volumes', 'pruneVolumes'],
           ] as [DockerPrune, KeyDk][]
         ).map(([kind, key]) => (
-          <button key={kind} className={`btn ${kind === 'volumes' ? 'danger' : 'ghost'}`} disabled={disabled} onClick={() => void prune(kind, key)}>
+          <button
+            key={kind}
+            className={`btn ${kind === 'volumes' ? 'danger' : 'ghost'}`}
+            disabled={disabled}
+            onClick={() => void prune(kind, key)}
+          >
             <Icon name="trash" size={12} /> {tk(key)}
           </button>
         ))}
@@ -836,7 +982,10 @@ function Compose({ act, disabled }: { act: Act; disabled: boolean }) {
   const [output, setOutput] = useState('');
   useEffect(() => {
     if (!root) return setFiles(null);
-    void api().docker.composeFiles().then(setFiles).catch(() => setFiles([]));
+    void api()
+      .docker.composeFiles()
+      .then(setFiles)
+      .catch(() => setFiles([]));
   }, [root, fsVersion]);
   if (!root) return <div className="dk-empty">{tk('noFolder')}</div>;
   if (!files) return <div className="dk-empty">{tk('loading')}</div>;
@@ -844,10 +993,12 @@ function Compose({ act, disabled }: { act: Act; disabled: boolean }) {
   const run = (file: string, action: 'up' | 'down' | 'restart' | 'pull' | 'ps', key: KeyDk) =>
     act(`${tk(key)} ${file}`, async () => {
       setOutput('');
-      const out = await api().docker.compose(file, action).catch((e) => {
-        setOutput(errText(e));
-        throw e;
-      });
+      const out = await api()
+        .docker.compose(file, action)
+        .catch((e) => {
+          setOutput(errText(e));
+          throw e;
+        });
       setOutput(out);
     });
   return (
@@ -865,15 +1016,24 @@ function Compose({ act, disabled }: { act: Act; disabled: boolean }) {
               className="btn ghost"
               disabled={disabled}
               onClick={async () => {
-                if (await confirmDialog(tk('confirmDown', { file: f }), { danger: true })) await run(f, 'down', 'down');
+                if (await confirmDialog(tk('confirmDown', { file: f }), { danger: true }))
+                  await run(f, 'down', 'down');
               }}
             >
               <Icon name="stop" size={12} /> {tk('down')}
             </button>
-            <button className="btn ghost" disabled={disabled} onClick={() => void run(f, 'restart', 'restart')}>
+            <button
+              className="btn ghost"
+              disabled={disabled}
+              onClick={() => void run(f, 'restart', 'restart')}
+            >
               {tk('restart')}
             </button>
-            <button className="btn ghost" disabled={disabled} onClick={() => void run(f, 'pull', 'pull')}>
+            <button
+              className="btn ghost"
+              disabled={disabled}
+              onClick={() => void run(f, 'pull', 'pull')}
+            >
               {tk('pull')}
             </button>
           </div>
@@ -948,14 +1108,26 @@ function useStream(start: (key: string) => Promise<void>, deps: unknown[]) {
     });
     return () => {
       off();
-      void api().docker.stopLogs(key).catch(() => undefined);
+      void api()
+        .docker.stopLogs(key)
+        .catch(() => undefined);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return { text, setText, end, key: keyRef };
 }
 
-function StreamPre({ text, follow, setFollow, tail }: { text: string; follow: boolean; setFollow: (f: boolean) => void; tail?: ReactNode }) {
+function StreamPre({
+  text,
+  follow,
+  setFollow,
+  tail,
+}: {
+  text: string;
+  follow: boolean;
+  setFollow: (f: boolean) => void;
+  tail?: ReactNode;
+}) {
   const pre = useRef<HTMLPreElement>(null);
   useEffect(() => {
     if (follow && pre.current) pre.current.scrollTop = pre.current.scrollHeight;
@@ -977,7 +1149,10 @@ function StreamPre({ text, follow, setFollow, tail }: { text: string; follow: bo
 /** Live log of a container (docker logs -f), with "follow the end". */
 function LogsView({ container, onBack }: { container: string; onBack: () => void }) {
   const [follow, setFollow] = useState(true);
-  const { text, setText, end } = useStream((key) => api().docker.followLogs(key, container), [container]);
+  const { text, setText, end } = useStream(
+    (key) => api().docker.followLogs(key, container),
+    [container],
+  );
   return (
     <div className="explorer docker-panel">
       <div className="sidebar-title">
@@ -996,14 +1171,25 @@ function LogsView({ container, onBack }: { container: string; onBack: () => void
         >
           <Icon name="terminal" size={15} />
         </button>
-        <button className="icon-btn" title={tk('clear')} aria-label={tk('clear')} onClick={() => setText('')}>
+        <button
+          className="icon-btn"
+          title={tk('clear')}
+          aria-label={tk('clear')}
+          onClick={() => setText('')}
+        >
           <Icon name="trash" size={15} />
         </button>
       </div>
       <label className="dk-follow">
-        <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> {tk('follow')}
+        <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />{' '}
+        {tk('follow')}
       </label>
-      <StreamPre text={text} follow={follow} setFollow={setFollow} tail={end && `\n${tk('logsEnded')}`} />
+      <StreamPre
+        text={text}
+        follow={follow}
+        setFollow={setFollow}
+        tail={end && `\n${tk('logsEnded')}`}
+      />
     </div>
   );
 }
@@ -1018,7 +1204,10 @@ function JobView({ title, job, onBack }: { title: string; job: DockerJob; onBack
       onBack={onBack}
       extra={
         !end && (
-          <button className="btn ghost dk-stop" onClick={() => void api().docker.stopLogs(key.current)}>
+          <button
+            className="btn ghost dk-stop"
+            onClick={() => void api().docker.stopLogs(key.current)}
+          >
             <Icon name="stop" size={12} /> {tk('stopJob')}
           </button>
         )

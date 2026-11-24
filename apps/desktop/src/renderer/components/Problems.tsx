@@ -42,7 +42,10 @@ function collect(): void {
     }))
     .sort(
       (a, b) =>
-        a.path.localeCompare(b.path) || b.severity - a.severity || a.line - b.line || a.column - b.column,
+        a.path.localeCompare(b.path) ||
+        b.severity - a.severity ||
+        a.line - b.line ||
+        a.column - b.column,
     );
   for (const l of listeners) l();
 }
@@ -98,7 +101,12 @@ export function goToNextProblem(): void {
 }
 
 function sevIcon(s: monaco.MarkerSeverity) {
-  if (s === monaco.MarkerSeverity.Error) return <span className="prob-sev err" aria-label={td('probErrors')}>●</span>;
+  if (s === monaco.MarkerSeverity.Error)
+    return (
+      <span className="prob-sev err" aria-label={td('probErrors')}>
+        ●
+      </span>
+    );
   if (s === monaco.MarkerSeverity.Warning)
     return (
       <span className="prob-sev warn" aria-label={td('probWarnings')}>
@@ -155,7 +163,9 @@ export function ProblemsView() {
               >
                 <Icon name={open ? 'chevronDown' : 'chevron'} size={11} />
                 <span className="prob-file-name">{path.split('/').pop()}</span>
-                <span className="dim small prob-file-dir">{path.split('/').slice(0, -1).join('/')}</span>
+                <span className="dim small prob-file-dir">
+                  {path.split('/').slice(0, -1).join('/')}
+                </span>
                 <span className="prob-badge">{items.length}</span>
               </div>
               {open &&
@@ -236,7 +246,12 @@ export function DebugConsole() {
             }
           }}
         />
-        <button className="dbg-row-x" title={td('dbgClear')} aria-label={td('dbgClear')} onClick={clearConsole}>
+        <button
+          className="dbg-row-x"
+          title={td('dbgClear')}
+          aria-label={td('dbgClear')}
+          onClick={clearConsole}
+        >
           <Icon name="trash" size={12} />
         </button>
       </div>

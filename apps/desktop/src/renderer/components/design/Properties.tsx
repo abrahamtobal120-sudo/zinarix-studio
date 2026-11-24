@@ -37,14 +37,53 @@ const SHADOWS: [string, string][] = [
   ['0 12px 32px rgba(0,0,0,0.25)', 'dzShadowStrong'],
 ];
 
-const TEXT_KEYS = ['font-family', 'font-size', 'color', 'font-weight', 'font-style', 'text-decoration', 'text-align', 'line-height', 'letter-spacing', 'text-transform'];
-const BOX_KEYS = ['background-color', 'background', 'border-radius', 'border', 'box-shadow', 'opacity'];
-const SPACE_KEYS = ['padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left', 'width', 'max-width', 'height'];
+const TEXT_KEYS = [
+  'font-family',
+  'font-size',
+  'color',
+  'font-weight',
+  'font-style',
+  'text-decoration',
+  'text-align',
+  'line-height',
+  'letter-spacing',
+  'text-transform',
+];
+const BOX_KEYS = [
+  'background-color',
+  'background',
+  'border-radius',
+  'border',
+  'box-shadow',
+  'opacity',
+];
+const SPACE_KEYS = [
+  'padding',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'margin',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'width',
+  'max-width',
+  'height',
+];
 
 const reset = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, null]));
 
 /** Number field that writes when the person stops typing (or presses Enter), not per key. */
-function NumberField(props: { value: number; min?: number; max?: number; unit?: string; onChange: (n: number) => void; label: string }) {
+function NumberField(props: {
+  value: number;
+  min?: number;
+  max?: number;
+  unit?: string;
+  onChange: (n: number) => void;
+  label: string;
+}) {
   const [text, setText] = useState(String(props.value));
   useEffect(() => setText(String(props.value)), [props.value]);
   const commit = (raw: string) => {
@@ -53,7 +92,10 @@ function NumberField(props: { value: number; min?: number; max?: number; unit?: 
   };
   return (
     <span className="dz-num">
-      <button onClick={() => props.onChange(Math.max(props.min ?? -9999, props.value - 1))} aria-label={`${props.label} −`}>
+      <button
+        onClick={() => props.onChange(Math.max(props.min ?? -9999, props.value - 1))}
+        aria-label={`${props.label} −`}
+      >
         −
       </button>
       <input
@@ -66,7 +108,10 @@ function NumberField(props: { value: number; min?: number; max?: number; unit?: 
         onBlur={(e) => commit(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && commit((e.target as HTMLInputElement).value)}
       />
-      <button onClick={() => props.onChange(Math.min(props.max ?? 9999, props.value + 1))} aria-label={`${props.label} +`}>
+      <button
+        onClick={() => props.onChange(Math.min(props.max ?? 9999, props.value + 1))}
+        aria-label={`${props.label} +`}
+      >
         +
       </button>
       {props.unit && <span className="dz-unit">{props.unit}</span>}
@@ -74,7 +119,12 @@ function NumberField(props: { value: number; min?: number; max?: number; unit?: 
   );
 }
 
-function Section(props: { title: string; onReset?: () => void; canReset?: boolean; children: ReactNode }) {
+function Section(props: {
+  title: string;
+  onReset?: () => void;
+  canReset?: boolean;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(true);
   return (
     <section className="dz-sec">
@@ -86,7 +136,12 @@ function Section(props: { title: string; onReset?: () => void; canReset?: boolea
           {props.title}
         </button>
         {props.onReset && (
-          <button className="link dz-reset" onClick={props.onReset} disabled={!props.canReset} title={t('dzResetTitle')}>
+          <button
+            className="link dz-reset"
+            onClick={props.onReset}
+            disabled={!props.canReset}
+            title={t('dzResetTitle')}
+          >
             {t('dzReset')}
           </button>
         )}
@@ -114,7 +169,8 @@ export function Properties(props: {
 }) {
   const { sel, setStyle } = props;
   const st = sel.style;
-  const has = (keys: string[]) => keys.some((k) => Object.keys(sel.inline).some((i) => i === k || i.startsWith(`${k}-`)));
+  const has = (keys: string[]) =>
+    keys.some((k) => Object.keys(sel.inline).some((i) => i === k || i.startsWith(`${k}-`)));
   const color = toHex(st['color'] ?? '');
   const bg = toHex(st['background-color'] ?? '');
   const bold = Number(st['font-weight']) >= 600 || st['font-weight'] === 'bold';
@@ -138,7 +194,12 @@ export function Properties(props: {
               .slice(0, 4)
               .reverse()
               .map((p) => (
-                <button key={p.src} className="link" onClick={() => props.onParent(p.src)} title={p.text}>
+                <button
+                  key={p.src}
+                  className="link"
+                  onClick={() => props.onParent(p.src)}
+                  title={p.text}
+                >
                   {tagName(p.tag)}
                 </button>
               ))}
@@ -161,9 +222,16 @@ export function Properties(props: {
       </div>
 
       {hasText && !isImage && (
-        <Section title={t('dzSecText')} onReset={() => setStyle(reset(TEXT_KEYS))} canReset={has(TEXT_KEYS)}>
+        <Section
+          title={t('dzSecText')}
+          onReset={() => setStyle(reset(TEXT_KEYS))}
+          canReset={has(TEXT_KEYS)}
+        >
           <Row label={t('dzFont')}>
-            <select value={FONTS.some(([v]) => v === family) ? family : ''} onChange={(e) => setStyle({ 'font-family': e.target.value || null })}>
+            <select
+              value={FONTS.some(([v]) => v === family) ? family : ''}
+              onChange={(e) => setStyle({ 'font-family': e.target.value || null })}
+            >
               {FONTS.map(([v, l]) => (
                 <option key={v} value={v} style={v ? { fontFamily: v } : undefined}>
                   {l.startsWith('dz') ? t(l as 'dzFontPage') : l}
@@ -172,20 +240,47 @@ export function Properties(props: {
             </select>
           </Row>
           <Row label={t('dzSize')}>
-            <NumberField label={t('dzSize')} value={px(st['font-size'])} min={6} max={200} unit="px" onChange={(n) => setStyle({ 'font-size': `${n}px` })} />
+            <NumberField
+              label={t('dzSize')}
+              value={px(st['font-size'])}
+              min={6}
+              max={200}
+              unit="px"
+              onChange={(n) => setStyle({ 'font-size': `${n}px` })}
+            />
           </Row>
           <Row label={t('dzColor')}>
-            <input type="color" value={color.hex} onChange={(e) => setStyle({ color: e.target.value })} aria-label={t('dzColor')} />
+            <input
+              type="color"
+              value={color.hex}
+              onChange={(e) => setStyle({ color: e.target.value })}
+              aria-label={t('dzColor')}
+            />
           </Row>
           <Row label={t('dzStyle')}>
             <span className="dz-seg">
-              <button className={bold ? 'on' : ''} aria-pressed={bold} onClick={() => setStyle({ 'font-weight': bold ? '400' : '700' })} title={t('dzBold')}>
+              <button
+                className={bold ? 'on' : ''}
+                aria-pressed={bold}
+                onClick={() => setStyle({ 'font-weight': bold ? '400' : '700' })}
+                title={t('dzBold')}
+              >
                 <b>B</b>
               </button>
-              <button className={italic ? 'on' : ''} aria-pressed={italic} onClick={() => setStyle({ 'font-style': italic ? 'normal' : 'italic' })} title={t('dzItalic')}>
+              <button
+                className={italic ? 'on' : ''}
+                aria-pressed={italic}
+                onClick={() => setStyle({ 'font-style': italic ? 'normal' : 'italic' })}
+                title={t('dzItalic')}
+              >
                 <i>I</i>
               </button>
-              <button className={underline ? 'on' : ''} aria-pressed={underline} onClick={() => setStyle({ 'text-decoration': underline ? 'none' : 'underline' })} title={t('dzUnderline')}>
+              <button
+                className={underline ? 'on' : ''}
+                aria-pressed={underline}
+                onClick={() => setStyle({ 'text-decoration': underline ? 'none' : 'underline' })}
+                title={t('dzUnderline')}
+              >
                 <u>U</u>
               </button>
             </span>
@@ -213,7 +308,10 @@ export function Properties(props: {
             </span>
           </Row>
           <Row label={t('dzLineHeight')}>
-            <select value={lh} onChange={(e) => setStyle({ 'line-height': e.target.value || null })}>
+            <select
+              value={lh}
+              onChange={(e) => setStyle({ 'line-height': e.target.value || null })}
+            >
               <option value="">{t('dzAuto')}</option>
               <option value="1">1</option>
               <option value="1.15">1.15</option>
@@ -224,19 +322,57 @@ export function Properties(props: {
         </Section>
       )}
 
-      <Section title={t('dzSecBox')} onReset={() => setStyle(reset(BOX_KEYS))} canReset={has(BOX_KEYS)}>
+      <Section
+        title={t('dzSecBox')}
+        onReset={() => setStyle(reset(BOX_KEYS))}
+        canReset={has(BOX_KEYS)}
+      >
         <Row label={t('dzBackground')}>
-          <input type="color" value={bg.clear ? '#ffffff' : bg.hex} onChange={(e) => setStyle({ 'background-color': e.target.value })} aria-label={t('dzBackground')} />
-          <button className="link" onClick={() => setStyle({ 'background-color': 'transparent', background: null })} disabled={bg.clear}>
+          <input
+            type="color"
+            value={bg.clear ? '#ffffff' : bg.hex}
+            onChange={(e) => setStyle({ 'background-color': e.target.value })}
+            aria-label={t('dzBackground')}
+          />
+          <button
+            className="link"
+            onClick={() => setStyle({ 'background-color': 'transparent', background: null })}
+            disabled={bg.clear}
+          >
             {t('dzNoColor')}
           </button>
         </Row>
         <Row label={t('dzRadius')}>
-          <input type="range" min={0} max={60} value={px(st['border-top-left-radius'])} onChange={(e) => setStyle({ 'border-radius': `${e.target.value}px` })} aria-label={t('dzRadius')} />
+          <input
+            type="range"
+            min={0}
+            max={60}
+            value={px(st['border-top-left-radius'])}
+            onChange={(e) => setStyle({ 'border-radius': `${e.target.value}px` })}
+            aria-label={t('dzRadius')}
+          />
           <span className="dz-unit">{px(st['border-top-left-radius'])} px</span>
         </Row>
         <Row label={t('dzBorder')}>
-          <select value={sel.inline['border-top-width'] ? sel.inline['border-top-width'] : sel.inline['border-top-style'] === 'none' ? 'none' : ''} onChange={(e) => setStyle({ border: e.target.value === '' ? null : e.target.value === 'none' ? 'none' : `${e.target.value} solid ${color.hex}` })}>
+          <select
+            value={
+              sel.inline['border-top-width']
+                ? sel.inline['border-top-width']
+                : sel.inline['border-top-style'] === 'none'
+                  ? 'none'
+                  : ''
+            }
+            onChange={(e) =>
+              setStyle({
+                border:
+                  e.target.value === ''
+                    ? null
+                    : e.target.value === 'none'
+                      ? 'none'
+                      : `${e.target.value} solid ${color.hex}`,
+              })
+            }
+          >
             <option value="">{t('dzAuto')}</option>
             <option value="none">{t('dzBorderNone')}</option>
             <option value="1px">{t('dzBorderThin')}</option>
@@ -244,7 +380,10 @@ export function Properties(props: {
           </select>
         </Row>
         <Row label={t('dzShadow')}>
-          <select value={SHADOWS.some(([v]) => v === shadow) ? shadow : ''} onChange={(e) => setStyle({ 'box-shadow': e.target.value || null })}>
+          <select
+            value={SHADOWS.some(([v]) => v === shadow) ? shadow : ''}
+            onChange={(e) => setStyle({ 'box-shadow': e.target.value || null })}
+          >
             {!SHADOWS.some(([v]) => v === shadow) && <option value="">{t('dzCustom')}</option>}
             {SHADOWS.map(([v, l]) => (
               <option key={v} value={v}>
@@ -254,31 +393,78 @@ export function Properties(props: {
           </select>
         </Row>
         <Row label={t('dzOpacity')}>
-          <input type="range" min={10} max={100} value={Math.round(Number(st['opacity'] ?? 1) * 100)} onChange={(e) => setStyle({ opacity: String(Number(e.target.value) / 100) })} aria-label={t('dzOpacity')} />
+          <input
+            type="range"
+            min={10}
+            max={100}
+            value={Math.round(Number(st['opacity'] ?? 1) * 100)}
+            onChange={(e) => setStyle({ opacity: String(Number(e.target.value) / 100) })}
+            aria-label={t('dzOpacity')}
+          />
           <span className="dz-unit">{Math.round(Number(st['opacity'] ?? 1) * 100)}%</span>
         </Row>
       </Section>
 
-      <Section title={t('dzSecSpace')} onReset={() => setStyle(reset(SPACE_KEYS))} canReset={has(SPACE_KEYS)}>
+      <Section
+        title={t('dzSecSpace')}
+        onReset={() => setStyle(reset(SPACE_KEYS))}
+        canReset={has(SPACE_KEYS)}
+      >
         <Row label={t('dzPadding')}>
-          <NumberField label={t('dzPadding')} value={px(st['padding-top'])} min={0} max={400} unit="px" onChange={(n) => setStyle({ padding: `${n}px`, 'padding-top': null, 'padding-right': null, 'padding-bottom': null, 'padding-left': null })} />
+          <NumberField
+            label={t('dzPadding')}
+            value={px(st['padding-top'])}
+            min={0}
+            max={400}
+            unit="px"
+            onChange={(n) =>
+              setStyle({
+                padding: `${n}px`,
+                'padding-top': null,
+                'padding-right': null,
+                'padding-bottom': null,
+                'padding-left': null,
+              })
+            }
+          />
         </Row>
         <Row label={t('dzMargin')}>
-          <NumberField label={t('dzMargin')} value={px(st['margin-top'])} min={-200} max={400} unit="px" onChange={(n) => setStyle({ margin: `${n}px`, 'margin-top': null, 'margin-right': null, 'margin-bottom': null, 'margin-left': null })} />
+          <NumberField
+            label={t('dzMargin')}
+            value={px(st['margin-top'])}
+            min={-200}
+            max={400}
+            unit="px"
+            onChange={(n) =>
+              setStyle({
+                margin: `${n}px`,
+                'margin-top': null,
+                'margin-right': null,
+                'margin-bottom': null,
+                'margin-left': null,
+              })
+            }
+          />
         </Row>
         <Row label={t('dzWidth')}>
-          <select value={sel.inline['width'] ?? ''} onChange={(e) => setStyle({ width: e.target.value || null })}>
+          <select
+            value={sel.inline['width'] ?? ''}
+            onChange={(e) => setStyle({ width: e.target.value || null })}
+          >
             <option value="">{t('dzAuto')}</option>
             <option value="100%">{t('dzFullWidth')}</option>
             <option value="75%">75%</option>
             <option value="50%">50%</option>
             <option value="25%">25%</option>
-            {sel.inline['width'] && !['100%', '75%', '50%', '25%'].includes(sel.inline['width']) && (
-              <option value={sel.inline['width']}>{sel.inline['width']}</option>
-            )}
+            {sel.inline['width'] &&
+              !['100%', '75%', '50%', '25%'].includes(sel.inline['width']) && (
+                <option value={sel.inline['width']}>{sel.inline['width']}</option>
+              )}
           </select>
         </Row>
-        <div className="dz-note">{t('dzSpaceNote', { w: Math.round(sel.rect.width), h: Math.round(sel.rect.height) })}</div>
+        <div className="dz-note">
+          {t('dzSpaceNote', { w: Math.round(sel.rect.width), h: Math.round(sel.rect.height) })}
+        </div>
       </Section>
     </div>
   );

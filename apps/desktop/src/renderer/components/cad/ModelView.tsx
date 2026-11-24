@@ -21,12 +21,18 @@ const ext = (p: string) => p.toLowerCase().split('.').pop() ?? '';
 /** Formats that are usually Y-up and in metres (glTF, FBX, Blender's OBJ). */
 const Y_UP = new Set(['glb', 'gltf', 'fbx']);
 
-const ab = (b: Uint8Array): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+const ab = (b: Uint8Array): ArrayBuffer =>
+  b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 
 /** A three.js object from the file's bytes (the loaders' parse: the window cannot fetch files). */
 async function parseObject(bytes: Uint8Array, e: string): Promise<Object3D> {
   if (e === 'glb' || e === 'gltf')
-    return (await new GLTFLoader().parseAsync(e === 'glb' ? ab(bytes) : new TextDecoder().decode(bytes), '')).scene;
+    return (
+      await new GLTFLoader().parseAsync(
+        e === 'glb' ? ab(bytes) : new TextDecoder().decode(bytes),
+        '',
+      )
+    ).scene;
   if (e === 'fbx') return new FBXLoader().parse(ab(bytes), '');
   if (e === 'obj') return new OBJLoader().parse(new TextDecoder().decode(bytes));
   if (e === '3mf') {
@@ -37,7 +43,10 @@ async function parseObject(bytes: Uint8Array, e: string): Promise<Object3D> {
     const { PLYLoader } = await import('three/examples/jsm/loaders/PLYLoader.js');
     const g = new PLYLoader().parse(ab(bytes));
     g.computeVertexNormals();
-    return new Mesh(g, new MeshStandardMaterial({ color: 0xcccccc, vertexColors: g.hasAttribute('color') }));
+    return new Mesh(
+      g,
+      new MeshStandardMaterial({ color: 0xcccccc, vertexColors: g.hasAttribute('color') }),
+    );
   }
   throw new Error(`.${e}`);
 }
@@ -50,7 +59,11 @@ export function ModelView({ path }: { path: string }) {
   const host = useRef<HTMLDivElement>(null);
   const viewer = useRef<MeshViewer | null>(null);
   const e = ext(path);
-  const [state, setState] = useState<{ loading: boolean; error?: string; report?: MeshReport | null }>({ loading: true });
+  const [state, setState] = useState<{
+    loading: boolean;
+    error?: string;
+    report?: MeshReport | null;
+  }>({ loading: true });
   const [units, setUnits] = useState<'mm' | 'm'>(Y_UP.has(e) ? 'm' : 'mm');
   const [yUp, setYUp] = useState(Y_UP.has(e));
   const [bed, setBed] = useState(BEDS[0]!);
@@ -87,7 +100,8 @@ export function ModelView({ path }: { path: string }) {
           v.setObject(o, yUp);
           tris = v.modelTris();
         }
-        const report = tris.length / 9 <= MAX_ANALYZE ? analyzeMesh(tris, units === 'm' ? 1e-7 : 1e-4) : null;
+        const report =
+          tris.length / 9 <= MAX_ANALYZE ? analyzeMesh(tris, units === 'm' ? 1e-7 : 1e-4) : null;
         if (alive) {
           setState({ loading: false, report });
           setShown((n) => n + 1);
@@ -103,7 +117,13 @@ export function ModelView({ path }: { path: string }) {
 
   useEffect(() => viewer.current?.setWire(wire), [wire]);
   // The bed in the model's units, so it shows at the right size under it.
-  useEffect(() => viewer.current?.setBed(units === 'm' ? [bed.size[0] / 1000, bed.size[1] / 1000] : [bed.size[0], bed.size[1]]), [bed, units, state.report]);
+  useEffect(
+    () =>
+      viewer.current?.setBed(
+        units === 'm' ? [bed.size[0] / 1000, bed.size[1] / 1000] : [bed.size[0], bed.size[1]],
+      ),
+    [bed, units, state.report],
+  );
 
   const views: [ViewName, string][] = [
     ['iso', tc('viewIso')],
@@ -161,7 +181,10 @@ export function ModelView({ path }: { path: string }) {
             </label>
             <label className="cad-field">
               <span>{tc('bed')}</span>
-              <select value={bed.id} onChange={(ev) => setBed(BEDS.find((b) => b.id === ev.target.value) ?? BEDS[0]!)}>
+              <select
+                value={bed.id}
+                onChange={(ev) => setBed(BEDS.find((b) => b.id === ev.target.value) ?? BEDS[0]!)}
+              >
                 {BEDS.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.label} mm
@@ -172,7 +195,9 @@ export function ModelView({ path }: { path: string }) {
             <button
               className="btn ghost cad-small"
               onClick={() =>
-askAgent(tc('checkAiPrompt', { file: path, units: units === 'm' ? ' (units "m")' : '' }))
+                askAgent(
+                  tc('checkAiPrompt', { file: path, units: units === 'm' ? ' (units "m")' : '' }),
+                )
               }
             >
               <Icon name="sparkle" size={13} /> {tc('askAi')}

@@ -15,15 +15,15 @@ Esto reemplaza el uso directo de `vendor/vscode-main` (`pnpm code:*`): aquel ZIP
 
 ## Requisitos en Windows
 
-| Herramienta | Instalacion |
-| --- | --- |
-| Node **24** (ver `vendor/vscodium/.nvmrc`) | `winget install CoreyButler.NVMforWindows`, despues `nvm install 24.18.0` y `nvm use 24.18.0` |
-| jq | `winget install jqlang.jq -e` |
-| 7-Zip | ya instalado; el script lo agrega al PATH |
-| Python 3.11 | ya instalado |
-| Rust (cargo) | ya instalado |
-| Visual Studio Build Tools con C++ | `winget install Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"` |
-| WiX v3 (solo `codium:package`) | https://wixtoolset.org/releases/ |
+| Herramienta                                | Instalacion                                                                                                                                              |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node **24** (ver `vendor/vscodium/.nvmrc`) | `winget install CoreyButler.NVMforWindows`, despues `nvm install 24.18.0` y `nvm use 24.18.0`                                                            |
+| jq                                         | `winget install jqlang.jq -e`                                                                                                                            |
+| 7-Zip                                      | ya instalado; el script lo agrega al PATH                                                                                                                |
+| Python 3.11                                | ya instalado                                                                                                                                             |
+| Rust (cargo)                               | ya instalado                                                                                                                                             |
+| Visual Studio Build Tools con C++          | `winget install Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"` |
+| WiX v3 (solo `codium:package`)             | https://wixtoolset.org/releases/                                                                                                                         |
 
 Node 26 no sirve: los modulos nativos de VS Code se compilan para Node 24. Zinarix (`apps/desktop`) pide Node >= 24.7, asi que con Node 24 funcionan los dos.
 

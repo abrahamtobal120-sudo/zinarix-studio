@@ -7,7 +7,8 @@ const es = {
   refresh: 'Actualizar',
   loading: 'Buscando Godot y proyectos de juegos…',
   noFolder: 'Abre una carpeta para ver sus proyectos de juegos.',
-  godotMissing: 'No encontré Godot 4. Es gratis y de código abierto: descárgalo y, si no lo detecto solo, elige el ejecutable.',
+  godotMissing:
+    'No encontré Godot 4. Es gratis y de código abierto: descárgalo y, si no lo detecto solo, elige el ejecutable.',
   download: 'Descargar Godot',
   pick: 'Elegir ejecutable…',
   recheck: 'Buscar otra vez',
@@ -35,7 +36,8 @@ const es = {
   'tpl.web-canvas': 'Web · Canvas 2D',
   'tpl.web-canvas.d': 'Plataformas en HTML y JavaScript, sin librerías.',
   'tpl.web-phaser': 'Web · Phaser 2D',
-  'tpl.web-phaser.d': 'Plataformas 2D con física, monedas y marcador, hecho con Phaser 4 (incluido, funciona sin internet).',
+  'tpl.web-phaser.d':
+    'Plataformas 2D con física, monedas y marcador, hecho con Phaser 4 (incluido, funciona sin internet).',
   'tpl.web-three': 'Web · three.js 3D',
   'tpl.web-three.d': 'Escena 3D con three.js (incluido, funciona sin internet).',
   godot: 'Godot',
@@ -135,7 +137,8 @@ const en: typeof es = {
   refresh: 'Refresh',
   loading: 'Looking for Godot and game projects…',
   noFolder: 'Open a folder to see its game projects.',
-  godotMissing: "Godot 4 wasn't found. It's free and open source: download it and, if it isn't detected, pick the executable.",
+  godotMissing:
+    "Godot 4 wasn't found. It's free and open source: download it and, if it isn't detected, pick the executable.",
   download: 'Download Godot',
   pick: 'Pick executable…',
   recheck: 'Look again',
@@ -163,7 +166,8 @@ const en: typeof es = {
   'tpl.web-canvas': 'Web · 2D canvas',
   'tpl.web-canvas.d': 'A platformer in HTML and JavaScript, no libraries.',
   'tpl.web-phaser': 'Web · Phaser 2D',
-  'tpl.web-phaser.d': 'A 2D platformer with physics, coins and a score, made with Phaser 4 (included, works offline).',
+  'tpl.web-phaser.d':
+    'A 2D platformer with physics, coins and a score, made with Phaser 4 (included, works offline).',
   'tpl.web-three': 'Web · three.js 3D',
   'tpl.web-three.d': 'A 3D scene with three.js (included, works offline).',
   godot: 'Godot',

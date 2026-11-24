@@ -8,7 +8,13 @@ import {
   histogramOf,
   type Rgba,
 } from '../../../shared/imageEdit';
-import { BG_MODELS, maskCoverage, maskFromOutput, modelInput, resizeMask } from '../../../shared/bgRemove';
+import {
+  BG_MODELS,
+  maskCoverage,
+  maskFromOutput,
+  modelInput,
+  resizeMask,
+} from '../../../shared/bgRemove';
 import type { ImageRequest, ImageResponse } from './imageWorkerProtocol';
 
 // The renderer tsconfig has the DOM lib, not WebWorker: type just what we use.
@@ -37,7 +43,11 @@ async function encode(img: Rgba, req: ImageRequest & { kind: 'save' }): Promise<
   const c = new OffscreenCanvas(src.width, src.height);
   const g = c.getContext('2d');
   if (!g) throw new Error('canvas');
-  g.putImageData(new ImageData(src.data as Uint8ClampedArray<ArrayBuffer>, src.width, src.height), 0, 0);
+  g.putImageData(
+    new ImageData(src.data as Uint8ClampedArray<ArrayBuffer>, src.width, src.height),
+    0,
+    0,
+  );
   const type = MIME_OF[req.format];
   const blob = await c.convertToBlob({ type, quality: req.quality / 100 });
   // Chromium falls back to PNG for a type it cannot write: never save PNG bytes as .webp.
@@ -60,12 +70,20 @@ async function handle(req: ImageRequest): Promise<void> {
       const ph = Math.max(1, Math.round(bmp.height * k));
       preview = { img: k < 1 ? pixels(bmp, pw, ph) : full, scale: pw / bmp.width };
       bmp.close();
-      ctx.postMessage({ kind: 'init', id: req.id, width: full.width, height: full.height, scale: preview.scale });
+      ctx.postMessage({
+        kind: 'init',
+        id: req.id,
+        width: full.width,
+        height: full.height,
+        scale: preview.scale,
+      });
       return;
     }
     case 'render': {
       if (!preview) throw new Error('not loaded');
-      const out = req.original ? preview.img : applyEdit(preview.img, req.edit, preview.scale, mask?.preview);
+      const out = req.original
+        ? preview.img
+        : applyEdit(preview.img, req.edit, preview.scale, mask?.preview);
       // A copy when the result is the stored preview itself (it must stay here).
       const data = out.data === preview.img.data ? new Uint8ClampedArray(out.data) : out.data;
       const h = histogramOf(out);
@@ -76,7 +94,14 @@ async function handle(req: ImageRequest): Promise<void> {
       hist.set(h.l, 768);
       const buf = data.buffer as ArrayBuffer;
       ctx.postMessage(
-        { kind: 'render', id: req.id, width: out.width, height: out.height, data: buf, hist: hist.buffer },
+        {
+          kind: 'render',
+          id: req.id,
+          width: out.width,
+          height: out.height,
+          data: buf,
+          hist: hist.buffer,
+        },
         [buf, hist.buffer],
       );
       return;
@@ -90,7 +115,9 @@ async function handle(req: ImageRequest): Promise<void> {
       if (!full) throw new Error('not loaded');
       const out = applyEdit(full, req.edit, 1, mask?.full);
       const bytes = await encode(out, req);
-      ctx.postMessage({ kind: 'save', id: req.id, bytes, width: out.width, height: out.height }, [bytes]);
+      ctx.postMessage({ kind: 'save', id: req.id, bytes, width: out.width, height: out.height }, [
+        bytes,
+      ]);
       return;
     }
     case 'cutoutInput': {

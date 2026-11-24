@@ -84,7 +84,12 @@ export function installCellIntellisense(): void {
         .catch(() => null);
       if (!text || token.isCancellationRequested) return null;
       return {
-        range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+        range: new monaco.Range(
+          position.lineNumber,
+          word.startColumn,
+          position.lineNumber,
+          word.endColumn,
+        ),
         contents: [{ value: `\`\`\`text\n${text.replace(/```/g, "'''")}\n\`\`\`` }],
       };
     },

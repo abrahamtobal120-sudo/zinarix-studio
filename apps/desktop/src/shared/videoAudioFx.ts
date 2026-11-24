@@ -163,7 +163,12 @@ export function ffmpegEq(eq: Eq4 | null | undefined): string[] {
 }
 
 /** FFmpeg acompressor's own limits. */
-const AC = { thrMin: 0.000976563, makeupMax: 64, attack: [0.01, 2000], release: [0.01, 9000] } as const;
+const AC = {
+  thrMin: 0.000976563,
+  makeupMax: 64,
+  attack: [0.01, 2000],
+  release: [0.01, 9000],
+} as const;
 
 /**
  * `acompressor` set up to mirror DynamicsCompressorNode: hard knee (knee=1), peak detection and
@@ -195,7 +200,12 @@ export interface BiquadCoefs {
 }
 
 /** RBJ peaking EQ (= FFmpeg equalizer t=q, = Web Audio 'peaking'). */
-export function peakingCoefs(f: number, q: number, gainDb: number, sampleRate: number): BiquadCoefs {
+export function peakingCoefs(
+  f: number,
+  q: number,
+  gainDb: number,
+  sampleRate: number,
+): BiquadCoefs {
   const A = Math.pow(10, gainDb / 40);
   const w0 = (2 * Math.PI * f) / sampleRate;
   const alpha = Math.sin(w0) / (2 * q);
@@ -276,7 +286,10 @@ export function eqResponseDb(eq: Eq4 | null | undefined, freq: number, sampleRat
  * Gain (dB) the compressor applies at a steady detected level `inputDb` (peak dBFS):
  * hard knee, then makeup. Output level = inputDb + compStaticGainDb(inputDb, c).
  */
-export function compStaticGainDb(inputDb: number, comp: Partial<Compressor> | null | undefined): number {
+export function compStaticGainDb(
+  inputDb: number,
+  comp: Partial<Compressor> | null | undefined,
+): number {
   const c = cleanComp(comp);
   if (!c) return 0;
   const over = inputDb - c.threshold;
@@ -323,7 +336,9 @@ export interface WebAudioCompParams {
   makeupGain: number;
 }
 
-export function webAudioCompParams(comp: Partial<Compressor> | null | undefined): WebAudioCompParams | undefined {
+export function webAudioCompParams(
+  comp: Partial<Compressor> | null | undefined,
+): WebAudioCompParams | undefined {
   const c = cleanComp(comp);
   if (!c) return undefined;
   // Web Audio spec: fullRangeGain = curve(1.0); auto makeup = (1/fullRangeGain)^0.6.
@@ -378,7 +393,12 @@ export function kWeightingCoefs(sampleRate: number): [BiquadCoefs, BiquadCoefs] 
  */
 export function kWeightingWebAudio(): [WebAudioBiquadParams, WebAudioBiquadParams] {
   return [
-    { type: 'highpass', frequency: 38.13547087602444, Q: 20 * Math.log10(0.5003270373238773), gain: 0 },
+    {
+      type: 'highpass',
+      frequency: 38.13547087602444,
+      Q: 20 * Math.log10(0.5003270373238773),
+      gain: 0,
+    },
     { type: 'highshelf', frequency: 1681.974450955533, Q: 1, gain: 3.999843853973347 },
   ];
 }
@@ -441,8 +461,14 @@ export class LoudnessMeter {
         const w = this.weights[ch] ?? 1;
         const data = channels[ch];
         const st = this.state[ch]!;
-        let x1 = st[0]!, x2 = st[1]!, y1 = st[2]!, y2 = st[3]!;
-        let u1 = st[4]!, u2 = st[5]!, z1 = st[6]!, z2 = st[7]!;
+        let x1 = st[0]!,
+          x2 = st[1]!,
+          y1 = st[2]!,
+          y2 = st[3]!;
+        let u1 = st[4]!,
+          u2 = st[5]!,
+          z1 = st[6]!,
+          z2 = st[7]!;
         let acc = 0;
         let pk = this.peakAbs;
         for (let k = i; k < end; k++) {
@@ -450,14 +476,26 @@ export class LoudnessMeter {
           const ax = Math.abs(x);
           if (ax > pk) pk = ax;
           const y = s1.b0 * x + s1.b1 * x1 + s1.b2 * x2 - s1.a1 * y1 - s1.a2 * y2;
-          x2 = x1; x1 = x; y2 = y1; y1 = y;
+          x2 = x1;
+          x1 = x;
+          y2 = y1;
+          y1 = y;
           const z = s2.b0 * y + s2.b1 * u1 + s2.b2 * u2 - s2.a1 * z1 - s2.a2 * z2;
-          u2 = u1; u1 = y; z2 = z1; z1 = z;
+          u2 = u1;
+          u1 = y;
+          z2 = z1;
+          z1 = z;
           acc += z * z;
         }
         this.peakAbs = pk;
-        st[0] = x1; st[1] = x2; st[2] = y1; st[3] = y2;
-        st[4] = u1; st[5] = u2; st[6] = z1; st[7] = z2;
+        st[0] = x1;
+        st[1] = x2;
+        st[2] = y1;
+        st[3] = y2;
+        st[4] = u1;
+        st[5] = u2;
+        st[6] = z1;
+        st[7] = z2;
         this.subAcc += w * acc;
       }
       this.subPos += end - i;

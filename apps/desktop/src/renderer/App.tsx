@@ -532,7 +532,8 @@ export function App() {
       if (ev.type === 'chat:title')
         for (const c of getState().chats)
           // A bot chat keeps the bot's name as its title.
-          if (c.conversationId === ev.conversationId && !c.bot) updateChat(c.id, { title: ev.title });
+          if (c.conversationId === ev.conversationId && !c.bot)
+            updateChat(c.id, { title: ev.title });
       // Another window changed models, keys, theme or preferences.
       if (ev.type === 'settings:changed')
         void (async () => {

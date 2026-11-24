@@ -11,13 +11,7 @@ import type { Keyframe } from './video.js';
 
 /** Non-transform properties that can be animated. */
 export type ExtraKeyProp =
-  | 'volume'
-  | 'pan'
-  | 'brightness'
-  | 'contrast'
-  | 'saturation'
-  | 'blur'
-  | 'gradeMix';
+  'volume' | 'pan' | 'brightness' | 'contrast' | 'saturation' | 'blur' | 'gradeMix';
 export const EXTRA_KEY_PROPS: readonly ExtraKeyProp[] = [
   'volume',
   'pan',
@@ -56,7 +50,9 @@ const fin = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** Control points of a key (x within 0…1 as in CSS; y may overshoot a little). */
-export function bezierOf(k: Pick<Keyframe, 'cx1' | 'cy1' | 'cx2' | 'cy2'>): [number, number, number, number] {
+export function bezierOf(
+  k: Pick<Keyframe, 'cx1' | 'cy1' | 'cx2' | 'cy2'>,
+): [number, number, number, number] {
   const [a, b, c, d] = BEZIER_DEFAULT;
   return [
     clamp(fin(k.cx1, a), 0, 1),

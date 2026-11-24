@@ -17,7 +17,14 @@ import type { ExportOptions, MediaItem, VideoProject } from '../shared/video.js'
 import { mediaKindOf, uid } from '../shared/video.js';
 import { buildRender, parseLoudnorm } from '../shared/videoRender.js';
 import type { LoudnessMeasure } from '../shared/videoRender.js';
-import { LUT_MAX_BYTES, cleanGrade, lutKey, mixLut, parseCube, serializeCube } from '../shared/videoColor.js';
+import {
+  LUT_MAX_BYTES,
+  cleanGrade,
+  lutKey,
+  mixLut,
+  parseCube,
+  serializeCube,
+} from '../shared/videoColor.js';
 import { findExecutable } from './lspProtocol.js';
 
 export interface FfmpegInfo {

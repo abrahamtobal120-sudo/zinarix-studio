@@ -19,7 +19,8 @@ export const TYPE_MAX_STEPS = 256;
 /** The graphemes of a text (Intl.Segmenter; a code point split as a fallback). */
 export function graphemes(text: string): string[] {
   const Seg = (Intl as unknown as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
-  if (Seg) return [...new Seg(undefined, { granularity: 'grapheme' }).segment(text)].map((s) => s.segment);
+  if (Seg)
+    return [...new Seg(undefined, { granularity: 'grapheme' }).segment(text)].map((s) => s.segment);
   return Array.from(text);
 }
 
@@ -65,7 +66,8 @@ export function typeReveal(stops: readonly number[], k: number): number {
 const isType = (a: ClipAnim | undefined) => a?.in === 'typewriter' || a?.out === 'typewriter';
 
 /** Whether a clip types its text in or out. */
-export const usesTypewriter = (c: Pick<Clip, 'anim' | 'text'>): boolean => !!c.text && isType(c.anim);
+export const usesTypewriter = (c: Pick<Clip, 'anim' | 'text'>): boolean =>
+  !!c.text && isType(c.anim);
 
 /**
  * Typewriter reveal of a title at timeline time t (1 = all shown), or null when the clip has no

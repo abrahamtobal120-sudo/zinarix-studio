@@ -39,7 +39,7 @@ claros en español.
   espacio, al abrirlo debe poder **ocupar el área del editor completa** (modo pantalla de edición), con
   un botón para volver al modo normal.
 - Archivos del proyecto: usa la API existente `api.workspace.readFile / writeFile / listFiles /
-  createFile / rename / trash` (en `src/preload/preload.ts`, implementada en `src/main/workspace.ts`).
+createFile / rename / trash` (en `src/preload/preload.ts`, implementada en `src/main/workspace.ts`).
   No crees otro canal de acceso a disco si este alcanza; si hace falta uno nuevo (p. ej. escribir
   binarios de imágenes), agrégalo en `workspace.ts` con las mismas protecciones.
 - Arranque del proyecto: reutiliza la detección de `components/RunPanel.tsx` (`RunTask`, "Detectar y
@@ -111,18 +111,18 @@ claros en español.
 
 ## 4. La cinta (pestaña por pestaña)
 
-| Pestaña | Grupos y botones |
-|---|---|
-| **Archivo** | Guardar versión con nombre, Historial de versiones, Abrir otro proyecto, Nuevo sitio desde plantilla, Exportar (ZIP, PDF de las páginas, imágenes PNG), Configuración del sitio, Salir del modo edición |
-| **Inicio** | Portapapeles (Cortar, Copiar, Pegar, Brocha copiar formato), Fuente (tipo, tamaño, B/I/U/S, color, resaltado, borrar formato), Párrafo (alineación, viñetas, numeración, interlineado, sangría), Estilos rápidos (Título 1/2/3, Texto, Cita, Destacado), Organizar (traer al frente, alinear, agrupar), Buscar y reemplazar, Seleccionar todo / Panel de selección |
-| **Insertar** | Sección (biblioteca de bloques), Texto, Título, Botón, Imagen, Galería, Video, Audio, Icono, Forma (rectángulo, círculo, línea, flecha), Separador, Espacio, Tabla, Gráfica, Mapa, Formulario, Ventana emergente, Menú, Redes sociales, Código incrustado (solo Avanzado), Emoji, Fecha/año automático |
-| **Diseño** | Temas del sitio, Colores, Fuentes, Estilo de botones, Esquinas/sombras globales, Fondo del sitio, Modo claro/oscuro, Ancho del contenido, Logo y favicon, Encabezado y pie globales ("patrón" como el Patrón de diapositivas) |
-| **Animaciones** | Entrada, Énfasis, Al pasar el ratón, Al desplazarse (parallax, aparecer al bajar), Transición entre páginas, Duración, Retraso, Repetir, Panel de animaciones (orden y línea de tiempo), ▶ Vista previa |
-| **Páginas** | Nueva página, Duplicar, Plantillas, Menú de navegación, Redirecciones, Página 404, Idiomas del sitio |
-| **Contenido** | Listas/colecciones (productos, blog, equipo, testimonios), Formularios y respuestas, Archivos e imágenes del proyecto, Textos de todo el sitio en una tabla, Traducciones |
-| **Revisar** | Ortografía, Accesibilidad, SEO, Enlaces rotos, Velocidad (imágenes pesadas), Comentarios, Comparar versiones |
-| **Vista** | Escritorio/Tablet/Celular/Personalizado, Zoom, Reglas, Cuadrícula, Guías, Contornos de elementos, Ver como visitante, Modo presentación, Pantalla completa, Modo oscuro de la vista previa |
-| **Publicar** | Ver como visitante, Vista previa compartible, Publicar, Dominio, Historial de publicaciones, Volver a una publicación anterior, Código QR |
+| Pestaña         | Grupos y botones                                                                                                                                                                                                                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Archivo**     | Guardar versión con nombre, Historial de versiones, Abrir otro proyecto, Nuevo sitio desde plantilla, Exportar (ZIP, PDF de las páginas, imágenes PNG), Configuración del sitio, Salir del modo edición                                                                                                                                                            |
+| **Inicio**      | Portapapeles (Cortar, Copiar, Pegar, Brocha copiar formato), Fuente (tipo, tamaño, B/I/U/S, color, resaltado, borrar formato), Párrafo (alineación, viñetas, numeración, interlineado, sangría), Estilos rápidos (Título 1/2/3, Texto, Cita, Destacado), Organizar (traer al frente, alinear, agrupar), Buscar y reemplazar, Seleccionar todo / Panel de selección |
+| **Insertar**    | Sección (biblioteca de bloques), Texto, Título, Botón, Imagen, Galería, Video, Audio, Icono, Forma (rectángulo, círculo, línea, flecha), Separador, Espacio, Tabla, Gráfica, Mapa, Formulario, Ventana emergente, Menú, Redes sociales, Código incrustado (solo Avanzado), Emoji, Fecha/año automático                                                             |
+| **Diseño**      | Temas del sitio, Colores, Fuentes, Estilo de botones, Esquinas/sombras globales, Fondo del sitio, Modo claro/oscuro, Ancho del contenido, Logo y favicon, Encabezado y pie globales ("patrón" como el Patrón de diapositivas)                                                                                                                                      |
+| **Animaciones** | Entrada, Énfasis, Al pasar el ratón, Al desplazarse (parallax, aparecer al bajar), Transición entre páginas, Duración, Retraso, Repetir, Panel de animaciones (orden y línea de tiempo), ▶ Vista previa                                                                                                                                                            |
+| **Páginas**     | Nueva página, Duplicar, Plantillas, Menú de navegación, Redirecciones, Página 404, Idiomas del sitio                                                                                                                                                                                                                                                               |
+| **Contenido**   | Listas/colecciones (productos, blog, equipo, testimonios), Formularios y respuestas, Archivos e imágenes del proyecto, Textos de todo el sitio en una tabla, Traducciones                                                                                                                                                                                          |
+| **Revisar**     | Ortografía, Accesibilidad, SEO, Enlaces rotos, Velocidad (imágenes pesadas), Comentarios, Comparar versiones                                                                                                                                                                                                                                                       |
+| **Vista**       | Escritorio/Tablet/Celular/Personalizado, Zoom, Reglas, Cuadrícula, Guías, Contornos de elementos, Ver como visitante, Modo presentación, Pantalla completa, Modo oscuro de la vista previa                                                                                                                                                                         |
+| **Publicar**    | Ver como visitante, Vista previa compartible, Publicar, Dominio, Historial de publicaciones, Volver a una publicación anterior, Código QR                                                                                                                                                                                                                          |
 
 La cinta se puede **contraer** (doble clic en una pestaña, como en Office) y tiene **"Dime qué deseas
 hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar logo").
@@ -132,6 +132,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
 ## 5. Qué se debe poder editar (lo más posible)
 
 ### 5.1 Texto
+
 - Doble clic sobre cualquier texto para escribir directo encima (edición en el lugar). Enter/Esc para
   terminar; pegar texto de Word/Google Docs limpiando formato basura.
 - Negrita, cursiva, subrayado, tachado, superíndice/subíndice, tamaño, fuente (lista de Google Fonts con
@@ -147,6 +148,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
 - Textos dinámicos: año actual, nombre del sitio, datos de contacto globales (se cambian en un solo lugar).
 
 ### 5.2 Imágenes y medios
+
 - Reemplazar imagen: subir desde la computadora, arrastrar archivo, pegar del portapapeles, elegir de la
   **Galería del proyecto**, o banco de imágenes libres (Unsplash/Pexels, si hay internet), o **generar
   con IA**. Se copian a la carpeta de recursos del proyecto (`public/`, `assets/`, `static/`…).
@@ -162,6 +164,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
 - Galerías: cuadrícula, carrusel, mosaico; reordenar arrastrando; vista ampliada al hacer clic.
 
 ### 5.3 Formas, posición y diseño
+
 - Mover arrastrando, cambiar tamaño con agarraderas (Shift = mantener proporción, Alt = desde el
   centro), girar con la agarradera circular.
 - **Guías inteligentes** como PowerPoint (líneas rosas al alinear con otros elementos y mostrar
@@ -186,6 +189,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
   la pantalla, hex/RGB, transparencia, aviso de contraste insuficiente.
 
 ### 5.4 Diseño por dispositivo (responsive)
+
 - Vista Escritorio / Tablet / Celular / tamaño personalizado (arrastrando el borde del lienzo).
 - Cada cambio se puede aplicar **a todos los dispositivos** o **solo a este dispositivo** (selector
   visible y claro, con icono del dispositivo). Los cambios solo-celular se marcan con un punto.
@@ -194,6 +198,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
 - Vista lado a lado de los 3 dispositivos a la vez (opcional).
 
 ### 5.5 Estados e interacciones
+
 - Estados: normal, al pasar el ratón, al presionar, enfocado, desactivado (para botones, enlaces,
   campos). Se editan eligiendo el estado en Propiedades y cambiando el estilo.
 - Acciones al hacer clic: ir a página, ir a sección (desplazamiento suave), abrir enlace, abrir ventana
@@ -205,6 +210,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
   progreso, cuenta regresiva: insertables y editables sin código.
 
 ### 5.6 Secciones y bloques (Insertar)
+
 - Biblioteca de bloques con miniaturas, por categorías y con buscador: Encabezado/menú, Portada (hero)
   en varias variantes, Texto e imagen, Características, Tarjetas, Galería, Logos de clientes,
   Testimonios, Equipo, Precios, Comparativa, Preguntas frecuentes, Estadísticas/números, Línea de
@@ -220,6 +226,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
 - **Mis bloques**: bloques guardados por el usuario, reutilizables en otros proyectos.
 
 ### 5.7 Diseño global (pestaña Diseño)
+
 - **Temas**: paletas listas (10+) y personalizada: primario, secundario, acento, fondo, superficie,
   texto, bordes, éxito/aviso/error. Botón "Generar paleta desde mi logo" (extraer colores).
 - Fuentes de títulos y de texto (pares recomendados), escala de tamaños.
@@ -233,6 +240,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
   proyecto, no repartidos elemento por elemento.
 
 ### 5.8 Animaciones (pestaña Animaciones)
+
 - Entrada al aparecer en pantalla: aparecer, deslizar (4 direcciones), zoom, rebote, girar, escribir
   letra por letra; duración, retraso, suavizado, repetir.
 - Énfasis (pulso, sacudir, brillo) y efecto al pasar el ratón (crecer, levantar, cambio de color,
@@ -244,6 +252,7 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
 - Respetar "reducir movimiento" del visitante (`prefers-reduced-motion`).
 
 ### 5.9 Contenido y datos
+
 - Textos que vienen de archivos JSON, Markdown, YAML o de traducción (i18n): se editan igual con doble
   clic y se guardan en su archivo de origen.
 - **Colecciones** (productos, entradas de blog, equipo, testimonios, preguntas): se ven como una tabla
@@ -260,11 +269,13 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
   y editar filas, sin escribir SQL.
 
 ### 5.10 Varios idiomas
+
 - Agregar idiomas al sitio; selector de idioma insertable.
 - Vista "Traducciones": tabla con el texto original y cada idioma lado a lado; botón "Traducir con IA".
 - Al editar en el lienzo, se edita el idioma que esté activo.
 
 ### 5.11 SEO y compartir
+
 - Por página: título de la pestaña, descripción para Google, dirección (URL), imagen para redes, no
   indexar. Vista previa de cómo se ve en Google, WhatsApp, Facebook y X.
 - Generar `sitemap.xml`, `robots.txt`, datos estructurados básicos (negocio local, artículo, producto).
@@ -387,26 +398,26 @@ hacer"** (búsqueda de cualquier comando por nombre, p. ej. "sombra", "cambiar l
 
 ## 13. Atajos de teclado
 
-| Atajo | Acción |
-|---|---|
-| Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z) | Deshacer / Rehacer |
-| Ctrl+C / Ctrl+X / Ctrl+V | Copiar / Cortar / Pegar |
-| Ctrl+Shift+V | Pegar sin formato |
-| Ctrl+Shift+C / Ctrl+Shift+V (sobre elemento) | Copiar estilo / Pegar estilo |
-| Ctrl+D | Duplicar |
-| Supr / Retroceso | Eliminar |
-| Flechas / Shift+Flechas | Mover 1 px / 10 px |
-| Ctrl+G / Ctrl+Shift+G | Agrupar / Desagrupar |
-| Ctrl+B / I / U | Negrita / Cursiva / Subrayado |
-| Ctrl+K | Insertar enlace (dentro de texto) / "Dime qué quieres cambiar" (fuera) |
-| Ctrl+F / Ctrl+H | Buscar / Buscar y reemplazar |
-| Ctrl+S | Guardar versión |
-| Ctrl+A | Seleccionar todo en la sección |
-| Esc | Salir de edición / seleccionar el contenedor padre |
-| Ctrl+clic / Shift+clic | Selección múltiple |
-| Ctrl + rueda / Ctrl+0 | Zoom / Ajustar a la ventana |
-| F5 / Shift+F5 | Modo presentación desde el inicio / desde la página actual |
-| Ctrl+/ | Lista de atajos |
+| Atajo                                        | Acción                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------- |
+| Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z)               | Deshacer / Rehacer                                                     |
+| Ctrl+C / Ctrl+X / Ctrl+V                     | Copiar / Cortar / Pegar                                                |
+| Ctrl+Shift+V                                 | Pegar sin formato                                                      |
+| Ctrl+Shift+C / Ctrl+Shift+V (sobre elemento) | Copiar estilo / Pegar estilo                                           |
+| Ctrl+D                                       | Duplicar                                                               |
+| Supr / Retroceso                             | Eliminar                                                               |
+| Flechas / Shift+Flechas                      | Mover 1 px / 10 px                                                     |
+| Ctrl+G / Ctrl+Shift+G                        | Agrupar / Desagrupar                                                   |
+| Ctrl+B / I / U                               | Negrita / Cursiva / Subrayado                                          |
+| Ctrl+K                                       | Insertar enlace (dentro de texto) / "Dime qué quieres cambiar" (fuera) |
+| Ctrl+F / Ctrl+H                              | Buscar / Buscar y reemplazar                                           |
+| Ctrl+S                                       | Guardar versión                                                        |
+| Ctrl+A                                       | Seleccionar todo en la sección                                         |
+| Esc                                          | Salir de edición / seleccionar el contenedor padre                     |
+| Ctrl+clic / Shift+clic                       | Selección múltiple                                                     |
+| Ctrl + rueda / Ctrl+0                        | Zoom / Ajustar a la ventana                                            |
+| F5 / Shift+F5                                | Modo presentación desde el inicio / desde la página actual             |
+| Ctrl+/                                       | Lista de atajos                                                        |
 
 Regístralos en `keys.ts` / `commands.ts` y que solo apliquen cuando el panel tiene el foco.
 

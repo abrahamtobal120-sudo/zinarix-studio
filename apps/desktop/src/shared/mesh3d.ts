@@ -60,7 +60,8 @@ export function parseObj(text: string): Tris {
         });
       if (idx.some((i) => !Number.isInteger(i) || i < 0 || i >= n)) continue;
       for (let k = 1; k + 1 < idx.length; k++)
-        for (const i of [idx[0]!, idx[k]!, idx[k + 1]!]) out.push(v[i * 3]!, v[i * 3 + 1]!, v[i * 3 + 2]!);
+        for (const i of [idx[0]!, idx[k]!, idx[k + 1]!])
+          out.push(v[i * 3]!, v[i * 3 + 1]!, v[i * 3 + 2]!);
     }
   }
   return Float32Array.from(out);
@@ -68,16 +69,14 @@ export function parseObj(text: string): Tris {
 
 /** OFF (what OpenSCAD writes with -o x.off): polygons become fans. */
 export function parseOff(text: string): Tris {
-  const tok = text
-    .replace(/#.*$/gm, '')
-    .split(/\s+/)
-    .filter(Boolean);
+  const tok = text.replace(/#.*$/gm, '').split(/\s+/).filter(Boolean);
   let i = 0;
   if (/^OFF$/i.test(tok[0] ?? '')) i++;
   const nv = Number(tok[i++]);
   const nf = Number(tok[i++]);
   i++;
-  if (!Number.isInteger(nv) || !Number.isInteger(nf)) throw new Error('No es un archivo OFF válido.');
+  if (!Number.isInteger(nv) || !Number.isInteger(nf))
+    throw new Error('No es un archivo OFF válido.');
   const v = tok.slice(i, i + nv * 3).map(Number);
   i += nv * 3;
   const out: number[] = [];
@@ -86,7 +85,8 @@ export function parseOff(text: string): Tris {
     const idx = tok.slice(i, i + k).map(Number);
     i += k;
     for (let j = 1; j + 1 < idx.length; j++)
-      for (const t of [idx[0]!, idx[j]!, idx[j + 1]!]) out.push(v[t * 3]!, v[t * 3 + 1]!, v[t * 3 + 2]!);
+      for (const t of [idx[0]!, idx[j]!, idx[j + 1]!])
+        out.push(v[t * 3]!, v[t * 3 + 1]!, v[t * 3 + 2]!);
   }
   return Float32Array.from(out);
 }
@@ -111,9 +111,15 @@ export function writeStl(tris: Tris, header = 'Zinarix Studio'): Uint8Array {
 
 function normalOf(t: Tris, i: number): [number, number, number] {
   const o = i * 9;
-  const ux = t[o + 3]! - t[o]!, uy = t[o + 4]! - t[o + 1]!, uz = t[o + 5]! - t[o + 2]!;
-  const vx = t[o + 6]! - t[o]!, vy = t[o + 7]! - t[o + 1]!, vz = t[o + 8]! - t[o + 2]!;
-  const x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx;
+  const ux = t[o + 3]! - t[o]!,
+    uy = t[o + 4]! - t[o + 1]!,
+    uz = t[o + 5]! - t[o + 2]!;
+  const vx = t[o + 6]! - t[o]!,
+    vy = t[o + 7]! - t[o + 1]!,
+    vz = t[o + 8]! - t[o + 2]!;
+  const x = uy * vz - uz * vy,
+    y = uz * vx - ux * vz,
+    z = ux * vy - uy * vx;
   const l = Math.hypot(x, y, z) || 1;
   return [x / l, y / l, z / l];
 }
@@ -190,13 +196,26 @@ export function analyzeMesh(t: Tris, weld = 1e-4): MeshReport {
   let degenerate = 0;
   const W = ids.size + 1;
   for (let i = 0; i < n; i++) {
-    const a = corner[i * 3]!, b = corner[i * 3 + 1]!, c = corner[i * 3 + 2]!;
+    const a = corner[i * 3]!,
+      b = corner[i * 3 + 1]!,
+      c = corner[i * 3 + 2]!;
     const o = i * 9;
-    const ax = t[o]!, ay = t[o + 1]!, az = t[o + 2]!;
-    const bx = t[o + 3]!, by = t[o + 4]!, bz = t[o + 5]!;
-    const cx = t[o + 6]!, cy = t[o + 7]!, cz = t[o + 8]!;
+    const ax = t[o]!,
+      ay = t[o + 1]!,
+      az = t[o + 2]!;
+    const bx = t[o + 3]!,
+      by = t[o + 4]!,
+      bz = t[o + 5]!;
+    const cx = t[o + 6]!,
+      cy = t[o + 7]!,
+      cz = t[o + 8]!;
     volume += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
-    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
+    const ux = bx - ax,
+      uy = by - ay,
+      uz = bz - az,
+      vx = cx - ax,
+      vy = cy - ay,
+      vz = cz - az;
     const tri = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
     area += tri;
     if (a === b || b === c || a === c || tri < 1e-12) {
@@ -294,11 +313,15 @@ export function checkPrint(r: MeshReport, o: PrintOptions = {}): PrintCheck {
     );
   if (r.triangles && r.volume < 0)
     warnings.push(
-      es ? 'Las normales apuntan hacia adentro: el modelo está "al revés".' : 'The normals point inwards: the model is inside out.',
+      es
+        ? 'Las normales apuntan hacia adentro: el modelo está "al revés".'
+        : 'The normals point inwards: the model is inside out.',
     );
   if (r.degenerate)
     notes.push(
-      es ? `${r.degenerate} triángulos sin área (se ignoran al laminar).` : `${r.degenerate} triangles with no area (slicers skip them).`,
+      es
+        ? `${r.degenerate} triángulos sin área (se ignoran al laminar).`
+        : `${r.degenerate} triangles with no area (slicers skip them).`,
     );
   if (r.triangles) {
     const fits = (s: number[]) => s[0]! <= bed[0] && s[1]! <= bed[1] && s[2]! <= bed[2];
@@ -340,8 +363,8 @@ export function checkPrint(r: MeshReport, o: PrintOptions = {}): PrintCheck {
     if (r.watertight && r.volume > 0)
       notes.push(
         es
-          ? `Volumen ${fmt(r.volume * k ** 3 / 1000)} cm³ (≈ ${fmt((r.volume * k ** 3 / 1000) * 1.24)} g de PLA macizo).`
-          : `Volume ${fmt(r.volume * k ** 3 / 1000)} cm³ (≈ ${fmt((r.volume * k ** 3 / 1000) * 1.24)} g of solid PLA).`,
+          ? `Volumen ${fmt((r.volume * k ** 3) / 1000)} cm³ (≈ ${fmt(((r.volume * k ** 3) / 1000) * 1.24)} g de PLA macizo).`
+          : `Volume ${fmt((r.volume * k ** 3) / 1000)} cm³ (≈ ${fmt(((r.volume * k ** 3) / 1000) * 1.24)} g of solid PLA).`,
       );
   }
   return { ok: !errors.length, errors, warnings, notes };

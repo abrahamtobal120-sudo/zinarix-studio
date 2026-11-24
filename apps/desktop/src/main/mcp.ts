@@ -76,7 +76,9 @@ export function parseMcpConfig(text: string): ParsedConfig {
   }
   for (const [name, raw] of Object.entries(list as Record<string, unknown>)) {
     if (!/^[\w.-]{1,40}$/.test(name)) {
-      errors.push(`"${name}": el nombre solo puede tener letras, números, ".", "_" y "-" (máx. 40).`);
+      errors.push(
+        `"${name}": el nombre solo puede tener letras, números, ".", "_" y "-" (máx. 40).`,
+      );
       continue;
     }
     if (!raw || typeof raw !== 'object') {
@@ -100,7 +102,9 @@ export function parseMcpConfig(text: string): ParsedConfig {
       const headers = strMap(r.headers);
       servers[name] = { url: u.toString(), ...(headers ? { headers } : {}), ...disabled };
     } else if (typeof r.command === 'string' && r.command.trim()) {
-      const args = Array.isArray(r.args) ? r.args.filter((a): a is string => typeof a === 'string') : [];
+      const args = Array.isArray(r.args)
+        ? r.args.filter((a): a is string => typeof a === 'string')
+        : [];
       const env = strMap(r.env);
       servers[name] = {
         command: r.command,
@@ -245,7 +249,8 @@ export function resultText(result: unknown): { text: string; isError: boolean } 
           ? `[resource ${c.resource.uri ?? ''}]\n${c.resource.text}`
           : `[resource ${c.resource.uri ?? ''} ${c.resource.mimeType ?? ''}]`,
       );
-    else if (c.type === 'resource_link') parts.push(`[resource link ${c.name ?? ''} ${c.uri ?? ''}]`);
+    else if (c.type === 'resource_link')
+      parts.push(`[resource link ${c.name ?? ''} ${c.uri ?? ''}]`);
   }
   if (!parts.length && r.structuredContent !== undefined)
     parts.push(JSON.stringify(r.structuredContent, null, 2));
@@ -428,7 +433,8 @@ class McpConnection {
 
   private async start(): Promise<void> {
     try {
-      const t: Transport = 'url' in this.cfg ? new HttpTransport(this.cfg) : new StdioTransport(this.cfg, this.cwd);
+      const t: Transport =
+        'url' in this.cfg ? new HttpTransport(this.cfg) : new StdioTransport(this.cfg, this.cwd);
       this.transport = t;
       t.onMessage = (m) => this.onMessage(m);
       t.onClose = (reason) => {
@@ -501,7 +507,11 @@ class McpConnection {
       else if (m.method === 'roots/list') void this.reply(m.id!, { roots: [] });
       else
         void this.transport
-          ?.send({ jsonrpc: '2.0', id: m.id, error: { code: -32601, message: 'Method not supported' } })
+          ?.send({
+            jsonrpc: '2.0',
+            id: m.id,
+            error: { code: -32601, message: 'Method not supported' },
+          })
           .catch(() => undefined);
       return;
     }
@@ -515,10 +525,18 @@ class McpConnection {
   }
 
   private reply(id: number | string, result: unknown): Promise<void> {
-    return this.transport?.send({ jsonrpc: '2.0', id, result }).catch(() => undefined) ?? Promise.resolve();
+    return (
+      this.transport?.send({ jsonrpc: '2.0', id, result }).catch(() => undefined) ??
+      Promise.resolve()
+    );
   }
 
-  request(method: string, params: unknown, timeout = CALL_TIMEOUT, signal?: AbortSignal): Promise<unknown> {
+  request(
+    method: string,
+    params: unknown,
+    timeout = CALL_TIMEOUT,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
     const t = this.transport;
     if (!t) return Promise.reject(new Error('no conectado'));
     const id = this.nextId++;
@@ -613,7 +631,10 @@ export class McpManager {
 
   constructor(private readonly dir: string) {
     try {
-      this.trust = JSON.parse(readFileSync(join(dir, 'mcp-trust.json'), 'utf8')) as Record<string, string>;
+      this.trust = JSON.parse(readFileSync(join(dir, 'mcp-trust.json'), 'utf8')) as Record<
+        string,
+        string
+      >;
     } catch {
       this.trust = {};
     }
@@ -642,7 +663,8 @@ export class McpManager {
   /** Saves the global config (only when it parses) and reconnects what changed. */
   saveGlobal(text: string): { errors: string[] } {
     const p = parseMcpConfig(text);
-    if (p.errors.length && !Object.keys(p.servers).length && text.trim()) return { errors: p.errors };
+    if (p.errors.length && !Object.keys(p.servers).length && text.trim())
+      return { errors: p.errors };
     writeFileSync(this.globalFile, text, 'utf8');
     this.sync();
     return { errors: p.errors };
@@ -716,8 +738,16 @@ export class McpManager {
   }
 
   /** What should run: the global servers, plus the project's when its file is trusted. */
-  private wanted(root: string | undefined): Map<string, { name: string; cfg: McpServerConfig; scope: 'global' | 'project'; cwd?: string }> {
-    const out = new Map<string, { name: string; cfg: McpServerConfig; scope: 'global' | 'project'; cwd?: string }>();
+  private wanted(
+    root: string | undefined,
+  ): Map<
+    string,
+    { name: string; cfg: McpServerConfig; scope: 'global' | 'project'; cwd?: string }
+  > {
+    const out = new Map<
+      string,
+      { name: string; cfg: McpServerConfig; scope: 'global' | 'project'; cwd?: string }
+    >();
     for (const [name, cfg] of Object.entries(parseMcpConfig(this.readGlobal()).servers))
       out.set(`global:${name}`, { name, cfg, scope: 'global', cwd: root });
     if (root) {
@@ -767,7 +797,10 @@ export class McpManager {
         target: 'url' in w.cfg ? w.cfg.url : [w.cfg.command, ...(w.cfg.args ?? [])].join(' '),
         state: w.cfg.disabled ? 'off' : (c?.state ?? 'connecting'),
         ...(c?.error ? { error: c.error } : {}),
-        tools: (c?.tools ?? []).map((t) => ({ name: t.name, description: t.description?.slice(0, 200) })),
+        tools: (c?.tools ?? []).map((t) => ({
+          name: t.name,
+          description: t.description?.slice(0, 200),
+        })),
         disabled: Boolean(w.cfg.disabled),
       });
     }
@@ -816,12 +849,23 @@ export class McpManager {
     return this.bindings.get(name);
   }
 
-  async call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<{ text: string; isError: boolean }> {
+  async call(
+    name: string,
+    args: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<{ text: string; isError: boolean }> {
     const b = this.bindings.get(name);
     if (!b) throw new Error(`Unknown MCP tool ${name}.`);
     if (b.connection.state !== 'connected')
-      throw new Error(`The MCP server "${b.server}" is not connected${b.connection.error ? `: ${b.connection.error}` : ''}.`);
-    const r = await b.connection.request('tools/call', { name: b.tool.name, arguments: args }, CALL_TIMEOUT, signal);
+      throw new Error(
+        `The MCP server "${b.server}" is not connected${b.connection.error ? `: ${b.connection.error}` : ''}.`,
+      );
+    const r = await b.connection.request(
+      'tools/call',
+      { name: b.tool.name, arguments: args },
+      CALL_TIMEOUT,
+      signal,
+    );
     return resultText(r);
   }
 

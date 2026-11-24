@@ -23,7 +23,9 @@ describe('browser history', () => {
       ['https://b.com/', 'B', 1],
     ]);
     d.flush();
-    expect(JSON.parse(readFileSync(join(dir, 'browser-data.json'), 'utf8')).history).toHaveLength(2);
+    expect(JSON.parse(readFileSync(join(dir, 'browser-data.json'), 'utf8')).history).toHaveLength(
+      2,
+    );
     expect(BrowserData.inDir(dir).history()).toHaveLength(2);
   });
 

@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -14,7 +22,11 @@ import {
   type SketchupJob,
 } from '../src/shared/sketchup.js';
 import { SketchupService, findSketchups, pluginsDir } from '../src/main/sketchup.js';
-import { SKETCHUP_LOADER_RB, SKETCHUP_MAIN_RB, SKETCHUP_EXT_VERSION } from '../src/main/sketchupRuby.js';
+import {
+  SKETCHUP_LOADER_RB,
+  SKETCHUP_MAIN_RB,
+  SKETCHUP_EXT_VERSION,
+} from '../src/main/sketchupRuby.js';
 import { SKETCHUP_TOOLS, runSketchupTool, sketchupPreview } from '../src/main/sketchupTools.js';
 
 const utf16 = (s: string) => Buffer.from(s, 'utf16le');
@@ -44,9 +56,16 @@ function skp(version: string | null, thumbs: Buffer[] = []): Buffer {
   const head = Buffer.concat([
     Buffer.from([0xff, 0xfe, 0xff, 0x0e]),
     utf16('SketchUp Model'),
-    ...(version ? [Buffer.from([0xff, 0xfe, 0xff, version.length + 2]), utf16(`{${version}}`)] : []),
+    ...(version
+      ? [Buffer.from([0xff, 0xfe, 0xff, version.length + 2]), utf16(`{${version}}`)]
+      : []),
   ]);
-  return Buffer.concat([head, Buffer.alloc(300, 1), ...thumbs.flatMap((t) => [t, Buffer.alloc(50, 2)]), Buffer.alloc(200, 3)]);
+  return Buffer.concat([
+    head,
+    Buffer.alloc(300, 1),
+    ...thumbs.flatMap((t) => [t, Buffer.alloc(50, 2)]),
+    Buffer.alloc(200, 3),
+  ]);
 }
 
 describe('.skp parser', () => {
@@ -86,7 +105,9 @@ describe('.skp parser', () => {
   });
 
   it('gets the year of an install folder', () => {
-    expect(sketchupYear('C:\\Program Files\\SketchUp\\SketchUp 2024\\SketchUp\\SketchUp.exe')).toBe(2024);
+    expect(sketchupYear('C:\\Program Files\\SketchUp\\SketchUp 2024\\SketchUp\\SketchUp.exe')).toBe(
+      2024,
+    );
     expect(sketchupYear('/Applications/SketchUp 2023/SketchUp.app')).toBe(2023);
     expect(sketchupYear('/opt/other')).toBeNull();
   });
@@ -140,7 +161,9 @@ describe('SketchUp ops', () => {
   });
 
   it('limits the number of ops', () => {
-    expect(() => validateSketchupOps(new Array(101).fill({ op: 'view' }), resolve)).toThrow(/At most 100/);
+    expect(() => validateSketchupOps(new Array(101).fill({ op: 'view' }), resolve)).toThrow(
+      /At most 100/,
+    );
     expect(validateSketchupOps([], resolve)).toEqual([]);
   });
 
@@ -152,7 +175,9 @@ describe('SketchUp ops', () => {
       units: 'mm',
       faces: 6,
       edges: 12,
-      entities: [{ name: 'Mesa', type: 'group', size: [1200, 800, 750], min: [0, 0, 0], tag: 'Muebles' }],
+      entities: [
+        { name: 'Mesa', type: 'group', size: [1200, 800, 750], min: [0, 0, 0], tag: 'Muebles' },
+      ],
       materials: ['Madera'],
       tags: ['Untagged', 'Muebles'],
       exported: ['out/mesa.stl'],
@@ -164,7 +189,8 @@ describe('SketchUp ops', () => {
 
 describe('the Ruby extension', () => {
   it('only knows the validated ops and never evaluates code', () => {
-    for (const op of ['add_box', 'pushpull', 'add_cylinder', 'export', 'view', 'add_component']) expect(SKETCHUP_MAIN_RB).toContain(`when '${op}'`);
+    for (const op of ['add_box', 'pushpull', 'add_cylinder', 'export', 'view', 'add_component'])
+      expect(SKETCHUP_MAIN_RB).toContain(`when '${op}'`);
     expect(SKETCHUP_MAIN_RB).not.toMatch(/\beval\b|instance_eval|send\(|system\(|`/);
     expect(SKETCHUP_LOADER_RB).toContain(`ZINARIX_EXT_VERSION = '${SKETCHUP_EXT_VERSION}'`);
     expect(SKETCHUP_MAIN_RB).toContain('write_image');
@@ -193,7 +219,9 @@ describe('SketchUp service', () => {
     writeFileSync(old, '');
     const found = findSketchups({ ProgramFiles: join(dir, 'pf') } as NodeJS.ProcessEnv, 'win32');
     expect(found.map((f) => f.year)).toEqual([2024, 2021]);
-    expect(pluginsDir(2024, { APPDATA: 'C:\\A' } as NodeJS.ProcessEnv, 'win32')).toMatch(/SketchUp 2024[\\/]SketchUp[\\/]Plugins$/);
+    expect(pluginsDir(2024, { APPDATA: 'C:\\A' } as NodeJS.ProcessEnv, 'win32')).toMatch(
+      /SketchUp 2024[\\/]SketchUp[\\/]Plugins$/,
+    );
   });
 
   it('installs the extension and answers jobs through the bridge folder', async () => {
@@ -210,7 +238,11 @@ describe('SketchUp service', () => {
 
     // A stand-in for the Ruby side: heartbeat + one answered job.
     const home = process.env.ZINARIX_SKETCHUP_HOME!;
-    const beat = () => writeFileSync(join(home, 'alive.json'), JSON.stringify({ time: Date.now(), version: '24.0.484', model: '', title: 'Untitled' }));
+    const beat = () =>
+      writeFileSync(
+        join(home, 'alive.json'),
+        JSON.stringify({ time: Date.now(), version: '24.0.484', model: '', title: 'Untitled' }),
+      );
     beat();
     expect(svc.status().connected).toBe(true);
     let seen: SketchupJob | null = null;
@@ -226,13 +258,31 @@ describe('SketchUp service', () => {
           JSON.stringify({
             id: job.id,
             ok: true,
-            report: { sketchup: '24.0.484', model: '', title: 'Untitled', units: job.units, faces: 6, edges: 12, entities: [], materials: [], tags: [], exported: [], shot: job.shot?.path },
+            report: {
+              sketchup: '24.0.484',
+              model: '',
+              title: 'Untitled',
+              units: job.units,
+              faces: 6,
+              edges: 12,
+              entities: [],
+              materials: [],
+              tags: [],
+              exported: [],
+              shot: job.shot?.path,
+            },
           }),
         );
       }
     }, 50);
     try {
-      const r = await runSketchupTool(svc, 'sketchup_screenshot', { view: 'iso' }, dir, new AbortController().signal);
+      const r = await runSketchupTool(
+        svc,
+        'sketchup_screenshot',
+        { view: 'iso' },
+        dir,
+        new AbortController().signal,
+      );
       expect(r.ok).toBe(true);
       expect(r.image?.width).toBe(64);
       expect(seen!.ops).toEqual([{ op: 'view', preset: 'iso', zoom_extents: true }]);
@@ -244,18 +294,37 @@ describe('SketchUp service', () => {
 
   it('fails clearly when SketchUp is closed and asks before writing', async () => {
     const svc = new SketchupService(join(dir, 'sketchup.json'));
-    const r = await runSketchupTool(svc, 'sketchup_screenshot', {}, dir, new AbortController().signal);
+    const r = await runSketchupTool(
+      svc,
+      'sketchup_screenshot',
+      {},
+      dir,
+      new AbortController().signal,
+    );
     expect(r.ok).toBe(false);
     expect(r.content).toMatch(/not open/);
-    const card = sketchupPreview(svc, 'sketchup_model', { path: 'casa.skp', ops: [{ op: 'add_box', w: 1, d: 1, h: 1 }] }, dir);
+    const card = sketchupPreview(
+      svc,
+      'sketchup_model',
+      { path: 'casa.skp', ops: [{ op: 'add_box', w: 1, d: 1, h: 1 }] },
+      dir,
+    );
     expect(card && 'risk' in card && card.action).toContain('crear casa.skp');
-    expect(sketchupPreview(svc, 'sketchup_model', { path: '../x.skp', ops: [] }, dir)).toMatchObject({ error: expect.stringMatching(/outside/) });
+    expect(
+      sketchupPreview(svc, 'sketchup_model', { path: '../x.skp', ops: [] }, dir),
+    ).toMatchObject({ error: expect.stringMatching(/outside/) });
     expect(sketchupPreview(svc, 'sketchup_inspect', { path: 'a.skp' }, dir)).toBeNull();
   });
 
   it('inspects a .skp of the project without SketchUp', async () => {
     writeFileSync(join(dir, 'casa.skp'), skp('23.0.367', [png(128, 80, 100)]));
-    const r = await runSketchupTool(undefined, 'sketchup_inspect', { path: 'casa.skp' }, dir, new AbortController().signal);
+    const r = await runSketchupTool(
+      undefined,
+      'sketchup_inspect',
+      { path: 'casa.skp' },
+      dir,
+      new AbortController().signal,
+    );
     expect(r.ok).toBe(true);
     expect(r.content).toContain('SketchUp 2023');
     expect(r.image).toMatchObject({ mediaType: 'image/png', width: 128, height: 80 });

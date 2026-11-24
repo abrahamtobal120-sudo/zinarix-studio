@@ -34,7 +34,10 @@ function clock(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-const COMMANDS: [string, 'waCmdRepos' | 'waCmdPull' | 'waCmdOpen' | 'waCmdStop' | 'waCmdNew' | 'waCmdChats'][] = [
+const COMMANDS: [
+  string,
+  'waCmdRepos' | 'waCmdPull' | 'waCmdOpen' | 'waCmdStop' | 'waCmdNew' | 'waCmdChats',
+][] = [
   ['/repos', 'waCmdRepos'],
   ['/pull 2', 'waCmdPull'],
   ['/abrir 2', 'waCmdOpen'],
@@ -121,8 +124,7 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
       if (!st?.chats.length) {
         if (!(await confirmAllowCurrent())) return;
         await api().whatsapp.useCurrent();
-      }
-      else await api().whatsapp.control(true);
+      } else await api().whatsapp.control(true);
       await ensureRemote();
       return api().whatsapp.status();
     });
@@ -185,7 +187,8 @@ export function WhatsAppPane({ visible }: { visible: boolean }) {
           className="bicon"
           title={t('navReload')}
           aria-label={t('navReload')}
-          onClick={() => void api().whatsapp.reload()}>
+          onClick={() => void api().whatsapp.reload()}
+        >
           <Icon name="refresh" size={15} />
         </button>
         <button

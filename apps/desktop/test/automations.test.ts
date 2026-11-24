@@ -26,7 +26,8 @@ import {
 import { parseAgentDef } from '../src/shared/agentKit.js';
 import { Automations, type AutomationRunner } from '../src/main/automations.js';
 
-const at = (y: number, mo: number, d: number, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
+const at = (y: number, mo: number, d: number, h = 0, mi = 0) =>
+  new Date(y, mo - 1, d, h, mi).getTime();
 
 describe('schedules', () => {
   it('daily: later today, else tomorrow', () => {
@@ -67,7 +68,9 @@ describe('schedules', () => {
   });
 
   it('describes schedules', () => {
-    expect(describeSchedule({ kind: 'daily', time: '09:00', days: [] })).toBe('Todos los días a las 09:00');
+    expect(describeSchedule({ kind: 'daily', time: '09:00', days: [] })).toBe(
+      'Todos los días a las 09:00',
+    );
     expect(describeSchedule({ kind: 'daily', time: '09:00', days: [1, 2, 3, 4, 5] })).toBe(
       'De lunes a viernes a las 09:00',
     );
@@ -84,7 +87,10 @@ describe('schedules', () => {
   });
 
   it('tells unattended runs that changes are refused', () => {
-    const p = taskPrompt({ name: 'Correo', prompt: 'Resume mi correo', tools: 'read' }, at(2026, 3, 10, 9));
+    const p = taskPrompt(
+      { name: 'Correo', prompt: 'Resume mi correo', tools: 'read' },
+      at(2026, 3, 10, 9),
+    );
     expect(p).toContain('Scheduled task "Correo"');
     expect(p).toContain('refused automatically');
     expect(p.endsWith('Resume mi correo')).toBe(true);
@@ -115,7 +121,11 @@ describe('bots', () => {
       name: ' Tutor ',
       model: 'not a model',
       mode: 'other' as 'chat',
-      widget: { color: 'red', origins: ['Example.com/x', 'ftp://x', 'https://a.dev'], perMinute: 999 },
+      widget: {
+        color: 'red',
+        origins: ['Example.com/x', 'ftp://x', 'https://a.dev'],
+        perMinute: 999,
+      },
     });
     expect(b.name).toBe('Tutor');
     expect(b.model).toBeUndefined();
@@ -128,7 +138,9 @@ describe('bots', () => {
   });
 
   it('exports and imports a bot file (without the author’s Vercel link)', () => {
-    const b = bot({ widget: { ...bot().widget, vercelUrl: 'https://x.vercel.app', vercelProject: 'p' } });
+    const b = bot({
+      widget: { ...bot().widget, vercelUrl: 'https://x.vercel.app', vercelProject: 'p' },
+    });
     const file = botToFile(b);
     expect(file).not.toContain('vercel.app');
     const back = botFromFile(file);
@@ -168,11 +180,22 @@ describe('website widget', () => {
     expect(widgetUrlIssue('https://api.openai.com/v1')).toBeNull();
   });
 
-  const target = { api: 'openai' as const, baseUrl: 'https://api.example.com/v1', model: 'm1', provider: 'Example' };
+  const target = {
+    api: 'openai' as const,
+    baseUrl: 'https://api.example.com/v1',
+    model: 'm1',
+    provider: 'Example',
+  };
 
   it('never writes a key into the files, and the scripts are valid JS', () => {
     const files = widgetFiles(bot({ instructions: 'x </script> y' }), target);
-    expect(files.map((f) => f.file).sort()).toEqual(['README.md', 'api/chat.js', 'index.html', 'vercel.json', 'widget.js']);
+    expect(files.map((f) => f.file).sort()).toEqual([
+      'README.md',
+      'api/chat.js',
+      'index.html',
+      'vercel.json',
+      'widget.js',
+    ]);
     for (const f of files) expect(f.text).not.toMatch(/sk-|Bearer [A-Za-z0-9]/);
     const chat = files.find((f) => f.file === 'api/chat.js')!.text;
     expect(chat).not.toContain('</script>');
@@ -181,10 +204,14 @@ describe('website widget', () => {
   });
 
   /** Loads api/chat.js as Vercel would (CommonJS) with a fake fetch. */
-  function handler(origins: string[] = [], env: Record<string, string> = { BOT_API_KEY: 'k-test' }) {
-    const chat = widgetFiles(bot({ widget: { ...bot().widget, origins, perMinute: 2 } }), target).find(
-      (f) => f.file === 'api/chat.js',
-    )!.text;
+  function handler(
+    origins: string[] = [],
+    env: Record<string, string> = { BOT_API_KEY: 'k-test' },
+  ) {
+    const chat = widgetFiles(
+      bot({ widget: { ...bot().widget, origins, perMinute: 2 } }),
+      target,
+    ).find((f) => f.file === 'api/chat.js')!.text;
     const mod = { exports: null as unknown as (req: unknown, res: unknown) => Promise<void> };
     new Function('module', 'process', chat)(mod, { env });
     return mod.exports;
@@ -213,10 +240,19 @@ describe('website widget', () => {
   }
 
   it('answers through the provider with the bot’s system prompt', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'Hola 👋' } }] })));
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ choices: [{ message: { content: 'Hola 👋' } }] })),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const r = res();
-    await handler()({ method: 'POST', headers: { 'x-forwarded-for': '1.1.1.1' }, body: { messages: [{ role: 'user', content: 'hola' }] } }, r);
+    await handler()(
+      {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '1.1.1.1' },
+        body: { messages: [{ role: 'user', content: 'hola' }] },
+      },
+      r,
+    );
     expect(r.code).toBe(200);
     expect(r.body).toEqual({ reply: 'Hola 👋' });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
@@ -230,20 +266,42 @@ describe('website widget', () => {
   });
 
   it('blocks other sites, floods and a missing key', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }))));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] })),
+      ),
+    );
     const h = handler(['https://mine.com']);
     const bad = res();
-    await h({ method: 'POST', headers: { origin: 'https://evil.com' }, body: { messages: [{ role: 'user', content: 'x' }] } }, bad);
+    await h(
+      {
+        method: 'POST',
+        headers: { origin: 'https://evil.com' },
+        body: { messages: [{ role: 'user', content: 'x' }] },
+      },
+      bad,
+    );
     expect(bad.code).toBe(403);
     const codes: number[] = [];
     for (let i = 0; i < 3; i++) {
       const r = res();
-      await h({ method: 'POST', headers: { origin: 'https://mine.com', 'x-forwarded-for': '9.9.9.9' }, body: { messages: [{ role: 'user', content: 'x' }] } }, r);
+      await h(
+        {
+          method: 'POST',
+          headers: { origin: 'https://mine.com', 'x-forwarded-for': '9.9.9.9' },
+          body: { messages: [{ role: 'user', content: 'x' }] },
+        },
+        r,
+      );
       codes.push(r.code);
     }
     expect(codes).toEqual([200, 200, 429]);
     const nokey = res();
-    await handler([], {})({ method: 'POST', headers: {}, body: { messages: [{ role: 'user', content: 'x' }] } }, nokey);
+    await handler([], {})(
+      { method: 'POST', headers: {}, body: { messages: [{ role: 'user', content: 'x' }] } },
+      nokey,
+    );
     expect(nokey.code).toBe(503);
     vi.unstubAllGlobals();
   });
@@ -267,7 +325,13 @@ describe('Automations service', () => {
         const e = (ev: ChatEventView) => emit(rid, ev);
         e({ type: 'start', provider: 'p', model: 'm' });
         e({ type: 'conversation', id: 'conv-1' });
-        e({ type: 'tool_approval', id: 't1', name: 'mail_send', args: {}, preview: {} } as unknown as ChatEventView);
+        e({
+          type: 'tool_approval',
+          id: 't1',
+          name: 'mail_send',
+          args: {},
+          preview: {},
+        } as unknown as ChatEventView);
         e({ type: 'text', delta: 'Resumen listo.' });
         e({ type: 'cost', usd: 0.01, inputTokens: 1, outputTokens: 1, latencyMs: 1 });
         e({ type: 'done', stopReason: 'end' });
@@ -332,7 +396,14 @@ describe('Automations service', () => {
       deliver: [],
     });
     expect(() =>
-      a.createTask({ name: 'Pasada', prompt: 'x', schedule: { kind: 'once', at: now - 1 }, enabled: true, tools: 'none', deliver: [] }),
+      a.createTask({
+        name: 'Pasada',
+        prompt: 'x',
+        schedule: { kind: 'once', at: now - 1 },
+        enabled: true,
+        tools: 'none',
+        deliver: [],
+      }),
     ).toThrow(/pasó/);
     now += 2 * 60_000;
     a.tick();
@@ -346,7 +417,15 @@ describe('Automations service', () => {
   it('runs with a bot: its id and model ride along; deleting the bot unlinks tasks', async () => {
     const a = make();
     const { id } = a.createBot({ name: 'Tutor', model: 'openai/gpt-5', instructions: 'Explica.' });
-    a.createTask({ name: 'Clase', prompt: 'Enséñame', schedule: { kind: 'every', minutes: 60 }, enabled: true, tools: 'none', deliver: [], bot: id });
+    a.createTask({
+      name: 'Clase',
+      prompt: 'Enséñame',
+      schedule: { kind: 'every', minutes: 60 },
+      enabled: true,
+      tools: 'none',
+      deliver: [],
+      bot: id,
+    });
     const task = a.status().tasks[0]!;
     a.runNow(task.id);
     await vi.waitFor(() => expect(a.status().runs[0]?.state).toBe('ok'));
@@ -359,7 +438,14 @@ describe('Automations service', () => {
 
   it('marks a run left halfway as failed after a restart', () => {
     const a = make();
-    a.createTask({ name: 'X', prompt: 'y', schedule: { kind: 'every', minutes: 60 }, enabled: true, tools: 'none', deliver: [] });
+    a.createTask({
+      name: 'X',
+      prompt: 'y',
+      schedule: { kind: 'every', minutes: 60 },
+      enabled: true,
+      tools: 'none',
+      deliver: [],
+    });
     runner.chat = () => new Promise(() => undefined);
     void a.run(a.status().tasks[0]!, true);
     expect(a.status().runs[0]!.state).toBe('running');

@@ -290,10 +290,9 @@ export class DapBackend implements DebugBackend {
   }
 
   async scopes(frameId: number): Promise<DebugVariable[]> {
-    const r = await this.req<{ scopes: { name: string; variablesReference: number }[] }>(
-      'scopes',
-      { frameId },
-    );
+    const r = await this.req<{ scopes: { name: string; variablesReference: number }[] }>('scopes', {
+      frameId,
+    });
     return (r?.scopes ?? []).map((s) => ({ name: s.name, value: '', ref: s.variablesReference }));
   }
 

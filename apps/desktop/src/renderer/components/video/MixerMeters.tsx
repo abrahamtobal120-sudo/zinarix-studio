@@ -4,7 +4,14 @@
  * waveform peaks at the playhead (shared/videoMeter.ts), with peak hold and a slow fall.
  */
 import { useEffect } from 'react';
-import { METER_FLOOR_DB, METER_TOP_DB, meterFall, meterFrac, mixLevels, toDb } from '../../../shared/videoMeter';
+import {
+  METER_FLOOR_DB,
+  METER_TOP_DB,
+  meterFall,
+  meterFrac,
+  mixLevels,
+  toDb,
+} from '../../../shared/videoMeter';
 import { getV } from './videoStore';
 
 type Bar = { l: HTMLDivElement | null; r: HTMLDivElement | null; db: HTMLElement | null };
@@ -24,7 +31,13 @@ export function MeterBar({ id, label }: { id: string; label: string }) {
   };
   useEffect(() => () => void bars.delete(id), [id]);
   return (
-    <div className="vs-meter" role="meter" aria-label={label} aria-valuemin={METER_FLOOR_DB} aria-valuemax={METER_TOP_DB}>
+    <div
+      className="vs-meter"
+      role="meter"
+      aria-label={label}
+      aria-valuemin={METER_FLOOR_DB}
+      aria-valuemax={METER_TOP_DB}
+    >
       <div className="vs-meter-chs" style={{ ['--meter-0db' as string]: `${ZERO * 100}%` }}>
         <div className="vs-meter-ch">
           <div className="vs-meter-fill" ref={set('l')} />
@@ -50,7 +63,10 @@ export function useMeterLoop(): void {
       last = now;
       const s = getV();
       const lv = mixLevels(s.project, s.waves, s.playhead);
-      const all: [string, { l: number; r: number }][] = [...Object.entries(lv.tracks), [MASTER, lv.master]];
+      const all: [string, { l: number; r: number }][] = [
+        ...Object.entries(lv.tracks),
+        [MASTER, lv.master],
+      ];
       for (const [id, v] of all) {
         const b = bars.get(id);
         if (!b) continue;
@@ -72,7 +88,8 @@ export function useMeterLoop(): void {
         }
         if (b.db) {
           const db = toDb(hold);
-          b.db.textContent = Number.isFinite(db) && db > METER_FLOOR_DB ? `${db.toFixed(1)} dB` : '−∞';
+          b.db.textContent =
+            Number.isFinite(db) && db > METER_FLOOR_DB ? `${db.toFixed(1)} dB` : '−∞';
           b.db.classList.toggle('vs-meter-over', hold > 1);
         }
       }

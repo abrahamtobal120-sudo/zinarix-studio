@@ -27,7 +27,10 @@ export interface ElevenVoice {
 }
 
 /** Voices of the user's account (premade and their own). */
-export async function elevenVoices(cfg: ProviderConfig, signal?: AbortSignal): Promise<ElevenVoice[]> {
+export async function elevenVoices(
+  cfg: ProviderConfig,
+  signal?: AbortSignal,
+): Promise<ElevenVoice[]> {
   const r = await requestJson<{ voices?: { voice_id?: string; name?: string }[] }>(cfg, {
     path: '/v1/voices',
     signal,
@@ -52,7 +55,8 @@ export function elevenRequest(
     return v;
   };
   if (req.kind === 'speech') {
-    if (!voiceId) throw new OmniError('config', 'Falta la voz de ElevenLabs.', { provider: 'elevenlabs' });
+    if (!voiceId)
+      throw new OmniError('config', 'Falta la voz de ElevenLabs.', { provider: 'elevenlabs' });
     if (req.style?.trim())
       warnings.push('ElevenLabs no recibe el estilo por separado: escríbelo en el texto.');
     return {
@@ -125,7 +129,9 @@ export const elevenLabsMedia: MediaGenProvider = {
     const mediaType = res.headers.get('content-type')?.split(';')[0] || 'audio/mpeg';
     const data = new Uint8Array(await res.arrayBuffer());
     if (!data.length)
-      throw new OmniError('server', 'ElevenLabs devolvió un audio vacío', { provider: cfg.entry.id });
+      throw new OmniError('server', 'ElevenLabs devolvió un audio vacío', {
+        provider: cfg.entry.id,
+      });
     return {
       kind: req.kind,
       model: req.model,

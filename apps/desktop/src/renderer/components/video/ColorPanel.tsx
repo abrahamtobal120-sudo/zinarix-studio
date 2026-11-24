@@ -29,7 +29,10 @@ function edit(patch: (g: ColorGrade) => ColorGrade, what: string, merged = true)
   let p = s.project;
   const targets = targetsOf(p, s.selection);
   for (const c of targets) p = setGrade(p, new Set([c.id]), patch({ ...(c.color ?? {}) }));
-  (merged ? commitMerged : commit)(p, `${tp('editColor')} ${what} ${targets.map((c) => c.id).join(',')}`);
+  (merged ? commitMerged : commit)(
+    p,
+    `${tp('editColor')} ${what} ${targets.map((c) => c.id).join(',')}`,
+  );
 }
 
 function Row({
@@ -124,9 +127,7 @@ function LutBlock({ grade }: { grade: ColorGrade | undefined }) {
         </span>
         <button onClick={() => void pick()}>{path ? tp('lutChange') : tp('lutLoad')}</button>
       </div>
-      {st?.state === 'error' && (
-        <p className="vs-color-err">{tp('lutError', { e: st.error })}</p>
-      )}
+      {st?.state === 'error' && <p className="vs-color-err">{tp('lutError', { e: st.error })}</p>}
       {path && (
         <div className="vs-color-row">
           <label htmlFor="vs-lut-mix">{tp('lutMix')}</label>
@@ -175,7 +176,11 @@ export function ColorPanel() {
               key={pr.id}
               onClick={() => {
                 // A style replaces the wheels and the balance; the LUT stays.
-                edit((g) => ({ ...pr.grade, lut: g.lut, lutMix: g.lutMix, curves: g.curves }), pr.id, false);
+                edit(
+                  (g) => ({ ...pr.grade, lut: g.lut, lutMix: g.lutMix, curves: g.curves }),
+                  pr.id,
+                  false,
+                );
                 toast(tp('applied', { n: targets.length }));
               }}
             >

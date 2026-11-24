@@ -68,7 +68,10 @@ async function request<T>(
   const path = modelPath(model);
   if (!path || !opened.has(path)) return null;
   try {
-    return (await api().lsp.request(path, method, { textDocument: textDoc(model), ...params })) as T;
+    return (await api().lsp.request(path, method, {
+      textDocument: textDoc(model),
+      ...params,
+    })) as T;
   } catch {
     return null;
   }
@@ -86,7 +89,9 @@ async function ensureModel(path: string): Promise<monaco.editor.ITextModel | nul
   try {
     const f = await api().workspace.readFile(path);
     if (f.binary || f.tooLarge) return null;
-    return monaco.editor.getModel(uri) ?? monaco.editor.createModel(f.content, languageFor(path), uri);
+    return (
+      monaco.editor.getModel(uri) ?? monaco.editor.createModel(f.content, languageFor(path), uri)
+    );
   } catch {
     return null;
   }
@@ -111,7 +116,10 @@ export async function applyWorkspaceEdit(edit: unknown): Promise<boolean> {
   const { files, outside, ops } = editsByFile(edit);
   try {
     for (const op of ops) {
-      if (op.kind === 'create') await api().workspace.createFile(op.path).catch(() => undefined);
+      if (op.kind === 'create')
+        await api()
+          .workspace.createFile(op.path)
+          .catch(() => undefined);
       else if (op.kind === 'rename' && op.to) await api().workspace.rename(op.path, op.to);
       else if (op.kind === 'delete') await api().workspace.trash(op.path);
     }
@@ -157,8 +165,7 @@ function register(language: string): void {
         const trig = ctx.triggerCharacter;
         if (trig && !(status()?.triggerCharacters ?? []).includes(trig)) return { suggestions: [] };
         const r = await request<
-          | { isIncomplete?: boolean; items: LspCompletion[] }
-          | LspCompletion[]
+          { isIncomplete?: boolean; items: LspCompletion[] } | LspCompletion[]
         >(model, 'textDocument/completion', {
           position: toLspPosition(position),
           context: trig ? { triggerKind: 2, triggerCharacter: trig } : { triggerKind: 1 },
@@ -184,7 +191,11 @@ function register(language: string): void {
         const path = modelPath(model);
         if (!path) return item;
         try {
-          const res = (await api().lsp.request(path, 'completionItem/resolve', raw)) as LspCompletion;
+          const res = (await api().lsp.request(
+            path,
+            'completionItem/resolve',
+            raw,
+          )) as LspCompletion;
           if (res?.documentation) item.documentation = docString(res.documentation);
           if (res?.detail) item.detail = res.detail;
           if (res?.additionalTextEdits)
@@ -293,7 +304,10 @@ function register(language: string): void {
           signatures: {
             label: string;
             documentation?: string | { kind: string; value: string };
-            parameters?: { label: string | [number, number]; documentation?: string | { kind: string; value: string } }[];
+            parameters?: {
+              label: string | [number, number];
+              documentation?: string | { kind: string; value: string };
+            }[];
           }[];
           activeSignature?: number;
           activeParameter?: number;
@@ -339,7 +353,12 @@ function register(language: string): void {
                 textEdit: { range: toMonacoRange(e.range), text: e.newText },
                 versionId: undefined,
               });
-          actions.push({ title: a.title, kind: a.kind, isPreferred: a.isPreferred, edit: { edits } });
+          actions.push({
+            title: a.title,
+            kind: a.kind,
+            isPreferred: a.isPreferred,
+            edit: { edits },
+          });
         }
         return { actions, dispose() {} };
       },
@@ -389,7 +408,10 @@ function toSuggestion(
     sortText: it.sortText,
     range,
     additionalTextEdits: toMonacoEdits(it.additionalTextEdits),
-    tags: it.deprecated || it.tags?.includes(1) ? [monaco.languages.CompletionItemTag.Deprecated] : undefined,
+    tags:
+      it.deprecated || it.tags?.includes(1)
+        ? [monaco.languages.CompletionItemTag.Deprecated]
+        : undefined,
   };
   item._lsp = it;
   item._model = model;

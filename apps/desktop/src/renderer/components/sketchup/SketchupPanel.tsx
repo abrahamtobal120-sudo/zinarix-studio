@@ -8,7 +8,12 @@ import { Icon } from '../Icon';
 import { formatBytes } from '../FileViewers';
 import { MeshViewer } from '../cad/meshViewer';
 import { parseStl } from '../../../shared/mesh3d';
-import { SKETCHUP_PREVIEWABLE, type SketchupRunView, type SketchupStatusView, type SkpInfoView } from '../../../shared/sketchup';
+import {
+  SKETCHUP_PREVIEWABLE,
+  type SketchupRunView,
+  type SketchupStatusView,
+  type SkpInfoView,
+} from '../../../shared/sketchup';
 import { tsu } from './sketchupStrings';
 import '../cad/cad.css';
 import './sketchup.css';
@@ -131,7 +136,11 @@ export function SkpMeshPreview({ path }: { path: string }) {
   );
 }
 
-const safeName = (s: string) => s.replace(/\.skp$/i, '').replace(/[^\w\- ]+/g, '_').trim() || 'modelo';
+const safeName = (s: string) =>
+  s
+    .replace(/\.skp$/i, '')
+    .replace(/[^\w\- ]+/g, '_')
+    .trim() || 'modelo';
 
 // ---------------------------------------------------------------- the panel
 
@@ -160,7 +169,10 @@ export function SketchupPanel() {
     const all = await api()
       .workspace.listFiles()
       .catch(() => [] as string[]);
-    setFiles({ skp: all.filter((f) => /\.skp$/i.test(f)).slice(0, 200), mesh: all.filter((f) => SKETCHUP_PREVIEWABLE.test(f)).slice(0, 100) });
+    setFiles({
+      skp: all.filter((f) => /\.skp$/i.test(f)).slice(0, 200),
+      mesh: all.filter((f) => SKETCHUP_PREVIEWABLE.test(f)).slice(0, 100),
+    });
   }, [workspace]);
 
   useEffect(() => {
@@ -171,7 +183,11 @@ export function SketchupPanel() {
   }, [load]);
   useEffect(() => void loadFiles(), [loadFiles, fsVersion]);
 
-  const run = async (path: string | null, ops: Record<string, unknown>[], opts: { shot?: boolean; save?: boolean } = {}): Promise<SketchupRunView | null> => {
+  const run = async (
+    path: string | null,
+    ops: Record<string, unknown>[],
+    opts: { shot?: boolean; save?: boolean } = {},
+  ): Promise<SketchupRunView | null> => {
     setBusy(true);
     try {
       const r = await api().sketchup.run(path, ops, { units: 'mm', ...opts });
@@ -230,7 +246,14 @@ export function SketchupPanel() {
 
   const newBox = async () => {
     if (!st?.connected) return toast(tsu('needConnect'));
-    await run(null, [{ op: 'add_box', name: `Caja ${Date.now() % 10000}`, x: 0, y: 0, z: 0, ...box }, { op: 'view', preset: 'iso' }], { shot: true });
+    await run(
+      null,
+      [
+        { op: 'add_box', name: `Caja ${Date.now() % 10000}`, x: 0, y: 0, z: 0, ...box },
+        { op: 'view', preset: 'iso' },
+      ],
+      { shot: true },
+    );
   };
 
   const sendAsk = () => {
@@ -246,7 +269,11 @@ export function SketchupPanel() {
       <div className="sidebar-title">
         <span className="panel-title">{tsu('title')}</span>
         <span className="sidebar-actions">
-          <button title={tsu('recheck')} aria-label={tsu('recheck')} onClick={() => (void load(), void loadFiles())}>
+          <button
+            title={tsu('recheck')}
+            aria-label={tsu('recheck')}
+            onClick={() => (void load(), void loadFiles())}
+          >
             <Icon name="refresh" size={15} />
           </button>
         </span>
@@ -258,25 +285,43 @@ export function SketchupPanel() {
           <section className="cad-card">
             <div className={`cad-engine ${st.active ? 'ok' : 'skp-missing'}`}>
               <Icon name="home" />
-              <span>{st.active ? (st.active.year ? tsu('found', { v: st.active.year }) : tsu('foundNoYear')) : tsu('notFound')}</span>
+              <span>
+                {st.active
+                  ? st.active.year
+                    ? tsu('found', { v: st.active.year })
+                    : tsu('foundNoYear')
+                  : tsu('notFound')}
+              </span>
             </div>
             {!st.active && <p className="cad-hint">{tsu('notFoundHint')}</p>}
             {st.active && (
               <div className={`skp-line ${ext?.installed && !ext.outdated ? 'ok' : 'warn'}`}>
                 <Icon name={ext?.installed && !ext.outdated ? 'check' : 'warning'} size={13} />
-                <span>{ext?.installed ? (ext.outdated ? tsu('extOld') : tsu('extOk')) : tsu('extMissing')}</span>
+                <span>
+                  {ext?.installed
+                    ? ext.outdated
+                      ? tsu('extOld')
+                      : tsu('extOk')
+                    : tsu('extMissing')}
+                </span>
               </div>
             )}
-            {st.active && (!ext?.installed || ext.outdated) && <p className="cad-hint">{tsu('extHint')}</p>}
+            {st.active && (!ext?.installed || ext.outdated) && (
+              <p className="cad-hint">{tsu('extHint')}</p>
+            )}
             {st.active && (
               <div className={`skp-line ${st.connected ? 'ok' : ''}`}>
                 <span className={`skp-dot${st.connected ? ' on' : ''}`} aria-hidden="true" />
                 <span>
-                  {st.connected ? tsu('connected', { v: st.running?.version ?? '' }) : tsu('disconnected')}
+                  {st.connected
+                    ? tsu('connected', { v: st.running?.version ?? '' })
+                    : tsu('disconnected')}
                   {st.connected && (
                     <>
                       <br />
-                      <span className="skp-dim">{tsu('connectedModel', { m: st.running?.model || tsu('unsavedModel') })}</span>
+                      <span className="skp-dim">
+                        {tsu('connectedModel', { m: st.running?.model || tsu('unsavedModel') })}
+                      </span>
                     </>
                   )}
                 </span>
@@ -284,7 +329,10 @@ export function SketchupPanel() {
             )}
             <div className="cad-row-btns">
               {!st.active && (
-                <button className="btn cad-small" onClick={() => openLink('https://www.sketchup.com/try-sketchup')}>
+                <button
+                  className="btn cad-small"
+                  onClick={() => openLink('https://www.sketchup.com/try-sketchup')}
+                >
                   {tsu('download')}
                 </button>
               )}
@@ -294,7 +342,11 @@ export function SketchupPanel() {
                 </button>
               )}
               {st.active && !st.connected && (
-                <button className="btn ghost cad-small" disabled={busy} onClick={() => void run(null, []).then(() => load())}>
+                <button
+                  className="btn ghost cad-small"
+                  disabled={busy}
+                  onClick={() => void run(null, []).then(() => load())}
+                >
                   {tsu('launch')}
                 </button>
               )}
@@ -337,24 +389,46 @@ export function SketchupPanel() {
                   min={1}
                   aria-label={k}
                   value={box[k]}
-                  onChange={(e) => setBox((b) => ({ ...b, [k]: Math.max(1, Number(e.target.value) || 1) }))}
+                  onChange={(e) =>
+                    setBox((b) => ({ ...b, [k]: Math.max(1, Number(e.target.value) || 1) }))
+                  }
                 />
               ))}
             </div>
             <div className="cad-row-btns">
-              <button className="btn ghost cad-small" disabled={busy || !st.connected || !workspace} onClick={() => void newBox()}>
+              <button
+                className="btn ghost cad-small"
+                disabled={busy || !st.connected || !workspace}
+                onClick={() => void newBox()}
+              >
                 <Icon name="cube" size={13} /> {tsu('newBox')}
               </button>
-              <button className="btn ghost cad-small" disabled={busy || !st.connected || !workspace} onClick={() => void exportAs('stl')}>
+              <button
+                className="btn ghost cad-small"
+                disabled={busy || !st.connected || !workspace}
+                onClick={() => void exportAs('stl')}
+              >
                 {tsu('exportStl')}
               </button>
-              <button className="btn ghost cad-small" disabled={busy || !st.connected || !workspace} onClick={() => void exportAs('obj')}>
+              <button
+                className="btn ghost cad-small"
+                disabled={busy || !st.connected || !workspace}
+                onClick={() => void exportAs('obj')}
+              >
                 {tsu('exportObj')}
               </button>
-              <button className="btn ghost cad-small" disabled={busy || !st.connected || !workspace} onClick={() => void exportAs('dae')}>
+              <button
+                className="btn ghost cad-small"
+                disabled={busy || !st.connected || !workspace}
+                onClick={() => void exportAs('dae')}
+              >
                 {tsu('exportDae')}
               </button>
-              <button className="btn ghost cad-small" disabled={busy || !st.connected} onClick={() => void run(null, [], { shot: true })}>
+              <button
+                className="btn ghost cad-small"
+                disabled={busy || !st.connected}
+                onClick={() => void run(null, [], { shot: true })}
+              >
                 <Icon name="image" size={13} /> {tsu('screenshot')}
               </button>
             </div>
@@ -384,7 +458,12 @@ export function SketchupPanel() {
                         <span className="skp-name">{f}</span>
                       </button>
                       {st?.active && (
-                        <button className="btn ghost cad-small" title={tsu('openIn')} aria-label={tsu('openIn')} onClick={() => void openIn(f)}>
+                        <button
+                          className="btn ghost cad-small"
+                          title={tsu('openIn')}
+                          aria-label={tsu('openIn')}
+                          onClick={() => void openIn(f)}
+                        >
                           <Icon name="external" size={12} />
                         </button>
                       )}
@@ -401,7 +480,11 @@ export function SketchupPanel() {
                 <ul className="cad-files">
                   {files.mesh.map((f) => (
                     <li key={f}>
-                      <button className={`cad-file${preview === f ? ' on' : ''}`} title={f} onClick={() => setPreview(preview === f ? null : f)}>
+                      <button
+                        className={`cad-file${preview === f ? ' on' : ''}`}
+                        title={f}
+                        onClick={() => setPreview(preview === f ? null : f)}
+                      >
                         <Icon name="cube" /> {f}
                       </button>
                     </li>
@@ -450,11 +533,21 @@ export function SkpView({ path }: { path: string }) {
         <strong className="cad-title">{name}</strong>
         <span className="cad-grow" />
         {st?.active && (
-          <button className="btn cad-small" onClick={() => void api().sketchup.open(path).catch((e: unknown) => toast(errText(e)))}>
+          <button
+            className="btn cad-small"
+            onClick={() =>
+              void api()
+                .sketchup.open(path)
+                .catch((e: unknown) => toast(errText(e)))
+            }
+          >
             <Icon name="external" size={13} /> {tsu('openIn')}
           </button>
         )}
-        <button className="btn ghost cad-small" onClick={() => askAgent(tsu('checkAiPrompt', { file: path }))}>
+        <button
+          className="btn ghost cad-small"
+          onClick={() => askAgent(tsu('checkAiPrompt', { file: path }))}
+        >
           <Icon name="sparkle" size={13} /> {tsu('checkAi')}
         </button>
       </div>
@@ -467,9 +560,14 @@ export function SkpView({ path }: { path: string }) {
           <p className="cad-hint">{tsu('loading')}</p>
         ) : (
           <>
-            {url ? <img className="skp-view-img" src={url} alt={name} /> : <div className="skp-thumb big">{tsu('noThumb')}</div>}
+            {url ? (
+              <img className="skp-view-img" src={url} alt={name} />
+            ) : (
+              <div className="skp-thumb big">{tsu('noThumb')}</div>
+            )}
             <p className="skp-meta">
-              {tsu('version', { v: `${info.label}${info.version ? ` (${info.version})` : ''}` })} · {formatBytes(info.size)}
+              {tsu('version', { v: `${info.label}${info.version ? ` (${info.version})` : ''}` })} ·{' '}
+              {formatBytes(info.size)}
             </p>
             {st && !st.active && <p className="cad-hint">{tsu('noSketchupOpen')}</p>}
             {st?.active?.year && fileYear && Number(fileYear) > st.active.year && (

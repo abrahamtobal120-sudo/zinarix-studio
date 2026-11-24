@@ -11,5 +11,9 @@ export function Badge({
   children: ReactNode;
   className?: string;
 }) {
-  return <span className={`ui-badge ui-badge-${tone}${className ? ` ${className}` : ''}`}>{children}</span>;
+  return (
+    <span className={`ui-badge ui-badge-${tone}${className ? ` ${className}` : ''}`}>
+      {children}
+    </span>
+  );
 }

@@ -4,21 +4,21 @@
 
 ## Licencias (comprobadas en los archivos)
 
-| Proyecto | Commit | Licencia |
-|---|---|---|
+| Proyecto                           | Commit                 | Licencia                                       |
+| ---------------------------------- | ---------------------- | ---------------------------------------------- |
 | OpenReel (`Augani/openreel-video`) | `367d7e9` (2026-10-17) | MIT, © 2024-2026 Augustus Otu and Contributors |
-| Motion Canvas | `7b91435` (2026-07-02) | MIT, © 2022 motion-canvas |
+| Motion Canvas                      | `7b91435` (2026-07-02) | MIT, © 2022 motion-canvas                      |
 
 Dependencias de OpenReel que hay que vigilar (licencias consultadas con `npm view`):
 
-| Dependencia | Licencia | Dónde la usa | Qué hacer |
-|---|---|---|---|
-| `@ffmpeg/core` (ffmpeg.wasm) | **GPL-2.0-or-later** | `core/media/ffmpeg-fallback.ts`, `core/video/stabilization/vidstab-engine.ts` | **No traerla.** Zinarix ya usa FFmpeg como programa aparte |
-| `gsap` | Licencia propia "Standard no-charge", no es OSI | `core/animation/gsap-engine.ts` | No traerla. Usar las curvas de Motion Canvas (MIT) |
-| `@imgly/background-removal` | "SEE LICENSE" (AGPL o comercial) | solo `apps/image` | No traerla |
-| `mediabunny` | MPL-2.0 | `core` | Se puede usar como dependencia |
-| `posthog-js` | (telemetría) | `apps/web` | No traerla |
-| `@mediapipe/tasks-vision`, `onnxruntime-web`, `@paper-design/shaders`, `three`, Radix, `lucide-react` | Apache-2.0 / MIT / ISC | `core` / `ui` | Sin problema |
+| Dependencia                                                                                           | Licencia                                        | Dónde la usa                                                                  | Qué hacer                                                  |
+| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `@ffmpeg/core` (ffmpeg.wasm)                                                                          | **GPL-2.0-or-later**                            | `core/media/ffmpeg-fallback.ts`, `core/video/stabilization/vidstab-engine.ts` | **No traerla.** Zinarix ya usa FFmpeg como programa aparte |
+| `gsap`                                                                                                | Licencia propia "Standard no-charge", no es OSI | `core/animation/gsap-engine.ts`                                               | No traerla. Usar las curvas de Motion Canvas (MIT)         |
+| `@imgly/background-removal`                                                                           | "SEE LICENSE" (AGPL o comercial)                | solo `apps/image`                                                             | No traerla                                                 |
+| `mediabunny`                                                                                          | MPL-2.0                                         | `core`                                                                        | Se puede usar como dependencia                             |
+| `posthog-js`                                                                                          | (telemetría)                                    | `apps/web`                                                                    | No traerla                                                 |
+| `@mediapipe/tasks-vision`, `onnxruntime-web`, `@paper-design/shaders`, `three`, Radix, `lucide-react` | Apache-2.0 / MIT / ISC                          | `core` / `ui`                                                                 | Sin problema                                               |
 
 Además, el FFmpeg del escritorio de OpenReel también es GPL. Su carpeta `apps/desktop/LICENSES/FFMPEG.md` sirve de **modelo** para el aviso que le falta a Zinarix (plan, sección 5.4).
 

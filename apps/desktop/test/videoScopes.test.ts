@@ -96,7 +96,12 @@ describe('videoScopes', () => {
     // degrees elsewhere (e.g. M 61°), which is why the 709 values are pinned here.
     const ref = { R: 102.9, Y: 174.8, G: 229.7, C: 282.9, B: 354.8, M: 49.7 };
     for (const [k, deg] of Object.entries(ref)) expect(dAngle(a[k]!, deg), k).toBeLessThan(0.2);
-    for (const [x, y] of [['R', 'C'], ['G', 'M'], ['B', 'Y']] as const) expect(dAngle(a[x]!, a[y]! + 180)).toBeLessThan(0.2);
+    for (const [x, y] of [
+      ['R', 'C'],
+      ['G', 'M'],
+      ['B', 'Y'],
+    ] as const)
+      expect(dAngle(a[x]!, a[y]! + 180)).toBeLessThan(0.2);
   });
 
   it('histogram counts sum to the pixel count', () => {
@@ -112,7 +117,11 @@ describe('videoScopes', () => {
   it('flat grey → the waveform lives in one bin per column', () => {
     const w = 64;
     const h = 32;
-    const wf = waveform(image(w, h, () => [128, 128, 128]), w, h);
+    const wf = waveform(
+      image(w, h, () => [128, 128, 128]),
+      w,
+      h,
+    );
     expect(wf.cols).toBe(w);
     for (let c = 0; c < w; c++)
       for (let lv = 0; lv < 256; lv++) expect(wf.bins[c * 256 + lv]).toBe(lv === 128 ? h : 0);
@@ -120,7 +129,11 @@ describe('videoScopes', () => {
   });
 
   it('parade splits the channels', () => {
-    const p = parade(image(10, 5, () => [10, 20, 30]), 10, 5);
+    const p = parade(
+      image(10, 5, () => [10, 20, 30]),
+      10,
+      5,
+    );
     expect(p.r[3 * 256 + 10]).toBe(5);
     expect(p.g[3 * 256 + 20]).toBe(5);
     expect(p.b[3 * 256 + 30]).toBe(5);
@@ -137,7 +150,11 @@ describe('videoScopes', () => {
     expect(s.belowPct).toBeCloseTo((16 / 256) * 100, 5);
     expect(s.abovePct).toBeCloseTo((20 / 256) * 100, 5);
     expect(s.outPct).toBeCloseTo((36 / 256) * 100, 5);
-    const narrow = frameStats(image(100, 2, (x) => [40 + x, 40 + x, 40 + x]), 100, 2);
+    const narrow = frameStats(
+      image(100, 2, (x) => [40 + x, 40 + x, 40 + x]),
+      100,
+      2,
+    );
     expect([narrow.min, narrow.max, narrow.outPct]).toEqual([40, 139, 0]);
   });
 

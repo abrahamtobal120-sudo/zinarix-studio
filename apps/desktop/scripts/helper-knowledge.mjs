@@ -22,7 +22,8 @@ export function spanishStrings(src) {
   const es = end > 0 ? src.slice(0, end) : src;
   const out = {};
   const re = /^ {2}(\w+):\s*(?:\n\s*)?(['"])((?:\\.|(?!\2)[^\\])*)\2/gm;
-  for (const m of es.matchAll(re)) out[m[1]] = m[3].replace(/\\(['"\\])/g, '$1').replace(/\\n/g, ' ');
+  for (const m of es.matchAll(re))
+    out[m[1]] = m[3].replace(/\\(['"\\])/g, '$1').replace(/\\n/g, ' ');
   return out;
 }
 
@@ -73,7 +74,9 @@ function commandList(commandsTs, es) {
     const lab = /label:\s*([^\n]+)/.exec(block)?.[1];
     if (!lab) continue;
     const text = label(lab, es).replace(/…$/, '…');
-    const keys = shortcut(/keys:\s*`([^`]+)`|keys:\s*'([^']+)'/.exec(block)?.slice(1).find(Boolean));
+    const keys = shortcut(
+      /keys:\s*`([^`]+)`|keys:\s*'([^']+)'/.exec(block)?.slice(1).find(Boolean),
+    );
     const alt = shortcut(/altKeys:\s*'([^']+)'/.exec(block)?.[1]);
     if (text) lines.push(`- ${text}${keys ? ` (${keys}${alt ? ` o ${alt}` : ''})` : ''}`);
   }
@@ -113,7 +116,9 @@ function activityBar(chromeTsx, es) {
 
 /** Sections and switches of the Settings screen (Settings.tsx). */
 function settingsList(settingsTsx, es) {
-  const sections = [...settingsTsx.matchAll(/nav\('(\w+)',\s*([^,]+),/g)].map((m) => label(m[2], es));
+  const sections = [...settingsTsx.matchAll(/nav\('(\w+)',\s*([^,]+),/g)].map((m) =>
+    label(m[2], es),
+  );
   const toggles = [];
   for (const m of settingsTsx.matchAll(/<Toggle\s+label=\{([^}]+)\}(?:\s+hint=\{([^}]+)\})?/g)) {
     const l = label(m[1], es);
@@ -198,7 +203,10 @@ export function buildKnowledge() {
     [null, 'Referencia generada', 1.3, generated],
     [join(repo, 'README.md'), 'README', 1],
   ];
-  for (const [dir, weight] of [['es', 0.55], ['en', 0.45]]) {
+  for (const [dir, weight] of [
+    ['es', 0.55],
+    ['en', 0.45],
+  ]) {
     const d = join(repo, '.md', dir);
     if (!existsSync(d)) continue;
     for (const f of readdirSync(d).sort())

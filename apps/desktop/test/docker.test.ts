@@ -15,12 +15,16 @@ import { dockerPreview, runDockerTool, specFrom } from '../src/main/dockerTools.
 
 describe('docker CLI output', () => {
   it('reads one JSON object per line and skips the rest', () => {
-    const rows = parseJsonLines('{"ID":"abc","Names":"web"}\nWARNING: something\n\n{"ID":"def"}\r\n{bad');
+    const rows = parseJsonLines(
+      '{"ID":"abc","Names":"web"}\nWARNING: something\n\n{"ID":"def"}\r\n{bad',
+    );
     expect(rows).toEqual([{ ID: 'abc', Names: 'web' }, { ID: 'def' }]);
   });
 
   it('finds the compose project in the labels', () => {
-    expect(composeProject('a=b,com.docker.compose.project=shop,com.docker.compose.service=db')).toBe('shop');
+    expect(
+      composeProject('a=b,com.docker.compose.project=shop,com.docker.compose.service=db'),
+    ).toBe('shop');
     expect(composeProject('maintainer=me')).toBeNull();
   });
 });
@@ -38,12 +42,18 @@ describe('argument checks', () => {
   });
 
   it('ports, env and volumes', () => {
-    for (const p of ['80', '8080:80', '127.0.0.1:5432:5432', '53:53/udp']) expect(validPort(p)).toBe(true);
+    for (const p of ['80', '8080:80', '127.0.0.1:5432:5432', '53:53/udp'])
+      expect(validPort(p)).toBe(true);
     for (const p of ['0:80', '99999:1', '80:80:80', 'abc']) expect(validPort(p)).toBe(false);
     expect(validEnv('POSTGRES_PASSWORD=dev')).toBe(true);
     expect(validEnv('=x')).toBe(false);
     expect(validEnv('A=1\nB=2')).toBe(false);
-    for (const v of ['pgdata:/var/lib/postgresql/data', './data:/data:ro', 'C:\\proj\\data:/data', '/srv:/srv:rw'])
+    for (const v of [
+      'pgdata:/var/lib/postgresql/data',
+      './data:/data:ro',
+      'C:\\proj\\data:/data',
+      '/srv:/srv:rw',
+    ])
       expect(validVolume(v)).toBe(true);
     for (const v of ['data', 'data:relative', 'a:/b:exec', '-v:/x', 'C:\\x'])
       expect(validVolume(v)).toBe(false);
@@ -63,9 +73,22 @@ describe('docker run', () => {
       command: ['postgres', '-c', 'log_statement=all'],
     });
     expect(args).toEqual([
-      'run', '-d', '--name', 'db', '-p', '5432:5432', '-e', 'POSTGRES_PASSWORD=dev',
-      '-v', 'pgdata:/var/lib/postgresql/data', '--restart', 'unless-stopped',
-      'postgres:16', 'postgres', '-c', 'log_statement=all',
+      'run',
+      '-d',
+      '--name',
+      'db',
+      '-p',
+      '5432:5432',
+      '-e',
+      'POSTGRES_PASSWORD=dev',
+      '-v',
+      'pgdata:/var/lib/postgresql/data',
+      '--restart',
+      'unless-stopped',
+      'postgres:16',
+      'postgres',
+      '-c',
+      'log_statement=all',
     ]);
   });
 
@@ -131,7 +154,12 @@ describe.skipIf(!hasHello)('docker tools on the real engine', () => {
     expect(ps.content).toContain(name);
     const logs = await runDockerTool(live, 'docker_logs', { container: name }, undefined);
     expect(logs.content).toContain('Hello from Docker!');
-    const rm = await runDockerTool(live, 'docker_action', { action: 'rm', target: name }, undefined);
+    const rm = await runDockerTool(
+      live,
+      'docker_action',
+      { action: 'rm', target: name },
+      undefined,
+    );
     expect(rm.ok).toBe(true);
     const after = await runDockerTool(live, 'docker_ps', {}, undefined);
     expect(after.content).not.toContain(name);

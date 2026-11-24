@@ -35,7 +35,9 @@ import {
 
 describe('ANSI colors of outputs', () => {
   it('splits styled runs: 16 colors, bold, reset, 256 and true color', () => {
-    const s = ansiSpans('\u001b[0;31mZeroDivisionError\u001b[0m: x \u001b[1;32mok\u001b[39m!\u001b[38;5;196mR\u001b[48;2;1;2;3mB');
+    const s = ansiSpans(
+      '\u001b[0;31mZeroDivisionError\u001b[0m: x \u001b[1;32mok\u001b[39m!\u001b[38;5;196mR\u001b[48;2;1;2;3mB',
+    );
     expect(s).toEqual([
       { text: 'ZeroDivisionError', fg: 1 },
       { text: ': x ' },
@@ -56,8 +58,14 @@ describe('ANSI colors of outputs', () => {
 describe('export as a script', () => {
   it('writes the percent format with markdown commented out', () => {
     const nb = emptyNotebook();
-    nb.cells = [newCell('markdown', '# Título\n\ntexto'), newCell('code', 'x = 1\nprint(x)\n\n'), newCell('raw', 'r')];
-    expect(notebookToScript(nb)).toBe('# %% [markdown]\n# # Título\n#\n# texto\n\n# %%\nx = 1\nprint(x)\n\n# %% [raw]\n# r\n');
+    nb.cells = [
+      newCell('markdown', '# Título\n\ntexto'),
+      newCell('code', 'x = 1\nprint(x)\n\n'),
+      newCell('raw', 'r'),
+    ];
+    expect(notebookToScript(nb)).toBe(
+      '# %% [markdown]\n# # Título\n#\n# texto\n\n# %%\nx = 1\nprint(x)\n\n# %% [raw]\n# r\n',
+    );
     expect(scriptExtension(nb)).toBe('.py');
     nb.metadata.language_info = { name: 'julia', file_extension: '.jl' };
     expect(scriptExtension(nb)).toBe('.jl');
@@ -91,7 +99,10 @@ describe('kernel completions', () => {
     expect(r).toEqual({
       start: 6,
       end: 11,
-      matches: [{ text: 'np.array', type: 'function', signature: '(object)' }, { text: 'np.arange' }],
+      matches: [
+        { text: 'np.array', type: 'function', signature: '(object)' },
+        { text: 'np.arange' },
+      ],
     });
     expect(parseCompleteReply(code, { status: 'error' })).toBeNull();
   });
@@ -142,14 +153,25 @@ describe.skipIf(!status.ok)('kernel completions, docs and variables (live)', () 
     // Applying the replaced range gives the full name (IPython answers "append" from 8 or
     // "numeros.append" from 0, depending on its version).
     const code = 'numeros.ap';
-    expect(c?.matches.map((m) => code.slice(0, c.start) + m.text + code.slice(c.end))).toContain('numeros.append');
+    expect(c?.matches.map((m) => code.slice(0, c.start) + m.text + code.slice(c.end))).toContain(
+      'numeros.append',
+    );
     const doc = await kernels.inspect('v.ipynb', 'len', 3);
     expect(doc).toMatch(/number of items/i);
     const vars = await kernels.variables('v.ipynb');
     // Modules and functions are left out; the run left no history behind.
     expect(vars?.map((v) => v.name).sort()).toEqual(['numeros', 'texto']);
-    expect(vars?.find((v) => v.name === 'numeros')).toMatchObject({ type: 'list', size: 3, value: '[1, 2, 3]' });
-    const tool = await runNotebookTool(() => kernels, 'notebook_variables', { path: 'v.ipynb' }, root);
+    expect(vars?.find((v) => v.name === 'numeros')).toMatchObject({
+      type: 'list',
+      size: 3,
+      value: '[1, 2, 3]',
+    });
+    const tool = await runNotebookTool(
+      () => kernels,
+      'notebook_variables',
+      { path: 'v.ipynb' },
+      root,
+    );
     expect(tool.ok).toBe(true);
     expect(tool.content).toContain('texto: str len=4');
     // Silent: the execution count did not move.
@@ -188,7 +210,9 @@ describe('docker parsing and checks', () => {
         },
         Networks: { shop_default: { IPAddress: '172.18.0.2' } },
       },
-      Mounts: [{ Type: 'volume', Name: 'data', Source: '/var/lib/x', Destination: '/data', RW: false }],
+      Mounts: [
+        { Type: 'volume', Name: 'data', Source: '/var/lib/x', Destination: '/data', RW: false },
+      ],
     });
     expect(d).toMatchObject({
       id: 'abcdef012345',
@@ -212,8 +236,30 @@ describe('docker parsing and checks', () => {
   });
 
   it('reads stats and disk usage rows', () => {
-    expect(parseStats([{ Name: 'web', CPUPerc: '0.50%', MemUsage: '24MiB / 7GiB', MemPerc: '0.3%', NetIO: '1kB / 2kB', BlockIO: '0B / 0B', PIDs: '3' }])[0]).toMatchObject({ name: 'web', cpu: '0.50%', mem: '24MiB / 7GiB' });
-    expect(parseDiskUsage([{ Type: 'Images', TotalCount: '4', Active: '1', Size: '1.2GB', Reclaimable: '900MB (75%)' }])[0]).toEqual({ type: 'Images', total: '4', active: '1', size: '1.2GB', reclaimable: '900MB (75%)' });
+    expect(
+      parseStats([
+        {
+          Name: 'web',
+          CPUPerc: '0.50%',
+          MemUsage: '24MiB / 7GiB',
+          MemPerc: '0.3%',
+          NetIO: '1kB / 2kB',
+          BlockIO: '0B / 0B',
+          PIDs: '3',
+        },
+      ])[0],
+    ).toMatchObject({ name: 'web', cpu: '0.50%', mem: '24MiB / 7GiB' });
+    expect(
+      parseDiskUsage([
+        { Type: 'Images', TotalCount: '4', Active: '1', Size: '1.2GB', Reclaimable: '900MB (75%)' },
+      ])[0],
+    ).toEqual({
+      type: 'Images',
+      total: '4',
+      active: '1',
+      size: '1.2GB',
+      reclaimable: '900MB (75%)',
+    });
   });
 
   it('checks tags, Dockerfile names, secrets and clean-ups', () => {
@@ -222,8 +268,10 @@ describe('docker parsing and checks', () => {
     expect(validTag('My-App:dev')).toBe(false);
     expect(validTag('app@sha256:' + 'a'.repeat(64))).toBe(false);
     expect(validTag('--rm')).toBe(false);
-    for (const n of ['Dockerfile', 'dockerfile.dev', 'api.Dockerfile', 'Containerfile']) expect(isDockerfile(n)).toBe(true);
-    for (const n of ['Dockerfile.', 'docker-compose.yml', 'README.md']) expect(isDockerfile(n)).toBe(false);
+    for (const n of ['Dockerfile', 'dockerfile.dev', 'api.Dockerfile', 'Containerfile'])
+      expect(isDockerfile(n)).toBe(true);
+    for (const n of ['Dockerfile.', 'docker-compose.yml', 'README.md'])
+      expect(isDockerfile(n)).toBe(false);
     expect(secretKey('POSTGRES_PASSWORD')).toBe(true);
     expect(secretKey('API_KEY')).toBe(true);
     expect(secretKey('PATH')).toBe(false);
@@ -234,10 +282,17 @@ describe('docker parsing and checks', () => {
 
   it('approval cards of the new tools', () => {
     expect(dockerPreview('docker_inspect', { container: 'web' })).toBeNull();
-    expect(dockerPreview('docker_pull', { image: 'redis:7' })).toMatchObject({ risk: 'medium', allowKey: 'docker_pull:redis:7' });
+    expect(dockerPreview('docker_pull', { image: 'redis:7' })).toMatchObject({
+      risk: 'medium',
+      allowKey: 'docker_pull:redis:7',
+    });
     expect(dockerPreview('docker_pull', { image: '--help' })).toHaveProperty('error');
-    expect(dockerPreview('docker_build', { dockerfile: 'Dockerfile', tag: 'Bad' })).toHaveProperty('error');
-    expect(dockerPreview('docker_build', { dockerfile: 'Dockerfile', tag: 'app:dev' })).toMatchObject({ risk: 'high' });
+    expect(dockerPreview('docker_build', { dockerfile: 'Dockerfile', tag: 'Bad' })).toHaveProperty(
+      'error',
+    );
+    expect(
+      dockerPreview('docker_build', { dockerfile: 'Dockerfile', tag: 'app:dev' }),
+    ).toMatchObject({ risk: 'high' });
     const prune = dockerPreview('docker_prune', { kind: 'volumes' });
     expect(prune).toMatchObject({ risk: 'high', command: 'docker volume prune -f' });
     // Never "always".
@@ -248,7 +303,9 @@ describe('docker parsing and checks', () => {
     const svc = new DockerService();
     const dir = mkdtempSync(join(tmpdir(), 'zs-dkb-'));
     writeFileSync(join(dir, 'Dockerfile'), 'FROM scratch\n');
-    await expect(svc.jobArgs(dir, { kind: 'build', dockerfile: '../Dockerfile', tag: 'x:y' })).rejects.toThrow(/no está en el proyecto/);
+    await expect(
+      svc.jobArgs(dir, { kind: 'build', dockerfile: '../Dockerfile', tag: 'x:y' }),
+    ).rejects.toThrow(/no está en el proyecto/);
     const ok = await svc.jobArgs(dir, { kind: 'build', dockerfile: 'Dockerfile', tag: 'x:y' });
     expect(ok.args.slice(0, 3)).toEqual(['build', '-t', 'x:y']);
     expect(await svc.dockerfiles(dir)).toEqual(['Dockerfile']);
@@ -278,7 +335,11 @@ describe.skipIf(engine.state !== 'running')('docker on the real engine (mejoras)
 
   it.skipIf(!hasHello)('inspects a container', { timeout: 60_000 }, async () => {
     const name = `zs-insp-${Date.now().toString(36)}`;
-    await live.runContainer({ image: 'hello-world', name, env: ['SECRET_TOKEN=abc', 'COLOR=blue'] });
+    await live.runContainer({
+      image: 'hello-world',
+      name,
+      env: ['SECRET_TOKEN=abc', 'COLOR=blue'],
+    });
     try {
       const d = await live.inspect(name);
       expect(d.name).toBe(name);

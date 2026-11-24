@@ -7,9 +7,22 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
-import { PRINTER_KINDS, type PrinterAction, type PrinterConfig, type PrinterKind, type PrinterStatus, type Temp } from '../shared/slicer.js';
+import {
+  PRINTER_KINDS,
+  type PrinterAction,
+  type PrinterConfig,
+  type PrinterKind,
+  type PrinterStatus,
+  type Temp,
+} from '../shared/slicer.js';
 
-export { PRINTER_KINDS, type PrinterAction, type PrinterConfig, type PrinterKind, type PrinterStatus };
+export {
+  PRINTER_KINDS,
+  type PrinterAction,
+  type PrinterConfig,
+  type PrinterKind,
+  type PrinterStatus,
+};
 
 export interface Secret {
   get(): string | null;
@@ -27,10 +40,14 @@ export function normalizePrinterUrl(raw: string): string {
   try {
     u = new URL(v);
   } catch {
-    throw new Error('La dirección no es válida (ejemplo: http://octopi.local o http://192.168.1.50).');
+    throw new Error(
+      'La dirección no es válida (ejemplo: http://octopi.local o http://192.168.1.50).',
+    );
   }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('La dirección debe empezar con http:// o https://.');
-  if (u.username || u.password) throw new Error('No pongas usuario ni contraseña en la dirección; usa la clave de API.');
+  if (u.protocol !== 'http:' && u.protocol !== 'https:')
+    throw new Error('La dirección debe empezar con http:// o https://.');
+  if (u.username || u.password)
+    throw new Error('No pongas usuario ni contraseña en la dirección; usa la clave de API.');
   u.hash = '';
   u.search = '';
   return u.toString().replace(/\/+$/, '');
@@ -38,11 +55,17 @@ export function normalizePrinterUrl(raw: string): string {
 
 /** File name the printer will show: safe characters, ends in .gcode. */
 export function printerFileName(p: string): string {
-  const b = basename(p).replace(/[^\w.\- ]+/g, '_').replace(/\s+/g, '_').replace(/_+/g, '_').slice(0, 120) || 'zinarix';
+  const b =
+    basename(p)
+      .replace(/[^\w.\- ]+/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .slice(0, 120) || 'zinarix';
   return /\.(gcode|gco|g|bgcode)$/i.test(b) ? b : `${b}.gcode`;
 }
 
-const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+const num = (v: unknown): number | undefined =>
+  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 const temp = (o: unknown): Temp | undefined => {
   const t = o as { actual?: unknown; target?: unknown; temperature?: unknown } | undefined;
   const a = num(t?.actual) ?? num(t?.temperature);
@@ -62,10 +85,17 @@ export class PrinterClient {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), timeoutMs);
     try {
-      return await this.fetchImpl(`${this.cfg.url}${path}`, { ...init, headers, signal: ctl.signal, redirect: 'manual' });
+      return await this.fetchImpl(`${this.cfg.url}${path}`, {
+        ...init,
+        headers,
+        signal: ctl.signal,
+        redirect: 'manual',
+      });
     } catch (e) {
       throw new Error(
-        ctl.signal.aborted ? `${this.cfg.name} no respondió (${this.cfg.url}).` : `No se pudo conectar con ${this.cfg.name} (${this.cfg.url}): ${(e as Error).message}`,
+        ctl.signal.aborted
+          ? `${this.cfg.name} no respondió (${this.cfg.url}).`
+          : `No se pudo conectar con ${this.cfg.name} (${this.cfg.url}): ${(e as Error).message}`,
       );
     } finally {
       clearTimeout(timer);
@@ -74,10 +104,13 @@ export class PrinterClient {
 
   private async json(path: string, init?: RequestInit, timeoutMs?: number): Promise<unknown> {
     const r = await this.call(path, init, timeoutMs);
-    if (r.status === 401 || r.status === 403) throw new Error(`${this.cfg.name} rechazó la clave de API (${r.status}).`);
+    if (r.status === 401 || r.status === 403)
+      throw new Error(`${this.cfg.name} rechazó la clave de API (${r.status}).`);
     if (!r.ok) {
       const t = (await r.text().catch(() => '')).slice(0, 300);
-      const e = new Error(`${this.cfg.name} respondió ${r.status}${t ? `: ${t}` : ''}`) as Error & { status?: number };
+      const e = new Error(`${this.cfg.name} respondió ${r.status}${t ? `: ${t}` : ''}`) as Error & {
+        status?: number;
+      };
       e.status = r.status;
       throw e;
     }
@@ -89,7 +122,13 @@ export class PrinterClient {
     try {
       return this.cfg.kind === 'octoprint' ? await this.octoStatus() : await this.moonStatus();
     } catch (e) {
-      return { online: false, state: 'offline', printing: false, paused: false, error: (e as Error).message };
+      return {
+        online: false,
+        state: 'offline',
+        printing: false,
+        paused: false,
+        error: (e as Error).message,
+      };
     }
   }
 
@@ -99,7 +138,10 @@ export class PrinterClient {
       job?: { file?: { name?: string } };
       progress?: { completion?: number; printTimeLeft?: number };
     };
-    let printer: { temperature?: Record<string, unknown>; state?: { text?: string; flags?: Record<string, boolean> } } = {};
+    let printer: {
+      temperature?: Record<string, unknown>;
+      state?: { text?: string; flags?: Record<string, boolean> };
+    } = {};
     let disconnected = false;
     try {
       printer = (await this.json('/api/printer')) as typeof printer;
@@ -109,7 +151,9 @@ export class PrinterClient {
       else throw e;
     }
     const flags = printer.state?.flags ?? {};
-    const state = disconnected ? 'Desconectada de OctoPrint' : (printer.state?.text ?? job.state ?? '?');
+    const state = disconnected
+      ? 'Desconectada de OctoPrint'
+      : (printer.state?.text ?? job.state ?? '?');
     const c = num(job.progress?.completion);
     return {
       online: !disconnected,
@@ -118,14 +162,18 @@ export class PrinterClient {
       paused: !!flags.paused || /paus/i.test(job.state ?? ''),
       ...(job.job?.file?.name ? { file: job.job.file.name } : {}),
       ...(c !== undefined ? { progress: c / 100 } : {}),
-      ...(num(job.progress?.printTimeLeft) !== undefined ? { timeLeftS: job.progress!.printTimeLeft! } : {}),
+      ...(num(job.progress?.printTimeLeft) !== undefined
+        ? { timeLeftS: job.progress!.printTimeLeft! }
+        : {}),
       ...(temp(printer.temperature?.tool0) ? { nozzle: temp(printer.temperature?.tool0)! } : {}),
       ...(temp(printer.temperature?.bed) ? { bed: temp(printer.temperature?.bed)! } : {}),
     };
   }
 
   private async moonStatus(): Promise<PrinterStatus> {
-    const r = (await this.json('/printer/objects/query?print_stats&virtual_sdcard&extruder&heater_bed&webhooks')) as {
+    const r = (await this.json(
+      '/printer/objects/query?print_stats&virtual_sdcard&extruder&heater_bed&webhooks',
+    )) as {
       result?: { status?: Record<string, Record<string, unknown>> };
     };
     const st = r.result?.status ?? {};
@@ -143,7 +191,9 @@ export class PrinterClient {
       paused,
       ...(ps.filename ? { file: String(ps.filename) } : {}),
       ...(progress !== undefined && (printing || paused) ? { progress } : {}),
-      ...(progress && dur && (printing || paused) && progress > 0.01 ? { timeLeftS: Math.round(dur / progress - dur) } : {}),
+      ...(progress && dur && (printing || paused) && progress > 0.01
+        ? { timeLeftS: Math.round(dur / progress - dur) }
+        : {}),
       ...(temp(st.extruder) ? { nozzle: temp(st.extruder)! } : {}),
       ...(temp(st.heater_bed) ? { bed: temp(st.heater_bed)! } : {}),
       ...(ps.message ? { error: String(ps.message) } : {}),
@@ -159,7 +209,9 @@ export class PrinterClient {
       await this.json('/api/job');
       return v.text ?? `OctoPrint ${v.server}`;
     }
-    const v = (await this.json('/server/info')) as { result?: { moonraker_version?: string; klippy_state?: string } };
+    const v = (await this.json('/server/info')) as {
+      result?: { moonraker_version?: string; klippy_state?: string };
+    };
     if (!v.result) throw new Error('Esa dirección no parece Moonraker (Klipper).');
     return `Moonraker ${v.result.moonraker_version ?? ''} · Klipper ${v.result.klippy_state ?? '?'}`.trim();
   }
@@ -167,7 +219,11 @@ export class PrinterClient {
   /** Uploads the G-code; `start` prints it right away. */
   async upload(name: string, data: Uint8Array, start: boolean): Promise<void> {
     const form = new FormData();
-    form.append('file', new Blob([new Uint8Array(data)], { type: 'application/octet-stream' }), name);
+    form.append(
+      'file',
+      new Blob([new Uint8Array(data)], { type: 'application/octet-stream' }),
+      name,
+    );
     if (this.cfg.kind === 'octoprint') {
       form.append('select', start ? 'true' : 'false');
       form.append('print', start ? 'true' : 'false');
@@ -182,7 +238,11 @@ export class PrinterClient {
   async control(action: PrinterAction): Promise<void> {
     if (this.cfg.kind === 'octoprint') {
       const body = action === 'cancel' ? { command: 'cancel' } : { command: 'pause', action };
-      await this.json('/api/job', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+      await this.json('/api/job', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      });
     } else await this.json(`/printer/print/${action}`, { method: 'POST' });
   }
 }
@@ -204,24 +264,57 @@ export class PrinterStore {
     }
     const arr = Array.isArray(raw) ? raw : [];
     return arr
-      .filter((p): p is PrinterConfig => !!p && typeof p === 'object' && typeof p.id === 'string' && PRINTER_KINDS.includes(p.kind) && typeof p.url === 'string')
-      .map((p) => ({ id: p.id, name: String(p.name || p.url), kind: p.kind, url: p.url, hasKey: !!this.secretFor(p.id).get() }));
+      .filter(
+        (p): p is PrinterConfig =>
+          !!p &&
+          typeof p === 'object' &&
+          typeof p.id === 'string' &&
+          PRINTER_KINDS.includes(p.kind) &&
+          typeof p.url === 'string',
+      )
+      .map((p) => ({
+        id: p.id,
+        name: String(p.name || p.url),
+        kind: p.kind,
+        url: p.url,
+        hasKey: !!this.secretFor(p.id).get(),
+      }));
   }
 
   private async write(list: PrinterConfig[]): Promise<void> {
     await mkdir(dirname(this.file), { recursive: true });
-    await writeFile(this.file, JSON.stringify(list.map(({ id, name, kind, url }) => ({ id, name, kind, url })), null, 2));
+    await writeFile(
+      this.file,
+      JSON.stringify(
+        list.map(({ id, name, kind, url }) => ({ id, name, kind, url })),
+        null,
+        2,
+      ),
+    );
   }
 
   get(idOrName: string): PrinterConfig {
     const all = this.list();
-    const p = all.find((x) => x.id === idOrName) ?? all.find((x) => x.name.toLowerCase() === idOrName.trim().toLowerCase());
-    if (!p) throw new Error(all.length ? `No hay una impresora "${idOrName}". Están: ${all.map((x) => x.name).join(', ')}.` : 'No hay impresoras. Agrega una en el panel CAD 3D → Impresoras.');
+    const p =
+      all.find((x) => x.id === idOrName) ??
+      all.find((x) => x.name.toLowerCase() === idOrName.trim().toLowerCase());
+    if (!p)
+      throw new Error(
+        all.length
+          ? `No hay una impresora "${idOrName}". Están: ${all.map((x) => x.name).join(', ')}.`
+          : 'No hay impresoras. Agrega una en el panel CAD 3D → Impresoras.',
+      );
     return p;
   }
 
   /** Adds or edits one. key: undefined = keep the saved one, '' = remove it. */
-  async save(input: { id?: string; name: string; kind: PrinterKind; url: string; key?: string }): Promise<PrinterConfig> {
+  async save(input: {
+    id?: string;
+    name: string;
+    kind: PrinterKind;
+    url: string;
+    key?: string;
+  }): Promise<PrinterConfig> {
     if (!PRINTER_KINDS.includes(input.kind)) throw new Error('Tipo de impresora desconocido.');
     const url = normalizePrinterUrl(input.url);
     const name = input.name.trim().slice(0, 60) || new URL(url).host;
@@ -252,12 +345,20 @@ export class PrinterStore {
 
 /** One line of status, in the user's language. */
 export function describeStatus(name: string, s: PrinterStatus, lang: 'es' | 'en' = 'es'): string {
-  if (!s.online && s.error) return `${name}: ${lang === 'en' ? 'not reachable' : 'sin conexión'} (${s.error})`;
+  if (!s.online && s.error)
+    return `${name}: ${lang === 'en' ? 'not reachable' : 'sin conexión'} (${s.error})`;
   const parts = [`${name}: ${s.state}`];
   if (s.file) parts.push(s.file);
   if (s.progress !== undefined) parts.push(`${Math.round(s.progress * 100)} %`);
-  if (s.timeLeftS !== undefined) parts.push(`${lang === 'en' ? 'left' : 'faltan'} ${Math.round(s.timeLeftS / 60)} min`);
-  if (s.nozzle) parts.push(`${lang === 'en' ? 'nozzle' : 'boquilla'} ${s.nozzle.actual.toFixed(0)}/${s.nozzle.target.toFixed(0)} °C`);
-  if (s.bed) parts.push(`${lang === 'en' ? 'bed' : 'cama'} ${s.bed.actual.toFixed(0)}/${s.bed.target.toFixed(0)} °C`);
+  if (s.timeLeftS !== undefined)
+    parts.push(`${lang === 'en' ? 'left' : 'faltan'} ${Math.round(s.timeLeftS / 60)} min`);
+  if (s.nozzle)
+    parts.push(
+      `${lang === 'en' ? 'nozzle' : 'boquilla'} ${s.nozzle.actual.toFixed(0)}/${s.nozzle.target.toFixed(0)} °C`,
+    );
+  if (s.bed)
+    parts.push(
+      `${lang === 'en' ? 'bed' : 'cama'} ${s.bed.actual.toFixed(0)}/${s.bed.target.toFixed(0)} °C`,
+    );
   return parts.join(' · ');
 }

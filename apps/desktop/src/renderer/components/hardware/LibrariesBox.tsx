@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { confirmDialog } from '../../confirm';
 import { api, toast } from '../../store';
 import { Icon } from '../Icon';
-import { libName, type PioInstalledLibs, type PioLibrary, type PioProject } from '../../../shared/platformio';
+import {
+  libName,
+  type PioInstalledLibs,
+  type PioLibrary,
+  type PioProject,
+} from '../../../shared/platformio';
 import { th } from './hardwareStrings';
 
 /**
@@ -12,9 +17,20 @@ import { th } from './hardwareStrings';
  */
 
 const errText = (e: unknown) =>
-  String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  String((e as Error)?.message ?? e).replace(
+    /^Error invoking remote method '[^']+': (Error: )?/,
+    '',
+  );
 
-export function LibrariesBox({ project, env, onChanged }: { project: PioProject; env: string; onChanged: () => void }) {
+export function LibrariesBox({
+  project,
+  env,
+  onChanged,
+}: {
+  project: PioProject;
+  env: string;
+  onChanged: () => void;
+}) {
   const [open, setOpen] = useState(() => localStorage.getItem('zs.hw.libsOpen') !== '0');
   const [libs, setLibs] = useState<PioInstalledLibs | null>(null);
   const [query, setQuery] = useState('');
@@ -25,7 +41,11 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLibs(await api().pio.libraries(project.dir, env || null).catch(() => null));
+    setLibs(
+      await api()
+        .pio.libraries(project.dir, env || null)
+        .catch(() => null),
+    );
   }, [project.dir, env]);
   useEffect(() => {
     if (open) void load();
@@ -47,12 +67,22 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
   };
 
   const change = async (spec: string, remove: boolean) => {
-    if (remove && !(await confirmDialog(th('libRemoveAsk', { lib: libName(spec) }), { okLabel: th('libRemove'), danger: true })))
+    if (
+      remove &&
+      !(await confirmDialog(th('libRemoveAsk', { lib: libName(spec) }), {
+        okLabel: th('libRemove'),
+        danger: true,
+      }))
+    )
       return;
     setBusy(spec);
     try {
       await api().pio.changeLibrary(project.dir, env || null, spec, remove);
-      toast(remove ? th('libRemoved', { lib: libName(spec) }) : th('libInstalled', { lib: libName(spec) }));
+      toast(
+        remove
+          ? th('libRemoved', { lib: libName(spec) })
+          : th('libInstalled', { lib: libName(spec) }),
+      );
       await load();
       onChanged();
     } catch (e) {
@@ -62,7 +92,8 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
     }
   };
 
-  const has = (id: string) => !!libs?.deps.some((d) => libName(d).toLowerCase() === id.toLowerCase());
+  const has = (id: string) =>
+    !!libs?.deps.some((d) => libName(d).toLowerCase() === id.toLowerCase());
 
   return (
     <div className="hw-section hw-libs">
@@ -88,13 +119,21 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
             <ul className="hw-liblist">
               {libs.deps.map((d) => {
                 const name = libName(d);
-                const got = libs.installed.find((x) => name.toLowerCase().endsWith(x.name.toLowerCase()));
+                const got = libs.installed.find((x) =>
+                  name.toLowerCase().endsWith(x.name.toLowerCase()),
+                );
                 return (
                   <li key={d}>
                     <span className="hw-libname" title={d}>
                       {name}
                     </span>
-                    <span className="hw-dim">{got?.version ? `v${got.version}` : d.includes('@') ? d.slice(d.indexOf('@') + 1).trim() : ''}</span>
+                    <span className="hw-dim">
+                      {got?.version
+                        ? `v${got.version}`
+                        : d.includes('@')
+                          ? d.slice(d.indexOf('@') + 1).trim()
+                          : ''}
+                    </span>
                     <button
                       className="icon-btn"
                       title={th('libRemove')}
@@ -110,7 +149,9 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
             </ul>
           )}
           {libs && libs.installed.length > libs.deps.length && (
-            <div className="hw-dim">{th('libsDeps', { n: libs.installed.length - libs.deps.length })}</div>
+            <div className="hw-dim">
+              {th('libsDeps', { n: libs.installed.length - libs.deps.length })}
+            </div>
           )}
           <form
             className="hw-libsearch"
@@ -119,7 +160,12 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
               void search(1);
             }}
           >
-            <input value={query} placeholder={th('libSearchPh')} aria-label={th('libSearchPh')} onChange={(e) => setQuery(e.target.value)} />
+            <input
+              value={query}
+              placeholder={th('libSearchPh')}
+              aria-label={th('libSearchPh')}
+              onChange={(e) => setQuery(e.target.value)}
+            />
             <button className="btn hw-small" type="submit" disabled={searching || !query.trim()}>
               <Icon name="search" size={12} /> {th('libSearch')}
             </button>
@@ -144,7 +190,11 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
                       {installed ? (
                         <span className="hw-libok">{th('libHave')}</span>
                       ) : (
-                        <button className="btn hw-small" disabled={!!busy} onClick={() => void change(spec, false)}>
+                        <button
+                          className="btn hw-small"
+                          disabled={!!busy}
+                          onClick={() => void change(spec, false)}
+                        >
                           {busy === spec ? th('libInstalling') : th('libInstall')}
                         </button>
                       )}
@@ -155,11 +205,19 @@ export function LibrariesBox({ project, env, onChanged }: { project: PioProject;
               })}
               {pages > 1 && (
                 <div className="hw-row-btns">
-                  <button className="btn ghost hw-small" disabled={page <= 1} onClick={() => void search(page - 1)}>
+                  <button
+                    className="btn ghost hw-small"
+                    disabled={page <= 1}
+                    onClick={() => void search(page - 1)}
+                  >
                     ‹
                   </button>
                   <span className="hw-dim">{th('libPage', { page, pages })}</span>
-                  <button className="btn ghost hw-small" disabled={page >= pages} onClick={() => void search(page + 1)}>
+                  <button
+                    className="btn ghost hw-small"
+                    disabled={page >= pages}
+                    onClick={() => void search(page + 1)}
+                  >
                     ›
                   </button>
                 </div>

@@ -291,7 +291,12 @@ function baseCommands(): Command[] {
       },
     },
     { id: 'debug.stop', label: td('dbgStop'), keys: 'Shift+F5', run: () => stopDebug() },
-    { id: 'debug.restart', label: td('dbgRestart'), keys: 'Ctrl+Shift+F5', run: () => restartDebug() },
+    {
+      id: 'debug.restart',
+      label: td('dbgRestart'),
+      keys: 'Ctrl+Shift+F5',
+      run: () => restartDebug(),
+    },
     { id: 'debug.pause', label: td('dbgPause'), keys: 'F6', run: () => pause() },
     { id: 'debug.stepOver', label: td('dbgStepOver'), keys: 'F10', run: () => stepOver() },
     { id: 'debug.stepInto', label: td('dbgStepInto'), keys: 'F11', run: () => stepInto() },
@@ -337,8 +342,7 @@ function baseCommands(): Command[] {
     {
       id: 'view.automations',
       label: ta('barTip'),
-      run: () =>
-        setState((s) => ({ sidebar: s.sidebar === 'automations' ? null : 'automations' })),
+      run: () => setState((s) => ({ sidebar: s.sidebar === 'automations' ? null : 'automations' })),
     },
     {
       id: 'app.studio3d',

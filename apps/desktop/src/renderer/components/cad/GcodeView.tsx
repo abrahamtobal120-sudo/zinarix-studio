@@ -3,7 +3,13 @@ import { api, openLargeInEditor, toast } from '../../store';
 import { errText } from '../../errText';
 import { lang } from '../../i18n';
 import { Icon } from '../Icon';
-import { filamentGrams, formatDuration, gcodeTime, parseGcode, type GcodeParsed } from '../../../shared/gcode';
+import {
+  filamentGrams,
+  formatDuration,
+  gcodeTime,
+  parseGcode,
+  type GcodeParsed,
+} from '../../../shared/gcode';
 import { MeshViewer, type ViewName } from './meshViewer';
 import { BEDS } from './PrintCheck';
 import { SendBox } from './Printers';
@@ -64,7 +70,14 @@ export function GcodeView({ path }: { path: string }) {
   useEffect(() => {
     const l = g?.layers[layer - 1];
     if (!g || !l) return;
-    viewer.current?.showLayers({ from: only ? l.e0 : 0, curFrom: l.e0, to: l.e1, travelFrom: l.t0, travelTo: l.t1, travel });
+    viewer.current?.showLayers({
+      from: only ? l.e0 : 0,
+      curFrom: l.e0,
+      to: l.e1,
+      travelFrom: l.t0,
+      travelTo: l.t1,
+      travel,
+    });
   }, [g, layer, only, travel]);
 
   useEffect(() => viewer.current?.setBed([bed.size[0], bed.size[1]]), [bed, g]);
@@ -95,7 +108,11 @@ export function GcodeView({ path }: { path: string }) {
   ];
   const out =
     st?.bounds &&
-    (st.bounds[0] < -1 || st.bounds[1] < -1 || st.bounds[3] > bed.size[0] + 1 || st.bounds[4] > bed.size[1] + 1 || st.bounds[5] > bed.size[2] + 0.5);
+    (st.bounds[0] < -1 ||
+      st.bounds[1] < -1 ||
+      st.bounds[3] > bed.size[0] + 1 ||
+      st.bounds[4] > bed.size[1] + 1 ||
+      st.bounds[5] > bed.size[2] + 0.5);
   const mm = st ? (st.slicerFilamentMm ?? st.filamentMm) : 0;
 
   return (
@@ -111,7 +128,11 @@ export function GcodeView({ path }: { path: string }) {
         <button className="btn ghost cad-small" onClick={() => setReload((n) => n + 1)}>
           <Icon name="refresh" /> {tc('render')}
         </button>
-        <button className="btn ghost cad-small" title={tc('asTextHint')} onClick={() => void openLargeInEditor(path).catch((e: unknown) => toast(errText(e)))}>
+        <button
+          className="btn ghost cad-small"
+          title={tc('asTextHint')}
+          onClick={() => void openLargeInEditor(path).catch((e: unknown) => toast(errText(e)))}
+        >
           <Icon name="code" /> {tc('asText')}
         </button>
       </div>
@@ -125,10 +146,21 @@ export function GcodeView({ path }: { path: string }) {
             </div>
           )}
           {st?.binary && <div className="cad-overlay">{tc('binaryGcode')}</div>}
-          {g && !st?.binary && !g.layers.length && <div className="cad-overlay">{tc('gcodeEmpty')}</div>}
+          {g && !st?.binary && !g.layers.length && (
+            <div className="cad-overlay">{tc('gcodeEmpty')}</div>
+          )}
           {g && g.layers.length > 0 && (
             <div className="cad-layers">
-              <button className="icon-btn" title={playing ? tc('stop') : tc('play')} aria-label={playing ? tc('stop') : tc('play')} onClick={() => (playing ? setPlaying(false) : (layer >= g.layers.length && setLayer(1), setPlaying(true)))}>
+              <button
+                className="icon-btn"
+                title={playing ? tc('stop') : tc('play')}
+                aria-label={playing ? tc('stop') : tc('play')}
+                onClick={() =>
+                  playing
+                    ? setPlaying(false)
+                    : (layer >= g.layers.length && setLayer(1), setPlaying(true))
+                }
+              >
                 <Icon name={playing ? 'pause' : 'play'} />
               </button>
               <input
@@ -140,14 +172,19 @@ export function GcodeView({ path }: { path: string }) {
                 onChange={(e) => (setPlaying(false), setLayer(Number(e.target.value)))}
               />
               <span className="cad-layers-text">
-                {tc('layer', { n: layer, total: g.layers.length })} · {tc('layerZ', { z: cur ? cur.z.toFixed(2) : '?' })}
+                {tc('layer', { n: layer, total: g.layers.length })} ·{' '}
+                {tc('layerZ', { z: cur ? cur.z.toFixed(2) : '?' })}
               </span>
               <label className="cad-check">
                 <input type="checkbox" checked={only} onChange={(e) => setOnly(e.target.checked)} />
                 {tc('onlyLayer')}
               </label>
               <label className="cad-check">
-                <input type="checkbox" checked={travel} onChange={(e) => setTravel(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={travel}
+                  onChange={(e) => setTravel(e.target.checked)}
+                />
                 {tc('travel')}
               </label>
             </div>
@@ -165,7 +202,8 @@ export function GcodeView({ path }: { path: string }) {
                 </dd>
                 <dt>{tc('filament')}</dt>
                 <dd>
-                  {(mm / 1000).toFixed(2)} m · {(st.slicerFilamentG ?? filamentGrams(mm)).toFixed(1)} g
+                  {(mm / 1000).toFixed(2)} m ·{' '}
+                  {(st.slicerFilamentG ?? filamentGrams(mm)).toFixed(1)} g
                 </dd>
                 <dt>{tc('layersN')}</dt>
                 <dd>
@@ -176,7 +214,8 @@ export function GcodeView({ path }: { path: string }) {
                   <>
                     <dt>{tc('size')}</dt>
                     <dd>
-                      {(st.bounds[3] - st.bounds[0]).toFixed(1)} × {(st.bounds[4] - st.bounds[1]).toFixed(1)} × {st.bounds[5].toFixed(1)} mm
+                      {(st.bounds[3] - st.bounds[0]).toFixed(1)} ×{' '}
+                      {(st.bounds[4] - st.bounds[1]).toFixed(1)} × {st.bounds[5].toFixed(1)} mm
                     </dd>
                   </>
                 )}
@@ -204,7 +243,10 @@ export function GcodeView({ path }: { path: string }) {
               {st.truncated && <p className="cad-print-line warn">{tc('gcodeTruncated')}</p>}
               <label className="cad-field">
                 <span>{tc('bed')}</span>
-                <select value={bed.id} onChange={(e) => setBed(BEDS.find((b) => b.id === e.target.value) ?? BEDS[0]!)}>
+                <select
+                  value={bed.id}
+                  onChange={(e) => setBed(BEDS.find((b) => b.id === e.target.value) ?? BEDS[0]!)}
+                >
                   {BEDS.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.label} mm

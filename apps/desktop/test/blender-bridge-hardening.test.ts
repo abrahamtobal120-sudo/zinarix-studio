@@ -10,11 +10,7 @@ import { BlenderBridge, type BridgeChatRequest } from '../src/main/blenderBridge
 import type { Scene3DService } from '../src/main/scene3d.js';
 import { MAX_SCRIPT, runScene3dTool, scene3dPreview } from '../src/main/scene3dTools.js';
 
-function post(
-  port: number,
-  token: string,
-  headers: Record<string, string> = {},
-): Promise<number> {
+function post(port: number, token: string, headers: Record<string, string> = {}): Promise<number> {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({ messages: [{ role: 'user', content: 'hola' }] });
     const req = request(

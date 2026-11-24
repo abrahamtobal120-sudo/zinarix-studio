@@ -10,7 +10,9 @@ describe('logpoints', () => {
   it('become a condition that prints and never stops', () => {
     const logs: string[] = [];
     const scope = { x: 5, items: [1, 2], console: { log: (s: string) => logs.push(s) } };
-    expect(runInNewContext(logpointCondition('x = {x}, n {items.length * 10}, `ok` \\ ${open'), scope)).toBe(false);
+    expect(
+      runInNewContext(logpointCondition('x = {x}, n {items.length * 10}, `ok` \\ ${open'), scope),
+    ).toBe(false);
     expect(logs).toEqual(['x = 5, n 20, `ok` \\ ${open']);
     // A bad expression prints its error instead of breaking the program.
     expect(runInNewContext(logpointCondition('{nope.x}'), scope)).toBe(false);
@@ -26,7 +28,10 @@ describe('logpoints', () => {
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
   it('print in a real Node program without stopping it', { timeout: 60_000 }, async () => {
-    writeFileSync(join(root, 'app.js'), 'let s = 0;\nfor (let i = 0; i < 3; i++) {\n  s += i;\n}\nconsole.log("fin", s);\n');
+    writeFileSync(
+      join(root, 'app.js'),
+      'let s = 0;\nfor (let i = 0; i < 3; i++) {\n  s += i;\n}\nconsole.log("fin", s);\n',
+    );
     const events: DebugEvent[] = [];
     let onIdle: () => void = () => undefined;
     const idle = new Promise<void>((r) => (onIdle = r));

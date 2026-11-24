@@ -91,7 +91,8 @@ export class LicenseIssuer {
       email: req.email?.trim() || (gift ? 'regalo@zinarix-studio' : 'cliente@zinarix-studio'),
       iat,
     };
-    const name = req.name?.trim() || (gift && n ? `Regalo Pro + AI #${String(n).padStart(2, '0')}` : '');
+    const name =
+      req.name?.trim() || (gift && n ? `Regalo Pro + AI #${String(n).padStart(2, '0')}` : '');
     if (name) payload.name = name;
     if (days > 0) payload.exp = iat + days * DAY;
     const licenseKey = signLicense(payload, (data) => sign(null, data, key));

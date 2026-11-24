@@ -22,12 +22,18 @@ const PAINT_SIZES: [number, number][] = [
 ];
 
 async function freePath(base: string, ext: string): Promise<string> {
-  const files = new Set(await api().workspace.listFiles().catch(() => [] as string[]));
+  const files = new Set(
+    await api()
+      .workspace.listFiles()
+      .catch(() => [] as string[]),
+  );
   return `${DIR}/${uniqueName(base, ext, (n) => files.has(`${DIR}/${n}`))}`;
 }
 
 async function ensureDir(): Promise<void> {
-  await api().workspace.createDir(DIR).catch(() => undefined);
+  await api()
+    .workspace.createDir(DIR)
+    .catch(() => undefined);
 }
 
 export function GraphicsPanel() {
@@ -56,7 +62,16 @@ export function GraphicsPanel() {
     if (!workspace) return setMine([]);
     void api()
       .workspace.listFiles()
-      .then((fs) => setMine(fs.filter((f) => /\.(svg|zdraw)$/i.test(f) && !/(^|\/)(node_modules|dist|build|\.git)\//.test(f)).slice(0, 300)))
+      .then((fs) =>
+        setMine(
+          fs
+            .filter(
+              (f) =>
+                /\.(svg|zdraw)$/i.test(f) && !/(^|\/)(node_modules|dist|build|\.git)\//.test(f),
+            )
+            .slice(0, 300),
+        ),
+      )
       .catch(() => setMine([]));
   }, [workspace]);
   useEffect(refresh, [refresh]);
@@ -103,7 +118,10 @@ export function GraphicsPanel() {
     setBusy(true);
     try {
       const [pw, ph] = PAINT_SIZES[paintSize]!;
-      const text = await newPaintFile(pw, ph, { base: tg('baseLayer'), layer: tg('layerName', { n: 1 }) });
+      const text = await newPaintFile(pw, ph, {
+        base: tg('baseLayer'),
+        layer: tg('layerName', { n: 1 }),
+      });
       await ensureDir();
       const p = await freePath(en ? 'drawing' : 'dibujo', 'zdraw');
       await api().workspace.writeFile(p, text);
@@ -125,7 +143,10 @@ export function GraphicsPanel() {
       // A blank page of the chosen size, open in the editor; the agent draws into it.
       await ensureDir();
       const p = await freePath(slugify(want.split(/\s+/).slice(0, 5).join(' ')), 'svg');
-      await api().workspace.writeFile(p, buildTemplate({ template: 'blank', width: w, height: h }).replace(/<rect[^>]*\/>\n?/, ''));
+      await api().workspace.writeFile(
+        p,
+        buildTemplate({ template: 'blank', width: w, height: h }).replace(/<rect[^>]*\/>\n?/, ''),
+      );
       await openFile(p);
       askAgent(
         `Diseña esto como un SVG editable en el archivo ${p} (ya existe, ${w} × ${h} px, abierto en el editor de diseño; reemplaza su contenido): ${want}\n\n` +
@@ -168,7 +189,12 @@ export function GraphicsPanel() {
         </div>
         <div className="gp-grid">
           {TEMPLATES.map((x) => (
-            <button key={x.id} className={`gp-tpl ${tpl === x.id ? 'on' : ''}`} onClick={() => setTpl(x.id)} title={`${x.width} × ${x.height} px`}>
+            <button
+              key={x.id}
+              className={`gp-tpl ${tpl === x.id ? 'on' : ''}`}
+              onClick={() => setTpl(x.id)}
+              title={`${x.width} × ${x.height} px`}
+            >
               <span className="gp-thumb">
                 <img src={thumbs[x.id]} alt="" draggable={false} />
               </span>
@@ -180,19 +206,43 @@ export function GraphicsPanel() {
           <>
             <label className="gp-field">
               <span>{tg('textTitle')}</span>
-              <input value={title} placeholder={(en ? t.text.en : t.text.es).title.replace(/\n/g, ' ')} onChange={(e) => setTitle(e.target.value)} />
+              <input
+                value={title}
+                placeholder={(en ? t.text.en : t.text.es).title.replace(/\n/g, ' ')}
+                onChange={(e) => setTitle(e.target.value)}
+              />
             </label>
             <label className="gp-field">
               <span>{tg('textSub')}</span>
-              <input value={sub} placeholder={(en ? t.text.en : t.text.es).subtitle.replace(/\n/g, ' ')} onChange={(e) => setSub(e.target.value)} />
+              <input
+                value={sub}
+                placeholder={(en ? t.text.en : t.text.es).subtitle.replace(/\n/g, ' ')}
+                onChange={(e) => setSub(e.target.value)}
+              />
             </label>
           </>
         )}
         <div className="gp-row">
           <span className="gp-dim">{tg('customSize')}</span>
-          <input className="gp-num" type="number" min={16} max={10000} value={w} aria-label={en ? 'Width (px)' : 'Ancho (px)'} onChange={(e) => setW(Number(e.target.value) || t.width)} />
+          <input
+            className="gp-num"
+            type="number"
+            min={16}
+            max={10000}
+            value={w}
+            aria-label={en ? 'Width (px)' : 'Ancho (px)'}
+            onChange={(e) => setW(Number(e.target.value) || t.width)}
+          />
           ×
-          <input className="gp-num" type="number" min={16} max={10000} value={h} aria-label={en ? 'Height (px)' : 'Alto (px)'} onChange={(e) => setH(Number(e.target.value) || t.height)} />
+          <input
+            className="gp-num"
+            type="number"
+            min={16}
+            max={10000}
+            value={h}
+            aria-label={en ? 'Height (px)' : 'Alto (px)'}
+            onChange={(e) => setH(Number(e.target.value) || t.height)}
+          />
         </div>
         <button className="gp-go" disabled={busy || !workspace} onClick={() => void create()}>
           {tg('create')}

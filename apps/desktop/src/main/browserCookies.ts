@@ -27,7 +27,10 @@ const marker = () => join(app.getPath('userData'), 'browser-cookies.json');
 
 function readMarker(): { importedAt: number; imported: number } | null {
   try {
-    const m = JSON.parse(readFileSync(marker(), 'utf8')) as { importedAt?: unknown; imported?: unknown };
+    const m = JSON.parse(readFileSync(marker(), 'utf8')) as {
+      importedAt?: unknown;
+      imported?: unknown;
+    };
     return typeof m.importedAt === 'number'
       ? { importedAt: m.importedAt, imported: typeof m.imported === 'number' ? m.imported : 0 }
       : null;
@@ -82,6 +85,8 @@ export async function importCookieFile(file: string): Promise<CookieImportResult
 /** Deletes every cookie of the built-in browser (signs out of every site). */
 export async function clearCookies(): Promise<void> {
   await ses().clearStorageData({ storages: ['cookies'] });
-  await ses().cookies.flushStore().catch(() => {});
+  await ses()
+    .cookies.flushStore()
+    .catch(() => {});
   rmSync(marker(), { force: true });
 }

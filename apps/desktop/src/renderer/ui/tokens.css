@@ -17,230 +17,228 @@
 @layer reset, tokens, base, components, features, utilities;
 
 @layer tokens {
-/* Base themes. Neutral grays with one accent color; custom themes override these from themes.ts. */
-:root,
-:root[data-theme='dark'] {
-  /* Native controls (checkboxes, select lists, date pickers) follow the theme, not the system. */
-  color-scheme: dark;
-  --bg: #1b1b1f;
-  --bg-2: #17171a;
-  --bg-3: #222226;
-  --bg-4: #2c2c31;
-  --activity: #131316;
-  --border: #2a2a2f;
-  --fg: #d6d6dc;
-  /* >= 4.5:1 on every surface (--bg … --bg-4, --sel, --hover); #8c8c96 fell to 4.17 on --bg-4. */
-  --fg-dim: #9696a0;
-  --fg-strong: #f4f4f6;
-  --accent: #6d5ef6;
-  /* A hover fill under white text: darker than --accent, like the light theme. The old lighter
+  /* Base themes. Neutral grays with one accent color; custom themes override these from themes.ts. */
+  :root,
+  :root[data-theme='dark'] {
+    /* Native controls (checkboxes, select lists, date pickers) follow the theme, not the system. */
+    color-scheme: dark;
+    --bg: #1b1b1f;
+    --bg-2: #17171a;
+    --bg-3: #222226;
+    --bg-4: #2c2c31;
+    --activity: #131316;
+    --border: #2a2a2f;
+    --fg: #d6d6dc;
+    /* >= 4.5:1 on every surface (--bg … --bg-4, --sel, --hover); #8c8c96 fell to 4.17 on --bg-4. */
+    --fg-dim: #9696a0;
+    --fg-strong: #f4f4f6;
+    --accent: #6d5ef6;
+    /* A hover fill under white text: darker than --accent, like the light theme. The old lighter
      #7d6ff8 dropped white text to 3.82:1. */
-  --accent-hover: #5f50ee;
-  --accent-fg: #ffffff;
-  --focus: #7d6ff8;
-  --sel: #2a2840;
-  --hover: #26262b;
-  --status: #131316;
-  --status-fg: #9a9aa4;
-  --danger: #f1595b;
-  --ok: #83d6a0;
-  --warn: #e0b341;
-  --code-bg: #141519;
-  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --brand-1: #8b5cff;
-  --brand-2: #3b82f6;
-  --brand: #7d6ff8;
-  --brand-grad: linear-gradient(135deg, #8b5cff, #3b82f6);
-  --radius: 6px;
-  --radius-sm: 4px;
-  --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 38%, transparent);
-  --sel-soft: color-mix(in srgb, var(--brand) 18%, transparent);
-  --elev: 0 2px 8px rgba(0, 0, 0, 0.35);
-  /* WhatsApp green, with dark text on it (white on #25d366 is 1.98:1). */
-  --wa: #25d366;
-  --wa-fg: #0b1a10;
-}
-:root[data-theme='light'] {
-  color-scheme: light;
-  --bg: #ffffff;
-  --bg-2: #f7f7f8;
-  --bg-3: #f1f1f3;
-  --bg-4: #e9e9ec;
-  --activity: #f0f0f2;
-  --border: #e3e3e7;
-  --fg: #2b2b31;
-  /* >= 4.5:1 on every surface; #6e6e78 fell to 4.16 on --bg-4. */
-  --fg-dim: #686872;
-  --fg-strong: #0f0f12;
-  --accent: #5b4cf0;
-  --accent-hover: #4d3fe0;
-  --accent-fg: #ffffff;
-  --hover: #ececef;
-  --status: #f0f0f2;
-  --status-fg: #5b5b65;
-  --danger: #c72e2e;
-  --ok: #2e7d32;
-  --warn: #8a6d00;
-  --code-bg: #f6f8fa;
-  --shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
-  --brand-1: #7c3aed;
-  --brand-2: #2563eb;
-  --brand: #6d4df2;
-  --brand-grad: linear-gradient(135deg, #7c3aed, #2563eb);
-  --radius: 6px;
-  --radius-sm: 4px;
-  --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
-  --sel-soft: color-mix(in srgb, var(--brand) 14%, transparent);
-  --elev: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --focus: #6d4df2;
-  --sel: #e4e9ff;
-  /* WhatsApp green: darker in light themes so text and white-on-green pass AA. */
-  --wa: #0f7a6d;
-  --wa-fg: #ffffff;
-}
+    --accent-hover: #5f50ee;
+    --accent-fg: #ffffff;
+    --focus: #7d6ff8;
+    --sel: #2a2840;
+    --hover: #26262b;
+    --status: #131316;
+    --status-fg: #9a9aa4;
+    --danger: #f1595b;
+    --ok: #83d6a0;
+    --warn: #e0b341;
+    --code-bg: #141519;
+    --shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --brand-1: #8b5cff;
+    --brand-2: #3b82f6;
+    --brand: #7d6ff8;
+    --brand-grad: linear-gradient(135deg, #8b5cff, #3b82f6);
+    --radius: 6px;
+    --radius-sm: 4px;
+    --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 38%, transparent);
+    --sel-soft: color-mix(in srgb, var(--brand) 18%, transparent);
+    --elev: 0 2px 8px rgba(0, 0, 0, 0.35);
+    /* WhatsApp green, with dark text on it (white on #25d366 is 1.98:1). */
+    --wa: #25d366;
+    --wa-fg: #0b1a10;
+  }
+  :root[data-theme='light'] {
+    color-scheme: light;
+    --bg: #ffffff;
+    --bg-2: #f7f7f8;
+    --bg-3: #f1f1f3;
+    --bg-4: #e9e9ec;
+    --activity: #f0f0f2;
+    --border: #e3e3e7;
+    --fg: #2b2b31;
+    /* >= 4.5:1 on every surface; #6e6e78 fell to 4.16 on --bg-4. */
+    --fg-dim: #686872;
+    --fg-strong: #0f0f12;
+    --accent: #5b4cf0;
+    --accent-hover: #4d3fe0;
+    --accent-fg: #ffffff;
+    --hover: #ececef;
+    --status: #f0f0f2;
+    --status-fg: #5b5b65;
+    --danger: #c72e2e;
+    --ok: #2e7d32;
+    --warn: #8a6d00;
+    --code-bg: #f6f8fa;
+    --shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+    --brand-1: #7c3aed;
+    --brand-2: #2563eb;
+    --brand: #6d4df2;
+    --brand-grad: linear-gradient(135deg, #7c3aed, #2563eb);
+    --radius: 6px;
+    --radius-sm: 4px;
+    --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
+    --sel-soft: color-mix(in srgb, var(--brand) 14%, transparent);
+    --elev: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --focus: #6d4df2;
+    --sel: #e4e9ff;
+    /* WhatsApp green: darker in light themes so text and white-on-green pass AA. */
+    --wa: #0f7a6d;
+    --wa-fg: #ffffff;
+  }
 
-:root {
-  /* ---- Spacing: 4 px base ---- */
-  --space-0-5: 2px;
-  --space-1: 4px;
-  --space-1-5: 6px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
+  :root {
+    /* ---- Spacing: 4 px base ---- */
+    --space-0-5: 2px;
+    --space-1: 4px;
+    --space-1-5: 6px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
 
-  /* ---- Type: 8 sizes for the interface + 2 display sizes (big numbers, empty-state icons) ---- */
-  --text-2xs: 10px; /* badges and counters */
-  --text-xs: 11px; /* secondary labels, status bar */
-  --text-sm: 12px; /* lists, inputs, most panels */
-  --text-base: 13px; /* body text */
-  --text-md: 14px; /* emphasis, small headings */
-  --text-lg: 16px; /* panel headings */
-  --text-xl: 20px; /* dialog headings */
-  --text-2xl: 24px; /* page headings */
-  --text-display: 32px;
-  --text-hero: 40px;
-  --leading-tight: 1.25;
-  --leading-normal: 1.45;
-  --font-ui:
-    'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono:
-    ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    /* ---- Type: 8 sizes for the interface + 2 display sizes (big numbers, empty-state icons) ---- */
+    --text-2xs: 10px; /* badges and counters */
+    --text-xs: 11px; /* secondary labels, status bar */
+    --text-sm: 12px; /* lists, inputs, most panels */
+    --text-base: 13px; /* body text */
+    --text-md: 14px; /* emphasis, small headings */
+    --text-lg: 16px; /* panel headings */
+    --text-xl: 20px; /* dialog headings */
+    --text-2xl: 24px; /* page headings */
+    --text-display: 32px;
+    --text-hero: 40px;
+    --leading-tight: 1.25;
+    --leading-normal: 1.45;
+    --font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono:
+      ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
-  /* ---- Radii ---- */
-  --radius-xs: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-full: 9999px;
+    /* ---- Radii ---- */
+    --radius-xs: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-full: 9999px;
 
-  /* ---- Elevation 0–4 (shadows take the theme's shadow color through --shadow-color) ---- */
-  --shadow-color: rgb(0 0 0 / 0.35);
-  --elevation-0: none;
-  --elevation-1: 0 1px 2px var(--shadow-color);
-  --elevation-2: 0 2px 8px var(--shadow-color);
-  --elevation-3: 0 8px 24px var(--shadow-color);
-  --elevation-4: 0 16px 40px var(--shadow-color);
+    /* ---- Elevation 0–4 (shadows take the theme's shadow color through --shadow-color) ---- */
+    --shadow-color: rgb(0 0 0 / 0.35);
+    --elevation-0: none;
+    --elevation-1: 0 1px 2px var(--shadow-color);
+    --elevation-2: 0 2px 8px var(--shadow-color);
+    --elevation-3: 0 8px 24px var(--shadow-color);
+    --elevation-4: 0 16px 40px var(--shadow-color);
 
-  /* ---- Motion ---- */
-  --duration-instant: 60ms;
-  --duration-fast: 120ms;
-  --duration-normal: 200ms;
-  --duration-slow: 320ms;
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-enter: cubic-bezier(0, 0, 0, 1);
-  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+    /* ---- Motion ---- */
+    --duration-instant: 60ms;
+    --duration-fast: 120ms;
+    --duration-normal: 200ms;
+    --duration-slow: 320ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-enter: cubic-bezier(0, 0, 0, 1);
+    --ease-exit: cubic-bezier(0.3, 0, 1, 1);
 
-  /* ---- Layers. Local stacking inside a component may use 1–10; anything above uses a name.
+    /* ---- Layers. Local stacking inside a component may use 1–10; anything above uses a name.
      The values keep the order the app already had, so nothing moves in front of something else. */
-  --z-dropdown: 20; /* menus attached to a control: send menu, terminal menu, debug toolbar */
-  --z-popover: 30; /* suggestion lists */
-  --z-banner: 40; /* app-wide banners */
-  --z-helper: 45; /* floating helper bubble (its popup is +1) */
-  --z-overlay: 50; /* modal backdrop, mode menu */
-  --z-toast: 60;
-  --z-confirm: 70; /* confirmation dialogs, above other modals */
-  --z-studio: 80; /* Video Studio, full window */
-  --z-studio-confirm: 95; /* confirmations and toasts while Video Studio is open */
-  --z-studio-toast: 96;
-  --z-menu: 100; /* context menus */
-  --z-drop: 200; /* drag-and-drop overlay */
-  --z-tooltip: 2000;
-  /* Inside Video Studio (.vs-root is its own stacking context). */
-  --z-vs-top: 30;
-  --z-vs-queue: 40;
-  --z-vs-pill: 75;
-  --z-vs-dialog: 88;
-  --z-vs-menu: 90;
+    --z-dropdown: 20; /* menus attached to a control: send menu, terminal menu, debug toolbar */
+    --z-popover: 30; /* suggestion lists */
+    --z-banner: 40; /* app-wide banners */
+    --z-helper: 45; /* floating helper bubble (its popup is +1) */
+    --z-overlay: 50; /* modal backdrop, mode menu */
+    --z-toast: 60;
+    --z-confirm: 70; /* confirmation dialogs, above other modals */
+    --z-studio: 80; /* Video Studio, full window */
+    --z-studio-confirm: 95; /* confirmations and toasts while Video Studio is open */
+    --z-studio-toast: 96;
+    --z-menu: 100; /* context menus */
+    --z-drop: 200; /* drag-and-drop overlay */
+    --z-tooltip: 2000;
+    /* Inside Video Studio (.vs-root is its own stacking context). */
+    --z-vs-top: 30;
+    --z-vs-queue: 40;
+    --z-vs-pill: 75;
+    --z-vs-dialog: 88;
+    --z-vs-menu: 90;
 
-  /* ---- 12-step scales derived from the theme (OKLCH mixes, so they follow every theme) ---- */
-  --gray-1: var(--bg);
-  --gray-2: color-mix(in oklch, var(--fg-strong) 3%, var(--bg));
-  --gray-3: color-mix(in oklch, var(--fg-strong) 6%, var(--bg));
-  --gray-4: color-mix(in oklch, var(--fg-strong) 9%, var(--bg));
-  --gray-5: color-mix(in oklch, var(--fg-strong) 12%, var(--bg));
-  --gray-6: color-mix(in oklch, var(--fg-strong) 16%, var(--bg));
-  --gray-7: color-mix(in oklch, var(--fg-strong) 22%, var(--bg));
-  --gray-8: color-mix(in oklch, var(--fg-strong) 30%, var(--bg));
-  --gray-9: color-mix(in oklch, var(--fg-strong) 45%, var(--bg));
-  --gray-10: color-mix(in oklch, var(--fg-strong) 55%, var(--bg));
-  --gray-11: color-mix(in oklch, var(--fg-strong) 70%, var(--bg));
-  --gray-12: color-mix(in oklch, var(--fg-strong) 90%, var(--bg));
-  --accent-1: color-mix(in oklch, var(--accent) 4%, var(--bg));
-  --accent-2: color-mix(in oklch, var(--accent) 8%, var(--bg));
-  --accent-3: color-mix(in oklch, var(--accent) 12%, var(--bg));
-  --accent-4: color-mix(in oklch, var(--accent) 18%, var(--bg));
-  --accent-5: color-mix(in oklch, var(--accent) 24%, var(--bg));
-  --accent-6: color-mix(in oklch, var(--accent) 32%, var(--bg));
-  --accent-7: color-mix(in oklch, var(--accent) 44%, var(--bg));
-  --accent-8: color-mix(in oklch, var(--accent) 60%, var(--bg));
-  --accent-9: var(--accent);
-  --accent-10: var(--accent-hover);
-  --accent-11: color-mix(in oklch, var(--accent) 70%, var(--fg-strong));
-  --accent-12: color-mix(in oklch, var(--accent) 35%, var(--fg-strong));
-  /* Accent used as TEXT. --accent itself is a fill (white text on it), and as text it falls to
+    /* ---- 12-step scales derived from the theme (OKLCH mixes, so they follow every theme) ---- */
+    --gray-1: var(--bg);
+    --gray-2: color-mix(in oklch, var(--fg-strong) 3%, var(--bg));
+    --gray-3: color-mix(in oklch, var(--fg-strong) 6%, var(--bg));
+    --gray-4: color-mix(in oklch, var(--fg-strong) 9%, var(--bg));
+    --gray-5: color-mix(in oklch, var(--fg-strong) 12%, var(--bg));
+    --gray-6: color-mix(in oklch, var(--fg-strong) 16%, var(--bg));
+    --gray-7: color-mix(in oklch, var(--fg-strong) 22%, var(--bg));
+    --gray-8: color-mix(in oklch, var(--fg-strong) 30%, var(--bg));
+    --gray-9: color-mix(in oklch, var(--fg-strong) 45%, var(--bg));
+    --gray-10: color-mix(in oklch, var(--fg-strong) 55%, var(--bg));
+    --gray-11: color-mix(in oklch, var(--fg-strong) 70%, var(--bg));
+    --gray-12: color-mix(in oklch, var(--fg-strong) 90%, var(--bg));
+    --accent-1: color-mix(in oklch, var(--accent) 4%, var(--bg));
+    --accent-2: color-mix(in oklch, var(--accent) 8%, var(--bg));
+    --accent-3: color-mix(in oklch, var(--accent) 12%, var(--bg));
+    --accent-4: color-mix(in oklch, var(--accent) 18%, var(--bg));
+    --accent-5: color-mix(in oklch, var(--accent) 24%, var(--bg));
+    --accent-6: color-mix(in oklch, var(--accent) 32%, var(--bg));
+    --accent-7: color-mix(in oklch, var(--accent) 44%, var(--bg));
+    --accent-8: color-mix(in oklch, var(--accent) 60%, var(--bg));
+    --accent-9: var(--accent);
+    --accent-10: var(--accent-hover);
+    --accent-11: color-mix(in oklch, var(--accent) 70%, var(--fg-strong));
+    --accent-12: color-mix(in oklch, var(--accent) 35%, var(--fg-strong));
+    /* Accent used as TEXT. --accent itself is a fill (white text on it), and as text it falls to
      3:1 on the dark surfaces; step 11 leans toward --fg-strong, so it reads in every theme. */
-  --accent-text: var(--accent-11);
+    --accent-text: var(--accent-11);
 
-  /* ---- Fixed colors (the same in every theme) ---- */
-  --white: #ffffff;
-  --black: #000000;
-  /* Text on a saturated fill (badges, avatars, primary buttons, video overlays). */
-  --on-color: var(--white);
-  /* A white "paper" surface: email bodies, design frames, logo plates. */
-  --paper: var(--white);
-  --success-solid: #16825d; /* "local model" fills, white text passes AA */
-  --star: #f5b301; /* favorites */
-  --teal: #0d9488; /* AI plan */
-  --teal-2: #14b8a6;
-  --warn-solid: #e0a33a; /* amber fill with dark text */
-  --on-warn-solid: #1a1206;
-  --device-bezel: #111111;
+    /* ---- Fixed colors (the same in every theme) ---- */
+    --white: #ffffff;
+    --black: #000000;
+    /* Text on a saturated fill (badges, avatars, primary buttons, video overlays). */
+    --on-color: var(--white);
+    /* A white "paper" surface: email bodies, design frames, logo plates. */
+    --paper: var(--white);
+    --success-solid: #16825d; /* "local model" fills, white text passes AA */
+    --star: #f5b301; /* favorites */
+    --teal: #0d9488; /* AI plan */
+    --teal-2: #14b8a6;
+    --warn-solid: #e0a33a; /* amber fill with dark text */
+    --on-warn-solid: #1a1206;
+    --device-bezel: #111111;
 
-  /* Debugger (Monaco gutter). */
-  --dbg-breakpoint: #e51400;
-  --dbg-unbound: #8a8f9a;
-  --dbg-current: #ffcc00;
-  --dbg-frame: #4ec27a;
-  --dbg-var: #c586c0;
+    /* Debugger (Monaco gutter). */
+    --dbg-breakpoint: #e51400;
+    --dbg-unbound: #8a8f9a;
+    --dbg-current: #ffcc00;
+    --dbg-frame: #4ec27a;
+    --dbg-var: #c586c0;
 
-  /* Video Studio timeline. Clips keep their own hues so video, image and audio are told apart. */
-  --vs-stage: var(--black);
-  --vs-stage-fg: #dddddd;
-  --vs-audio: #1fa37a;
-  --vs-clip-video: linear-gradient(180deg, #4b3fa8, #3a3186);
-  --vs-clip-image: linear-gradient(180deg, #2f6aa8, #255489);
-  --vs-clip-audio: linear-gradient(180deg, #17876a, #116b54);
-  --vs-clip-missing: repeating-linear-gradient(135deg, #6b3a3a 0 8px, #522c2c 8px 16px);
-  --vs-playhead: #ff4d5e;
-  --vs-keyframe: #e5b33a;
-}
+    /* Video Studio timeline. Clips keep their own hues so video, image and audio are told apart. */
+    --vs-stage: var(--black);
+    --vs-stage-fg: #dddddd;
+    --vs-audio: #1fa37a;
+    --vs-clip-video: linear-gradient(180deg, #4b3fa8, #3a3186);
+    --vs-clip-image: linear-gradient(180deg, #2f6aa8, #255489);
+    --vs-clip-audio: linear-gradient(180deg, #17876a, #116b54);
+    --vs-clip-missing: repeating-linear-gradient(135deg, #6b3a3a 0 8px, #522c2c 8px 16px);
+    --vs-playhead: #ff4d5e;
+    --vs-keyframe: #e5b33a;
+  }
 
-:root[data-theme='light'] {
-  --shadow-color: rgb(0 0 0 / 0.12);
-  --dbg-var: #8b2f8b;
-}
-
+  :root[data-theme='light'] {
+    --shadow-color: rgb(0 0 0 / 0.12);
+    --dbg-var: #8b2f8b;
+  }
 }
 
 @layer utilities {

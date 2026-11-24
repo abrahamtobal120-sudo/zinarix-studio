@@ -133,7 +133,9 @@ function uiCell(cell: NbCell): UiCell {
     cell,
     run: 'idle',
     out: { outputs: cell.outputs, clearPending: false },
-    collapsed: cell.metadata.collapsed === true || (cell.metadata.jupyter as { outputs_hidden?: boolean } | undefined)?.outputs_hidden === true,
+    collapsed:
+      cell.metadata.collapsed === true ||
+      (cell.metadata.jupyter as { outputs_hidden?: boolean } | undefined)?.outputs_hidden === true,
     editing: false,
   };
 }
@@ -155,7 +157,8 @@ export function cellModel(path: string, uid: string): monaco.editor.ITextModel |
   if (m && !m.isDisposed()) return m;
   // Own scheme: language servers and the file tree never see these as project files.
   const uri = monaco.Uri.from({ scheme: 'nbcell', path: `/${path}`, fragment: uid });
-  m = monaco.editor.getModel(uri) ?? monaco.editor.createModel(c.cell.source, languageOf(d, c), uri);
+  m =
+    monaco.editor.getModel(uri) ?? monaco.editor.createModel(c.cell.source, languageOf(d, c), uri);
   m.onDidChangeContent(() => {
     const doc = docs.get(path);
     const cell = doc?.cells.find((x) => x.uid === uid);
@@ -413,7 +416,10 @@ async function ensureKernel(d: NbDoc): Promise<boolean> {
     );
     return true;
   } catch (e) {
-    const msg = (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    const msg = (e as Error).message.replace(
+      /^Error invoking remote method '[^']+': (Error: )?/,
+      '',
+    );
     patch(d.path, (x) => ((x.kernel = 'dead'), (x.kernelMessage = msg)), false);
     toast(tn('failedStart', { err: msg }));
     return false;
@@ -460,17 +466,24 @@ export function runFrom(path: string, uid: string, dir: 'above' | 'below'): Prom
   if (!d) return Promise.resolve();
   const i = d.cells.findIndex((c) => c.uid === uid);
   const list = dir === 'above' ? d.cells.slice(0, i) : d.cells.slice(i);
-  return runCells(path, list.map((c) => c.uid));
+  return runCells(
+    path,
+    list.map((c) => c.uid),
+  );
 }
 
 export async function interrupt(path: string): Promise<void> {
-  await api().notebook.interrupt(path).catch((e: Error) => toast(e.message));
+  await api()
+    .notebook.interrupt(path)
+    .catch((e: Error) => toast(e.message));
 }
 
 export async function restart(path: string): Promise<void> {
   const d = docs.get(path);
   if (!d || d.kernel === 'off' || d.kernel === 'dead') return;
-  await api().notebook.restart(path).catch((e: Error) => toast(e.message));
+  await api()
+    .notebook.restart(path)
+    .catch((e: Error) => toast(e.message));
 }
 
 function markRunning(c: UiCell): void {
@@ -609,7 +622,10 @@ export async function loadVariables(path: string): Promise<void> {
 // ------------------------------------------------------------------ export
 
 /** Writes the notebook as a script (`# %%` cells) next to it; returns its path. */
-export async function exportScript(path: string, confirmOverwrite: (p: string) => Promise<boolean>): Promise<string | null> {
+export async function exportScript(
+  path: string,
+  confirmOverwrite: (p: string) => Promise<boolean>,
+): Promise<string | null> {
   const d = docs.get(path);
   if (!d?.nb) return null;
   const nb = snapshot(d);
@@ -662,7 +678,11 @@ const unsavers = new Map<string, () => void>();
 /** Closing a notebook tab frees its kernel, models and state. */
 function watchTabs(): void {
   for (const path of docs.keys())
-    if (!unsavers.has(path)) unsavers.set(path, registerViewerSaver(path, () => saveNotebook(path)));
+    if (!unsavers.has(path))
+      unsavers.set(
+        path,
+        registerViewerSaver(path, () => saveNotebook(path)),
+      );
   if (tabsWatched) return;
   tabsWatched = true;
   subscribeStore(() => {
@@ -675,7 +695,10 @@ function watchTabs(): void {
       disposeModels(path);
       unsavers.get(path)?.();
       unsavers.delete(path);
-      if (d.kernel !== 'off') void api().notebook.shutdown(path).catch(() => undefined);
+      if (d.kernel !== 'off')
+        void api()
+          .notebook.shutdown(path)
+          .catch(() => undefined);
     }
   });
 }

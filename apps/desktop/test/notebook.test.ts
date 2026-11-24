@@ -106,7 +106,10 @@ describe('ipynb parse/serialize', () => {
     expect(back.cells[1].source).toEqual(['x = 1']);
     expect(back.cells[1].metadata.custom).toEqual({ deep: [1, 2, { x: null }] });
     expect(back.cells[1].outputs[2].zfuture).toBe(true);
-    expect(back.cells[1].outputs[4]).toEqual({ output_type: 'some_future_output', payload: { a: 1 } });
+    expect(back.cells[1].outputs[4]).toEqual({
+      output_type: 'some_future_output',
+      payload: { a: 1 },
+    });
     expect(back.cells[3]).toMatchObject({ cell_type: 'markdown', source: ['new'] });
     expect(back.cells[3].id).toMatch(/^[a-z0-9]{12}$/);
     // Markdown cells never get outputs / execution_count.

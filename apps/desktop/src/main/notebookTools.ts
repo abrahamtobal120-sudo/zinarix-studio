@@ -88,7 +88,12 @@ export const NOTEBOOK_TOOLS: ToolDefinition[] = [
           description: 'Cell numbers to run, in this order (default: every code cell)',
         },
         restart: { type: 'boolean', description: 'Restart the kernel first (fresh variables)' },
-        timeout: { type: 'integer', minimum: 5, maximum: 3600, description: 'Seconds per cell (default 300)' },
+        timeout: {
+          type: 'integer',
+          minimum: 5,
+          maximum: 3600,
+          description: 'Seconds per cell (default 300)',
+        },
       },
       required: ['path'],
     },
@@ -163,7 +168,8 @@ export function notebookText(nb: Notebook, withOutputs = true): string {
   if (!nb.cells.length) return '(empty notebook)';
   const lines: string[] = [`kernel: ${kernelName(nb) ?? 'python3'} · ${nb.cells.length} cells`];
   nb.cells.forEach((c, i) => {
-    const run = c.cell_type === 'code' && c.execution_count != null ? ` [${c.execution_count}]` : '';
+    const run =
+      c.cell_type === 'code' && c.execution_count != null ? ` [${c.execution_count}]` : '';
     lines.push(`--- cell ${i + 1} · ${c.cell_type}${run} ---`, c.source || '(empty)');
     if (withOutputs && c.cell_type === 'code' && c.outputs.length) {
       const t = outputsText(c.outputs, 2000);
@@ -193,7 +199,8 @@ function parseEdits(v: unknown): Edit[] {
       throw new Error(`Edit ${i + 1}: unknown op.`);
     const cell = Number(o.cell);
     if (!Number.isInteger(cell) || cell < 1) throw new Error(`Edit ${i + 1}: "cell" must be ≥ 1.`);
-    const type = o.type === 'code' || o.type === 'markdown' || o.type === 'raw' ? o.type : undefined;
+    const type =
+      o.type === 'code' || o.type === 'markdown' || o.type === 'raw' ? o.type : undefined;
     if (o.source !== undefined && typeof o.source !== 'string')
       throw new Error(`Edit ${i + 1}: "source" must be text.`);
     return {
@@ -214,7 +221,8 @@ export function applyEdits(nb: Notebook, edits: Edit[]): Notebook {
     const at = e.cell - 1;
     const where = `Edit ${i + 1} (${e.op} ${e.cell})`;
     if (e.op === 'insert') {
-      if (at > n) throw new Error(`${where}: the notebook has ${n} cells (use ${n + 1} to append).`);
+      if (at > n)
+        throw new Error(`${where}: the notebook has ${n} cells (use ${n + 1} to append).`);
       cells.splice(at, 0, newCell(e.type ?? 'code', e.source ?? '', nb.nbformat_minor));
       return;
     }
@@ -222,11 +230,13 @@ export function applyEdits(nb: Notebook, edits: Edit[]): Notebook {
     if (e.op === 'delete') cells.splice(at, 1);
     else if (e.op === 'move') {
       const to = (e.to ?? 0) - 1;
-      if (!Number.isInteger(to) || to < 0 || to >= n) throw new Error(`${where}: "to" must be 1…${n}.`);
+      if (!Number.isInteger(to) || to < 0 || to >= n)
+        throw new Error(`${where}: "to" must be 1…${n}.`);
       const [c] = cells.splice(at, 1);
       cells.splice(to, 0, c!);
     } else {
-      if (e.source === undefined && !e.type) throw new Error(`${where}: give "source" and/or "type".`);
+      if (e.source === undefined && !e.type)
+        throw new Error(`${where}: give "source" and/or "type".`);
       const old = cells[at]!;
       const type = e.type ?? old.cell_type;
       const next: NbCell = {
@@ -244,9 +254,17 @@ export function applyEdits(nb: Notebook, edits: Edit[]): Notebook {
 }
 
 function editSummary(edits: Edit[]): string {
-  const names = { replace: 'cambiar', insert: 'insertar', delete: 'borrar', move: 'mover' } as const;
+  const names = {
+    replace: 'cambiar',
+    insert: 'insertar',
+    delete: 'borrar',
+    move: 'mover',
+  } as const;
   return edits
-    .map((e) => `${names[e.op]} ${e.cell}${e.op === 'move' ? `→${e.to}` : ''}${e.type ? ` (${e.type})` : ''}`)
+    .map(
+      (e) =>
+        `${names[e.op]} ${e.cell}${e.op === 'move' ? `→${e.to}` : ''}${e.type ? ` (${e.type})` : ''}`,
+    )
     .join(', ');
 }
 
@@ -263,7 +281,9 @@ export function notebookPreview(
     const { rel } = notebookPath(root, a.path);
     if (name === 'notebook_edit') {
       const edits = parseEdits(a.edits);
-      const code = edits.filter((e) => e.source !== undefined).map((e) => `# celda ${e.cell}\n${e.source}`);
+      const code = edits
+        .filter((e) => e.source !== undefined)
+        .map((e) => `# celda ${e.cell}\n${e.source}`);
       return {
         risk: 'medium',
         action: `editar las celdas de ${rel}: ${editSummary(edits)}`,
@@ -318,7 +338,11 @@ function runCell(
   code: string,
   timeoutMs: number,
   signal?: AbortSignal,
-): Promise<{ outputs: NbOutput[]; status: 'ok' | 'error' | 'aborted' | 'timeout'; count: number | null }> {
+): Promise<{
+  outputs: NbOutput[];
+  status: 'ok' | 'error' | 'aborted' | 'timeout';
+  count: number | null;
+}> {
   return new Promise((done, fail) => {
     let st: OutputState = { outputs: [], clearPending: false };
     let finished = false;
@@ -372,26 +396,33 @@ export async function runNotebookTool(
   root: string | undefined,
   signal?: AbortSignal,
 ): Promise<NotebookToolResult> {
-  if (!root) return { ok: false, content: 'No folder is open in the editor.', summary: 'sin carpeta' };
+  if (!root)
+    return { ok: false, content: 'No folder is open in the editor.', summary: 'sin carpeta' };
   try {
     const { abs, rel } = notebookPath(root, a.path);
     if (name === 'notebook_read') {
       const nb = await load(abs);
-      return { ok: true, content: notebookText(nb, a.outputs !== false), summary: `${nb.cells.length} celdas` };
+      return {
+        ok: true,
+        content: notebookText(nb, a.outputs !== false),
+        summary: `${nb.cells.length} celdas`,
+      };
     }
     if (name === 'notebook_variables') {
       const kernels = host?.(root);
       if (!kernels?.has(rel))
         return {
           ok: false,
-          content: 'This notebook has no running kernel: run a cell first (notebook_run), then ask again.',
+          content:
+            'This notebook has no running kernel: run a cell first (notebook_run), then ask again.',
           summary: 'sin kernel',
         };
       const vars = await kernels.variables(rel, 20_000);
       if (!vars)
         return {
           ok: false,
-          content: 'The kernel did not answer (busy with a long cell, or it is not a Python kernel).',
+          content:
+            'The kernel did not answer (busy with a long cell, or it is not a Python kernel).',
           summary: 'sin respuesta',
         };
       const lines = vars.map(
@@ -416,7 +447,8 @@ export async function runNotebookTool(
       };
     }
     if (name === 'notebook_run') {
-      if (!host) return { ok: false, content: 'Notebooks cannot run here.', summary: 'no disponible' };
+      if (!host)
+        return { ok: false, content: 'Notebooks cannot run here.', summary: 'no disponible' };
       const kernels = host(root);
       const status = await kernels.status(root);
       if (!status.ok)
@@ -429,7 +461,8 @@ export async function runNotebookTool(
       const order = Array.isArray(a.cells)
         ? a.cells.map((n) => Number(n) - 1)
         : nb.cells.flatMap((c, i) => (c.cell_type === 'code' ? [i] : []));
-      if (!order.length) return { ok: false, content: 'The notebook has no code cells.', summary: 'sin código' };
+      if (!order.length)
+        return { ok: false, content: 'The notebook has no code cells.', summary: 'sin código' };
       if (order.length > MAX_CELLS_RUN) throw new Error(`At most ${MAX_CELLS_RUN} cells per call.`);
       for (const i of order) {
         const c = nb.cells[i];
@@ -453,8 +486,18 @@ export async function runNotebookTool(
         results.push({ i, cell, outputs: r.outputs, count: r.count });
         image = lastImage(r.outputs) ?? image;
         const text = outputsText(r.outputs, 3000);
-        const tag = r.status === 'ok' ? '' : r.status === 'timeout' ? ' · TIMEOUT (interrupted)' : r.status === 'aborted' ? ' · aborted' : ' · ERROR';
-        report.push(`--- cell ${i + 1}${r.count != null ? ` [${r.count}]` : ''}${tag} ---`, text || '(no output)');
+        const tag =
+          r.status === 'ok'
+            ? ''
+            : r.status === 'timeout'
+              ? ' · TIMEOUT (interrupted)'
+              : r.status === 'aborted'
+                ? ' · aborted'
+                : ' · ERROR';
+        report.push(
+          `--- cell ${i + 1}${r.count != null ? ` [${r.count}]` : ''}${tag} ---`,
+          text || '(no output)',
+        );
         if (r.status !== 'ok') {
           failed = true;
           break;

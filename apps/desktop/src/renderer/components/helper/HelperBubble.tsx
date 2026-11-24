@@ -256,7 +256,10 @@ export function HelperBubble() {
           )}
           <div className="hlp-actions">
             {!status.installed && (
-              <button className="primary" onClick={() => void api().app.openExternal(OLLAMA_DOWNLOAD)}>
+              <button
+                className="primary"
+                onClick={() => void api().app.openExternal(OLLAMA_DOWNLOAD)}
+              >
                 <Icon name="download" size={14} /> {t('hlpDownloadOllama')}
               </button>
             )}
@@ -288,7 +291,9 @@ export function HelperBubble() {
               >
                 <span style={{ width: `${pct ?? 3}%` }} />
               </div>
-              <button onClick={() => void api().helper.abort(pull!.id)}>{t('hlpPullCancel')}</button>
+              <button onClick={() => void api().helper.abort(pull!.id)}>
+                {t('hlpPullCancel')}
+              </button>
             </div>
           ) : (
             <div className="hlp-actions">
@@ -302,7 +307,11 @@ export function HelperBubble() {
             <div className="hlp-installed">
               <span>{t('hlpUseInstalled')}</span>
               {others.map((m) => (
-                <button key={m} className="hlp-chip" onClick={() => void updatePrefs({ helperModel: m })}>
+                <button
+                  key={m}
+                  className="hlp-chip"
+                  onClick={() => void updatePrefs({ helperModel: m })}
+                >
                   {m}
                 </button>
               ))}
@@ -377,7 +386,7 @@ export function HelperBubble() {
           <header className="hlp-head">
             <Icon name="sparkle" size={15} />
             <span className="hlp-title">{t('hlpTitle')}</span>
-            <span className="hlp-badge" title={cloud ? cloudModel ?? '' : model}>
+            <span className="hlp-badge" title={cloud ? (cloudModel ?? '') : model}>
               {cloud ? t('hlpCloudBadge', { model: cloudModel ?? '' }) : t('hlpLocal', { model })}
             </span>
             {msgs.length > 0 && (

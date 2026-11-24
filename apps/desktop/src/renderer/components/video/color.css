@@ -1,115 +1,115 @@
 @layer features {
-/* Video Studio, Fase 12: the Color tab (theme variables only). */
+  /* Video Studio, Fase 12: the Color tab (theme variables only). */
 
-.vs-color-wheel {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px 10px;
-  border-bottom: 1px solid var(--border);
-}
-.vs-color-wheel h4 {
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.vs-color-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.vs-color-row {
-  display: grid;
-  grid-template-columns: 76px 1fr 32px;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
-}
-.vs-color-row input[type='range'] {
-  width: 100%;
-}
-.vs-color-num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: var(--fg-dim);
-}
-.vs-color-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.vs-color-lut {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-sm);
-}
-.vs-color-file {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vs-color-err {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--danger);
-}
-.vs-color-foot {
-  padding: 8px 12px;
-}
-.vs-color-reset {
-  padding: 0 4px;
-  border: none;
-  background: none;
-  color: var(--accent-text);
-  font-size: var(--text-xs);
-  cursor: pointer;
-}
-.vs-color-reset:disabled {
-  color: var(--fg-dim);
-  cursor: default;
-}
+  .vs-color-wheel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .vs-color-wheel h4 {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .vs-color-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .vs-color-row {
+    display: grid;
+    grid-template-columns: 76px 1fr 32px;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-xs);
+  }
+  .vs-color-row input[type='range'] {
+    width: 100%;
+  }
+  .vs-color-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-dim);
+  }
+  .vs-color-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .vs-color-lut {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+  }
+  .vs-color-file {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vs-color-err {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--danger);
+  }
+  .vs-color-foot {
+    padding: 8px 12px;
+  }
+  .vs-color-reset {
+    padding: 0 4px;
+    border: none;
+    background: none;
+    color: var(--accent-text);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .vs-color-reset:disabled {
+    color: var(--fg-dim);
+    cursor: default;
+  }
 
-/* Fase 4 (mejora): RGB curves. */
-.vs-curve-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.vs-curve-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 4px;
-  border-radius: 50%;
-}
-.vs-curve {
-  width: 100%;
-  max-width: 280px;
-  aspect-ratio: 1;
-  align-self: center;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  cursor: crosshair;
-  touch-action: none;
-}
-.vs-curve-grid line,
-.vs-curve-diag {
-  stroke: var(--border);
-  stroke-width: 1;
-}
-.vs-curve-diag {
-  stroke-dasharray: 4 4;
-}
-.vs-curve-pt {
-  fill: var(--bg);
-  stroke-width: 2;
-  cursor: grab;
-}
-.vs-curve-pt:hover {
-  fill: var(--accent);
-}
+  /* Fase 4 (mejora): RGB curves. */
+  .vs-curve-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .vs-curve-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    border-radius: 50%;
+  }
+  .vs-curve {
+    width: 100%;
+    max-width: 280px;
+    aspect-ratio: 1;
+    align-self: center;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .vs-curve-grid line,
+  .vs-curve-diag {
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .vs-curve-diag {
+    stroke-dasharray: 4 4;
+  }
+  .vs-curve-pt {
+    fill: var(--bg);
+    stroke-width: 2;
+    cursor: grab;
+  }
+  .vs-curve-pt:hover {
+    fill: var(--accent);
+  }
 }

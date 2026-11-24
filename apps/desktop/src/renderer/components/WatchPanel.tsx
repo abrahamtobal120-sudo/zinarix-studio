@@ -86,12 +86,21 @@ export function WatchPanel() {
           <div className="watch-status-line">
             <span className="watch-dot" />
             <strong>
-              {state === 'busy' ? t('wtStateBusy') : state === 'on' ? t('wtStateOn') : t('wtStateOff')}
+              {state === 'busy'
+                ? t('wtStateBusy')
+                : state === 'on'
+                  ? t('wtStateOn')
+                  : t('wtStateOff')}
             </strong>
           </div>
           <div className="dim small">{status}</div>
-          <button className="primary run-main" disabled={busy || !root} onClick={() => void runNow()}>
-            <Icon name={busy ? 'refresh' : 'eye'} size={14} /> {busy ? t('wtReviewing') : t('wtRunNow')}
+          <button
+            className="primary run-main"
+            disabled={busy || !root}
+            onClick={() => void runNow()}
+          >
+            <Icon name={busy ? 'refresh' : 'eye'} size={14} />{' '}
+            {busy ? t('wtReviewing') : t('wtRunNow')}
           </button>
           {!root && <div className="dim small">{t('wtNoProject')}</div>}
         </div>
@@ -142,7 +151,9 @@ export function WatchPanel() {
               {r.items.map((it, i) => (
                 <div key={i} className={`watch-item watch-${it.kind}`}>
                   <div className="watch-item-title">
-                    <span className="run-badge">{it.kind === 'fix' ? t('wtFix') : t('wtImprove')}</span>
+                    <span className="run-badge">
+                      {it.kind === 'fix' ? t('wtFix') : t('wtImprove')}
+                    </span>
                     {it.title}
                   </div>
                   <div className="small watch-detail">{it.detail}</div>

@@ -4,9 +4,21 @@ import type { HelperChunk } from '../src/main/helper.js';
 import { Bm25, MODEL_NAME, retrieve, systemPrompt, tokenize } from '../src/main/helper.js';
 
 const chunks: HelperChunk[] = [
-  { source: 'g', title: 'Cambiar el tema', text: 'Ver > Alternar tema claro/oscuro. Ajustes > Apariencia > Tema de color.' },
-  { source: 'g', title: 'Abrir un proyecto', text: 'Archivo > Abrir carpeta… (Ctrl+O) y elige la carpeta.' },
-  { source: 'g', title: 'Conectar una IA', text: 'IA > Proveedores y llaves… pega tu llave de API.' },
+  {
+    source: 'g',
+    title: 'Cambiar el tema',
+    text: 'Ver > Alternar tema claro/oscuro. Ajustes > Apariencia > Tema de color.',
+  },
+  {
+    source: 'g',
+    title: 'Abrir un proyecto',
+    text: 'Archivo > Abrir carpeta… (Ctrl+O) y elige la carpeta.',
+  },
+  {
+    source: 'g',
+    title: 'Conectar una IA',
+    text: 'IA > Proveedores y llaves… pega tu llave de API.',
+  },
   { source: 'g', title: 'Terminal', text: 'Ver > Terminal (Ctrl+J) abre la terminal integrada.' },
 ];
 

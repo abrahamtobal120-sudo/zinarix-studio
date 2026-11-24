@@ -516,7 +516,17 @@ const THEME_KEYS = [
   'music',
   'lut',
 ] as const;
-const TITLE_KEYS = ['font', 'size', 'color', 'bold', 'italic', 'align', 'stroke', 'shadow', 'bg'] as const;
+const TITLE_KEYS = [
+  'font',
+  'size',
+  'color',
+  'bold',
+  'italic',
+  'align',
+  'stroke',
+  'shadow',
+  'bg',
+] as const;
 
 /** A theme id from any name: lower-case letters, digits and dashes. */
 export const themeSlug = (s: string): string =>
@@ -543,7 +553,8 @@ export function parseThemeFile(x: unknown): VideoTheme | null {
   const version = typeof o.version === 'number' && Number.isFinite(o.version) ? o.version : 1;
   // v1 (11A, in code) had no name: the id was the name.
   const name = rawName || rawId.trim().slice(0, 60);
-  const transition = validTransition(o.transition) && o.transition ? (o.transition as Transition) : def.transition;
+  const transition =
+    validTransition(o.transition) && o.transition ? (o.transition as Transition) : def.transition;
   const look = typeof o.look === 'string' && LOOKS.some((l) => l.id === o.look) ? o.look : 'none';
   const fx = o.fx !== undefined && validEffects(o.fx) ? cleanEffects(o.fx as Effects) : undefined;
   const title: Partial<TextSpec> = {};
@@ -556,10 +567,14 @@ export function parseThemeFile(x: unknown): VideoTheme | null {
       if (validText(trial)) (title as Record<string, unknown>)[k] = t[k];
     }
   }
-  const titleAnim = validAnim(o.titleAnim) && o.titleAnim ? { ...(o.titleAnim as ClipAnim) } : { ...def.titleAnim };
+  const titleAnim =
+    validAnim(o.titleAnim) && o.titleAnim ? { ...(o.titleAnim as ClipAnim) } : { ...def.titleAnim };
   const duck =
-    typeof o.duck === 'number' && Number.isFinite(o.duck) ? Math.min(1, Math.max(0, o.duck)) : def.duck;
-  const str = (v: unknown) => (typeof v === 'string' && v.length <= 1024 && v.trim() ? v : undefined);
+    typeof o.duck === 'number' && Number.isFinite(o.duck)
+      ? Math.min(1, Math.max(0, o.duck))
+      : def.duck;
+  const str = (v: unknown) =>
+    typeof v === 'string' && v.length <= 1024 && v.trim() ? v : undefined;
   const theme: VideoTheme = {
     id: themeSlug(rawId),
     name,
@@ -593,17 +608,25 @@ export function themeToFile(t: VideoTheme): Record<string, unknown> {
  * (or all of them): the first transition, the media clips' effects, the first title's style and
  * animation, whether photos carry Ken Burns, and the ducking level of a ducked track.
  */
-export function themeFromProject(p: VideoProject, name: string, ids?: readonly string[]): VideoTheme {
+export function themeFromProject(
+  p: VideoProject,
+  name: string,
+  ids?: readonly string[],
+): VideoTheme {
   const pick = new Set(ids?.length ? ids : p.clips.map((c) => c.id));
   const clips = p.clips.filter((c) => pick.has(c.id)).sort((a, b) => a.start - b.start);
   const def = VIDEO_THEMES[0]!;
   const media = clips.filter((c) => !c.text && mediaOf(p, c.mediaId)?.kind !== 'audio');
   const tr = media.find((c) => c.transition)?.transition;
   const fx = cleanEffects(media.find((c) => c.effects)?.effects);
-  const look = fx ? (LOOKS.find((l) => JSON.stringify(cleanEffects(l.fx)) === JSON.stringify(fx))?.id ?? 'none') : 'none';
+  const look = fx
+    ? (LOOKS.find((l) => JSON.stringify(cleanEffects(l.fx)) === JSON.stringify(fx))?.id ?? 'none')
+    : 'none';
   const t = clips.find((c) => c.text);
   const title: Partial<TextSpec> = {};
-  if (t?.text) for (const k of TITLE_KEYS) if (t.text[k] !== undefined) (title as Record<string, unknown>)[k] = t.text[k];
+  if (t?.text)
+    for (const k of TITLE_KEYS)
+      if (t.text[k] !== undefined) (title as Record<string, unknown>)[k] = t.text[k];
   const photos = media.filter((c) => mediaOf(p, c.mediaId)?.kind === 'image');
   const ducked = p.tracks.find((x) => x.duck !== undefined);
   const lut = media.find((c) => c.color?.lut)?.color?.lut;

@@ -341,11 +341,7 @@ export function SearchView({
           <span aria-hidden="true">{collapsed.size ? '⊞' : '⊟'}</span>
         </button>
       )}
-      <button
-        title={t('refresh')}
-        aria-label={t('refresh')}
-        onClick={() => setNonce((n) => n + 1)}
-      >
+      <button title={t('refresh')} aria-label={t('refresh')} onClick={() => setNonce((n) => n + 1)}>
         <Icon name="refresh" size={14} />
       </button>
       <button
@@ -364,7 +360,9 @@ export function SearchView({
 
   let rowIndex = -1;
   return (
-    <div className={`search-view${embedded ? ' embedded' : ''}${embedded && !active ? ' idle' : ''}`}>
+    <div
+      className={`search-view${embedded ? ' embedded' : ''}${embedded && !active ? ' idle' : ''}`}
+    >
       {!embedded && (
         <div className="sidebar-title">
           <span>{t('search')}</span>

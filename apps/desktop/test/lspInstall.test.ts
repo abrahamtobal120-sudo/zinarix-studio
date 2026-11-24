@@ -21,7 +21,21 @@ describe('installing a language server with a click', () => {
 
   it('gives most common languages a one-click install on Windows', () => {
     const one = (id: string) =>
-      LSP_LANGUAGES.find((l) => l.ids.includes(id))!.candidates.some((c) => installCommand(c.install, 'win32'));
-    for (const id of ['python', 'go', 'rust', 'cpp', 'csharp', 'php', 'ruby', 'lua', 'shell', 'yaml']) expect(one(id), id).toBe(true);
+      LSP_LANGUAGES.find((l) => l.ids.includes(id))!.candidates.some((c) =>
+        installCommand(c.install, 'win32'),
+      );
+    for (const id of [
+      'python',
+      'go',
+      'rust',
+      'cpp',
+      'csharp',
+      'php',
+      'ruby',
+      'lua',
+      'shell',
+      'yaml',
+    ])
+      expect(one(id), id).toBe(true);
   });
 });

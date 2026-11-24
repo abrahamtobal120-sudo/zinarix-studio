@@ -159,7 +159,9 @@ export class Bm25 {
         if (!f) continue;
         const df = this.df.get(tk) ?? 0;
         const idf = Math.log(1 + (n - df + 0.5) / (df + 0.5));
-        score += (idf * f * (this.k1 + 1)) / (f + this.k1 * (1 - this.b + (this.b * this.lens[i]!) / this.avg));
+        score +=
+          (idf * f * (this.k1 + 1)) /
+          (f + this.k1 * (1 - this.b + (this.b * this.lens[i]!) / this.avg));
       }
       score *= this.chunks[i]!.weight ?? 1;
       if (score > 0) hits.push({ chunk: this.chunks[i]!, score });
@@ -234,17 +236,26 @@ function ollamaInstalled(): boolean {
   const paths =
     process.platform === 'win32'
       ? [
-          join(process.env.LOCALAPPDATA ?? join(home, 'AppData', 'Local'), 'Programs', 'Ollama', 'ollama.exe'),
+          join(
+            process.env.LOCALAPPDATA ?? join(home, 'AppData', 'Local'),
+            'Programs',
+            'Ollama',
+            'ollama.exe',
+          ),
           join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Ollama', 'ollama.exe'),
         ]
       : process.platform === 'darwin'
-        ? ['/Applications/Ollama.app', join(home, 'Applications', 'Ollama.app'), '/usr/local/bin/ollama', '/opt/homebrew/bin/ollama']
+        ? [
+            '/Applications/Ollama.app',
+            join(home, 'Applications', 'Ollama.app'),
+            '/usr/local/bin/ollama',
+            '/opt/homebrew/bin/ollama',
+          ]
         : ['/usr/local/bin/ollama', '/usr/bin/ollama', '/snap/bin/ollama'];
   return paths.some((p) => existsSync(p));
 }
 
-const sameModel = (a: string, b: string) =>
-  a === b || a === `${b}:latest` || `${a}:latest` === b;
+const sameModel = (a: string, b: string) => a === b || a === `${b}:latest` || `${a}:latest` === b;
 
 export type CloudStream = (
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
@@ -373,7 +384,11 @@ export class HelperService {
         });
         if (!res.ok) {
           const body = await res.text().catch(() => '');
-          throw new Error(/not found/i.test(body) ? `Falta el modelo ${req.model}.` : `Ollama respondió ${res.status}`);
+          throw new Error(
+            /not found/i.test(body)
+              ? `Falta el modelo ${req.model}.`
+              : `Ollama respondió ${res.status}`,
+          );
         }
         for await (const j of ndjson(res)) {
           if (typeof j.error === 'string') throw new Error(j.error);

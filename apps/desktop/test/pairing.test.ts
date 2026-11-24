@@ -11,7 +11,10 @@ describe('pairing PIN guard', () => {
   it('accepts the right PIN (digits only) and rejects a wrong one', () => {
     const { g } = guard();
     expect(g.check('phone', '123 456', '123456')).toEqual({ ok: true });
-    expect(g.check('phone', '000000', '123456')).toMatchObject({ ok: false, error: 'PIN incorrecto' });
+    expect(g.check('phone', '000000', '123456')).toMatchObject({
+      ok: false,
+      error: 'PIN incorrecto',
+    });
     expect(g.check('phone', '', '')).toMatchObject({ ok: false });
   });
 
@@ -74,16 +77,25 @@ describe('PairingGuard persistence', () => {
     const { join } = await import('node:path');
     const file = join(mkdtempSync(join(tmpdir(), 'zx-pair-')), 'guard.json');
     let t = 1_000_000;
-    const a = new PairingGuard(() => t, () => file);
+    const a = new PairingGuard(
+      () => t,
+      () => file,
+    );
     for (let i = 0; i < MAX_TRIES; i++) a.check('phone', '000000', '123456');
     // "Restart": a fresh guard must still be locked, even with the right PIN.
-    const b = new PairingGuard(() => t, () => file);
+    const b = new PairingGuard(
+      () => t,
+      () => file,
+    );
     expect(b.lockedFor('phone')).toBe(LOCK_MS);
     expect(b.check('phone', '123456', '123456').ok).toBe(false);
     // Tries below the limit are kept too.
     t += LOCK_MS + 1;
     b.check('phone', '000000', '123456');
-    const c = new PairingGuard(() => t, () => file);
+    const c = new PairingGuard(
+      () => t,
+      () => file,
+    );
     for (let i = 0; i < MAX_TRIES - 2; i++) c.check('phone', '000000', '123456');
     expect(c.check('phone', '000000', '123456')).toMatchObject({ rotated: true });
     // The second lock lasts twice as long.

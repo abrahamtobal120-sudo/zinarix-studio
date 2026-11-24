@@ -102,7 +102,10 @@ export const rasterSvg: Raster = (svg, o) => {
       } finally { URL.revokeObjectURL(url); }
     })()`;
     try {
-      const r = (await page.webContents.executeJavaScript(script, true)) as { error?: string; data?: string };
+      const r = (await page.webContents.executeJavaScript(script, true)) as {
+        error?: string;
+        data?: string;
+      };
       if (r.error || !r.data) throw new Error(r.error ?? 'The SVG could not be drawn.');
       return Buffer.from(r.data.slice(r.data.indexOf(',') + 1), 'base64');
     } finally {

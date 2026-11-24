@@ -113,7 +113,9 @@ function setupProviders() {
 // ---------- reveal on scroll (added from JS so the page never hides content without it) ----------
 function setupReveal() {
   if (reduceMotion || !('IntersectionObserver' in window)) return;
-  const els = document.querySelectorAll('.sec-head, .feature, .more, .plans, .os-grid, .term, .qa, .gallery, .card');
+  const els = document.querySelectorAll(
+    '.sec-head, .feature, .more, .plans, .os-grid, .term, .qa, .gallery, .card',
+  );
   const io = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {

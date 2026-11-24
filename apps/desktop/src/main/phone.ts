@@ -1,6 +1,13 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { ICON_SVG, LOGO_SVG } from './zinarixLogo';
-import { createReadStream, existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import {
+  createReadStream,
+  existsSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { hostname, networkInterfaces } from 'node:os';
@@ -64,7 +71,9 @@ export interface PhoneFileEntry {
 /** The project files of the window the phone controls (see main.ts). Paths are relative. */
 export interface PhoneFiles {
   list(path: string): Promise<{ root: string; name: string; entries: PhoneFileEntry[] }>;
-  read(path: string): Promise<{ content: string; binary: boolean; tooLarge: boolean; size: number }>;
+  read(
+    path: string,
+  ): Promise<{ content: string; binary: boolean; tooLarge: boolean; size: number }>;
   /** The bytes of a file (images, downloads), up to a few MB. */
   raw(path: string): Promise<Uint8Array>;
   write(path: string, content: string): Promise<void>;
@@ -99,7 +108,14 @@ export interface PhoneTerminals {
     id: number,
     since: number,
     abort: AbortSignal,
-  ): Promise<{ from: number; data: string; next: number; alive: boolean; cols: number; rows: number }>;
+  ): Promise<{
+    from: number;
+    data: string;
+    next: number;
+    alive: boolean;
+    cols: number;
+    rows: number;
+  }>;
   write(id: number, data: string): void;
   resize(id: number, cols: number, rows: number): void;
   kill(id: number): void;
@@ -140,7 +156,10 @@ export const PhoneConfigPatchSchema = z
     theme: z.enum(THEME_IDS),
     prefs: z
       .object({
-        uiZoom: z.number().int().refine((n) => UI_ZOOM_STEPS.includes(n)),
+        uiZoom: z
+          .number()
+          .int()
+          .refine((n) => UI_ZOOM_STEPS.includes(n)),
         fontSize: z.number().int().min(8).max(40),
         tabSize: z.number().int().min(1).max(16),
         wordWrap: z.boolean(),
@@ -510,7 +529,9 @@ export class PhoneRemote {
     return {
       running: true,
       url: `http://${ip ? `${ip}:${this.port}` : this.host}`,
-      apkUrl: this.hasApk() ? `http://${ip ? `${ip}:${this.port}` : this.host}${APK_PATH}` : undefined,
+      apkUrl: this.hasApk()
+        ? `http://${ip ? `${ip}:${this.port}` : this.host}${APK_PATH}`
+        : undefined,
       pin: this.pin,
       phones: s.devices!.length,
       remote: r
@@ -798,12 +819,7 @@ export class PhoneRemote {
       const tunnelHost = this.remote?.url ? new URL(this.remote.url).host : null;
       // Any address of this computer on its networks (the Wi-Fi may give it a new one).
       const lan = () => lanAddresses().some((ip) => host === `${ip}:${this.port}`);
-      if (
-        host !== this.host &&
-        host !== tunnelHost &&
-        host !== `127.0.0.1:${this.port}` &&
-        !lan()
-      )
+      if (host !== this.host && host !== tunnelHost && host !== `127.0.0.1:${this.port}` && !lan())
         return end(res, 421, { error: 'host' });
       // The tunnel reaches the server from this same computer: everything local is "remote".
       const viaTunnel = /^(127\.|::1$|::ffff:127\.)/.test(req.socket.remoteAddress ?? '');
@@ -817,9 +833,11 @@ export class PhoneRemote {
           'Referrer-Policy': 'no-referrer',
           'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data: blob:; media-src blob:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
         });
-        return void res.end(phonePage(nonce, phoneLang(req.headers['accept-language']), {
+        return void res.end(
+          phonePage(nonce, phoneLang(req.headers['accept-language']), {
             localApk: this.hasApk() ? APK_PATH : undefined,
-          }));
+          }),
+        );
       }
       // Installable as an app on the phone (home screen icon, full screen, same link).
       if (req.method === 'GET' && url.pathname === '/manifest.webmanifest') {
@@ -898,7 +916,12 @@ export class PhoneRemote {
         return end(res, 200, { ok: true });
       }
       if (req.method === 'GET' && url.pathname === '/api/me')
-        return end(res, 200, { id: device.id, name: device.name, at: device.at, computer: hostname() });
+        return end(res, 200, {
+          id: device.id,
+          name: device.name,
+          at: device.at,
+          computer: hostname(),
+        });
       if (req.method === 'POST' && url.pathname === '/api/rename') {
         const { name } = z
           .object({ name: z.string().trim().min(1).max(60) })
@@ -975,7 +998,8 @@ export class PhoneRemote {
           return end(res, 409, { error: e instanceof Error ? e.message : String(e) });
         }
       }
-      if (req.method === 'GET' && url.pathname === '/api/caps') return end(res, 200, this.allowed());
+      if (req.method === 'GET' && url.pathname === '/api/caps')
+        return end(res, 200, this.allowed());
       if (url.pathname.startsWith('/api/files/')) return await this.filesRoute(req, res, url);
       if (url.pathname.startsWith('/api/term')) return await this.termRoute(req, res, url);
       if (url.pathname.startsWith('/api/git/')) return await this.gitRoute(req, res, url);
@@ -1056,7 +1080,11 @@ export class PhoneRemote {
       if (req.method === 'GET' && op === 's') return end(res, 200, { terms: t.list() });
       if (req.method === 'GET' && op === '/read') {
         const id = z.coerce.number().int().parse(url.searchParams.get('id'));
-        const since = z.coerce.number().int().min(0).parse(url.searchParams.get('since') ?? 0);
+        const since = z.coerce
+          .number()
+          .int()
+          .min(0)
+          .parse(url.searchParams.get('since') ?? 0);
         if (!t.list().some((x) => x.id === id))
           return end(res, 404, { error: 'Esa terminal ya no existe.' });
         const abort = new AbortController();
@@ -1113,7 +1141,9 @@ export class PhoneRemote {
       if (req.method === 'GET' && op === 'status') return end(res, 200, await g.status());
       if (req.method === 'GET' && op === 'log') return end(res, 200, { commits: await g.log() });
       if (req.method === 'GET' && op === 'diff')
-        return end(res, 200, { diff: await g.diff(Rel.min(1).parse(url.searchParams.get('path'))) });
+        return end(res, 200, {
+          diff: await g.diff(Rel.min(1).parse(url.searchParams.get('path'))),
+        });
       if (req.method === 'POST' && op === 'commit') {
         const b = z
           .object({

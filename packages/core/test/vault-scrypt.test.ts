@@ -35,7 +35,9 @@ describe('FileVault without Argon2', () => {
     const vf = JSON.parse(readFileSync(file, 'utf8'));
     vf.kdf.N = 2 ** 24;
     writeFileSync(file, JSON.stringify(vf));
-    await expect(new FileVault(file, async () => 'pw', {}).get('a')).rejects.toThrow(/out of range/);
+    await expect(new FileVault(file, async () => 'pw', {}).get('a')).rejects.toThrow(
+      /out of range/,
+    );
   });
 
   it('explains how to recover an Argon2id vault instead of a raw crypto error', async () => {

@@ -28,7 +28,9 @@
   history.replaceState(null, '', location.pathname);
   const go = (url) => {
     const token = localStorage.getItem(slot) || '';
-    location.replace(`${url}/#k=${key}&g=${gist}${/^[0-9a-f]{64}$/.test(token) ? `&t=${token}` : ''}`);
+    location.replace(
+      `${url}/#k=${key}&g=${gist}${/^[0-9a-f]{64}$/.test(token) ? `&t=${token}` : ''}`,
+    );
   };
   let timer = 0;
   const later = (ms) => {
@@ -49,11 +51,19 @@
         headers: { Accept: 'application/vnd.github+json' },
       });
       if (res.status === 404) {
-        say('Este enlace ya no existe', 'Abre en la computadora Configuración → Celular y copia el enlace nuevo.', false);
+        say(
+          'Este enlace ya no existe',
+          'Abre en la computadora Configuración → Celular y copia el enlace nuevo.',
+          false,
+        );
         return;
       }
       if (res.status === 403 || res.status === 429) {
-        say('Demasiados intentos', 'GitHub pide esperar un momento. Lo intento solo en un minuto.', true);
+        say(
+          'Demasiados intentos',
+          'GitHub pide esperar un momento. Lo intento solo en un minuto.',
+          true,
+        );
         return later(60_000);
       }
       if (!res.ok) throw new Error(String(res.status));
@@ -74,7 +84,11 @@
     }
     // Only a Cloudflare tunnel address: the gist can never send the phone anywhere else.
     if (typeof url !== 'string' || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) {
-      say('Dirección no válida', 'Apaga y enciende el control a distancia en Zinarix Studio.', false);
+      say(
+        'Dirección no válida',
+        'Apaga y enciende el control a distancia en Zinarix Studio.',
+        false,
+      );
       return;
     }
     // Only an address that answers: Zinarix closed or reconnecting leaves the old one dead.

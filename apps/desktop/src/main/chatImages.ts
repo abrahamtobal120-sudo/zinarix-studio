@@ -25,14 +25,19 @@ const EXT: Record<string, string> = {
 /** What the model can do with images: send them, write them to files (CLI agents), or not. */
 export type VisionMode = 'parts' | 'files' | 'none';
 
-export function visionMode(core: OmniCore, model: string | undefined, role: 'chat' | 'agent'): VisionMode {
+export function visionMode(
+  core: OmniCore,
+  model: string | undefined,
+  role: 'chat' | 'agent',
+): VisionMode {
   try {
     const ref = core.resolveModel(model, role);
     const entry = core.provider(ref.provider);
     if (entry.adapter === 'cli-agent') return 'files';
     const live = core.models.find(ref.provider, ref.model)?.capabilities.vision;
-    const cat = (entry.fallbackModels.find((m) => m.id === ref.model) as { vision?: boolean } | undefined)
-      ?.vision;
+    const cat = (
+      entry.fallbackModels.find((m) => m.id === ref.model) as { vision?: boolean } | undefined
+    )?.vision;
     return (live ?? cat) === false ? 'none' : 'parts';
   } catch {
     return 'parts';
@@ -67,7 +72,8 @@ function imageDir(): string {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const st = statSync(dir);
     const mine = typeof process.getuid !== 'function' || st.uid === process.getuid();
-    if (!mine || (process.platform !== 'win32' && (st.mode & 0o077) !== 0)) throw new Error('shared');
+    if (!mine || (process.platform !== 'win32' && (st.mode & 0o077) !== 0))
+      throw new Error('shared');
   } catch {
     dir = mkdtempSync(join(tmpdir(), 'zinarix-img-'));
   }
@@ -89,10 +95,7 @@ export function imagesAsFiles(message: ChatMessage, images: ChatImage[]): ChatMe
   if (message.role !== 'user' || !images.length) return message;
   const dir = imageDir();
   const paths = images.map((img, i) => {
-    const p = join(
-      dir,
-      `${Date.now().toString(36)}-${i}.${EXT[img.mediaType] ?? 'png'}`,
-    );
+    const p = join(dir, `${Date.now().toString(36)}-${i}.${EXT[img.mediaType] ?? 'png'}`);
     writeFileSync(p, Buffer.from(img.data, 'base64'));
     return p;
   });

@@ -12,7 +12,9 @@ const home = mkdtempSync(join(tmpdir(), 'zs-chrome-'));
 const ps = (script) =>
   execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8' });
 const keys = (k) =>
-  ps(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${k}')`);
+  ps(
+    `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${k}')`,
+  );
 
 const app = await electron.launch({
   executablePath: 'node_modules/electron/dist/electron',
@@ -64,7 +66,8 @@ keys('{ESC}');
 await win.waitForTimeout(300);
 
 // A shortcut that only the app menu knows (Ver > Agrandar todo) still works.
-const zoom = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomFactor());
+const zoom = () =>
+  app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomFactor());
 const z0 = await zoom();
 await front();
 keys('^=');

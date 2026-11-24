@@ -3,7 +3,15 @@ import { api, getDoc, openFile, save, toast } from '../../store';
 import { errText } from '../../errText';
 import { askAgent } from '../Chat';
 import { Icon } from '../Icon';
-import { coerceParam, parseScadParams, scadLiteral, type CadFormat, type ScadMessage, type ScadParam, type ScadValue } from '../../../shared/cad';
+import {
+  coerceParam,
+  parseScadParams,
+  scadLiteral,
+  type CadFormat,
+  type ScadMessage,
+  type ScadParam,
+  type ScadValue,
+} from '../../../shared/cad';
 import { analyzeMesh, parseStl, type MeshReport } from '../../../shared/mesh3d';
 import { MeshViewer, type ViewName } from './meshViewer';
 import { BEDS, PrintCheck } from './PrintCheck';
@@ -123,7 +131,8 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
       if (e.key === 'F6') {
         e.preventDefault();
         void render();
-      } else if (!autoRef.current && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') setTimeout(() => void render(), 50);
+      } else if (!autoRef.current && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's')
+        setTimeout(() => void render(), 50);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -160,7 +169,12 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
         const m = /^(\s*[A-Za-z_$][\w$]*\s*=\s*)(.+?)(\s*;.*)$/.exec(line);
         if (!m) return null;
         return {
-          range: { startLineNumber: p.line, startColumn: m[1]!.length + 1, endLineNumber: p.line, endColumn: m[1]!.length + m[2]!.length + 1 },
+          range: {
+            startLineNumber: p.line,
+            startColumn: m[1]!.length + 1,
+            endLineNumber: p.line,
+            endColumn: m[1]!.length + m[2]!.length + 1,
+          },
           text: scadLiteral(values[p.name]!),
         };
       })
@@ -222,20 +236,33 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
   const goTo = (m: ScadMessage) => {
     if (!m.line) return;
     // Main gives project files relative to it (absolute = outside the project: stay on this one).
-    const file = m.file && !samePath(m.file, path) && !/^([a-z]:|[\\/])/i.test(m.file) ? m.file : path;
+    const file =
+      m.file && !samePath(m.file, path) && !/^([a-z]:|[\\/])/i.test(m.file) ? m.file : path;
     void openFile(file, { line: m.line, column: 1 });
   };
 
   return (
-    <aside className="cad-pane" style={width ? ({ '--cad-w': `${width}px` } as React.CSSProperties) : undefined} aria-label={tc('preview')}>
-      <div className="cad-split" onPointerDown={startDrag} role="separator" aria-orientation="vertical" />
+    <aside
+      className="cad-pane"
+      style={width ? ({ '--cad-w': `${width}px` } as React.CSSProperties) : undefined}
+      aria-label={tc('preview')}
+    >
+      <div
+        className="cad-split"
+        onPointerDown={startDrag}
+        role="separator"
+        aria-orientation="vertical"
+      />
       <div className="cad-toolbar">
         <strong className="cad-title">{tc('preview')}</strong>
         <span className="cad-status" aria-live="polite">
           {st.busy
             ? tc('rendering')
             : st.ms !== undefined && !st.error
-              ? tc('renderedIn', { s: (st.ms / 1000).toFixed(1), engine: st.engine === 'native' ? tc('native') : tc('builtin') })
+              ? tc('renderedIn', {
+                  s: (st.ms / 1000).toFixed(1),
+                  engine: st.engine === 'native' ? tc('native') : tc('builtin'),
+                })
               : ''}
         </span>
         <span className="cad-grow" />
@@ -244,7 +271,11 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
             {tc('cancel')}
           </button>
         ) : (
-          <button className="btn ghost cad-small" title={tc('renderHint')} onClick={() => void render()}>
+          <button
+            className="btn ghost cad-small"
+            title={tc('renderHint')}
+            onClick={() => void render()}
+          >
             <Icon name="refresh" /> {tc('render')}
           </button>
         )}
@@ -286,8 +317,13 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
       </div>
       <div className="cad-side">
         <section className="cad-sec">
-          <button className="cad-sec-head" aria-expanded={open.params} onClick={() => setOpen((o) => ({ ...o, params: !o.params }))}>
-            <Icon name={open.params ? 'chevronDown' : 'chevron'} /> {tc('params')} {params.length ? `(${params.length})` : ''}
+          <button
+            className="cad-sec-head"
+            aria-expanded={open.params}
+            onClick={() => setOpen((o) => ({ ...o, params: !o.params }))}
+          >
+            <Icon name={open.params ? 'chevronDown' : 'chevron'} /> {tc('params')}{' '}
+            {params.length ? `(${params.length})` : ''}
           </button>
           {open.params &&
             (params.length ? (
@@ -296,7 +332,13 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
                   <fieldset key={g || '-'} className="cad-group">
                     {g && <legend>{g}</legend>}
                     {ps.map((p) => (
-                      <ParamRow key={p.name} p={p} value={p.name in values ? values[p.name]! : p.value} changed={p.name in values} onChange={(v) => setValue(p, v)} />
+                      <ParamRow
+                        key={p.name}
+                        p={p}
+                        value={p.name in values ? values[p.name]! : p.value}
+                        changed={p.name in values}
+                        onChange={(v) => setValue(p, v)}
+                      />
                     ))}
                   </fieldset>
                 ))}
@@ -318,18 +360,35 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
         </section>
         {listed.length > 0 && (
           <section className="cad-sec">
-            <button className="cad-sec-head" aria-expanded={open.msgs} onClick={() => setOpen((o) => ({ ...o, msgs: !o.msgs }))}>
-              <Icon name={open.msgs ? 'chevronDown' : 'chevron'} /> {tc('problems')} ({listed.length})
+            <button
+              className="cad-sec-head"
+              aria-expanded={open.msgs}
+              onClick={() => setOpen((o) => ({ ...o, msgs: !o.msgs }))}
+            >
+              <Icon name={open.msgs ? 'chevronDown' : 'chevron'} /> {tc('problems')} (
+              {listed.length})
             </button>
             {open.msgs && (
               <>
                 <ul className="cad-msgs">
                   {listed.map((m, i) => (
                     <li key={i}>
-                      <button className={`cad-msg ${m.severity}`} onClick={() => goTo(m)} disabled={!m.line}>
-                        <span className="cad-msg-kind">{m.severity === 'echo' ? 'ECHO' : <Icon name={m.severity === 'error' ? 'close' : 'warning'} size={14} />}</span>
+                      <button
+                        className={`cad-msg ${m.severity}`}
+                        onClick={() => goTo(m)}
+                        disabled={!m.line}
+                      >
+                        <span className="cad-msg-kind">
+                          {m.severity === 'echo' ? (
+                            'ECHO'
+                          ) : (
+                            <Icon name={m.severity === 'error' ? 'close' : 'warning'} size={14} />
+                          )}
+                        </span>
                         <span className="cad-msg-text">{m.message}</span>
-                        {m.line ? <span className="cad-msg-line">{tc('line', { n: m.line })}</span> : null}
+                        {m.line ? (
+                          <span className="cad-msg-line">{tc('line', { n: m.line })}</span>
+                        ) : null}
                       </button>
                     </li>
                   ))}
@@ -341,7 +400,12 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
                       askAgent(
                         tc('fixAiPrompt', {
                           file: base(path),
-                          errors: errors.map((e) => `- ${e.line ? `${tc('line', { n: e.line })}: ` : ''}${e.message}`).join('\n'),
+                          errors: errors
+                            .map(
+                              (e) =>
+                                `- ${e.line ? `${tc('line', { n: e.line })}: ` : ''}${e.message}`,
+                            )
+                            .join('\n'),
                         }),
                       )
                     }
@@ -355,7 +419,11 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
         )}
         {st.report !== undefined && !st.error && (
           <section className="cad-sec">
-            <button className="cad-sec-head" aria-expanded={open.print} onClick={() => setOpen((o) => ({ ...o, print: !o.print }))}>
+            <button
+              className="cad-sec-head"
+              aria-expanded={open.print}
+              onClick={() => setOpen((o) => ({ ...o, print: !o.print }))}
+            >
               <Icon name={open.print ? 'chevronDown' : 'chevron'} /> {tc('print')}
             </button>
             {open.print && (
@@ -363,7 +431,10 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
                 <PrintCheck report={st.report ?? null} units="mm" bed={bed.size} />
                 <label className="cad-field">
                   <span>{tc('bed')}</span>
-                  <select value={bed.id} onChange={(e) => setBed(BEDS.find((b) => b.id === e.target.value) ?? BEDS[0]!)}>
+                  <select
+                    value={bed.id}
+                    onChange={(e) => setBed(BEDS.find((b) => b.id === e.target.value) ?? BEDS[0]!)}
+                  >
                     {BEDS.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.label} mm
@@ -374,7 +445,12 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
                 <div className="cad-export">
                   <span>{exporting ? tc('exporting') : tc('export')}</span>
                   {(['stl', '3mf', 'obj'] as CadFormat[]).map((f) => (
-                    <button key={f} className="btn ghost cad-small" disabled={exporting || !!st.error} onClick={() => void exportAs(f)}>
+                    <button
+                      key={f}
+                      className="btn ghost cad-small"
+                      disabled={exporting || !!st.error}
+                      onClick={() => void exportAs(f)}
+                    >
                       {f.toUpperCase()}
                     </button>
                   ))}
@@ -385,10 +461,20 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
         )}
         {st.report !== undefined && !st.error && (
           <section className="cad-sec">
-            <button className="cad-sec-head" aria-expanded={open.slice} onClick={() => setOpen((o) => ({ ...o, slice: !o.slice }))}>
+            <button
+              className="cad-sec-head"
+              aria-expanded={open.slice}
+              onClick={() => setOpen((o) => ({ ...o, slice: !o.slice }))}
+            >
               <Icon name={open.slice ? 'chevronDown' : 'chevron'} /> {tc('slice')}
             </button>
-            {open.slice && <SliceBox path={path} code={() => getDoc(path)?.model.getValue() ?? null} values={values} />}
+            {open.slice && (
+              <SliceBox
+                path={path}
+                code={() => getDoc(path)?.model.getValue() ?? null}
+                values={values}
+              />
+            )}
           </section>
         )}
       </div>
@@ -396,7 +482,17 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
   );
 }
 
-function ParamRow({ p, value, changed, onChange }: { p: ScadParam; value: ScadValue; changed: boolean; onChange: (v: unknown) => void }) {
+function ParamRow({
+  p,
+  value,
+  changed,
+  onChange,
+}: {
+  p: ScadParam;
+  value: ScadValue;
+  changed: boolean;
+  onChange: (v: unknown) => void;
+}) {
   const id = `cadp-${p.name}`;
   const label = (
     <label htmlFor={id} className="cad-param-name" title={p.description ?? p.name}>
@@ -408,7 +504,11 @@ function ParamRow({ p, value, changed, onChange }: { p: ScadParam; value: ScadVa
     return (
       <div className="cad-param">
         {label}
-        <select id={id} value={String(value)} onChange={(e) => onChange(p.type === 'number' ? Number(e.target.value) : e.target.value)}>
+        <select
+          id={id}
+          value={String(value)}
+          onChange={(e) => onChange(p.type === 'number' ? Number(e.target.value) : e.target.value)}
+        >
           {p.options.map((o) => (
             <option key={String(o.value)} value={String(o.value)}>
               {o.label}
@@ -421,7 +521,12 @@ function ParamRow({ p, value, changed, onChange }: { p: ScadParam; value: ScadVa
     return (
       <div className="cad-param">
         {label}
-        <input id={id} type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
+        <input
+          id={id}
+          type="checkbox"
+          checked={value === true}
+          onChange={(e) => onChange(e.target.checked)}
+        />
       </div>
     );
   if (p.type === 'number') {
@@ -441,7 +546,15 @@ function ParamRow({ p, value, changed, onChange }: { p: ScadParam; value: ScadVa
               onChange={(e) => onChange(Number(e.target.value))}
             />
           )}
-          <input id={id} type="number" min={p.min} max={p.max} step={p.step ?? 'any'} value={value as number} onChange={(e) => e.target.value !== '' && onChange(Number(e.target.value))} />
+          <input
+            id={id}
+            type="number"
+            min={p.min}
+            max={p.max}
+            step={p.step ?? 'any'}
+            value={value as number}
+            onChange={(e) => e.target.value !== '' && onChange(Number(e.target.value))}
+          />
         </div>
       </div>
     );
@@ -463,7 +576,12 @@ function ParamRow({ p, value, changed, onChange }: { p: ScadParam; value: ScadVa
   return (
     <div className="cad-param">
       {label}
-      <input id={id} value={value as string} maxLength={p.maxLength} onChange={(e) => onChange(e.target.value)} />
+      <input
+        id={id}
+        value={value as string}
+        maxLength={p.maxLength}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   );
 }

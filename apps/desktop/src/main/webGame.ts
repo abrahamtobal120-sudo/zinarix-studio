@@ -35,7 +35,8 @@ export class WebGameServers {
   /** URL of a file of the open folder (rel, '/'-separated; '' = the folder). */
   async url(root: string, rel: string): Promise<string> {
     const clean = rel.replace(/\\/g, '/').replace(/^\/+/, '');
-    if (clean.split('/').some((s) => s === '..' || s.startsWith('.'))) throw new Error('Ruta no válida.');
+    if (clean.split('/').some((s) => s === '..' || s.startsWith('.')))
+      throw new Error('Ruta no válida.');
     const s = await this.serve(root);
     return `http://127.0.0.1:${s.port}/${s.token}/${clean.split('/').map(encodeURIComponent).join('/')}`;
   }
@@ -77,7 +78,9 @@ async function start(root: string): Promise<Served> {
         res.writeHead(400).end();
         return;
       }
-      if (rel.some((x) => x === '..' || x.startsWith('.') || x.includes('\\') || x.includes('\0'))) {
+      if (
+        rel.some((x) => x === '..' || x.startsWith('.') || x.includes('\\') || x.includes('\0'))
+      ) {
         res.writeHead(403).end();
         return;
       }
@@ -91,12 +94,19 @@ async function start(root: string): Promise<Served> {
         const body = await readFile(file);
         // Godot web exports (a .wasm next to the page) need SharedArrayBuffer: isolate them.
         // Other games keep loading images and libraries from other sites.
-        const isolate = (await readdir(dirname(file)).catch(() => [] as string[])).some((f) => f.endsWith('.wasm'));
+        const isolate = (await readdir(dirname(file)).catch(() => [] as string[])).some((f) =>
+          f.endsWith('.wasm'),
+        );
         res.writeHead(200, {
           'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
           'cache-control': 'no-store',
           'x-content-type-options': 'nosniff',
-          ...(isolate ? { 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' } : {}),
+          ...(isolate
+            ? {
+                'cross-origin-opener-policy': 'same-origin',
+                'cross-origin-embedder-policy': 'require-corp',
+              }
+            : {}),
         });
         res.end(req.method === 'HEAD' ? undefined : body);
       } catch {

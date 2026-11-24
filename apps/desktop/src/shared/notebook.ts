@@ -229,7 +229,10 @@ export function serializeCell(c: NbCell): JsonObject {
   };
   if (c.cell_type === 'code') {
     out.execution_count = c.execution_count;
-    out.outputs = [...c.outputs.map(serializeOutput), ...(Array.isArray(rawOutputs) ? rawOutputs : [])];
+    out.outputs = [
+      ...c.outputs.map(serializeOutput),
+      ...(Array.isArray(rawOutputs) ? rawOutputs : []),
+    ];
   }
   return out;
 }
@@ -322,7 +325,6 @@ export function mimeText(v: Json | undefined): string {
   return JSON.stringify(v, null, 2);
 }
 
- 
 const ANSI = /\u001b\[[0-9;?]*[A-Za-z]|\u001b\][^\u0007]*\u0007/g;
 export function stripAnsi(s: string): string {
   return s.replace(ANSI, '');
@@ -341,7 +343,7 @@ export function collapseCarriageReturns(s: string): string {
         while (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
         cur = parts[parts.length - 1]!;
       }
-       
+
       while (cur.includes('\b')) cur = cur.replace(/[^\x08]\x08|^\x08+/, '');
       return cur;
     })
@@ -417,11 +419,7 @@ export interface OutputState {
  * outputs: stream (merged with the previous stream of the same name), execute_result,
  * display_data, update_display_data, error and clear_output. Other types are ignored.
  */
-export function applyIopub(
-  st: OutputState,
-  msgType: string,
-  content: JsonObject,
-): OutputState {
+export function applyIopub(st: OutputState, msgType: string, content: JsonObject): OutputState {
   if (msgType === 'clear_output') {
     if (content.wait === true) return { outputs: st.outputs, clearPending: true };
     return { outputs: [], clearPending: false };
@@ -477,7 +475,10 @@ export function applyIopub(
   const last = base[base.length - 1];
   if (next.output_type === 'stream' && last?.output_type === 'stream' && last.name === next.name)
     return {
-      outputs: [...base.slice(0, -1), { ...last, text: collapseCarriageReturns(last.text + next.text) }],
+      outputs: [
+        ...base.slice(0, -1),
+        { ...last, text: collapseCarriageReturns(last.text + next.text) },
+      ],
       clearPending: false,
     };
   if (next.output_type === 'stream') next.text = collapseCarriageReturns(next.text);
@@ -624,7 +625,9 @@ export function ansiSpans(s: string): AnsiSpan[] {
  */
 export function notebookToScript(nb: Notebook): string {
   const lang = notebookLanguage(nb);
-  const comment = ['python', 'julia', 'r', 'ruby', 'bash', 'sh', 'perl'].includes(lang) ? '#' : '//';
+  const comment = ['python', 'julia', 'r', 'ruby', 'bash', 'sh', 'perl'].includes(lang)
+    ? '#'
+    : '//';
   const parts: string[] = [];
   for (const c of nb.cells) {
     const src = c.source.replace(/\s+$/, '');
@@ -762,7 +765,9 @@ export const PY_VARIABLES_EXPR = '__zinarix_vars()';
 /** The user_expression of PY_VARIABLES_CODE → variables (null when it failed). */
 export function parseVariables(expr: Json | undefined): NbVariable[] | null {
   if (!isObj(expr) || expr.status !== 'ok' || !isObj(expr.data)) return null;
-  const raw = mimeText(expr.data['text/plain']).trim().replace(/^['"]|['"]$/g, '');
+  const raw = mimeText(expr.data['text/plain'])
+    .trim()
+    .replace(/^['"]|['"]$/g, '');
   let rows: unknown;
   try {
     rows = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))));

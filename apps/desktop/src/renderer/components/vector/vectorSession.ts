@@ -57,8 +57,21 @@ import { tg, type KeyG } from '../graphics/graphicsStrings';
 
 export const SVGNS = 'http://www.w3.org/2000/svg';
 const NOT_GRAPHIC = new Set([
-  'defs', 'style', 'title', 'desc', 'metadata', 'script', 'linearGradient', 'radialGradient',
-  'pattern', 'clipPath', 'mask', 'filter', 'symbol', 'marker', 'foreignObject',
+  'defs',
+  'style',
+  'title',
+  'desc',
+  'metadata',
+  'script',
+  'linearGradient',
+  'radialGradient',
+  'pattern',
+  'clipPath',
+  'mask',
+  'filter',
+  'symbol',
+  'marker',
+  'foreignObject',
 ]);
 
 export type Tool = 'select' | 'rect' | 'ellipse' | 'line' | 'pen' | 'text' | 'hand';
@@ -92,7 +105,8 @@ export const isLocked = (el: Element): boolean => el.getAttribute('data-locked')
 
 /** Name in the layers list: data-name, id, the start of a text, or the kind. */
 export function layerName(el: Element): string {
-  const n = el.getAttribute('data-name') || el.getAttribute('inkscape:label') || el.getAttribute('id');
+  const n =
+    el.getAttribute('data-name') || el.getAttribute('inkscape:label') || el.getAttribute('id');
   if (n) return n;
   if (el.localName === 'text') {
     const t = (el.textContent ?? '').trim();
@@ -143,8 +157,24 @@ export interface TextEdit {
 
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; px: number; py: number }
-  | { kind: 'move'; start: Pt; items: Item[]; box: Box; xs: number[]; ys: number[]; dup: boolean; moved: boolean }
-  | { kind: 'resize'; handle: Handle; items: Item[]; box: Box; single: { local: Box; full: Mat } | null; ratio: boolean }
+  | {
+      kind: 'move';
+      start: Pt;
+      items: Item[];
+      box: Box;
+      xs: number[];
+      ys: number[];
+      dup: boolean;
+      moved: boolean;
+    }
+  | {
+      kind: 'resize';
+      handle: Handle;
+      items: Item[];
+      box: Box;
+      single: { local: Box; full: Mat } | null;
+      ratio: boolean;
+    }
   | { kind: 'rotate'; c: Pt; a0: number; items: Item[] }
   | { kind: 'marquee'; start: Pt; now: Pt; add: boolean }
   | { kind: 'create'; el: SVGGraphicsElement; start: Pt; tool: 'rect' | 'ellipse' | 'line' }
@@ -162,7 +192,15 @@ export interface NodeEdit {
 }
 
 /** Shapes that become a path to edit their points. */
-export const NODE_EDITABLE = new Set(['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline']);
+export const NODE_EDITABLE = new Set([
+  'path',
+  'rect',
+  'ellipse',
+  'circle',
+  'line',
+  'polygon',
+  'polyline',
+]);
 
 interface Item {
   el: SVGGraphicsElement;
@@ -268,7 +306,9 @@ export class VectorSession {
     const d = new DOMParser().parseFromString(text, 'image/svg+xml');
     const pe = d.querySelector('parsererror');
     if (pe || d.documentElement.localName !== 'svg') {
-      this.error = pe ? (pe.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 300) : 'No <svg> element.';
+      this.error = pe
+        ? (pe.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 300)
+        : 'No <svg> element.';
       this.root?.remove();
       this.root = null;
       this.sel = [];
@@ -286,13 +326,15 @@ export class VectorSession {
       const v = parseFloat(root.getAttribute(k) ?? '');
       return Number.isFinite(v) && v > 0 && !/%/.test(root.getAttribute(k) ?? '') ? v : d0;
     };
-    if (!root.getAttribute('viewBox')) root.setAttribute('viewBox', `0 0 ${size('width', 300)} ${size('height', 150)}`);
+    if (!root.getAttribute('viewBox'))
+      root.setAttribute('viewBox', `0 0 ${size('width', 300)} ${size('height', 150)}`);
     const vb = root.viewBox.baseVal;
     this.page = { x: vb.x, y: vb.y, w: vb.width || 300, h: vb.height || 150 };
     if (!this.shadow.querySelector('style[data-vd]')) {
       const st = document.createElement('style');
       st.setAttribute('data-vd', '');
-      st.textContent = ':host{display:block}:host>svg{display:block;width:100%;height:100%;overflow:visible;user-select:none}';
+      st.textContent =
+        ':host{display:block}:host>svg{display:block;width:100%;height:100%;overflow:visible;user-select:none}';
       this.shadow.append(st);
     }
     this.root?.remove();
@@ -344,7 +386,11 @@ export class VectorSession {
     this.last = text;
     this.own = true;
     try {
-      this.model.pushEditOperations([], [{ range: this.model.getFullModelRange(), text }], () => null);
+      this.model.pushEditOperations(
+        [],
+        [{ range: this.model.getFullModelRange(), text }],
+        () => null,
+      );
     } finally {
       this.own = false;
     }
@@ -374,7 +420,8 @@ export class VectorSession {
 
   private restore(text: string): void {
     const path = this.sel.map((el) => this.indexPath(el));
-    const inside = this.container && this.container !== this.root ? this.indexPath(this.container) : null;
+    const inside =
+      this.container && this.container !== this.root ? this.indexPath(this.container) : null;
     const nodePath = this.nodes ? this.indexPath(this.nodes.el) : null;
     this.load(text, true);
     this.write(text);
@@ -419,7 +466,10 @@ export class VectorSession {
     const r = this.stage.getBoundingClientRect();
     if (!r.width || !r.height) return;
     const pad = 48;
-    this.zoom = Math.max(0.02, Math.min(4, (r.width - pad * 2) / this.page.w, (r.height - pad * 2) / this.page.h));
+    this.zoom = Math.max(
+      0.02,
+      Math.min(4, (r.width - pad * 2) / this.page.w, (r.height - pad * 2) / this.page.h),
+    );
     this.panX = (r.width - this.page.w * this.zoom) / 2;
     this.panY = (r.height - this.page.h * this.zoom) / 2;
     this.userView = false;
@@ -516,7 +566,9 @@ export class VectorSession {
 
   private handleOf(e: Event): Handle | 'rot' | null {
     const t = e.composedPath()[0];
-    return t instanceof Element ? ((t.getAttribute('data-h') as Handle | 'rot' | null) ?? null) : null;
+    return t instanceof Element
+      ? ((t.getAttribute('data-h') as Handle | 'rot' | null) ?? null)
+      : null;
   }
 
   // ---------------------------------------------------------------- pointer
@@ -555,7 +607,9 @@ export class VectorSession {
     if (h && this.sel.length) {
       const items = this.items();
       if (h === 'rot') {
-        const b = this.single() ? this.orientedCenter(this.sel[0]!) : this.boxCenter(this.selBox()!);
+        const b = this.single()
+          ? this.orientedCenter(this.sel[0]!)
+          : this.boxCenter(this.selBox()!);
         this.drag = { kind: 'rotate', c: b, a0: Math.atan2(p.y - b.y, p.x - b.x), items };
       } else {
         const one = this.single();
@@ -605,7 +659,16 @@ export class VectorSession {
       xs.push(...l.xs);
       ys.push(...l.ys);
     }
-    this.drag = { kind: 'move', start: p, items: this.items(), box: this.selBox()!, xs, ys, dup, moved: false };
+    this.drag = {
+      kind: 'move',
+      start: p,
+      items: this.items(),
+      box: this.selBox()!,
+      xs,
+      ys,
+      dup,
+      moved: false,
+    };
   }
 
   private move(e: PointerEvent): void {
@@ -650,7 +713,9 @@ export class VectorSession {
           if (Math.abs(dx) > Math.abs(dy)) dy = 0;
           else dx = 0;
         }
-        const s = e.ctrlKey ? { dx, dy, guides: [] } : snapMove(d.box, dx, dy, d.xs, d.ys, 6 / this.zoom);
+        const s = e.ctrlKey
+          ? { dx, dy, guides: [] }
+          : snapMove(d.box, dx, dy, d.xs, d.ys, 6 / this.zoom);
         this.guides = s.guides;
         this.applyDoc(d.items, translate(s.dx, s.dy));
         this.bump();
@@ -755,7 +820,13 @@ export class VectorSession {
         if (b.w * this.zoom < 3 && b.h * this.zoom < 3) {
           // A click without dragging: a shape of a default size there.
           const s = Math.min(this.page.w, this.page.h) / 4;
-          this.shapeTo(d.el, d.tool, { x: d.start.x - s / 2, y: d.start.y - s / 2 }, { x: d.start.x + s / 2, y: d.start.y + s / 2 }, false);
+          this.shapeTo(
+            d.el,
+            d.tool,
+            { x: d.start.x - s / 2, y: d.start.y - s / 2 },
+            { x: d.start.x + s / 2, y: d.start.y + s / 2 },
+            false,
+          );
         }
         this.sel = [d.el];
         this.tool = 'select';
@@ -781,7 +852,8 @@ export class VectorSession {
           ne.subs.forEach((sp, si) =>
             sp.nodes.forEach((n, i) => {
               const q = apply(k, n);
-              if (q.x >= m.x && q.x <= m.x + m.w && q.y >= m.y && q.y <= m.y + m.h) ne.sel.add(`${si}:${i}`);
+              if (q.x >= m.x && q.x <= m.x + m.w && q.y >= m.y && q.y <= m.y + m.h)
+                ne.sel.add(`${si}:${i}`);
             }),
           );
         }
@@ -802,7 +874,11 @@ export class VectorSession {
         const [si, i] = key.key.split(':').map(Number) as [number, number];
         const n = this.nodes.subs[si]?.nodes[i];
         if (n) {
-          setNodeType(this.nodes.subs[si]!, i, n.ix !== undefined || n.ox !== undefined ? 'corner' : 'smooth');
+          setNodeType(
+            this.nodes.subs[si]!,
+            i,
+            n.ix !== undefined || n.ox !== undefined ? 'corner' : 'smooth',
+          );
           this.writeNodes();
           this.commit();
         }
@@ -824,7 +900,8 @@ export class VectorSession {
       return;
     }
     if (el.localName === 'text') this.editText(el as SVGTextElement);
-    else if (el.localName === 'path' || el.localName === 'polygon' || el.localName === 'polyline') this.editNodes(el);
+    else if (el.localName === 'path' || el.localName === 'polygon' || el.localName === 'polyline')
+      this.editNodes(el);
   }
 
   private wheel(e: WheelEvent): void {
@@ -857,7 +934,13 @@ export class VectorSession {
     return el;
   }
 
-  private shapeTo(el: SVGGraphicsElement, tool: 'rect' | 'ellipse' | 'line', a: Pt, b: Pt, square: boolean): void {
+  private shapeTo(
+    el: SVGGraphicsElement,
+    tool: 'rect' | 'ellipse' | 'line',
+    a: Pt,
+    b: Pt,
+    square: boolean,
+  ): void {
     // In the container's own space (the group being edited may be transformed).
     const inv = invert(this.containerToDoc());
     const pa = apply(inv, a);
@@ -924,7 +1007,10 @@ export class VectorSession {
     const a = apply(inv, { x: c.x - s / 2, y: c.y - s / 2 });
     const el = document.createElementNS(SVGNS, 'path') as SVGPathElement;
     el.setAttribute('data-name', tg(`shape_${kind}` as KeyG));
-    el.setAttribute('d', shapePath(kind, { x: a.x, y: a.y, w: s, h: kind === 'arrow' ? s * 0.6 : s }));
+    el.setAttribute(
+      'd',
+      shapePath(kind, { x: a.x, y: a.y, w: s, h: kind === 'arrow' ? s * 0.6 : s }),
+    );
     el.setAttribute('fill', this.fill);
     this.container!.append(el);
     this.sel = [el];
@@ -1068,7 +1154,22 @@ export class VectorSession {
       const d = shapeAsPath(el);
       if (!d) return false;
       path = document.createElementNS(SVGNS, 'path') as SVGPathElement;
-      const geo = new Set(['x', 'y', 'width', 'height', 'rx', 'ry', 'cx', 'cy', 'r', 'x1', 'y1', 'x2', 'y2', 'points']);
+      const geo = new Set([
+        'x',
+        'y',
+        'width',
+        'height',
+        'rx',
+        'ry',
+        'cx',
+        'cy',
+        'r',
+        'x1',
+        'y1',
+        'x2',
+        'y2',
+        'points',
+      ]);
       for (const a of [...el.attributes]) if (!geo.has(a.name)) path.setAttribute(a.name, a.value);
       if (el.localName === 'line' && !path.getAttribute('fill')) path.setAttribute('fill', 'none');
       path.setAttribute('d', d);
@@ -1144,7 +1245,11 @@ export class VectorSession {
     return true;
   }
 
-  private nodeMove(d: Extract<Drag, { kind: 'node' | 'nhandle' | 'nmarquee' }>, p: Pt, e: PointerEvent): void {
+  private nodeMove(
+    d: Extract<Drag, { kind: 'node' | 'nhandle' | 'nmarquee' }>,
+    p: Pt,
+    e: PointerEvent,
+  ): void {
     const ne = this.nodes;
     if (!ne) return;
     if (d.kind === 'nmarquee') {
@@ -1383,14 +1488,17 @@ export class VectorSession {
 
   angle(el: SVGGraphicsElement): number {
     const m = this.elToDoc(el);
-    return Math.round((Math.atan2(m[1], m[0]) * 180) / Math.PI * 10) / 10;
+    return Math.round(((Math.atan2(m[1], m[0]) * 180) / Math.PI) * 10) / 10;
   }
 
   flip(axis: 'x' | 'y'): void {
     const b = this.selBox();
     if (!b) return;
     const c = this.boxCenter(b);
-    const t = mul(translate(c.x, c.y), mul(axis === 'x' ? scale(-1, 1) : scale(1, -1), translate(-c.x, -c.y)));
+    const t = mul(
+      translate(c.x, c.y),
+      mul(axis === 'x' ? scale(-1, 1) : scale(1, -1), translate(-c.x, -c.y)),
+    );
     this.applyDoc(this.items(), t);
     this.commit();
   }
@@ -1409,7 +1517,10 @@ export class VectorSession {
 
   distribute(axis: 'x' | 'y'): void {
     if (this.sel.length < 3) return;
-    const ds = distributeDeltas(this.sel.map((el) => this.docBox(el)), axis);
+    const ds = distributeDeltas(
+      this.sel.map((el) => this.docBox(el)),
+      axis,
+    );
     this.sel.forEach((el, i) => {
       this.applyDoc(this.items([el]), translate(ds[i]!.x, ds[i]!.y));
       bake(el);
@@ -1466,7 +1577,15 @@ export class VectorSession {
     const groups = this.sel.filter((el) => el.localName === 'g');
     if (!groups.length) return;
     const out: SVGGraphicsElement[] = this.sel.filter((el) => el.localName !== 'g');
-    const inherit = ['fill', 'stroke', 'stroke-width', 'font-family', 'font-size', 'font-weight', 'font-style'];
+    const inherit = [
+      'fill',
+      'stroke',
+      'stroke-width',
+      'font-family',
+      'font-size',
+      'font-weight',
+      'font-style',
+    ];
     for (const g of groups) {
       const mg = matOf(g);
       const gOpacity = parseFloat(g.getAttribute('opacity') ?? '1');
@@ -1522,7 +1641,10 @@ export class VectorSession {
 
   paste(): void {
     if (!this.clip.length || !this.container) return;
-    const d = new DOMParser().parseFromString(`<svg xmlns="${SVGNS}">${this.clip.join('')}</svg>`, 'image/svg+xml');
+    const d = new DOMParser().parseFromString(
+      `<svg xmlns="${SVGNS}">${this.clip.join('')}</svg>`,
+      'image/svg+xml',
+    );
     if (d.querySelector('parsererror')) return;
     sanitizeSvg(d.documentElement);
     this.pasteN++;
@@ -1603,20 +1725,28 @@ export function wrapWidth(el: Element): number {
   return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
-const firstNum = (v: string | null): number => parseFloat((v ?? '0').trim().split(/[\s,]+/)[0] ?? '0') || 0;
+const firstNum = (v: string | null): number =>
+  parseFloat((v ?? '0').trim().split(/[\s,]+/)[0] ?? '0') || 0;
 
 /** The text as typed: Enter between paragraphs, wrapped lines joined back with a space. */
 export function textValue(el: SVGTextElement): string {
   const spans = [...el.children].filter((c) => c.localName === 'tspan');
   if (!spans.length) return el.textContent ?? '';
   return spans
-    .map((s, i) => (i === 0 ? '' : s.getAttribute('data-soft') === '1' ? ' ' : '\n') + (s.textContent === ' ' ? '' : (s.textContent ?? '')))
+    .map(
+      (s, i) =>
+        (i === 0 ? '' : s.getAttribute('data-soft') === '1' ? ' ' : '\n') +
+        (s.textContent === ' ' ? '' : (s.textContent ?? '')),
+    )
     .join('');
 }
 
 /** Width of a line in the text's own font (an estimate where the DOM cannot measure). */
 function measurer(el: SVGTextElement): (s: string) => number {
-  const size = parseFloat(el.getAttribute('font-size') ?? '') || parseFloat(getComputedStyle(el).fontSize) || 16;
+  const size =
+    parseFloat(el.getAttribute('font-size') ?? '') ||
+    parseFloat(getComputedStyle(el).fontSize) ||
+    16;
   return (s: string) => {
     el.textContent = s;
     let w = 0;
@@ -1636,7 +1766,12 @@ function measurer(el: SVGTextElement): (s: string) => number {
 export function setTextLines(el: SVGTextElement, value: string): void {
   const w = wrapWidth(el);
   const lines =
-    w > 0 ? wrapText(value, w, measurer(el)) : value.replace(/\r/g, '').split('\n').map((text) => ({ text, soft: false }));
+    w > 0
+      ? wrapText(value, w, measurer(el))
+      : value
+          .replace(/\r/g, '')
+          .split('\n')
+          .map((text) => ({ text, soft: false }));
   const x = (el.getAttribute('x') ?? '0').trim().split(/[\s,]+/)[0] ?? '0';
   while (el.firstChild) el.firstChild.remove();
   if (lines.length === 1) {
@@ -1702,7 +1837,10 @@ const num = (el: Element, k: string): number | null => {
 function scaleList(el: Element, k: string, s: number, t: number): boolean {
   const v = el.getAttribute(k);
   if (v === null) return true;
-  const parts = v.trim().split(/[\s,]+/).map(Number);
+  const parts = v
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
   if (parts.some((p) => !Number.isFinite(p))) return false;
   el.setAttribute(k, parts.map((p) => r4(p * s + t)).join(' '));
   return true;
@@ -1783,7 +1921,13 @@ export function bake(el: SVGGraphicsElement): void {
         }
       const listOk = (n: Element, k: string): boolean => {
         const v = n.getAttribute(k);
-        return v === null || v.trim().split(/[\s,]+/).every((p) => Number.isFinite(Number(p)));
+        return (
+          v === null ||
+          v
+            .trim()
+            .split(/[\s,]+/)
+            .every((p) => Number.isFinite(Number(p)))
+        );
       };
       if (!nodes.every((n) => listOk(n, 'x') && listOk(n, 'y'))) return;
       for (const n of nodes) {
@@ -1798,9 +1942,11 @@ export function bake(el: SVGGraphicsElement): void {
             if (Number.isFinite(f)) n.setAttribute('font-size', String(r4(f * sx)));
           }
           const ww = n.getAttribute('data-wrap-width');
-          if (ww !== null && Number.isFinite(parseFloat(ww))) n.setAttribute('data-wrap-width', String(r4(parseFloat(ww) * sx)));
+          if (ww !== null && Number.isFinite(parseFloat(ww)))
+            n.setAttribute('data-wrap-width', String(r4(parseFloat(ww) * sx)));
           const ls = n.getAttribute('letter-spacing');
-          if (ls !== null && Number.isFinite(parseFloat(ls))) n.setAttribute('letter-spacing', String(r4(parseFloat(ls) * sx)));
+          if (ls !== null && Number.isFinite(parseFloat(ls)))
+            n.setAttribute('letter-spacing', String(r4(parseFloat(ls) * sx)));
         }
         if (el.getAttribute('font-size') === null) {
           const f = parseFloat(getComputedStyle(el).fontSize);

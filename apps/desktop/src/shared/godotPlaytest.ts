@@ -142,12 +142,19 @@ const MAX_SECONDS = 120;
 const MAX_SHOTS = 6;
 const MAX_EVENTS = 2000;
 
-const validAction = (s: unknown): s is string => typeof s === 'string' && /^[\w.\-/]{1,80}$/.test(s);
+const validAction = (s: unknown): s is string =>
+  typeof s === 'string' && /^[\w.\-/]{1,80}$/.test(s);
 /** Godot key names: A, Space, Enter, Escape, Left, Shift, F1, Kp 1… */
-const validKey = (s: unknown): s is string => typeof s === 'string' && /^[A-Za-z0-9 _+\-]{1,24}$/.test(s);
-const validNodePath = (s: unknown): s is string => typeof s === 'string' && s.length <= 200 && /^[\w./@ %\-]+$/.test(s);
-const validProp = (s: unknown): s is string => typeof s === 'string' && (s === '' || /^[A-Za-z_]\w*(?:[:/][A-Za-z_]\w*)*$/.test(s)) && s.length <= 120;
-const nums = (v: unknown, lo: number, hi: number): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : null);
+const validKey = (s: unknown): s is string =>
+  typeof s === 'string' && /^[A-Za-z0-9 _+\-]{1,24}$/.test(s);
+const validNodePath = (s: unknown): s is string =>
+  typeof s === 'string' && s.length <= 200 && /^[\w./@ %\-]+$/.test(s);
+const validProp = (s: unknown): s is string =>
+  typeof s === 'string' &&
+  (s === '' || /^[A-Za-z_]\w*(?:[:/][A-Za-z_]\w*)*$/.test(s)) &&
+  s.length <= 120;
+const nums = (v: unknown, lo: number, hi: number): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : null;
 
 /** "Player:position" / "Player.position" / {node, prop} → [node, prop]. */
 function splitProbe(v: unknown): [string, string] | null {
@@ -172,7 +179,12 @@ function splitProbe(v: unknown): [string, string] | null {
  *   { at: 2, shot: true }                     { at: 2, probe: "Player:position" }
  * plus watch (probes repeated every `every` seconds) and seconds (when it quits).
  */
-export function buildPlaytestPlan(input: { steps?: unknown; watch?: unknown; every?: unknown; seconds?: unknown }): PlayPlan {
+export function buildPlaytestPlan(input: {
+  steps?: unknown;
+  watch?: unknown;
+  every?: unknown;
+  seconds?: unknown;
+}): PlayPlan {
   const steps = Array.isArray(input.steps) ? input.steps : [];
   if (steps.length > 300) throw new Error('At most 300 steps.');
   const ev: PlayEvent[] = [];
@@ -182,18 +194,36 @@ export function buildPlaytestPlan(input: { steps?: unknown; watch?: unknown; eve
     const at = nums(s.at, 0, MAX_SECONDS);
     if (at === null) throw new Error(`steps[${i}]: "at" (game second) is required.`);
     const bad = (what: string) => new Error(`steps[${i}]: ${what}`);
-    const pressKind = (v: unknown, keyField: unknown): { type: 'action' | 'key'; id: string } | null => {
+    const pressKind = (
+      v: unknown,
+      keyField: unknown,
+    ): { type: 'action' | 'key'; id: string } | null => {
       if (keyField !== undefined) {
-        if (!validKey(keyField)) throw bad(`bad key ${JSON.stringify(keyField)} (Godot names: A, Space, Enter, Escape, Left, Up…).`);
+        if (!validKey(keyField))
+          throw bad(
+            `bad key ${JSON.stringify(keyField)} (Godot names: A, Space, Enter, Escape, Left, Up…).`,
+          );
         return { type: 'key', id: keyField };
       }
       if (v === undefined) return null;
-      if (!validAction(v)) throw bad(`bad action ${JSON.stringify(v)} (an input action of the project, see game_info).`);
+      if (!validAction(v))
+        throw bad(
+          `bad action ${JSON.stringify(v)} (an input action of the project, see game_info).`,
+        );
       return { type: 'action', id: v };
     };
-    const down = (k: { type: 'action' | 'key'; id: string }, t: number, pressed: boolean): PlayEvent =>
-      k.type === 'action' ? { t, type: 'action', name: k.id, pressed } : { t, type: 'key', key: k.id, pressed };
-    if (s.press !== undefined || (s.key !== undefined && s.hold === undefined && s.release === undefined)) {
+    const down = (
+      k: { type: 'action' | 'key'; id: string },
+      t: number,
+      pressed: boolean,
+    ): PlayEvent =>
+      k.type === 'action'
+        ? { t, type: 'action', name: k.id, pressed }
+        : { t, type: 'key', key: k.id, pressed };
+    if (
+      s.press !== undefined ||
+      (s.key !== undefined && s.hold === undefined && s.release === undefined)
+    ) {
       const k = pressKind(s.press, s.key)!;
       const dur = nums(s.for, 0.02, MAX_SECONDS) ?? 0.1;
       ev.push(down(k, at, true), down(k, at + dur, false));
@@ -211,12 +241,21 @@ export function buildPlaytestPlan(input: { steps?: unknown; watch?: unknown; eve
       ev.push(down(k, at, false));
     } else if (s.click !== undefined || s.move !== undefined) {
       const xy = (s.click ?? s.move) as unknown;
-      if (!Array.isArray(xy) || xy.length !== 2 || xy.some((n) => typeof n !== 'number' || !Number.isFinite(n))) throw bad('click / move: [x, y] in window pixels.');
+      if (
+        !Array.isArray(xy) ||
+        xy.length !== 2 ||
+        xy.some((n) => typeof n !== 'number' || !Number.isFinite(n))
+      )
+        throw bad('click / move: [x, y] in window pixels.');
       const [x, y] = [Math.round(xy[0] as number), Math.round(xy[1] as number)];
       if (s.move !== undefined) ev.push({ t: at, type: 'move', x, y });
       else {
         const button = s.button === 'right' ? 2 : s.button === 'middle' ? 3 : 1;
-        ev.push({ t: at, type: 'move', x, y }, { t: at, type: 'mouse', x, y, button, pressed: true }, { t: at + 0.05, type: 'mouse', x, y, button, pressed: false });
+        ev.push(
+          { t: at, type: 'move', x, y },
+          { t: at, type: 'mouse', x, y, button, pressed: true },
+          { t: at + 0.05, type: 'mouse', x, y, button, pressed: false },
+        );
       }
     } else if (s.shot) {
       ev.push({ t: at, type: 'shot' });
@@ -224,27 +263,38 @@ export function buildPlaytestPlan(input: { steps?: unknown; watch?: unknown; eve
       const list = Array.isArray(s.probe) ? s.probe : [s.probe];
       for (const p of list) {
         const np = splitProbe(p);
-        if (!np) throw bad(`bad probe ${JSON.stringify(p)} ("Node/Path:property", e.g. "Player:position" or "/root/Global:score").`);
+        if (!np)
+          throw bad(
+            `bad probe ${JSON.stringify(p)} ("Node/Path:property", e.g. "Player:position" or "/root/Global:score").`,
+          );
         ev.push({ t: at, type: 'probe', node: np[0], prop: np[1] });
       }
     } else throw bad('one of press, hold, release, key, click, move, shot or probe.');
     lastT = Math.max(lastT, at);
   });
-  const watch = (Array.isArray(input.watch) ? input.watch : input.watch !== undefined ? [input.watch] : []).slice(0, 10);
+  const watch = (
+    Array.isArray(input.watch) ? input.watch : input.watch !== undefined ? [input.watch] : []
+  ).slice(0, 10);
   const every = nums(input.every, 0.1, 10) ?? 0.5;
-  const seconds = nums(input.seconds, 0.5, MAX_SECONDS) ?? Math.min(MAX_SECONDS, Math.max(2, lastT + 0.5));
+  const seconds =
+    nums(input.seconds, 0.5, MAX_SECONDS) ?? Math.min(MAX_SECONDS, Math.max(2, lastT + 0.5));
   for (const w of watch) {
     const np = splitProbe(w);
     if (!np) throw new Error(`bad watch ${JSON.stringify(w)} ("Node:property").`);
-    for (let t = 0; t <= seconds + 1e-9; t += every) ev.push({ t: Math.round(t * 100) / 100, type: 'probe', node: np[0], prop: np[1] });
+    for (let t = 0; t <= seconds + 1e-9; t += every)
+      ev.push({ t: Math.round(t * 100) / 100, type: 'probe', node: np[0], prop: np[1] });
   }
   const shots = ev.filter((e) => e.type === 'shot').length;
   if (shots > MAX_SHOTS) throw new Error(`At most ${MAX_SHOTS} screenshots per play test.`);
   const kept = ev.filter((e) => e.t <= seconds);
   kept.push({ t: seconds, type: 'quit' });
-  if (kept.length > MAX_EVENTS) throw new Error('Too many events (shorten watch or make "every" bigger).');
+  if (kept.length > MAX_EVENTS)
+    throw new Error('Too many events (shorten watch or make "every" bigger).');
   // Stable sort by time: a press and the probe at the same second keep the given order.
-  const ordered = kept.map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t || a.i - b.i).map((x) => ({ ...x.e, t: Math.round(x.e.t * 1000) / 1000 }));
+  const ordered = kept
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => a.e.t - b.e.t || a.i - b.i)
+    .map((x) => ({ ...x.e, t: Math.round(x.e.t * 1000) / 1000 }));
   return { events: ordered, seconds, shots };
 }
 
@@ -301,7 +351,14 @@ export interface PlayOutput {
 }
 
 export function parsePlaytestOutput(text: string): PlayOutput {
-  const r: PlayOutput = { ready: false, done: false, probes: [], shots: [], badKeys: [], output: '' };
+  const r: PlayOutput = {
+    ready: false,
+    done: false,
+    probes: [],
+    shots: [],
+    badKeys: [],
+    output: '',
+  };
   const keep: string[] = [];
   for (const line of text.split(/\r?\n/)) {
     const m = /^ZS_(READY|DONE|PROBE|SHOT|BAD_KEY|PLAN)\b ?(.*)$/.exec(line.trim());
@@ -330,7 +387,12 @@ export function describeProbes(probes: PlayProbe[], max = 120): string {
   const byT = new Map<number, PlayProbe[]>();
   for (const p of probes) (byT.get(p.t) ?? byT.set(p.t, []).get(p.t)!).push(p);
   const rows = [...byT.entries()].sort((a, b) => a[0] - b[0]);
-  const lines = rows.slice(0, max).map(([t, ps]) => `t=${t.toFixed(2)}s  ${ps.map((p) => `${p.node}${p.prop ? `:${p.prop}` : ''}=${p.error ? `(${p.error})` : (p.value ?? '').slice(0, 120)}`).join('  ')}`);
+  const lines = rows
+    .slice(0, max)
+    .map(
+      ([t, ps]) =>
+        `t=${t.toFixed(2)}s  ${ps.map((p) => `${p.node}${p.prop ? `:${p.prop}` : ''}=${p.error ? `(${p.error})` : (p.value ?? '').slice(0, 120)}`).join('  ')}`,
+    );
   if (rows.length > max) lines.push(`… (+${rows.length - max} more times)`);
   return lines.join('\n');
 }

@@ -1,224 +1,272 @@
 @layer features {
-/* Image editor (Fase 1A del plan de funciones) */
-.image-editor {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  outline: none;
-}
-.ie-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-.ie-stage {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  background-color: var(--bg-2);
-  background-image:
-    linear-gradient(45deg, var(--bg-3) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--bg-3) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--bg-3) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--bg-3) 75%);
-  background-size: 20px 20px;
-  background-position:
-    0 0,
-    0 10px,
-    10px -10px,
-    -10px 0;
-}
-.ie-canvas-wrap {
-  position: relative;
-  box-shadow: var(--elevation-2);
-}
-.ie-canvas-wrap canvas {
-  display: block;
-  /* Checkerboard: transparent parts (background removed) show as such. */
-  background: repeating-conic-gradient(var(--bg-3) 0% 25%, var(--bg) 0% 50%) 0 0 / 16px 16px;
-}
-.ie-crop-layer {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  cursor: crosshair;
-  touch-action: none;
-}
-.ie-crop-box {
-  position: absolute;
-  border: 1px solid rgb(255 255 255);
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-  cursor: move;
-  background-image:
-    linear-gradient(to right, transparent 33.2%, rgba(255, 255, 255, 0.35) 33.3%, transparent 33.4%, transparent 66.5%, rgba(255, 255, 255, 0.35) 66.6%, transparent 66.7%),
-    linear-gradient(to bottom, transparent 33.2%, rgba(255, 255, 255, 0.35) 33.3%, transparent 33.4%, transparent 66.5%, rgba(255, 255, 255, 0.35) 66.6%, transparent 66.7%);
-}
-/* Handles: corners and the middle of each side. */
-.ie-h {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
-  background: rgb(255 255 255);
-  border: 1px solid rgba(0, 0, 0, 0.5);
-  border-radius: var(--radius-xs);
-  touch-action: none;
-}
-.ie-h-nw { left: 0; top: 0; cursor: nwse-resize; }
-.ie-h-n { left: 50%; top: 0; cursor: ns-resize; }
-.ie-h-ne { left: 100%; top: 0; cursor: nesw-resize; }
-.ie-h-e { left: 100%; top: 50%; cursor: ew-resize; }
-.ie-h-se { left: 100%; top: 100%; cursor: nwse-resize; }
-.ie-h-s { left: 50%; top: 100%; cursor: ns-resize; }
-.ie-h-sw { left: 0; top: 100%; cursor: nesw-resize; }
-.ie-h-w { left: 0; top: 50%; cursor: ew-resize; }
-.ie-hist {
-  display: block;
-  width: 100%;
-  height: 70px;
-  background: var(--bg-3);
-  border-radius: var(--radius-xs);
-}
-.ie-crop-size {
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  font-size: var(--text-xs, 11px);
-  color: rgb(255 255 255);
-  background: rgba(0, 0, 0, 0.6);
-  padding: 1px 5px;
-  border-radius: var(--radius-xs);
-  pointer-events: none;
-}
-.ie-side {
-  width: 270px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  border-left: 1px solid var(--border);
-  background: var(--bg-1, var(--bg-2));
-  padding: 6px 12px 16px;
-  font-size: var(--text-sm);
-}
-.ie-side section {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.ie-side section:last-child {
-  border-bottom: none;
-}
-.ie-side h4 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 6px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.ie-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 0;
-}
-.ie-wrap {
-  flex-wrap: wrap;
-}
-.ie-side button {
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  color: inherit;
-  padding: 3px 9px;
-  font-size: var(--text-sm);
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-}
-.ie-side button.on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-color);
-}
-.ie-side button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.ie-hint {
-  margin: 4px 0;
-  color: var(--fg-dim);
-  font-size: var(--text-xs, 11px);
-}
-.ie-slider {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0 6px;
-  margin: 6px 0;
-}
-.ie-slider-val {
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-}
-.ie-slider-val.set {
-  color: var(--accent);
-}
-.ie-side button.ie-mini {
-  padding: 0 6px;
-  font-size: var(--text-xs, 11px);
-  font-weight: 400;
-}
-.ie-slider input {
-  grid-column: 1 / -1;
-  width: 100%;
-  accent-color: var(--accent);
-}
-.ie-num {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  color: var(--fg-dim);
-}
-.ie-num input,
-.ie-num select {
-  width: 90px;
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  color: var(--fg);
-  padding: 2px 6px;
-  border-radius: var(--radius-xs);
-  font-size: var(--text-sm);
-}
-.ie-check {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-}
-.ie-side .ie-swatch {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border-radius: 50%;
-}
-.ie-side .ie-swatch.clear {
-  background: repeating-conic-gradient(var(--bg-3) 0% 25%, var(--bg) 0% 50%) 0 0 / 8px 8px;
-}
-.ie-side .ie-swatch.on {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.ie-swatch-pick input {
-  width: 26px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  background: none;
-  cursor: pointer;
-}
-.ie-progress {
-  flex: 1;
-  min-width: 80px;
-  accent-color: var(--accent);
-}
+  /* Image editor (Fase 1A del plan de funciones) */
+  .image-editor {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    outline: none;
+  }
+  .ie-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+  .ie-stage {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background-color: var(--bg-2);
+    background-image:
+      linear-gradient(45deg, var(--bg-3) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--bg-3) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--bg-3) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--bg-3) 75%);
+    background-size: 20px 20px;
+    background-position:
+      0 0,
+      0 10px,
+      10px -10px,
+      -10px 0;
+  }
+  .ie-canvas-wrap {
+    position: relative;
+    box-shadow: var(--elevation-2);
+  }
+  .ie-canvas-wrap canvas {
+    display: block;
+    /* Checkerboard: transparent parts (background removed) show as such. */
+    background: repeating-conic-gradient(var(--bg-3) 0% 25%, var(--bg) 0% 50%) 0 0 / 16px 16px;
+  }
+  .ie-crop-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .ie-crop-box {
+    position: absolute;
+    border: 1px solid rgb(255 255 255);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+    cursor: move;
+    background-image:
+      linear-gradient(
+        to right,
+        transparent 33.2%,
+        rgba(255, 255, 255, 0.35) 33.3%,
+        transparent 33.4%,
+        transparent 66.5%,
+        rgba(255, 255, 255, 0.35) 66.6%,
+        transparent 66.7%
+      ),
+      linear-gradient(
+        to bottom,
+        transparent 33.2%,
+        rgba(255, 255, 255, 0.35) 33.3%,
+        transparent 33.4%,
+        transparent 66.5%,
+        rgba(255, 255, 255, 0.35) 66.6%,
+        transparent 66.7%
+      );
+  }
+  /* Handles: corners and the middle of each side. */
+  .ie-h {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    background: rgb(255 255 255);
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-xs);
+    touch-action: none;
+  }
+  .ie-h-nw {
+    left: 0;
+    top: 0;
+    cursor: nwse-resize;
+  }
+  .ie-h-n {
+    left: 50%;
+    top: 0;
+    cursor: ns-resize;
+  }
+  .ie-h-ne {
+    left: 100%;
+    top: 0;
+    cursor: nesw-resize;
+  }
+  .ie-h-e {
+    left: 100%;
+    top: 50%;
+    cursor: ew-resize;
+  }
+  .ie-h-se {
+    left: 100%;
+    top: 100%;
+    cursor: nwse-resize;
+  }
+  .ie-h-s {
+    left: 50%;
+    top: 100%;
+    cursor: ns-resize;
+  }
+  .ie-h-sw {
+    left: 0;
+    top: 100%;
+    cursor: nesw-resize;
+  }
+  .ie-h-w {
+    left: 0;
+    top: 50%;
+    cursor: ew-resize;
+  }
+  .ie-hist {
+    display: block;
+    width: 100%;
+    height: 70px;
+    background: var(--bg-3);
+    border-radius: var(--radius-xs);
+  }
+  .ie-crop-size {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    font-size: var(--text-xs, 11px);
+    color: rgb(255 255 255);
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1px 5px;
+    border-radius: var(--radius-xs);
+    pointer-events: none;
+  }
+  .ie-side {
+    width: 270px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+    background: var(--bg-1, var(--bg-2));
+    padding: 6px 12px 16px;
+    font-size: var(--text-sm);
+  }
+  .ie-side section {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ie-side section:last-child {
+    border-bottom: none;
+  }
+  .ie-side h4 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 6px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .ie-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+  }
+  .ie-wrap {
+    flex-wrap: wrap;
+  }
+  .ie-side button {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    color: inherit;
+    padding: 3px 9px;
+    font-size: var(--text-sm);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+  }
+  .ie-side button.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-color);
+  }
+  .ie-side button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .ie-hint {
+    margin: 4px 0;
+    color: var(--fg-dim);
+    font-size: var(--text-xs, 11px);
+  }
+  .ie-slider {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0 6px;
+    margin: 6px 0;
+  }
+  .ie-slider-val {
+    color: var(--fg-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .ie-slider-val.set {
+    color: var(--accent);
+  }
+  .ie-side button.ie-mini {
+    padding: 0 6px;
+    font-size: var(--text-xs, 11px);
+    font-weight: 400;
+  }
+  .ie-slider input {
+    grid-column: 1 / -1;
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  .ie-num {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--fg-dim);
+  }
+  .ie-num input,
+  .ie-num select {
+    width: 90px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    font-size: var(--text-sm);
+  }
+  .ie-check {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+  }
+  .ie-side .ie-swatch {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .ie-side .ie-swatch.clear {
+    background: repeating-conic-gradient(var(--bg-3) 0% 25%, var(--bg) 0% 50%) 0 0 / 8px 8px;
+  }
+  .ie-side .ie-swatch.on {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .ie-swatch-pick input {
+    width: 26px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: none;
+    cursor: pointer;
+  }
+  .ie-progress {
+    flex: 1;
+    min-width: 80px;
+    accent-color: var(--accent);
+  }
 }

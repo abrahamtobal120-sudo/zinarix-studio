@@ -416,7 +416,11 @@ export class CdpBackend implements DebugBackend {
 
   async step(kind: 'over' | 'into' | 'out'): Promise<void> {
     await this.send(
-      kind === 'over' ? 'Debugger.stepOver' : kind === 'into' ? 'Debugger.stepInto' : 'Debugger.stepOut',
+      kind === 'over'
+        ? 'Debugger.stepOver'
+        : kind === 'into'
+          ? 'Debugger.stepInto'
+          : 'Debugger.stepOut',
     );
   }
 
@@ -499,7 +503,10 @@ export class CdpBackend implements DebugBackend {
 
   async evaluate(expression: string, frameId?: number): Promise<DebugVariable> {
     const f = frameId !== undefined ? this.frameIds.get(frameId) : this.paused?.[0];
-    const r = await this.send<{ result: RemoteObject; exceptionDetails?: { exception?: RemoteObject; text?: string } }>(
+    const r = await this.send<{
+      result: RemoteObject;
+      exceptionDetails?: { exception?: RemoteObject; text?: string };
+    }>(
       f ? 'Debugger.evaluateOnCallFrame' : 'Runtime.evaluate',
       f
         ? { callFrameId: f.callFrameId, expression, generatePreview: false }

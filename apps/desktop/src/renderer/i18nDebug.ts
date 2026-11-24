@@ -3,7 +3,8 @@ import { lang } from './i18n';
 /** Strings of the debugger and the Problems panel (kept apart from i18n.ts, like i18nLsp.ts). */
 const es = {
   dbgTitle: 'Depurador',
-  dbgBarTip: 'Depurador: pausa tu programa en una línea para ver qué valor tiene cada cosa y encontrar errores',
+  dbgBarTip:
+    'Depurador: pausa tu programa en una línea para ver qué valor tiene cada cosa y encontrar errores',
   dbgStart: 'Iniciar depuración',
   dbgStartFile: 'Depurar archivo actual',
   dbgContinue: 'Continuar',
@@ -46,8 +47,10 @@ const es = {
   dbgStepOutShort: 'Salir',
   dbgTipContinue: 'Sigue ejecutando hasta el siguiente punto rojo (o hasta el final).',
   dbgTipPause: 'Detiene el programa justo donde vaya para ver sus valores.',
-  dbgTipStepOver: 'Ejecuta esta línea completa y se detiene en la siguiente, sin entrar en las funciones que llama.',
-  dbgTipStepInto: 'Entra dentro de la función que se llama en esta línea para seguirla paso a paso.',
+  dbgTipStepOver:
+    'Ejecuta esta línea completa y se detiene en la siguiente, sin entrar en las funciones que llama.',
+  dbgTipStepInto:
+    'Entra dentro de la función que se llama en esta línea para seguirla paso a paso.',
   dbgTipStepOut: 'Termina la función actual y se detiene donde la llamaron.',
   dbgTipRestart: 'Vuelve a empezar el programa desde el principio.',
   dbgTipStop: 'Termina la depuración y cierra el programa.',
@@ -63,10 +66,12 @@ const es = {
   dbgReasonException: 'Ocurrió un error (excepción)',
   dbgReasonPause: 'Lo pausaste tú',
   dbgReasonEntry: 'Detenido al empezar',
-  dbgStep1: 'Abre tu archivo y haz clic a la izquierda del número de línea para poner un punto rojo (o pulsa F9). Ahí se detendrá el programa.',
+  dbgStep1:
+    'Abre tu archivo y haz clic a la izquierda del número de línea para poner un punto rojo (o pulsa F9). Ahí se detendrá el programa.',
   dbgStep1Done: '¡Listo! Tienes {n}.',
   dbgStep2: 'Pulsa «{start}» (F5). Tu programa correrá hasta llegar al punto rojo.',
-  dbgStep3: 'Cuando se pause, mira los valores en Variables y avanza línea por línea con Paso por encima (F10).',
+  dbgStep3:
+    'Cuando se pause, mira los valores en Variables y avanza línea por línea con Paso por encima (F10).',
   dbgWillDebug: 'Se depurará: {file}',
   dbgOpenFileFirst: 'Primero abre el archivo que quieres depurar (.js, .ts, .py, .go…).',
   dbgHelpVariables: 'Los valores que tiene cada variable justo en este momento.',
@@ -75,7 +80,8 @@ const es = {
   dbgHelpBreakpoints: 'Las líneas donde el programa se detendrá. Clic para ir a la línea.',
   dbgNoWatches: 'Pulsa + para vigilar una variable o expresión.',
   dbgAiExplain: 'Pedir a la IA que explique dónde está pausado',
-  dbgAiPrompt: 'Estoy depurando mi programa y está pausado. Explícame en palabras sencillas dónde está, qué significan estos valores y si ves algo que parezca un error.',
+  dbgAiPrompt:
+    'Estoy depurando mi programa y está pausado. Explícame en palabras sencillas dónde está, qué significan estos valores y si ves algo que parezca un error.',
   dbgAiWhere: 'Pausado en',
   dbgAiCode: 'Código alrededor (> marca la línea actual)',
   dbgAiAttached: 'Listo: lo adjunté al chat. Escribe tu pregunta o pulsa Enviar.',
@@ -134,7 +140,8 @@ const en: Record<keyof typeof es, string> = {
   dbgStepOutShort: 'Step out',
   dbgTipContinue: 'Keeps running until the next red dot (or the end).',
   dbgTipPause: 'Stops the program wherever it is so you can see its values.',
-  dbgTipStepOver: 'Runs this whole line and stops at the next one, without going into the functions it calls.',
+  dbgTipStepOver:
+    'Runs this whole line and stops at the next one, without going into the functions it calls.',
   dbgTipStepInto: 'Goes inside the function called on this line to follow it step by step.',
   dbgTipStepOut: 'Finishes the current function and stops where it was called.',
   dbgTipRestart: 'Starts the program again from the beginning.',
@@ -151,10 +158,12 @@ const en: Record<keyof typeof es, string> = {
   dbgReasonException: 'An error happened (exception)',
   dbgReasonPause: 'You paused it',
   dbgReasonEntry: 'Stopped at the start',
-  dbgStep1: 'Open your file and click left of a line number to put a red dot (or press F9). The program will stop there.',
+  dbgStep1:
+    'Open your file and click left of a line number to put a red dot (or press F9). The program will stop there.',
   dbgStep1Done: 'Done! You have {n}.',
   dbgStep2: 'Press "{start}" (F5). Your program runs until it reaches the red dot.',
-  dbgStep3: 'When it pauses, check the values in Variables and move line by line with Step over (F10).',
+  dbgStep3:
+    'When it pauses, check the values in Variables and move line by line with Step over (F10).',
   dbgWillDebug: 'Will debug: {file}',
   dbgOpenFileFirst: 'First open the file you want to debug (.js, .ts, .py, .go…).',
   dbgHelpVariables: 'The value each variable has right now.',
@@ -163,7 +172,8 @@ const en: Record<keyof typeof es, string> = {
   dbgHelpBreakpoints: 'The lines where the program will stop. Click to go to the line.',
   dbgNoWatches: 'Press + to watch a variable or expression.',
   dbgAiExplain: 'Ask the AI to explain where it is paused',
-  dbgAiPrompt: 'I am debugging my program and it is paused. Explain in plain words where it is, what these values mean and whether anything looks like a bug.',
+  dbgAiPrompt:
+    'I am debugging my program and it is paused. Explain in plain words where it is, what these values mean and whether anything looks like a bug.',
   dbgAiWhere: 'Paused at',
   dbgAiCode: 'Code around it (> marks the current line)',
   dbgAiAttached: 'Done: attached to the chat. Type your question or press Send.',

@@ -17,24 +17,40 @@ vi.mock('electron', () => ({
 
 import { Recorder } from '../src/main/recorder.js';
 import type { Clip, MediaItem, VideoProject } from '../src/shared/video.js';
-import { insertMedia, interpKeys, newProject, setTrackMix, transformAt, updateTrack, validProject } from '../src/shared/video.js';
+import {
+  insertMedia,
+  interpKeys,
+  newProject,
+  setTrackMix,
+  transformAt,
+  updateTrack,
+  validProject,
+} from '../src/shared/video.js';
 import { meterFall, meterFrac, mixLevels, toDb, wavePeak } from '../src/shared/videoMeter.js';
 import type { CursorTrack } from '../src/shared/videoZoom.js';
-import { autoZoomKeys, cursorFile, findRests, parseCursorTrack, withAutoZoom, withoutZoom } from '../src/shared/videoZoom.js';
+import {
+  autoZoomKeys,
+  cursorFile,
+  findRests,
+  parseCursorTrack,
+  withAutoZoom,
+  withoutZoom,
+} from '../src/shared/videoZoom.js';
 import { VIDEO_TOOLS } from '../src/main/videoTools.js';
 
-const media = (over: Partial<MediaItem> = {}): MediaItem => ({
-  id: 'm1',
-  name: 'a.mp4',
-  path: 'C:/a.mp4',
-  kind: 'video',
-  duration: 20,
-  width: 1920,
-  height: 1080,
-  hasAudio: true,
-  hasVideo: true,
-  ...over,
-} as MediaItem);
+const media = (over: Partial<MediaItem> = {}): MediaItem =>
+  ({
+    id: 'm1',
+    name: 'a.mp4',
+    path: 'C:/a.mp4',
+    kind: 'video',
+    duration: 20,
+    width: 1920,
+    height: 1080,
+    hasAudio: true,
+    hasVideo: true,
+    ...over,
+  }) as MediaItem;
 
 function project(...items: MediaItem[]): VideoProject {
   let p = newProject({ name: 't' });
@@ -80,7 +96,10 @@ describe('mixer level meters', () => {
   });
 
   it('two loud tracks add up as uncorrelated sound; meters fall slowly', () => {
-    const p = project(media(), media({ id: 'm2', kind: 'audio', hasVideo: false, path: 'C:/b.wav' }));
+    const p = project(
+      media(),
+      media({ id: 'm2', kind: 'audio', hasVideo: false, path: 'C:/b.wav' }),
+    );
     const lv = mixLevels(p, { m1: wave, m2: wave }, 1);
     expect(lv.master.l).toBeCloseTo(Math.SQRT2, 6);
     expect(meterFrac(1)).toBeCloseTo(60 / 66, 6);
@@ -100,7 +119,8 @@ function track(): CursorTrack {
   const s: [number, number, number][] = [];
   for (let t = 0; t < 2000; t += 33) s.push([t, 0.1 + (t / 2000) * 0.7, 0.5 - (t / 2000) * 0.3]);
   s.push([2000, 0.8, 0.2], [3000, 0.8, 0.2], [4000, 0.8, 0.2], [5000, 0.8, 0.2]);
-  for (let t = 5033; t < 5600; t += 33) s.push([t, 0.8 - ((t - 5000) / 600) * 0.5, 0.2 + ((t - 5000) / 600) * 0.5]);
+  for (let t = 5033; t < 5600; t += 33)
+    s.push([t, 0.8 - ((t - 5000) / 600) * 0.5, 0.2 + ((t - 5000) / 600) * 0.5]);
   s.push([5600, 0.3, 0.7], [6600, 0.3, 0.7], [7600, 0.3, 0.7], [8000, 0.3, 0.7]);
   for (let t = 8033; t < 10000; t += 33) s.push([t, 0.3 + ((t - 8000) / 2000) * 0.5, 0.7]);
   return { v: 1, w: 1920, h: 1080, samples: s };
@@ -125,7 +145,11 @@ describe('auto zoom', () => {
     expect(k.rests).toBe(2);
     // One chain (the second rest comes 0.6 s after the first): one zoom in and one out.
     expect(k.scale.map((x) => x.v)).toEqual([1, 2, 2, 1]);
-    const at = (t: number) => ({ s: interpKeys(k.scale, t), x: interpKeys(k.x, t), y: interpKeys(k.y, t) });
+    const at = (t: number) => ({
+      s: interpKeys(k.scale, t),
+      x: interpKeys(k.x, t),
+      y: interpKeys(k.y, t),
+    });
     expect(at(0.5).s).toBe(1);
     expect(at(0.5).x).toBe(0);
     const first = at(3);
@@ -163,8 +187,22 @@ describe('auto zoom', () => {
     expect(parseCursorTrack(JSON.stringify(track()))!.samples.length).toBe(track().samples.length);
     expect(parseCursorTrack('nope')).toBeNull();
     expect(parseCursorTrack(JSON.stringify({ v: 2, w: 1, h: 1, samples: [] }))).toBeNull();
-    expect(parseCursorTrack(JSON.stringify({ v: 1, w: 1, h: 1, samples: [[2, 0, 0], [1, 0, 0]] }))).toBeNull();
-    expect(parseCursorTrack(JSON.stringify({ v: 1, w: 1, h: 1, samples: [[1, 'x', 0]] }))).toBeNull();
+    expect(
+      parseCursorTrack(
+        JSON.stringify({
+          v: 1,
+          w: 1,
+          h: 1,
+          samples: [
+            [2, 0, 0],
+            [1, 0, 0],
+          ],
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      parseCursorTrack(JSON.stringify({ v: 1, w: 1, h: 1, samples: [[1, 'x', 0]] })),
+    ).toBeNull();
     expect(cursorFile('C:/r.webm')).toBe('C:/r.webm.cursor.json');
     expect(VIDEO_TOOLS.some((t) => t.name === 'video_auto_zoom')).toBe(true);
   });

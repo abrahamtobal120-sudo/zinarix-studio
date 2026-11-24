@@ -108,7 +108,8 @@ const es = {
   pruneBuild: 'Caché de construcción',
   pruneVolumes: 'Volúmenes sin usar',
   pruneAsk: '¿Borrar {what}? No se puede deshacer.',
-  pruneAskVolumes: '¿Borrar los volúmenes que ningún contenedor usa? Sus datos se pierden para siempre.',
+  pruneAskVolumes:
+    '¿Borrar los volúmenes que ningún contenedor usa? Sus datos se pierden para siempre.',
   pruned: 'Limpieza hecha',
   diskTypeImages: 'Imágenes',
   diskTypeContainers: 'Contenedores',
