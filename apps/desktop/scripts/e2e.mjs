@@ -123,7 +123,8 @@ async function splitEditor(run, project, fail) {
   await side.locator('.monaco-editor').first().waitFor({ state: 'visible', timeout: 10_000 });
   const box = await side.boundingBox();
   const main = await win.locator('.editor-split > .editor-host').boundingBox();
-  if (!box || !main || box.width < 200 || main.width < 200 || box.height < 100)
+  // 120 px: on a 1024 px screen (CI runners) each half gets under 200 px with the side panels.
+  if (!box || !main || box.width < 120 || main.width < 120 || box.height < 100)
     return fail(`the split editors have no room: ${JSON.stringify({ box, main })}`);
   await side.locator('.view-line').first().click();
   await win.keyboard.press('Control+Home');
