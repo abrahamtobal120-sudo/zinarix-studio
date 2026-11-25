@@ -4,6 +4,8 @@ import { lang } from './i18n';
 const es = {
   pgTab: 'Playground',
   pgOpen: 'Abrir Playground de modelos',
+  pgAppName: 'Playground de modelos',
+  pgAppDesc: 'Prueba un prompt y compara modelos lado a lado',
   pgOpenBuild: 'Build: crear una app describiéndola',
   pgModeSingle: 'Playground',
   pgModeCompare: 'Comparar',
@@ -144,6 +146,8 @@ export type PgKey = keyof typeof es;
 const en: Record<PgKey, string> = {
   pgTab: 'Playground',
   pgOpen: 'Open model Playground',
+  pgAppName: 'Model Playground',
+  pgAppDesc: 'Try a prompt and compare models side by side',
   pgOpenBuild: 'Build: create an app by describing it',
   pgModeSingle: 'Playground',
   pgModeCompare: 'Compare',

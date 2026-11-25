@@ -334,7 +334,7 @@ export function phonePage(
   --bg:#1a1b1e;--bg-2:#202125;--bg-3:#26272c;--bg-4:#32343c;--border:#33353d;
   --fg:#c8ccd4;--fg-dim:#8a8f9a;--strong:#fff;--hover:#26282e;
   --accent:#3b6fe0;--accent-fg:#fff;--focus:#6c8cff;
-  --brand:#7c6cff;--grad:linear-gradient(135deg,#8b5cff,#3b82f6);
+  --brand:#5b9bff;--grad:linear-gradient(135deg,#2f6fdb,#2563eb);
   --ok:#83d6a0;--warn:#e0b341;--danger:#f1595b;--code:#141519;
   --sel-soft:color-mix(in srgb,var(--brand) 18%,transparent);
   --ring:0 0 0 2px color-mix(in srgb,var(--focus) 38%,transparent);
@@ -343,8 +343,8 @@ export function phonePage(
 @media (prefers-color-scheme: light){:root{
   --bg:#fff;--bg-2:#f3f3f3;--bg-3:#ececec;--bg-4:#e4e6f1;--border:#d4d4d4;
   --fg:#333;--fg-dim:#717171;--strong:#000;--hover:#e8e8e8;
-  --accent:#005fb8;--focus:#6d4df2;
-  --brand:#6d4df2;--grad:linear-gradient(135deg,#7c3aed,#2563eb);
+  --accent:#005fb8;--focus:#1f5fd0;
+  --brand:#1f5fd0;--grad:linear-gradient(135deg,#1f5fd0,#2563eb);
   --ok:#2e7d32;--warn:#8a6d00;--danger:#c72e2e;--code:#f6f8fa;
   --sel-soft:color-mix(in srgb,var(--brand) 14%,transparent);
   --ring:0 0 0 2px color-mix(in srgb,var(--focus) 30%,transparent);

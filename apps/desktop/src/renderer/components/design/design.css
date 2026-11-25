@@ -473,7 +473,7 @@
   .dz-badge {
     background: var(--sel-soft);
     color: var(--fg-strong);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     padding: 1px 8px;
   }
   .dz-zoom {
@@ -666,7 +666,7 @@
   .dz-live-chips button {
     font-size: var(--text-sm);
     padding: 2px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
   }
   .dz-live-props > .primary {
     display: inline-flex;

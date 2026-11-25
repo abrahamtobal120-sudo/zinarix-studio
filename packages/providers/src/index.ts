@@ -25,6 +25,14 @@ export { ibmWatsonx, clearWatsonxTokenCache } from './adapters/ibm-watsonx.js';
 export { replicate, clearReplicateSchemaCache } from './adapters/replicate.js';
 export { writer } from './adapters/writer.js';
 export {
+  clearOllamaCache,
+  estimateOllamaTokens,
+  ollamaBody,
+  ollamaRoot,
+  pickNumCtx,
+  toOllamaMessages,
+} from './adapters/ollama.js';
+export {
   cliAgent,
   cliPrompt,
   cliMode,

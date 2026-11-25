@@ -419,7 +419,7 @@
   }
   .vs-soon-badge {
     padding: 2px 9px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     font-size: var(--text-xs);
     font-weight: 600;
     background: var(--bg-3);
@@ -455,8 +455,11 @@
     outline: 2px dashed var(--focus);
     outline-offset: -6px;
   }
+  /* Wraps: in a narrow library the grid / list switch was pushed out of the panel. */
   .vs-lib-head {
     display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
     justify-content: space-between;
     align-items: center;
   }
@@ -490,7 +493,7 @@
   }
   .vs-chips button {
     padding: 2px 9px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--bg-3);
     font-size: var(--text-sm);
   }
@@ -917,7 +920,7 @@
     position: absolute;
     left: 4px;
     top: 3px;
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
@@ -1356,7 +1359,7 @@
     height: 16px;
     padding: 0 4px;
     box-sizing: border-box;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--on-color);
     font-size: var(--text-2xs);
@@ -1517,7 +1520,7 @@
   }
   .vs-chip {
     padding: 2px 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
     background: transparent;
     color: inherit;

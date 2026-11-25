@@ -453,7 +453,7 @@ export function DesignPanel() {
           className="primary"
           onClick={() => askInChat(t('dzAiNotYet', { kind: view.label }))}
         >
-          <Icon name="sparkle" size={14} /> {t('dzAskAi')}
+          <Icon name="message" size={14} /> {t('dzAskAi')}
         </button>
         <button onClick={exit}>{t('dzExit')}</button>
       </Empty>
@@ -479,7 +479,7 @@ export function DesignPanel() {
             )
           }
         >
-          <Icon name="sparkle" size={14} /> {t('dzAskAi')}
+          <Icon name="message" size={14} /> {t('dzAskAi')}
         </button>
         <button onClick={exit}>{t('dzExit')}</button>
       </Empty>
@@ -555,7 +555,7 @@ export function DesignPanel() {
             askAi(aiText);
           }}
         >
-          <Icon name="sparkle" size={14} />
+          <Icon name="message" size={14} />
           <input
             ref={aiInput}
             value={aiText}
@@ -684,7 +684,7 @@ export function DesignPanel() {
               </Group>
               <Group label={t('dzGroupAi')}>
                 <R
-                  icon="sparkle"
+                  icon="message"
                   label={t('dzAskAi')}
                   onClick={() => (aiText.trim() ? askAi(aiText) : aiInput.current?.focus())}
                 />

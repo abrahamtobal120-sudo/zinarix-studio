@@ -13,7 +13,7 @@
   }
   .vs-rec-tabs > button {
     padding: 4px 12px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: transparent;
     color: var(--fg);

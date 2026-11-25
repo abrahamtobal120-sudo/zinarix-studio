@@ -133,3 +133,88 @@
 .monaco-editor .zx-ne-new {
   padding-left: 2px;
 }
+
+/* C4: review of an AI edit inside the editor (inlineReview.ts) */
+.monaco-editor .zx-rv-add {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+}
+.monaco-editor .zx-rv-add-gutter {
+  border-left: 3px solid var(--ok);
+}
+.monaco-editor .zx-rv-del-gutter {
+  border-left: 3px solid var(--danger);
+}
+.monaco-editor .zx-rv-zone {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  overflow: hidden;
+}
+.monaco-editor .zx-rv-old {
+  white-space: pre;
+  opacity: 0.75;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.monaco-editor .zx-rv-actions,
+.monaco-editor .zx-rv-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.monaco-editor .zx-rv-actions {
+  margin-left: 16px;
+}
+.monaco-editor .zx-rv-bar {
+  margin: 6px 22px 0 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2, var(--bg));
+  color: var(--fg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+.monaco-editor .zx-rv-count {
+  padding: 0 4px;
+  opacity: 0.85;
+}
+.monaco-editor .zx-rv-actions button,
+.monaco-editor .zx-rv-bar button {
+  padding: 0 6px;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.monaco-editor .zx-rv-yes:hover {
+  border-color: var(--ok);
+}
+.monaco-editor .zx-rv-no:hover {
+  border-color: var(--danger);
+}
+
+/* B7: git marks beside the line numbers (gitGutter.ts) */
+.monaco-editor .zx-git {
+  width: 3px !important;
+  margin-left: 3px;
+}
+.monaco-editor .zx-git-add {
+  background: var(--ok);
+}
+.monaco-editor .zx-git-mod {
+  background: var(--accent);
+}
+.monaco-editor .zx-git-del {
+  background: transparent;
+  border-top: 3px solid var(--danger);
+  width: 7px !important;
+  margin-left: 1px;
+}
+.monaco-editor .zx-git-del.below {
+  border-top: 0;
+  border-bottom: 3px solid var(--danger);
+}

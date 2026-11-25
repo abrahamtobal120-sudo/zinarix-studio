@@ -4,6 +4,7 @@ import { describeErrorBody, request, requestJson } from '../http.js';
 import { baseModel, catalogModels } from '../models.js';
 import { parseSse, safeJson } from '../sse.js';
 import type { ConnectionTest, ProviderAdapter, ProviderConfig } from '../types.js';
+import { noNativeApi, ollamaChat, ollamaModelContext, ollamaUsableContext } from './ollama.js';
 import {
   audioFormat,
   decodeText,
@@ -145,6 +146,20 @@ async function* chat(
   req: ChatRequest,
   signal: AbortSignal,
 ): AsyncGenerator<ChatChunk> {
+  if (cfg.entry.id === 'ollama') {
+    // Native API, so the context size can be set (see ollama.ts). Only a server without it
+    // (a proxy exposing just /v1) falls through, and only before anything was streamed.
+    let started = false;
+    try {
+      for await (const c of ollamaChat(cfg, req, signal)) {
+        started = true;
+        yield c;
+      }
+      return;
+    } catch (e) {
+      if (started || !noNativeApi(e)) throw e;
+    }
+  }
   let res: Response;
   try {
     res = await request(cfg, {
@@ -250,11 +265,29 @@ async function listModels(cfg: ProviderConfig, signal?: AbortSignal): Promise<Mo
     signal,
   });
   const list = Array.isArray(json) ? json : (json.data ?? json.models ?? []);
+  // Ollama's list has no context size: ask each model, and report the window Zinarix will
+  // actually request, so the agent summarizes the conversation before it stops fitting.
+  const ollamaCtx = new Map<string, number>();
+  if (cfg.entry.id === 'ollama') {
+    await Promise.all(
+      list.slice(0, 60).map(async (m) => {
+        const id = m.id ?? m.name;
+        if (!id) return;
+        const max = await ollamaModelContext(cfg, id, signal);
+        if (max) ollamaCtx.set(id, ollamaUsableContext(max));
+      }),
+    );
+  }
   return list
     .map((m) => {
       const id = m.id ?? m.name;
       if (!id) return undefined;
-      const ctx = m.context_length ?? m.context_window ?? m.max_model_len ?? m.max_context_length;
+      const ctx =
+        ollamaCtx.get(id) ??
+        m.context_length ??
+        m.context_window ??
+        m.max_model_len ??
+        m.max_context_length;
       return baseModel(cfg.entry, id, {
         context: typeof ctx === 'number' && ctx > 0 ? ctx : undefined,
         inputPrice: perMillion(m.pricing?.prompt) ?? undefined,

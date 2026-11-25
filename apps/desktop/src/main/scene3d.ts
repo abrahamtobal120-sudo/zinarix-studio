@@ -155,17 +155,23 @@ export class Scene3DService {
     private readonly bridge?: () => Promise<{ url: string; token: string }>,
   ) {}
 
-  /** <project>/media/3d, or the app data folder when no folder is open. */
+  /**
+   * <project>/media/3d, or the app data folder when no folder is open. Only the path: opening
+   * the 3D studio asks for it, and that must not leave a `media` folder in the project.
+   */
   outDir(workspaceRoot: string | undefined): string {
-    const d = workspaceRoot
-      ? join(workspaceRoot, 'media', '3d')
-      : join(this.userData, '3d-renders');
+    return workspaceRoot ? join(workspaceRoot, 'media', '3d') : join(this.userData, '3d-renders');
+  }
+
+  /** The same folder, created: for the code that is about to write a render into it. */
+  private ensureOutDir(workspaceRoot: string | undefined): string {
+    const d = this.outDir(workspaceRoot);
     mkdirSync(d, { recursive: true });
     return d;
   }
 
   private target(workspaceRoot: string | undefined, name: string, format: Render3DFormat): string {
-    const base = join(this.outDir(workspaceRoot), `${slug(name)}-${stamp()}`);
+    const base = join(this.ensureOutDir(workspaceRoot), `${slug(name)}-${stamp()}`);
     if (format !== 'png') return `${base}.${format}`;
     mkdirSync(base, { recursive: true });
     return join(base, FRAME_PATTERN);
@@ -539,7 +545,7 @@ export class Scene3DService {
           ].includes(extname(f).toLowerCase())
         )
           continue;
-        const dest = join(this.outDir(workspaceRoot), `${stamp()}-${f}`);
+        const dest = join(this.ensureOutDir(workspaceRoot), `${stamp()}-${f}`);
         await copyFile(join(outDir, f), dest);
         paths.push(dest);
       }

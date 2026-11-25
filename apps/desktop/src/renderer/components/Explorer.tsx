@@ -1,3 +1,4 @@
+import { diskPath } from '../diskPath';
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import type { DirEntry } from '../../shared/api';
 import { t } from '../i18n';
@@ -16,9 +17,14 @@ import {
 import { errText } from '../errText';
 import { fileIcon, folderIcon } from './icons';
 import { Icon } from './Icon';
+import { Outline } from './Outline';
 import { SearchView } from './Search';
 import { isStudioFile } from './video/videoCommands';
 import { openStudio } from './video/videoStore';
+import { rowRange, scrollToRow } from '../virtualList';
+
+/** Height of a .tree-row (03-layout.css): the tree only mounts the rows on screen. */
+const ROW = 24;
 
 interface Menu {
   x: number;
@@ -48,6 +54,28 @@ export function Explorer() {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuReturn = useRef<HTMLElement | null>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  // What the tree shows: first row on screen and the height of the viewport.
+  const [view, setView] = useState({ row: 0, height: 0 });
+  // Row to focus once it is in the DOM (keyboard moves may land on a row that was not mounted).
+  const pendingFocus = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const path = pendingFocus.current;
+    if (path === null) return;
+    const el = treeRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+    if (!el) return;
+    pendingFocus.current = null;
+    el.focus({ preventScroll: true });
+  });
+  useLayoutEffect(() => {
+    const el = treeRef.current;
+    if (!el) return;
+    const measure = () =>
+      setView((v) => (v.height === el.clientHeight ? v : { ...v, height: el.clientHeight }));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [workspace]);
 
   const load = useCallback(async (dir: string) => {
     try {
@@ -164,6 +192,16 @@ export function Explorer() {
     }
   };
 
+  /** The path of an entry to the clipboard: inside the project, or the full one on disk. */
+  const copyPath = (entry: DirEntry, relative: boolean) => {
+    void navigator.clipboard
+      .writeText(relative ? entry.path : diskPath(workspace.root, entry.path))
+      .then(
+        () => toast(t('copied')),
+        () => {},
+      );
+  };
+
   const remove = async (entry: DirEntry) => {
     if (!(await confirmDialog(t('confirmDelete', { name: entry.name }), { danger: true }))) return;
     try {
@@ -198,9 +236,21 @@ export function Explorer() {
   const current =
     items.find((r) => r.e.path === focused) ?? items.find((r) => r.e.path === selected) ?? items[0];
 
+  const itemIndex = new Map(items.map((r, i) => [r.e.path, i]));
+  const range = rowRange(view.row * ROW, view.height, ROW, rows.length);
+
   const focusRow = (path: string) => {
+    const el = treeRef.current;
+    const at = rows.findIndex((r) => 'e' in r && r.e.path === path);
+    if (el && at >= 0) {
+      const top = scrollToRow(at, el.scrollTop, el.clientHeight, ROW);
+      if (top !== null) el.scrollTop = top;
+    }
     setFocused(path);
-    treeRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`)?.focus();
+    const row = el?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+    if (row) row.focus({ preventScroll: true });
+    // Not in the DOM yet (it was off screen): focused after the next render.
+    else pendingFocus.current = path;
   };
   const activate = (e: DirEntry) => {
     setSelected(e.path);
@@ -271,7 +321,9 @@ export function Explorer() {
   };
 
   const renderRows = () =>
-    rows.map((r) => {
+    rows.map((r, at) => {
+      // Off screen rows are not mounted, except the one in the Tab order (it keeps the focus).
+      if ((at < range.start || at >= range.end) && r !== current) return null;
       if (!('e' in r))
         return (
           <div
@@ -281,7 +333,7 @@ export function Explorer() {
             aria-disabled="true"
             aria-selected={false}
             className="tree-row tree-error"
-            style={{ paddingLeft: 8 + r.depth * 12 }}
+            style={{ top: at * ROW, paddingLeft: 8 + r.depth * 12 }}
             title={r.err}
           >
             <span className="twisty" />
@@ -293,7 +345,7 @@ export function Explorer() {
           </div>
         );
       const { e, depth } = r;
-      const i = items.indexOf(r);
+      const i = itemIndex.get(e.path) ?? 0;
       return (
         <div
           key={e.path}
@@ -303,7 +355,7 @@ export function Explorer() {
           aria-expanded={e.dir ? open.has(e.path) : undefined}
           aria-selected={e.path === selected}
           className={`tree-row ${e.path === active ? 'active' : ''} ${e.path === selected ? 'selected' : ''}`}
-          style={{ paddingLeft: 8 + depth * 12 }}
+          style={{ top: at * ROW, paddingLeft: 8 + depth * 12 }}
           title={e.path}
           tabIndex={r === current ? 0 : -1}
           onFocus={() => setFocused(e.path)}
@@ -399,9 +451,16 @@ export function Explorer() {
         aria-label={workspace.name}
         ref={treeRef}
         hidden={searching && searchActive}
+        onScroll={(ev) => {
+          const row = Math.floor(ev.currentTarget.scrollTop / ROW);
+          setView((v) => (v.row === row ? v : { ...v, row }));
+        }}
       >
-        {renderRows()}
+        <div className="tree-rows" role="none" style={{ height: rows.length * ROW }}>
+          {renderRows()}
+        </div>
       </div>
+      <Outline />
       {menu && (
         <div
           ref={menuRef}
@@ -429,6 +488,20 @@ export function Explorer() {
               </button>
               <button role="menuitem" tabIndex={-1} onClick={() => void remove(menu.entry!)}>
                 {t('delete')}
+              </button>
+              <hr role="separator" />
+              <button role="menuitem" tabIndex={-1} onClick={() => copyPath(menu.entry!, false)}>
+                {t('copyPath')}
+              </button>
+              <button role="menuitem" tabIndex={-1} onClick={() => copyPath(menu.entry!, true)}>
+                {t('copyRelPath')}
+              </button>
+              <button
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => void api().workspace.reveal(menu.entry!.path)}
+              >
+                {t('revealInFolder')}
               </button>
             </>
           )}

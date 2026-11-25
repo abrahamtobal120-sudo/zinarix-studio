@@ -26,12 +26,14 @@ describe('source maps', () => {
       [0, 0],
       [1, 1],
     ]);
+    // A file URL of this system: "file:///C:/…" is not a Windows path on macOS or Linux.
+    const win = process.platform === 'win32';
     const map = new SourceMap(
       { version: 3, sources: ['a.ts'], mappings: 'AAAA;;AACA;AACA' },
-      'file:///C:/p/a.js',
+      win ? 'file:///C:/p/a.js' : 'file:///p/a.js',
     );
-    expect(map.hasSource('C:\\p\\a.ts')).toBe(true);
-    expect(map.generatedFor('C:/p/a.ts', 2)).toEqual({ line: 2, column: 0 });
+    expect(map.hasSource(win ? 'C:\\p\\a.ts' : '/p/a.ts')).toBe(true);
+    expect(map.generatedFor(win ? 'C:/p/a.ts' : '/p/a.ts', 2)).toEqual({ line: 2, column: 0 });
     expect(map.originalFor(3, 5)).toMatchObject({ line: 3 });
   });
 });

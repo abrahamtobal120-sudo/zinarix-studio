@@ -42,7 +42,7 @@ import type { Pro3DLook } from '../../../shared/api';
 import { lang } from '../../i18n';
 import { api, toast } from '../../store';
 import { Icon, type IconName } from '../Icon';
-import { render3d, wireAgent3d, type Engine3D } from './actions3d';
+import { render3d, type Engine3D } from './actions3d';
 import {
   close3d,
   commit,
@@ -62,33 +62,9 @@ import { Gen3DDialog } from './Gen3DDialog';
 import { QuickTools3D } from './QuickTools3D';
 import './studio3d.css';
 
-export function Studio3DHost() {
-  const open = use3((s) => s.open);
-  useEffect(() => wireAgent3d(), []);
-  const render = use3((s) => s.render);
-  return (
-    <>
-      {open && <Studio3D />}
-      {!open && render && <RenderPill />}
-    </>
-  );
-}
-
-function RenderPill() {
-  const r = use3((s) => s.render)!;
-  return (
-    <div className="s3-pill" role="status">
-      <span>{r.label}</span>
-      <button type="button" className="s3-btn" onClick={r.cancel}>
-        {t3('cancel')}
-      </button>
-    </div>
-  );
-}
-
 const fmtTime = (t: number) => `${t.toFixed(2)} s`;
 
-function Studio3D() {
+export function Studio3D() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const vp = useRef<Viewport | null>(null);
@@ -466,9 +442,9 @@ function appLook(): Pro3DLook {
   };
   return {
     dark: root.dataset.theme !== 'light',
-    bg: v('--bg', '#1b1b1f'),
+    bg: v('--bg', '#1e1e1e'),
     fg: v('--fg', '#d6d6dc'),
-    accent: v('--accent', '#6d5ef6'),
+    accent: v('--accent', '#2f6fdb'),
   };
 }
 

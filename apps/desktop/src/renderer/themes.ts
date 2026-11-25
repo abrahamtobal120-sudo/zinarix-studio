@@ -332,7 +332,69 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
   ...CUSTOM_THEMES,
 };
 
+/**
+ * B6: a theme from an installed extension, shown instead of the built-in one while it is set.
+ * The built-in id stays in the settings; picking a built-in theme clears this.
+ */
+export interface ExtThemeOverride {
+  id: string;
+  dark: boolean;
+  vars: Readonly<Record<string, string>>;
+  editor: Record<string, string>;
+  rules: monaco.editor.ITokenThemeRule[];
+}
+const EXT_MONACO = 'zs-ext';
+/** The chosen extension theme, already converted, so the app starts with it (no flash). */
+export const EXT_THEME_KEY = 'zs.extTheme';
+
+function defineExt(th: ExtThemeOverride): void {
+  monaco.editor.defineTheme(EXT_MONACO, {
+    base: th.dark ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules: th.rules,
+    colors: th.editor,
+  });
+}
+
+function savedExtTheme(): ExtThemeOverride | null {
+  try {
+    const raw = localStorage.getItem(EXT_THEME_KEY);
+    if (!raw) return null;
+    const th = JSON.parse(raw) as ExtThemeOverride;
+    if (typeof th.id !== 'string' || typeof th.vars !== 'object' || !Array.isArray(th.rules))
+      return null;
+    defineExt(th);
+    return th;
+  } catch {
+    // unreadable or a color Monaco refuses: the built-in theme is used
+    return null;
+  }
+}
+let extTheme: ExtThemeOverride | null = savedExtTheme();
+
+export function extThemeOverride(): ExtThemeOverride | null {
+  return extTheme;
+}
+
+/** Sets (or clears, with null) the extension theme. Call applyThemeColors afterwards. */
+export function setExtThemeOverride(th: ExtThemeOverride | null): void {
+  if (th) defineExt(th);
+  extTheme = th;
+  try {
+    if (th) localStorage.setItem(EXT_THEME_KEY, JSON.stringify(th));
+    else localStorage.removeItem(EXT_THEME_KEY);
+  } catch {
+    // storage full or blocked: the theme still applies until the app closes
+  }
+}
+
+/** Another window changed the extension theme: take the saved one. */
+export function reloadExtThemeOverride(): void {
+  extTheme = savedExtTheme();
+}
+
 export function isDark(id: ThemeId): boolean {
+  if (extTheme) return extTheme.dark;
   return (THEMES[id] ?? THEMES.dark).dark;
 }
 
@@ -353,12 +415,13 @@ function defineMonacoThemes(): void {
 /** Monaco theme name for an app theme (also used by the diff views). */
 export function monacoTheme(id: ThemeId): string {
   defineMonacoThemes();
+  if (extTheme) return EXT_MONACO;
   return `zs-${THEMES[id] ? id : 'dark'}`;
 }
 
 /** Applies the app colors (CSS variables) and the editor theme. */
 export function applyThemeColors(id: ThemeId): void {
-  const th = THEMES[id] ?? THEMES.dark;
+  const th = extTheme ?? THEMES[id] ?? THEMES.dark;
   const root = document.documentElement;
   root.dataset.theme = th.dark ? 'dark' : 'light';
   root.removeAttribute('style');

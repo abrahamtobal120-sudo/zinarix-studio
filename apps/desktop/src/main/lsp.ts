@@ -16,10 +16,14 @@ import {
   uriToRel,
 } from './lspProtocol.js';
 import { NO_CWD_EXE_SEARCH } from './bin.js';
+import { formatDiagnostics, languageOfPath } from './lspCheck.js';
 
 const REQUEST_TIMEOUT = 20_000;
 const INIT_TIMEOUT = 60_000;
 const MAX_RESTARTS = 4;
+/** How long an edit waits for the server's verdict on the file. */
+const CHECK_TIMEOUT = 2_500;
+const CHECK_SETTLE = 350;
 
 /** What the manager tells the window it works for. */
 export type LspEventSink = {
@@ -336,10 +340,76 @@ export class LspHost {
   private readonly slots = new Map<string, ServerSlot>();
   private readonly docs = new Map<string, DocState>();
 
+  /** Who waits for the next diagnostics of a file (the agent, after an edit). */
+  private readonly waiters = new Map<string, Set<(diagnostics: unknown[]) => void>>();
+  /** What the servers see: the window's sink, plus the waiters above. */
+  private readonly clientSink: LspEventSink;
+
   constructor(
     private readonly sink: LspEventSink,
     private readonly opts: LspHostOptions,
-  ) {}
+  ) {
+    this.clientSink = {
+      ...sink,
+      diagnostics: (path, diagnostics) => {
+        for (const w of this.waiters.get(path) ?? []) w(diagnostics);
+        sink.diagnostics(path, diagnostics);
+      },
+    };
+  }
+
+  /**
+   * A4: the problems a file has with this text, for the agent right after it edits it.
+   * Only asks a server that is already running (the user has a file of that language open):
+   * starting one can take a minute, and an edit must not wait for that. null = not known.
+   */
+  async check(path: string, text: string, timeout = CHECK_TIMEOUT): Promise<string | null> {
+    if (!this.root || !this.opts.enabled()) return null;
+    const tracked = this.docs.get(path);
+    const language = tracked?.language ?? languageOfPath(path);
+    if (!language) return null;
+    const client = this.slots.get(language)?.client;
+    if (!client) return null;
+    let last: unknown[] | undefined;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    let done!: () => void;
+    const finished = new Promise<void>((r) => (done = r));
+    // Servers often publish twice (syntax first, then types): the last one within a short
+    // pause after the first is the answer.
+    const waiter = (d: unknown[]): void => {
+      last = d;
+      clearTimeout(settle);
+      settle = setTimeout(done, CHECK_SETTLE);
+    };
+    const set = this.waiters.get(path) ?? new Set();
+    set.add(waiter);
+    this.waiters.set(path, set);
+    const limit = setTimeout(done, timeout);
+    const mine: DocState = { language, version: 1, text };
+    try {
+      if (tracked) {
+        // Same text as the server has: it will not publish again, so there is nothing to wait for.
+        if (tracked.text === text) return null;
+        this.change(path, text);
+        this.save(path);
+      } else {
+        this.docs.set(path, mine);
+        this.didOpen(client, path);
+      }
+      await finished;
+    } finally {
+      clearTimeout(limit);
+      clearTimeout(settle);
+      set.delete(waiter);
+      if (!set.size) this.waiters.delete(path);
+      // Unless the editor opened the file meanwhile: then the document is its own now.
+      if (!tracked && this.docs.get(path) === mine) {
+        this.docs.delete(path);
+        client.notify('textDocument/didClose', { textDocument: { uri: this.uri(path) } });
+      }
+    }
+    return last ? formatDiagnostics(path, last) : null;
+  }
 
   /** Follows the window's folder: a different root stops every server. */
   setRoot(root: string | undefined): void {
@@ -449,7 +519,7 @@ export class LspHost {
         spec.exe,
         spec.args,
         root,
-        this.sink,
+        this.clientSink,
         lspLanguageId(language),
         spec.env,
       );

@@ -2,7 +2,7 @@
  * the layers is declared once, at the top of ui/tokens.css. */
 @layer features {
   /* ---------- polish: calmer, more professional look ---------- */
-  /* Inter (SIL Open Font License 1.1, rsms.me/inter) gives the UI one crisp typeface on every OS. */
+  /* Inter (SIL Open Font License 1.1, rsms.me/inter): the fallback typeface, see --font-ui. */
   @font-face {
     font-family: 'Inter';
     src: url('../assets/Inter-roman.var.woff2') format('woff2');
@@ -11,16 +11,11 @@
     font-display: swap;
   }
   body {
-    font-family:
-      'Inter',
-      system-ui,
-      -apple-system,
-      'Segoe UI',
-      sans-serif;
+    /* The system's own typeface first (Segoe UI, San Francisco…): the app reads as a native
+     tool. Inter stays bundled as the fallback where the system has none worth using. */
+    font-family: var(--font-ui);
     font-size: var(--text-base);
-    font-feature-settings: 'calt';
     -webkit-font-smoothing: antialiased;
-    letter-spacing: -0.003em;
   }
 
   .sidebar {
@@ -95,7 +90,7 @@
   }
   .chat-input:focus-within {
     border-color: color-mix(in srgb, var(--focus) 60%, var(--border));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 16%, transparent);
+    box-shadow: none;
   }
   .chat-input-bar .pill {
     border-color: transparent;

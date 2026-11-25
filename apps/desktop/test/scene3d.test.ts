@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { alphaOf, findFfmpeg, parseProbe, VideoService } from '../src/main/video.js';
@@ -258,12 +258,11 @@ describe('Fase 14: Blender bridge', () => {
   });
 
   it('looks for Blender in the usual places, the variable first', () => {
-    const c = blenderCandidates(
-      { ZINARIX_BLENDER: 'D:\\b\\blender.exe', PATH: 'C:\\bin' },
-      'win32',
-    );
+    // PATH is split with this system's separator (":" would cut "C:\\bin" in two).
+    const bin = delimiter === ';' ? 'C:\\bin' : '/opt/bin';
+    const c = blenderCandidates({ ZINARIX_BLENDER: 'D:\\b\\blender.exe', PATH: bin }, 'win32');
     expect(c[0]).toBe('D:\\b\\blender.exe');
-    expect(c).toContain(join('C:\\bin', 'blender.exe'));
+    expect(c).toContain(join(bin, 'blender.exe'));
     // Our own Zinarix 3D build wins over any other Blender on the PC.
     const own = blenderCandidates({ LOCALAPPDATA: 'C:\\L', PATH: 'C:\\bin' }, 'win32');
     expect(own[0]).toBe(join('C:\\L', 'Programs', 'Zinarix Studio 3D', 'blender.exe'));

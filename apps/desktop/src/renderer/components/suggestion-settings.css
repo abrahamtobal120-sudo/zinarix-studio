@@ -1,6 +1,8 @@
 @layer features {
   /* Fase 8 — Settings › AI: suggestion metric (theme variables only). */
-  .settings-toggle.sx-disabled {
+  /* Off because the main switch is off: the switch dims, the text stays readable (it says
+   * what is needed to turn it on). */
+  .settings-toggle.sx-disabled input {
     opacity: 0.55;
   }
   .zx-stats {

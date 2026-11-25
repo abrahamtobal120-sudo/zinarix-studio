@@ -2,6 +2,7 @@ import {
   existsSync,
   mkdtempSync,
   readdirSync,
+  realpathSync,
   rmdirSync,
   rmSync,
   symlinkSync,
@@ -161,7 +162,9 @@ describe('Test Explorer runs (real Vitest)', () => {
   let root = '';
   let store = '';
   beforeAll(() => {
-    root = mkdtempSync(join(tmpdir(), 'zs-tests-'));
+    // The real path (no /var link on macOS, no RUNNER~1 short name on Windows): Vitest
+    // reports files by their real path and the results are matched by path.
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), 'zs-tests-')));
     store = mkdtempSync(join(tmpdir(), 'zs-results-'));
     symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'junction');
     writeFileSync(join(root, 'package.json'), '{"type":"module","devDependencies":{"vitest":"*"}}');

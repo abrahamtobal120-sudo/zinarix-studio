@@ -9,7 +9,6 @@ import { BROWSER_TAB, api, setState, toast, useStore } from '../store';
 import { tabKeyDown } from '../a11y';
 import { confirmDialog } from '../confirm';
 import { lang, t } from '../i18n';
-import { askInChat } from './Chat';
 import { Icon as UiIcon } from './Icon';
 import { ProviderLogo } from './ProviderLogo';
 import { importCookies, useCookieInfo } from './BrowserSettings';
@@ -699,8 +698,6 @@ export function BrowserPane({ visible }: { visible: boolean }) {
           )}
           {!panel && !st.url && (
             <div className="browser-start">
-              <img className="browser-start-logo" src="./logo.svg" alt="" />
-              <h2>{t('browserEmpty')}</h2>
               <form
                 className="browser-start-search"
                 onSubmit={(e) => {
@@ -738,16 +735,6 @@ export function BrowserPane({ visible }: { visible: boolean }) {
                     </span>
                     <span className="browser-tile-label">{q.label}</span>
                     <span className="browser-tile-hint">{q.hint}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="browser-ask">
-                <span className="browser-ask-title">
-                  <UiIcon name="agent" size={14} /> {t('browserAskAgent')}
-                </span>
-                {[t('browserIdea1'), t('browserIdea2'), t('browserIdea3')].map((idea) => (
-                  <button key={idea} className="browser-chip" onClick={() => askInChat(idea)}>
-                    {idea}
                   </button>
                 ))}
               </div>

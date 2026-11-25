@@ -123,7 +123,7 @@ Headers con secretos en endpoints personalizados: no los pases con `--header` (q
 
 ```bash
 pnpm build          # tsc -b de todo el monorepo
-pnpm test           # build + más de 180 pruebas (Vitest), incluye prueba canario anti-fugas de llaves
+pnpm test           # build + más de 1 700 pruebas (Vitest), incluye prueba canario anti-fugas de llaves
 pnpm test:coverage  # umbral 80 % en líneas
 pnpm lint && pnpm format:check
 pnpm catalog:check  # valida catalog/providers.json con Zod
@@ -134,7 +134,7 @@ OMNI_LIVE_TESTS=1 ANTHROPIC_API_KEY=… OPENAI_API_KEY=… GROQ_API_KEY=… pnpm
 
 ```
 apps/cli            CLI `omni` (commander + Ink)
-apps/desktop        App de escritorio Electron (v0.6.2): editor, agente, navegador IA, Git y GitHub, centro de seguridad
+apps/desktop        App de escritorio Electron: editor, agente, navegador IA, Git y GitHub, centro de seguridad
 apps/web            Fase 6 — PWA (pendiente)
 packages/shared     Esquemas Zod, tipos, errores, i18n es/en
 packages/security   Secret opaco, redactor de secretos, logger que redacta

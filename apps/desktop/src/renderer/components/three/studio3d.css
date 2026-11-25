@@ -616,11 +616,11 @@
   }
   @keyframes s3-splash-logo {
     0% {
-      transform: scale(0.7) rotate(-20deg);
+      transform: none;
       opacity: 0;
     }
     35% {
-      transform: scale(1) rotate(0);
+      transform: none;
       opacity: 1;
     }
   }

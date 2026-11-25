@@ -1,5 +1,5 @@
 @layer features {
-  /* Ayuda de Zinarix: the round help button and its small chat (HelperBubble.tsx). */
+  /* Ayuda de Zinarix: the help button and its small chat (HelperBubble.tsx). */
 
   .hlp-bubble {
     position: fixed;
@@ -8,7 +8,7 @@
     width: 38px;
     height: 38px;
     padding: 0;
-    border-radius: 50%;
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     background: var(--bg-3);
     color: var(--fg-dim);
@@ -25,13 +25,9 @@
       filter 0.18s;
   }
   .hlp-bubble:hover {
-    transform: translateY(-1px);
     background: var(--bg-4);
     color: var(--fg-strong);
-    box-shadow: var(--elevation-3);
-  }
-  .hlp-bubble:active {
-    transform: translateY(0) scale(0.96);
+    box-shadow: var(--elevation-2);
   }
   .hlp-bubble.on {
     background: var(--accent);
@@ -207,7 +203,7 @@
     background: var(--bg-3);
     border: 1px solid var(--border);
     color: var(--fg);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     padding: 3px 10px;
     font-size: var(--text-sm);
     cursor: pointer;
@@ -261,7 +257,7 @@
     background: var(--accent-hover);
   }
   .hlp-setup .hlp-chip {
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     padding: 3px 10px;
   }
 

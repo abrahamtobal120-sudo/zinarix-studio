@@ -5,12 +5,13 @@ import { t } from '../i18n';
 import { monaco } from '../monaco';
 import { registerInlineCompletions } from '../inline';
 import { attachNextEdit } from '../nextEdit';
+import { attachInlineReview } from '../inlineReview';
+import { attachGitGutter } from '../gitGutter';
 import { installLsp } from '../lsp';
 import { attachDebugToEditor, installDebug } from '../debug';
 import { installTests } from '../testExplorer';
 import { DebugToolbar } from './DebugPanel';
 import { monacoTheme } from '../themes';
-import type { Prefs } from '../../shared/api';
 import {
   BROWSER_TAB,
   PLAYGROUND_TAB,
@@ -18,6 +19,8 @@ import {
   WHATSAPP_TAB,
   activate,
   attachEditor,
+  focusEditorGroup,
+  openToSide,
   closeTab,
   getDoc,
   getState,
@@ -26,40 +29,37 @@ import {
   useStore,
 } from '../store';
 import { BrowserPane } from './Browser';
-import { PlaygroundPane } from './Playground';
-import { WhatsAppPane } from './WhatsApp';
-import { SecuritySection } from './SecuritySection';
 import { Welcome } from './Chrome';
 import { FileViewerPane } from './FileViewers';
-import { NotebookView } from './notebook/NotebookView';
-import { VectorEditor } from './vector/VectorEditor';
-import { PaintView } from './paint/PaintView';
-import { SceneView } from './games/SceneView';
 import { tgm } from './games/gamesStrings';
 import { tg } from './graphics/graphicsStrings';
 import { isGcodePath, isScenePath, isSvgPath, setTabViewer } from '../store';
-import { CadPreview } from './cad/CadPreview';
-import { ModelView } from './cad/ModelView';
-import { GcodeView } from './cad/GcodeView';
-import { SkpView } from './sketchup/SketchupPanel';
 import { tc } from './cad/cadStrings';
+import { lazyNamed } from '../lazy';
+import { SideEditor, prefOptions } from './EditorSplit';
+import { SymbolCrumbs } from './SymbolCrumbs';
 
-function prefOptions(p: Prefs): monaco.editor.IEditorOptions {
-  return {
-    fontSize: p.fontSize,
-    fontFamily: p.fontFamily,
-    wordWrap: p.wordWrap ? 'on' : 'off',
-    minimap: { enabled: p.minimap },
-    lineNumbers: p.lineNumbers ? 'on' : 'off',
-    inlineSuggest: { enabled: true, mode: 'subwordSmart' },
-  };
-}
+// C2: loaded the first time they are shown (see lazy.tsx).
+const PlaygroundPane = lazyNamed(() => import('./Playground'), 'PlaygroundPane');
+const WhatsAppPane = lazyNamed(() => import('./WhatsApp'), 'WhatsAppPane');
+const SecuritySection = lazyNamed(() => import('./SecuritySection'), 'SecuritySection');
+const NotebookView = lazyNamed(() => import('./notebook/NotebookView'), 'NotebookView');
+const VectorEditor = lazyNamed(() => import('./vector/VectorEditor'), 'VectorEditor');
+const PaintView = lazyNamed(() => import('./paint/PaintView'), 'PaintView');
+const SceneView = lazyNamed(() => import('./games/SceneView'), 'SceneView');
+const CadPreview = lazyNamed(() => import('./cad/CadPreview'), 'CadPreview');
+const ModelView = lazyNamed(() => import('./cad/ModelView'), 'ModelView');
+const GcodeView = lazyNamed(() => import('./cad/GcodeView'), 'GcodeView');
+const SkpView = lazyNamed(() => import('./sketchup/SketchupPanel'), 'SkpView');
 
 export function EditorArea() {
   const prefs = useStore((s) => s.prefs);
   const tabs = useStore((s) => s.tabs);
   const maximized = useStore((s) => s.maximized === 'editor');
   const active = useStore((s) => s.active);
+  const split = useStore((s) => s.split);
+  const splitRatio = useStore((s) => s.splitRatio);
+  const sideFocused = useStore((s) => s.editorFocus === 1 && !!s.split);
   const host = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const activeTab = tabs.find((x) => x.path === active);
@@ -91,15 +91,23 @@ export function EditorArea() {
     const dbg = attachDebugToEditor(ed);
     // Fase 8: next-edit prediction (Tab jumps / applies).
     const nextEdit = attachNextEdit(ed);
+    // C4: an AI edit (Ctrl+K) is reviewed here, block by block.
+    const aiReview = attachInlineReview(ed);
+    // B7: git marks beside the line numbers.
+    const gitMarks = attachGitGutter(ed);
     editorRef.current = ed;
     attachEditor(ed);
     const sub = ed.onDidChangeCursorPosition((e) =>
       setState({ cursor: { line: e.position.lineNumber, column: e.position.column } }),
     );
+    const focus = ed.onDidFocusEditorText(() => focusEditorGroup(0));
     return () => {
       sub.dispose();
+      focus.dispose();
       dbg.dispose();
       nextEdit.dispose();
+      aiReview.dispose();
+      gitMarks.dispose();
       attachEditor(null);
       ed.dispose();
     };
@@ -117,6 +125,11 @@ export function EditorArea() {
     doc?.model.updateOptions({ tabSize: getState().prefs.tabSize });
     ed.setModel(doc?.model ?? null);
     if (doc?.viewState) ed.restoreViewState(doc.viewState);
+    else if (doc?.cursor) {
+      // A tab brought back from the last session: put the cursor where it was.
+      ed.setPosition({ lineNumber: doc.cursor.line, column: doc.cursor.column });
+      ed.revealLineInCenter(doc.cursor.line);
+    }
     if (doc) ed.focus();
   }, [active, tabs.length, activeTab?.viewer]);
 
@@ -163,7 +176,7 @@ export function EditorArea() {
               <span className="tab-name">
                 {tab.path === SECURITY_TAB && <Icon name="shield" size={13} />}
                 {tab.path === WHATSAPP_TAB && <Icon name="whatsapp" size={13} />}
-                {tab.path === PLAYGROUND_TAB && <Icon name="sparkle" size={13} />}
+                {tab.path === PLAYGROUND_TAB && <Icon name="beaker" size={13} />}
                 {tab.path === BROWSER_TAB && (
                   <svg
                     className="tab-globe"
@@ -197,6 +210,15 @@ export function EditorArea() {
           ))}
           <div className="spacer" />
           <button
+            className="max-btn"
+            title={t('editorSplitRight')}
+            aria-label={t('editorSplitRight')}
+            disabled={!showEditor}
+            onClick={() => openToSide(active)}
+          >
+            <Icon name="columns" size={14} />
+          </button>
+          <button
             className={`max-btn ${maximized ? 'on' : ''}`}
             title={maximized ? t('restoreSize') : t('maximize')}
             aria-label={maximized ? t('restoreSize') : t('maximize')}
@@ -208,7 +230,8 @@ export function EditorArea() {
       )}
       {activeTab && !special && (
         <div className="breadcrumbs">
-          {activeTab.path.split('/').join(' › ')}
+          <span className="crumb-path">{activeTab.path.split('/').join(' › ')}</span>
+          {showEditor && <SymbolCrumbs path={activeTab.path} />}
           {/* Fase 3B: an SVG open as text can go back to the design editor. */}
           {!activeTab.viewer && !activeTab.notice && isSvgPath(activeTab.path) && (
             <button
@@ -237,8 +260,15 @@ export function EditorArea() {
           )}
         </div>
       )}
-      <div className="editor-split" style={{ display: showEditor ? 'flex' : 'none' }}>
-        <div className="editor-host" ref={host} />
+      <div
+        className={`editor-split ${split ? 'has-side' : ''} ${sideFocused ? 'side-focused' : ''}`}
+        style={{ display: showEditor ? 'flex' : 'none' }}
+      >
+        <div
+          className="editor-host"
+          ref={host}
+          style={split ? { flexGrow: splitRatio } : undefined}
+        />
         {isCad && active && !cadHidden.has(active) && (
           <CadPreview
             key={active}
@@ -260,6 +290,7 @@ export function EditorArea() {
             {tc('show')}
           </button>
         )}
+        {split && <SideEditor split={split} />}
       </div>
       <div className="dbg-float">
         <DebugToolbar />

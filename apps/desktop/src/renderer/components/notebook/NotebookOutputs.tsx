@@ -235,7 +235,7 @@ export const OutputView = memo(function OutputView({
         {onFix && (
           <div className="nb-error-actions">
             <button className="btn" onClick={onFix} title={tn('fixAiTip')}>
-              <Icon name="sparkle" size={14} /> {tn('fixAi')}
+              <Icon name="message" size={14} /> {tn('fixAi')}
             </button>
             <button
               className="btn ghost"

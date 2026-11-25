@@ -1,0 +1,104 @@
+/* Settings → Cuenta */
+@layer features {
+  .account h4 {
+    margin: 20px 0 6px;
+  }
+  .account-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-2);
+    padding: 12px 14px;
+    max-width: 460px;
+  }
+  .account-card:not(.account-form) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .account-who {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .account-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .account-tabs {
+    display: flex;
+    gap: 2px;
+    margin: -2px 0 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .account-tabs button {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: none;
+    padding: 6px 10px;
+    color: var(--fg-dim);
+  }
+  .account-tabs button.on {
+    border-bottom-color: var(--accent);
+    color: var(--fg);
+  }
+  .account form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .account form label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: var(--text-sm);
+  }
+  .account form button.primary {
+    align-self: flex-start;
+  }
+  .account form p {
+    margin: 0;
+  }
+  .account-error {
+    color: var(--danger);
+    margin: 8px 0 0;
+  }
+  .account-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: 560px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+  .account-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .account-list li:last-child {
+    border-bottom: 0;
+  }
+  .account-msg-text {
+    flex: 1 1 260px;
+    overflow-wrap: anywhere;
+  }
+  .account-pass {
+    margin-top: 16px;
+    max-width: 460px;
+  }
+  .account-pass summary {
+    cursor: pointer;
+    color: var(--fg-dim);
+  }
+  .account-pass form {
+    margin-top: 10px;
+  }
+}

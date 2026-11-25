@@ -198,8 +198,8 @@
     background: var(--bg);
   }
   .browser-start-logo {
-    width: 64px;
-    height: 64px;
+    width: 32px;
+    height: 32px;
   }
   .browser-start h2 {
     margin: 14px 0 22px;
@@ -261,7 +261,7 @@
       background 0.15s;
   }
   .browser-tile:hover {
-    transform: translateY(-2px);
+    border-color: var(--focus);
     border-color: var(--brand);
     background: var(--bg-3);
   }
@@ -492,7 +492,6 @@
   }
   .sec-card:hover {
     border-color: var(--ok);
-    transform: translateY(-1px);
   }
   .sec-card.disabled {
     opacity: 0.55;

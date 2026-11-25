@@ -27,7 +27,7 @@
   .status-item.plan-owner {
     background: var(--accent);
     color: var(--on-color);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     padding: 0 9px;
     margin: 2px 0;
   }
@@ -154,7 +154,7 @@
   .status-item.plan-ai {
     background: var(--teal);
     color: var(--on-color);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     padding: 0 9px;
     margin: 2px 0;
   }
@@ -227,8 +227,7 @@
   .onboarding-backdrop {
     align-items: center;
     padding-top: 0;
-    background: color-mix(in srgb, var(--bg) 70%, transparent);
-    backdrop-filter: blur(6px);
+    background: rgba(0, 0, 0, 0.4);
   }
   .onboarding {
     width: min(680px, 94vw);
@@ -245,7 +244,7 @@
   .onb-dots {
     display: flex;
     gap: 6px;
-    justify-content: center;
+    justify-content: flex-start;
   }
   .onb-dots span {
     width: 22px;
@@ -267,13 +266,14 @@
     animation: fade-in 0.18s ease-out;
   }
   .onb-step.center {
-    align-items: center;
-    text-align: center;
+    align-items: flex-start;
+    text-align: left;
     justify-content: center;
   }
   .onb-step h1 {
     margin: 0;
-    font-size: var(--text-2xl);
+    font-size: var(--text-xl);
+    font-weight: 600;
     color: var(--fg-strong);
   }
   .onb-step h2 {
@@ -286,8 +286,8 @@
     line-height: 1.5;
   }
   .onb-logo {
-    width: 84px;
-    height: 84px;
+    width: 36px;
+    height: 36px;
   }
   .onb-lead {
     max-width: 470px;
@@ -298,14 +298,14 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
   }
   .onb-pills span {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 5px 11px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--sel-soft);
     font-size: var(--text-sm);
   }
@@ -338,7 +338,6 @@
   }
   .onb-card:hover {
     border-color: var(--brand);
-    transform: translateY(-1px);
   }
   .onb-card .icon {
     color: var(--brand);

@@ -467,6 +467,25 @@ export function riskyCombo(c: KeyCombo): string | null {
   if (t === 'ctrl+alt+delete') return 'abre la pantalla de seguridad del sistema';
   if (t === 'meta+l') return 'bloquea la sesión';
   if (t === 'meta+q' || t === 'ctrl+q') return 'cierra el programa activo';
+  // Ways to a command line: what is typed there runs without the approval of run_command.
+  if (t === 'meta+r') return 'abre "Ejecutar", donde se puede lanzar cualquier comando';
+  if (t === 'meta+x') return 'abre el menú de administración (terminal, administrador de equipos)';
+  if (t === 'ctrl+alt+t') return 'abre una terminal';
+  return null;
+}
+
+/**
+ * Programs where typed text is a command (shells, script hosts, system consoles). Opening one
+ * and typing into it would run anything without the approval run_command asks for, so
+ * computer_open asks every time for these, also with "Controlar la compu" on.
+ */
+const COMMAND_APPS =
+  /^(cmd|command prompt|símbolo del sistema|simbolo del sistema|powershell|powershell ise|windows powershell|pwsh|wt|windows terminal|windowsterminal|terminal|conhost|bash|sh|zsh|fish|wsl|ubuntu|debian|git bash|mintty|iterm|iterm2|warp|alacritty|kitty|wezterm|hyper|tabby|gnome-terminal|konsole|xterm|xfce4-terminal|tilix|terminator|wscript|cscript|mshta|rundll32|regsvr32|regedit|regedit32|registry editor|editor del registro|run|ejecutar|mmc|taskschd|task scheduler|programador de tareas|gpedit|secpol|script editor|automator|python|python3|py|node|ruby|perl|php)(\.exe|\.msc|\.app)?$/i;
+
+/** Why opening this needs its own approval every time, or null. */
+export function riskyOpen(target: OpenTarget): string | null {
+  if (target.kind === 'app' && COMMAND_APPS.test(target.name.trim()))
+    return 'abre una terminal o consola: lo que se escriba ahí se ejecuta sin pedirte aprobación de comandos';
   return null;
 }
 
@@ -578,7 +597,11 @@ const CONTROL_WARNING =
   'La IA usará tu mouse y teclado reales en todo el equipo (cualquier programa). Mira lo que hace; para detenerla mueve el mouse a la esquina superior izquierda de la pantalla o pulsa Detener. Tras cada acción se envía una captura de pantalla al modelo.';
 
 /** The approval card. Screen and control are separate "always" keys for the conversation. */
-export function computerPreview(name: string, a: Record<string, unknown>): SystemPreview {
+export function computerPreview(
+  name: string,
+  a: Record<string, unknown>,
+  ctx: { external?: boolean } = {},
+): SystemPreview {
   const act = parseComputerArgs(name, a);
   if ('error' in act)
     return { risk: 'medium', warning: act.error, action: name, allowKey: COMPUTER_CONTROL_KEY };
@@ -644,18 +667,26 @@ export function computerPreview(name: string, a: Record<string, unknown>): Syste
         action: `ver de cerca la zona (${act.x}, ${act.y}) de ${act.width}×${act.height}`,
         allowKey: COMPUTER_SCREEN_KEY,
       };
-    case 'open':
+    case 'open': {
+      // A console, or anything opened after the AI read a web page / mail / MCP answer in
+      // this conversation (that text may carry instructions): approved every time.
+      const risky =
+        riskyOpen(act.target) ??
+        (ctx.external
+          ? 'la IA leyó contenido externo (web, correo o MCP) en esta conversación; revisa que esto sea lo que pediste'
+          : null);
       return {
         risk: 'high',
-        warning: CONTROL_WARNING,
+        warning: risky ? `Atención: ${risky}. ${CONTROL_WARNING}` : CONTROL_WARNING,
         action:
           act.target.kind === 'url'
             ? `abrir ${act.text}`
             : act.target.kind === 'file'
               ? `abrir el archivo ${act.text} con su programa`
               : `abrir el programa "${act.text}"`,
-        allowKey: COMPUTER_CONTROL_KEY,
+        ...(risky ? {} : { allowKey: COMPUTER_CONTROL_KEY }),
       };
+    }
     case 'windows':
       return act.focus
         ? {

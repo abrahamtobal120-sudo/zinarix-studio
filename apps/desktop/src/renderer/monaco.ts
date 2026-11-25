@@ -29,6 +29,12 @@ for (const lang of monaco.languages.getLanguages()) {
 // Godot's text resources (project.godot, scenes, resources, import settings) are INI-like.
 for (const ext of ['.tscn', '.tres', '.godot', '.import', '.gdshaderinc']) EXT_LANG[ext] ??= 'ini';
 
+/** B6: file names and extensions of a language added by an extension (built-in ones win). */
+export function addLanguageFiles(id: string, extensions: string[], filenames: string[]): void {
+  for (const ext of extensions) EXT_LANG[ext.toLowerCase()] ??= id;
+  for (const name of filenames) EXT_LANG[name.toLowerCase()] ??= id;
+}
+
 export function languageFor(path: string): string {
   const name = path.split('/').pop()!.toLowerCase();
   if (EXT_LANG[name]) return EXT_LANG[name]!;

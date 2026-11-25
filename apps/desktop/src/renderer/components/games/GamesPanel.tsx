@@ -548,7 +548,7 @@ function GodotBox({
             <div className="spacer" />
             {errors > 0 && (
               <button className="btn gm-small" onClick={fix}>
-                <Icon name="sparkle" size={13} /> {tgm('fix')}
+                <Icon name="message" size={13} /> {tgm('fix')}
               </button>
             )}
           </div>

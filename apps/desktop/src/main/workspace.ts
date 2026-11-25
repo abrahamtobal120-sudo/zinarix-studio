@@ -175,13 +175,29 @@ export class Workspace {
     return hits;
   }
 
-  watch(onChange: () => void): void {
+  /**
+   * Calls `onChange` (debounced) when something under the root changes, with the paths that
+   * changed (relative, "/" separated). `null` = too many to list, or the platform did not
+   * say which: the listener then checks everything it has open.
+   */
+  watch(onChange: (paths: string[] | null) => void): void {
     let timer: NodeJS.Timeout | undefined;
+    let paths: Set<string> | null = new Set();
+    const flush = () => {
+      const batch = paths ? [...paths] : null;
+      paths = new Set();
+      onChange(batch);
+    };
     try {
       this.watcher = watch(this.root, { recursive: true }, (_ev, file) => {
         if (file && /(^|[\\/])(\.git|node_modules)([\\/]|$)/.test(String(file))) return;
+        if (!file) paths = null;
+        else if (paths) {
+          paths.add(String(file).replace(/\\/g, '/'));
+          if (paths.size > MAX_WATCH_PATHS) paths = null;
+        }
         clearTimeout(timer);
-        timer = setTimeout(onChange, 250);
+        timer = setTimeout(flush, 250);
       });
     } catch {
       // recursive watch unsupported: explorer refreshes on demand
@@ -192,6 +208,9 @@ export class Workspace {
     this.watcher?.close();
   }
 }
+
+/** A change batch with more paths than this is reported as "many" (a checkout, an install). */
+const MAX_WATCH_PATHS = 300;
 
 function inside(root: string, abs: string): boolean {
   const r = relative(root, abs);

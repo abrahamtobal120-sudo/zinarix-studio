@@ -9,7 +9,7 @@ import {
   signLicense,
   type LicensePayload,
 } from '../src/main/license.js';
-import { newer, parseRemote, verifyConfig } from '../src/main/remote.js';
+import { isReplay, newer, parseRemote, verifyConfig } from '../src/main/remote.js';
 import { EDITIONS, editionOf } from '../src/shared/edition.js';
 import {
   AI_FEATURES,
@@ -184,6 +184,14 @@ describe('remote control file (app-config.json)', () => {
     expect(cfg.plans.free.delegation).toBe(true);
   });
 
+  it('the published file is signed with the key inside the app (pnpm config:sign)', () => {
+    // An app ignores the file when this fails: no notices, no revocations, no billing switch.
+    const file = fileURLToPath(new URL('../../../website/app-config.json', import.meta.url));
+    const body = readFileSync(file, 'utf8');
+    expect(verifyConfig(body, readFileSync(`${file}.sig`, 'utf8'))).toBe(true);
+    expect(parseRemote(JSON.parse(body)).seq).toBeGreaterThan(0);
+  });
+
   it('fills defaults, keeps agents in the free plan and reads notices and versions', () => {
     const cfg = parseRemote({
       billing: true,
@@ -196,6 +204,21 @@ describe('remote control file (app-config.json)', () => {
     expect(cfg.notice?.id).toBe('v0.6');
     expect(cfg.latestVersion).toBe('0.6.0');
     expect(parseRemote({}).plans).toEqual(DEFAULT_PLANS);
+  });
+
+  it('D8: a signed file older than the last one accepted is a replay', () => {
+    expect(parseRemote({}).seq).toBe(0);
+    expect(parseRemote({ seq: 1764000000 }).seq).toBe(1764000000);
+    expect(() => parseRemote({ seq: -1 })).toThrow();
+    expect(() => parseRemote({ seq: 1.5 })).toThrow();
+    // Nothing accepted yet (or files from before the number existed): anything goes.
+    expect(isReplay(0, undefined)).toBe(false);
+    expect(isReplay(5, undefined)).toBe(false);
+    // Same edition again is fine; an older one, or one with the number removed, is not.
+    expect(isReplay(5, 5)).toBe(false);
+    expect(isReplay(6, 5)).toBe(false);
+    expect(isReplay(4, 5)).toBe(true);
+    expect(isReplay(parseRemote({ billing: false }).seq, 5)).toBe(true);
   });
 
   it('reads the revoked list', () => {

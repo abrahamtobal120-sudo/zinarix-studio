@@ -87,7 +87,16 @@ describe('approval cards', () => {
     expect(
       cadPreview(
         'blender_model',
-        { path: 'm.blend', ops: [{ op: 'export', path: 'C:/Windows/x.stl' }] },
+        // An absolute path of this system ("C:/…" is a relative name on macOS and Linux).
+        {
+          path: 'm.blend',
+          ops: [
+            {
+              op: 'export',
+              path: process.platform === 'win32' ? 'C:/Windows/x.stl' : '/etc/x.stl',
+            },
+          ],
+        },
         root,
       ),
     ).toHaveProperty('error');

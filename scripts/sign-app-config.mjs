@@ -4,6 +4,8 @@
 //   node scripts/sign-app-config.mjs verify -> checks the signature
 // Uses the same Ed25519 private key as the licenses (~/.omni-signing/license.key, or
 // ZINARIX_LICENSE_KEY), under its own prefix so a config signature can never be a license.
+// Signing stamps "seq" (the time, in seconds) into the file: apps refuse a signed file with a
+// lower number than the last one they accepted, so an old copy cannot be served again.
 // Run it every time you edit app-config.json, and publish both files together: an app that
 // finds an unsigned or mismatched file ignores it and keeps the last good one.
 import { createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
@@ -24,8 +26,13 @@ function appPublicKey() {
   return createPublicKey(pem);
 }
 
-const body = readFileSync(file, 'utf8');
-JSON.parse(body); // refuse to sign broken JSON
+let body = readFileSync(file, 'utf8');
+const parsed = JSON.parse(body); // refuse to sign broken JSON
+if (process.argv[2] !== 'verify') {
+  const prev = Number.isSafeInteger(parsed.seq) ? parsed.seq : 0;
+  parsed.seq = Math.max(Math.floor(Date.now() / 1000), prev + 1);
+  body = JSON.stringify(parsed, null, 2) + '\n';
+}
 const data = Buffer.from(DOMAIN + body, 'utf8');
 
 if (process.argv[2] === 'verify') {
@@ -48,5 +55,6 @@ if (!mine.equals(appPublicKey().export({ type: 'spki', format: 'der' }))) {
   console.error('this private key does not match the public key inside the app');
   process.exit(1);
 }
+writeFileSync(file, body);
 writeFileSync(`${file}.sig`, sign(null, data, key).toString('base64') + '\n');
 console.log(`signed ${file}`);

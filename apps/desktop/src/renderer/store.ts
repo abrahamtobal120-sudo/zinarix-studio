@@ -1,3 +1,4 @@
+import { firstRunModel } from './firstModel';
 import { useSyncExternalStore } from 'react';
 import { isMeshPath } from '../shared/cad';
 import type { ModelInfo } from '@omni/shared';
@@ -24,7 +25,17 @@ import { languageFor, monaco } from './monaco';
 import { lspSaved } from './lsp';
 import { confirmDialog } from './confirm';
 import { t } from './i18n';
-import { applyThemeColors, isDark } from './themes';
+import { parseSessions, putSession } from './tabSession';
+import {
+  type EditorSplit,
+  clampRatio,
+  splitActivate,
+  splitClose,
+  splitOpen,
+  splitPrune,
+} from './editorSplit';
+import { diskAction, mayWarn, textFingerprint } from './diskSync';
+import { applyThemeColors, isDark, setExtThemeOverride } from './themes';
 
 declare global {
   interface Window {
@@ -165,6 +176,8 @@ export type Modal =
   /** "Run task…": the detected tasks (tasks.json, package.json scripts…) in a quick pick. */
   | { kind: 'tasks' }
   | { kind: 'quickOpen' }
+  /** B7: the palette on the symbols of the file ("@"). */
+  | { kind: 'symbols' }
   | {
       kind: 'models';
       role?: AiRole;
@@ -200,6 +213,12 @@ export interface State {
   workspace: WorkspaceInfo | null;
   tabs: Tab[];
   active: string | null;
+  /** B1: text files open beside the main editor (the side group); null = one editor. */
+  split: EditorSplit | null;
+  /** Share of the editor width the main group takes while split (0.2…0.8). */
+  splitRatio: number;
+  /** Which editor group has the keyboard: 0 main, 1 side. */
+  editorFocus: 0 | 1;
   sidebar:
     | 'explorer'
     | 'search'
@@ -220,6 +239,8 @@ export interface State {
     | 'testing'
     /** Fase 2B (plan de funciones): Docker (containers, images, volumes, compose). */
     | 'docker'
+    /** B6: extensions from Open VSX (themes, snippets, languages). */
+    | 'extensions'
     /** Fase 5A (plan de funciones): Arduino / PlatformIO (build, upload, serial monitor). */
     | 'hardware'
     /** Fase 5B (plan de funciones): phones, emulators and phone app projects. */
@@ -325,6 +346,9 @@ let state: State = {
   workspace: null,
   tabs: [],
   active: null,
+  split: null,
+  splitRatio: readSplitRatio(),
+  editorFocus: 0,
   sidebar: 'explorer',
   panelOpen: false,
   panelView: 'terminal',
@@ -412,7 +436,11 @@ export function askText(label: string, value = ''): Promise<string | null> {
 interface Doc {
   model: monaco.editor.ITextModel;
   savedVersion: number;
+  /** Fingerprint of the text last read from or written to disk (see syncOpenFiles). */
+  disk?: string;
   viewState: monaco.editor.ICodeEditorViewState | null;
+  /** Where the cursor was when the tab was restored from the last session (see restoreTabs). */
+  cursor?: { line: number; column: number };
 }
 const docs = new Map<string, Doc>();
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -420,8 +448,73 @@ let editor: monaco.editor.IStandaloneCodeEditor | null = null;
 export function attachEditor(e: monaco.editor.IStandaloneCodeEditor | null): void {
   editor = e;
 }
-export function getEditor(): monaco.editor.IStandaloneCodeEditor | null {
+/** The main editor (the breadcrumbs describe its file, whichever group has the focus). */
+export function getMainEditor(): monaco.editor.IStandaloneCodeEditor | null {
   return editor;
+}
+/** B1: the editor of the side group, while it is open. */
+let sideEditor: monaco.editor.IStandaloneCodeEditor | null = null;
+export function attachSideEditor(e: monaco.editor.IStandaloneCodeEditor | null): void {
+  sideEditor = e;
+}
+/** The editor the user is working in: the side one while it has the focus, else the main one. */
+export function getEditor(): monaco.editor.IStandaloneCodeEditor | null {
+  return state.editorFocus === 1 && state.split && sideEditor ? sideEditor : editor;
+}
+/** The file of the editor group that has the focus (commands like save and close act on it). */
+export function focusedPath(): string | null {
+  return state.editorFocus === 1 && state.split ? state.split.active : state.active;
+}
+// The key is written out twice: the initial state reads it before a constant here would exist.
+function readSplitRatio(): number {
+  try {
+    const raw = localStorage.getItem('zx.editorSplitRatio');
+    return clampRatio(raw === null ? undefined : Number(raw));
+  } catch {
+    return clampRatio(undefined);
+  }
+}
+/** Moves the divider between the two editor groups; `save` once the drag ends. */
+export function setSplitRatio(ratio: number, save = true): void {
+  const splitRatio = clampRatio(ratio);
+  if (splitRatio !== state.splitRatio) setState({ splitRatio });
+  if (!save) return;
+  try {
+    localStorage.setItem('zx.editorSplitRatio', String(splitRatio));
+  } catch {
+    // storage unavailable: the width lasts until the window closes
+  }
+}
+/** A file the side group can show: open as text (a document), not a viewer-only tab. */
+const canSplit = (path: string): boolean => docs.has(path);
+
+/** Opens a text file beside the main editor (default: the one in front) and focuses it. */
+export function openToSide(path = focusedPath()): boolean {
+  if (!path || !canSplit(path)) return false;
+  setState((s) => ({ split: splitOpen(s.split, path), editorFocus: 1 }));
+  return true;
+}
+export function activateSide(path: string): void {
+  setState((s) => ({ split: splitActivate(s.split, path), editorFocus: 1 }));
+}
+/** Closes one file of the side group (the document stays open in the main group). */
+export function closeSideTab(path: string): void {
+  setState((s) => {
+    const split = splitClose(s.split, path);
+    return { split, editorFocus: split ? s.editorFocus : 0 };
+  });
+}
+export function closeSide(): void {
+  setState({ split: null, editorFocus: 0 });
+}
+export function focusEditorGroup(group: 0 | 1): void {
+  if (state.editorFocus !== group) setState({ editorFocus: group });
+}
+/** Drops from the side group the files whose document is gone. */
+function pruneSide(): void {
+  if (!state.split) return;
+  const split = splitPrune(state.split, canSplit);
+  if (split !== state.split) setState((s) => ({ split, editorFocus: split ? s.editorFocus : 0 }));
 }
 export function getDoc(path: string): Doc | undefined {
   return docs.get(path);
@@ -537,7 +630,12 @@ function createDoc(path: string, content: string): void {
     const uri = monaco.Uri.from({ scheme: 'file', path: `/${path}` });
     const model =
       monaco.editor.getModel(uri) ?? monaco.editor.createModel(content, languageFor(path), uri);
-    docs.set(path, { model, savedVersion: model.getAlternativeVersionId(), viewState: null });
+    docs.set(path, {
+      model,
+      savedVersion: model.getAlternativeVersionId(),
+      viewState: null,
+      disk: textFingerprint(content),
+    });
     let autoSave: ReturnType<typeof setTimeout> | undefined;
     model.onDidChangeContent(() => {
       updateDirty(path);
@@ -605,6 +703,7 @@ export function openBrowserTab(): void {
 export function activate(path: string | null): void {
   const prev = state.active && docs.get(state.active);
   if (prev && editor) prev.viewState = editor.saveViewState();
+  lastActivated = path;
   setState({ active: path });
 }
 
@@ -616,7 +715,7 @@ export function onSaved(fn: (path: string) => void): () => void {
   return () => savedListeners.delete(fn);
 }
 
-export async function save(path = state.active, format = true): Promise<void> {
+export async function save(path = focusedPath(), format = true): Promise<void> {
   if (!path) return;
   const d = docs.get(path);
   if (!d) {
@@ -624,13 +723,16 @@ export async function save(path = state.active, format = true): Promise<void> {
     return;
   }
   // Format on save works on the visible editor (Monaco formatters need a view).
-  if (format && state.prefs.formatOnSave && editor?.getModel() === d.model) {
-    await editor
+  const view = [getEditor(), editor, sideEditor].find((e) => e?.getModel() === d.model);
+  if (format && state.prefs.formatOnSave && view) {
+    await view
       .getAction('editor.action.formatDocument')
       ?.run()
       .catch(() => undefined);
   }
-  await api().workspace.writeFile(path, d.model.getValue());
+  const text = d.model.getValue();
+  await api().workspace.writeFile(path, text);
+  d.disk = textFingerprint(text);
   d.savedVersion = d.model.getAlternativeVersionId();
   updateDirty(path);
   lspSaved(path);
@@ -641,7 +743,11 @@ export async function saveAll(): Promise<void> {
   for (const tab of state.tabs) if (tab.dirty) await save(tab.path);
 }
 
-export async function closeTab(path = state.active): Promise<void> {
+export async function closeTab(path?: string | null): Promise<void> {
+  // No path = the shortcut: in the side group it closes that group's file only.
+  if (path === undefined && state.editorFocus === 1 && state.split)
+    return closeSideTab(state.split.active);
+  path ??= state.active;
   if (!path) return;
   const tab = state.tabs.find((x) => x.path === path);
   if (tab?.dirty) {
@@ -652,6 +758,7 @@ export async function closeTab(path = state.active): Promise<void> {
   const d = docs.get(path);
   d?.model.dispose();
   docs.delete(path);
+  pruneSide();
   const idx = state.tabs.findIndex((x) => x.path === path);
   const tabs = state.tabs.filter((x) => x.path !== path);
   const next =
@@ -676,6 +783,7 @@ export async function renamePath(from: string, to: string): Promise<void> {
     }
   }
   setState((s) => ({ tabs: s.tabs.filter((x) => !moved.includes(x)) }));
+  pruneSide();
   const target = (p: string) => to + p.slice(from.length);
   for (const tab of moved) {
     const next = target(tab.path);
@@ -702,17 +810,61 @@ export async function reloadFromDisk(path: string): Promise<void> {
   }
   try {
     const file = await api().workspace.readFile(path);
-    if (file.binary || file.tooLarge || file.content === d.model.getValue()) return;
-    d.model.pushEditOperations(
-      [],
-      [{ range: d.model.getFullModelRange(), text: file.content }],
-      () => null,
-    );
-    d.savedVersion = d.model.getAlternativeVersionId();
-    updateDirty(path);
+    if (file.binary || file.tooLarge) return;
+    applyDiskText(path, d, file.content);
   } catch {
     // file deleted: leave the tab as is
   }
+}
+
+function applyDiskText(path: string, d: Doc, content: string): void {
+  d.disk = textFingerprint(content);
+  if (content === d.model.getValue()) return;
+  d.model.pushEditOperations(
+    [],
+    [{ range: d.model.getFullModelRange(), text: content }],
+    () => null,
+  );
+  d.savedVersion = d.model.getAlternativeVersionId();
+  updateDirty(path);
+}
+
+/** Last time the "changed on disk, not reloaded" notice was shown for a tab. */
+const dirtyWarned = new Map<string, number>();
+let syncing: Promise<void> = Promise.resolve();
+
+/**
+ * The folder changed on disk (git checkout, a formatter, another program): open text tabs
+ * follow it. A tab without unsaved changes takes the new text (undo brings the old one
+ * back); one with unsaved changes is left alone and the user is told, once per minute at
+ * most. Zinarix's own saves are told apart by the fingerprint of what it last wrote, so
+ * typing right after a save does not raise the notice. `paths` limits the check to the
+ * files that changed; without it every open tab is checked.
+ */
+export function syncOpenFiles(paths?: string[]): Promise<void> {
+  const wanted = paths ? new Set(paths) : null;
+  const run = async () => {
+    for (const [path, d] of [...docs]) {
+      if (wanted && !wanted.has(path)) continue;
+      let content: string;
+      try {
+        const file = await api().workspace.readFile(path);
+        if (file.binary || file.tooLarge) continue;
+        content = file.content;
+      } catch {
+        continue; // deleted or unreadable: the tab keeps what it has
+      }
+      if (docs.get(path) !== d) continue; // closed or replaced while reading
+      const tab = state.tabs.find((x) => x.path === path);
+      const action = diskAction(d.disk, content, Boolean(tab?.dirty));
+      if (action === 'reload') applyDiskText(path, d, content);
+      else if (action === 'warn' && tab && mayWarn(dirtyWarned, path, Date.now()))
+        toast(t('diskChangedDirty', { name: tab.name }));
+    }
+  };
+  // One pass at a time: two overlapping passes could apply an older read over a newer one.
+  syncing = syncing.then(run, run);
+  return syncing;
 }
 
 /** Closes every tab without prompting (used when the workspace changes). */
@@ -727,8 +879,118 @@ export function resetDocs(): void {
         x.path === WHATSAPP_TAB ||
         x.path === PLAYGROUND_TAB,
     );
-    return { tabs, active: tabs[0]?.path ?? null };
+    return { tabs, active: tabs[0]?.path ?? null, split: null, editorFocus: 0 as const };
   });
+}
+
+// ---------------- open tabs per folder (estudio, punto B4) ----------------
+
+const TABS_KEY = 'zs.tabs';
+/** The last tab the user (or a command) put in front; restoring tabs never overrides it. */
+let lastActivated: string | null = null;
+/** Above 0 while a folder is being switched or its tabs reopened: nothing is saved then. */
+let tabsFrozen = 0;
+let tabsSaved = '';
+
+const isFileTab = (path: string) => !path.startsWith('::');
+
+function tabCursor(path: string): { line: number; column: number } | undefined {
+  const doc = docs.get(path);
+  if (!doc) return undefined;
+  const pos =
+    path === state.active && editor?.getModel() === doc.model
+      ? editor.getPosition()
+      : doc.viewState?.cursorState[0]?.position;
+  if (pos) return { line: pos.lineNumber, column: pos.column };
+  return doc.cursor;
+}
+
+/** Saves the open file tabs of the current folder (with cursors) for the next time. */
+export function persistTabs(): void {
+  const root = state.workspace?.root;
+  if (!root || tabsFrozen) return;
+  try {
+    const next = JSON.stringify(
+      putSession(
+        parseSessions(localStorage.getItem(TABS_KEY)),
+        root,
+        {
+          tabs: state.tabs
+            .filter((x) => isFileTab(x.path))
+            .map((x) => ({ path: x.path, ...tabCursor(x.path) })),
+          active: state.active && isFileTab(state.active) ? state.active : null,
+          split: state.split,
+        },
+        Date.now(),
+      ),
+    );
+    // The time stamp changes every call: compare what matters.
+    const key = next.replace(/"at":[0-9]+/g, '');
+    if (key === tabsSaved) return;
+    tabsSaved = key;
+    localStorage.setItem(TABS_KEY, next);
+  } catch {
+    // storage unavailable: the tabs simply do not come back
+  }
+}
+
+/** Reopens the tabs a folder had the last time. Files that no longer exist are skipped. */
+async function restoreTabs(root: string): Promise<void> {
+  let session;
+  try {
+    session = parseSessions(localStorage.getItem(TABS_KEY))[root];
+  } catch {
+    return;
+  }
+  if (!session) return;
+  tabsFrozen++;
+  lastActivated = null;
+  try {
+    for (const tab of session.tabs) {
+      if (state.workspace?.root !== root) return;
+      if (docs.has(tab.path) || state.tabs.some((x) => x.path === tab.path)) continue;
+      await loadTab(tab.path).catch(() => undefined);
+      const doc = docs.get(tab.path);
+      if (doc && tab.line) doc.cursor = { line: tab.line, column: tab.column ?? 1 };
+    }
+    if (state.workspace?.root !== root) return;
+    // A file opened meanwhile (dropped on the window, a link in the chat) stays in front.
+    const front =
+      lastActivated ??
+      (session.active && state.tabs.some((x) => x.path === session.active)
+        ? session.active
+        : (state.tabs.find((x) => isFileTab(x.path))?.path ?? state.active));
+    if (front !== state.active) setState({ active: front });
+    // B1: the side group comes back with the files that could be reopened as text.
+    if (session.split && !state.split) {
+      const paths = session.split.paths.filter(canSplit);
+      if (paths.length)
+        setState({
+          split: {
+            paths,
+            active: paths.includes(session.split.active) ? session.split.active : paths[0]!,
+          },
+        });
+    }
+  } finally {
+    tabsFrozen--;
+    persistTabs();
+  }
+}
+
+{
+  let seenTabs: Tab[] | null = null;
+  let seenActive: string | null = null;
+  let seenSplit: EditorSplit | null = null;
+  subscribeStore(() => {
+    if (state.tabs === seenTabs && state.active === seenActive && state.split === seenSplit) return;
+    seenTabs = state.tabs;
+    seenActive = state.active;
+    seenSplit = state.split;
+    persistTabs();
+  });
+  // Cursor moves do not change the store: save them when the window goes away.
+  window.addEventListener('beforeunload', persistTabs);
 }
 
 /** Opens a folder or file dropped onto the window. */
@@ -747,6 +1009,34 @@ export async function openDropped(path: string): Promise<void> {
 export function switchWorkspace(next: WorkspaceInfo | null): void {
   const old = state.workspace?.root;
   if (old === next?.root) return setState({ workspace: next });
+  // Last chance to save the cursors of the folder being left; then nothing is saved until
+  // the new folder's tabs are back (closing the old tabs must not erase what was saved).
+  persistTabs();
+  tabsFrozen++;
+  try {
+    switchFolder(old, next);
+  } finally {
+    tabsFrozen--;
+  }
+  if (next) void restoreTabs(next.root);
+}
+
+/**
+ * The folder the window already had when it loaded (a reload, a window opened on a folder):
+ * nothing to switch, but its tabs come back. Frozen while the folder is set, or the empty
+ * tab bar would be saved over the session that is about to be read.
+ */
+export function initWorkspace(ws: WorkspaceInfo | null): void {
+  tabsFrozen++;
+  try {
+    setState({ workspace: ws });
+  } finally {
+    tabsFrozen--;
+  }
+  if (ws) void restoreTabs(ws.root);
+}
+
+function switchFolder(old: string | undefined, next: WorkspaceInfo | null): void {
   const focused = focusedChat();
   for (const c of state.chats) {
     if (c.folder || c.noFolder || c.id === focused || !old) continue;
@@ -785,7 +1075,16 @@ export async function refreshSettings(): Promise<void> {
 export async function refreshModels(refresh = false): Promise<void> {
   const r = await api().ai.models(refresh);
   setState({ models: r.models, modelErrors: r.errors });
-  if (r.detected.length) toast(t('providersDetected', { list: r.detected.join(', ') }));
+  if (!r.detected.length) return;
+  // First local runtime and no model chosen yet: start with one of its models, so the chat is
+  // ready to use instead of asking to pick a model.
+  const first = getState().settings?.defaultModel ? null : firstRunModel(r.models, r.detected);
+  if (first) await chooseModel(first).catch(() => {});
+  toast(
+    first && getState().settings?.defaultModel === first
+      ? t('providersDetectedUsing', { list: r.detected.join(', '), model: first })
+      : t('providersDetected', { list: r.detected.join(', ') }),
+  );
 }
 
 export async function chooseModel(ref: string): Promise<void> {
@@ -816,6 +1115,8 @@ export async function syncChrome(theme: ThemeId = state.settings.theme): Promise
 }
 
 export async function setTheme(theme: ThemeId): Promise<void> {
+  // Picking a built-in theme leaves the extension theme (B6).
+  setExtThemeOverride(null);
   await api().ai.setTheme(theme);
   applyTheme(theme);
   setState((s) => ({ settings: { ...s.settings, theme } }));

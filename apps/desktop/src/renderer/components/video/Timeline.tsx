@@ -996,6 +996,8 @@ function MiniMap({
     if (scroll.current) scroll.current.scrollLeft = Math.max(0, t * zoom);
   };
   const rows = project.tracks;
+  // Nothing to map yet: an empty strip only looks like a broken box.
+  if (project.clips.length === 0) return null;
   return (
     <div
       className="vs-minimap"

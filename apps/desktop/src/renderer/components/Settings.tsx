@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { BotKind, BotsStatus, PhoneStatus, ThemeId } from '../../shared/api';
 import { REMOTE_APP_APK, THEME_IDS } from '../../shared/api';
 import { commands, defaultKeys, runCommand } from '../commands';
@@ -6,6 +6,7 @@ import { lang, t } from '../i18n';
 import { confirmDialog } from '../confirm';
 import { comboFromEvent } from '../keys';
 import { qrEncode } from '../qr';
+import { fold, searchSettings, type SettingEntry, type SettingHit } from '../settingsSearch';
 import {
   api,
   getState,
@@ -17,6 +18,14 @@ import {
   useStore,
 } from '../store';
 import { THEMES } from '../themes';
+import {
+  activeExtTheme,
+  extThemes,
+  extensionsVersion,
+  onExtensions,
+  showExtTheme,
+  type ExtThemeChoice,
+} from '../extensions';
 import { Icon, type IconName } from './Icon';
 import { McpSection } from './McpSettings';
 import { DocsSection, MemoriesSection } from './KnowledgeSettings';
@@ -26,7 +35,9 @@ import { BrowserSection } from './BrowserSettings';
 import { SuggestionSettings } from './SuggestionSettings';
 import { ModalShell } from './ModalShell';
 import { tl } from '../layout/i18nLayout';
+import { tl as tlsp } from '../i18nLsp';
 import { OwnerKeysSection } from './OwnerKeys';
+import { AccountSection, ta } from './AccountSection';
 
 const close = () => setState({ modal: null });
 
@@ -64,6 +75,7 @@ type Section =
   | 'cloud'
   | 'browser'
   | 'phone'
+  | 'account'
   | 'keys'
   /** Only for the app's owner: make and hand out license keys. */
   | 'owner';
@@ -597,6 +609,27 @@ function BotsSection({ pin }: { pin?: string }) {
   );
 }
 
+/** B6: a color theme of an installed extension, next to the built-in ones. */
+function ExtThemeCard({ th, active }: { th: ExtThemeChoice; active: boolean }) {
+  return (
+    <button
+      className={`theme-card ${active ? 'on' : ''}`}
+      title={th.extension}
+      onClick={() => void showExtTheme(th.id)}
+    >
+      <span className="theme-preview" style={{ background: th.preview.bg }}>
+        <span className="theme-side" style={{ background: th.preview.side }} />
+        <span className="theme-lines">
+          <span style={{ background: th.preview.accent, width: '55%' }} />
+          <span style={{ background: th.preview.fg, width: '80%', opacity: 0.5 }} />
+          <span style={{ background: th.preview.fg, width: '40%', opacity: 0.5 }} />
+        </span>
+      </span>
+      <span className="theme-name">{th.label}</span>
+    </button>
+  );
+}
+
 function ThemeCard({ id, active }: { id: ThemeId; active: boolean }) {
   const th = THEMES[id];
   const v = (k: string, d: string) => th.vars[k] ?? d;
@@ -619,9 +652,123 @@ function ThemeCard({ id, active }: { id: ThemeId; active: boolean }) {
   );
 }
 
+/**
+ * What the search box of the dialog looks through: every setting with its visible label (the
+ * dialog scrolls to the row with that text), plus words people type that the label lacks.
+ */
+function settingEntries(isOwner: boolean): SettingEntry[] {
+  const out: SettingEntry[] = [];
+  const add = (
+    section: Section,
+    sectionLabel: string,
+    rows: [label: string, hint?: string, keywords?: string][],
+  ) => {
+    for (const [label, hint, keywords] of rows) {
+      out.push({ section, sectionLabel, label, hint, keywords });
+    }
+  };
+  add('appearance', t('setAppearance'), [
+    [t('setTheme'), undefined, 'theme tema color dark light oscuro claro'],
+    [t('setLanguage'), t('setLanguageHint'), 'language idioma español english inglés'],
+    [t('setUiZoom'), t('setUiZoomHint'), 'zoom scale escala tamaño interfaz'],
+    [tl('lyWindowEffects'), tl('lyWindowEffectsHint'), 'animations animaciones blur transparencia'],
+    [t('setFontSize'), undefined, 'font size fuente letra tamaño'],
+    [t('setFontFamily'), undefined, 'font family fuente letra tipografía'],
+  ]);
+  add('editor', t('setEditor'), [
+    [t('setTabSize'), undefined, 'tab indent sangría espacios tabulación'],
+    [t('setWordWrap'), undefined, 'word wrap ajuste de línea'],
+    [t('setMinimap'), undefined, 'minimap minimapa'],
+    [t('setLineNumbers'), undefined, 'line numbers números de línea'],
+    [t('setFormatOnSave'), t('setFormatOnSaveHint'), 'format prettier formatear'],
+    [t('setAutoSave'), t('setAutoSaveHint'), 'autosave guardado automático'],
+  ]);
+  add('ai', t('setAi'), [
+    [t('setInline'), t('setInlineHint'), 'autocomplete autocompletado copilot ghost text tab'],
+    [t('setInlineModel'), undefined, 'model modelo autocomplete'],
+    [tlsp('nextEditSetting'), tlsp('nextEditSettingHint'), 'next edit siguiente edición'],
+    [tlsp('autoImportSetting'), tlsp('autoImportSettingHint'), 'import importar'],
+    [t('setRules'), t('setRulesHint'), 'rules reglas agents.md instrucciones'],
+    [t('setLocalOnly'), t('setLocalOnlyHint'), 'local offline privacy privacidad ollama'],
+    [t('hlpSetTitle'), undefined, 'helper ayudante assistant'],
+  ]);
+  add('mcp', 'MCP', [['MCP', undefined, 'servers servidores tools herramientas plugins']]);
+  add('memories', t('setMemories'), [
+    [t('setMemories'), undefined, 'memory memoria recordar remember'],
+  ]);
+  add('docs', t('setDocsNav'), [
+    [t('setDocs'), undefined, 'docs documentation documentación index indexar'],
+    [t('setEmbed'), undefined, 'embeddings semantic search búsqueda semántica'],
+  ]);
+  add('cloud', t('cloudTitle'), [
+    [t('cloudTitle'), undefined, 'sync sincronizar backup respaldo cuenta account'],
+  ]);
+  add('browser', t('setBrowser'), [
+    [t('browserCookiesTitle'), undefined, 'cookies sesión login'],
+    [t('browserCookiesDirectTitle'), undefined, 'cookies'],
+    [t('browserDataTitle'), undefined, 'clear data borrar datos caché cache historial'],
+  ]);
+  add('phone', t('phoneTitle'), [
+    [t('phoneEnable'), t('phoneEnableHint'), 'phone celular móvil remote remoto qr'],
+    [t('botsTitle'), undefined, 'telegram discord bot'],
+  ]);
+  add('account', ta('title'), [
+    [
+      ta('title'),
+      ta('lead'),
+      'login sign in register cuenta sesión registrarse usuario contraseña',
+    ],
+    [ta('licenses'), undefined, 'license licencia clave key plan pro'],
+    [ta('messages'), undefined, 'avisos noticias news notice'],
+  ]);
+  if (isOwner) {
+    const owner = lang === 'en' ? 'Keys (owner)' : 'Claves (dueño)';
+    add('owner', owner, [[owner, undefined, 'license licencia keys claves']]);
+  }
+  const defaults = defaultKeys();
+  const custom = getState().prefs.keybindings;
+  for (const c of commands()) {
+    if (c.id === 'app.requestClose') continue;
+    out.push({
+      section: 'keys',
+      sectionLabel: t('shortcuts'),
+      label: c.label,
+      keywords: custom[c.id] ?? defaults[c.id] ?? '',
+      command: c.id,
+    });
+  }
+  return out;
+}
+
+/** Scrolls the open section to the row with this label and flashes it once. */
+function revealSetting(body: HTMLElement | null, label: string): void {
+  if (!body) return;
+  const want = fold(label).trim();
+  const rows = body.querySelectorAll<HTMLElement>(
+    '.settings-label, .settings-field > span:first-child, h3, h4, .settings-sub button, .keys-table td:first-child',
+  );
+  for (const el of rows) {
+    const text = fold(el.textContent ?? '').trim();
+    if (text !== want && !text.startsWith(want)) continue;
+    const row =
+      el.closest<HTMLElement>('.settings-toggle, .settings-field, .settings-sub, tr') ?? el;
+    row.scrollIntoView({ block: 'center' });
+    row.classList.remove('settings-hit');
+    void row.offsetWidth;
+    row.classList.add('settings-hit');
+    setTimeout(() => row.classList.remove('settings-hit'), 1800);
+    return;
+  }
+}
+
 export function SettingsPanel() {
   const prefs = useStore((s) => s.prefs);
   const settings = useStore((s) => s.settings);
+  // B6: the theme of an extension in use (and the list of them) changes outside the store.
+  const extTheme = useSyncExternalStore(onExtensions, activeExtTheme);
+  const extVersion = useSyncExternalStore(onExtensions, extensionsVersion);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- extVersion is what changes the list
+  const extChoices = useMemo(() => extThemes(), [extVersion]);
   const isOwner = useStore((s) => s.license.plan === 'owner');
   const [section, setSection] = useState<Section>(() => {
     const m = getState().modal;
@@ -629,6 +776,33 @@ export function SettingsPanel() {
   });
   const [recording, setRecording] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState(0);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  /** Label to scroll to once the section it lives in has rendered. */
+  const [reveal, setReveal] = useState<{ label: string; n: number } | null>(null);
+  const searching = query.trim() !== '';
+  // Built when the search starts; the labels do not change while the dialog is open.
+  const entries = useMemo(() => (searching ? settingEntries(isOwner) : []), [searching, isOwner]);
+  const hits = useMemo(() => searchSettings(entries, query), [entries, query]);
+  const openHit = (hit: SettingHit) => {
+    setSection(hit.section as Section);
+    if (hit.command) setFilter(hit.label);
+    setReveal({ label: hit.label, n: Date.now() });
+  };
+  useEffect(() => {
+    if (!reveal) return;
+    let done = false;
+    // Sections that load their data first (MCP, cloud…) draw their rows a moment later.
+    const timers = [0, 150, 500].map((ms) =>
+      setTimeout(() => {
+        if (done) return;
+        revealSetting(bodyRef.current, reveal.label);
+        done = !!bodyRef.current?.querySelector('.settings-hit');
+      }, ms),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [reveal]);
 
   const nav = (id: Section, label: string, icon: IconName) => (
     <button className={section === id ? 'on' : ''} onClick={() => setSection(id)}>
@@ -649,19 +823,73 @@ export function SettingsPanel() {
         <div className="settings-title" id="settings-title">
           <Icon name="settings" size={16} /> {t('settings')}
         </div>
-        {nav('appearance', t('setAppearance'), 'palette')}
-        {nav('editor', t('setEditor'), 'edit')}
-        {nav('ai', t('setAi'), 'agent')}
-        {nav('mcp', 'MCP', 'plug')}
-        {nav('memories', t('setMemories'), 'sparkle')}
-        {nav('docs', t('setDocsNav'), 'books')}
-        {nav('cloud', t('cloudTitle'), 'cloud')}
-        {nav('browser', t('setBrowser'), 'globe')}
-        {nav('phone', t('phoneTitle'), 'smartphone')}
-        {nav('keys', t('shortcuts'), 'keyboard')}
-        {isOwner && nav('owner', lang === 'en' ? 'Keys (owner)' : 'Claves (dueño)', 'key')}
+        <input
+          className="settings-search"
+          type="search"
+          role="combobox"
+          aria-expanded={searching}
+          aria-controls="settings-hits"
+          aria-label={t('setSearch')}
+          placeholder={t('setSearch')}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPicked(0);
+          }}
+          onKeyDown={(e) => {
+            if (!searching) return;
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              const step = e.key === 'ArrowDown' ? 1 : -1;
+              setPicked((p) => Math.max(0, Math.min(hits.length - 1, p + step)));
+            } else if (e.key === 'Enter' && hits[picked]) {
+              e.preventDefault();
+              openHit(hits[picked]!);
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              setQuery('');
+            }
+          }}
+        />
+        {searching && (
+          <div className="settings-hits" id="settings-hits" role="listbox">
+            {hits.length === 0 && <p className="dim small">{t('setSearchNone')}</p>}
+            {hits.map((hit, i) => (
+              <button
+                key={`${hit.section}:${hit.command ?? hit.label}`}
+                role="option"
+                aria-selected={i === picked}
+                className={i === picked ? 'on' : ''}
+                onClick={() => {
+                  setPicked(i);
+                  openHit(hit);
+                }}
+              >
+                <span className="settings-hit-label">{hit.label}</span>
+                <span className="settings-hit-section">{hit.sectionLabel}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {!searching && (
+          <>
+            {nav('appearance', t('setAppearance'), 'palette')}
+            {nav('editor', t('setEditor'), 'edit')}
+            {nav('ai', t('setAi'), 'agent')}
+            {nav('mcp', 'MCP', 'plug')}
+            {nav('memories', t('setMemories'), 'archive')}
+            {nav('docs', t('setDocsNav'), 'books')}
+            {nav('cloud', t('cloudTitle'), 'cloud')}
+            {nav('browser', t('setBrowser'), 'globe')}
+            {nav('phone', t('phoneTitle'), 'smartphone')}
+            {nav('account', ta('title'), 'users')}
+            {nav('keys', t('shortcuts'), 'keyboard')}
+            {isOwner && nav('owner', lang === 'en' ? 'Keys (owner)' : 'Claves (dueño)', 'key')}
+          </>
+        )}
       </nav>
-      <div className="settings-body">
+      <div className="settings-body" ref={bodyRef}>
         <button className="modal-x" onClick={close} aria-label={t('close')} title={t('close')}>
           <Icon name="close" size={16} />
         </button>
@@ -674,15 +902,26 @@ export function SettingsPanel() {
                   : 'Responde otra vez las preguntas de inicio para adaptar los paneles y la ayuda a ti.'}
               </span>
               <button className="small" onClick={() => setState({ modal: { kind: 'quiz' } })}>
-                <Icon name="sparkle" size={13} />{' '}
+                <Icon name="refresh" size={13} />{' '}
                 {lang === 'en' ? 'Repeat questionnaire' : 'Repetir cuestionario'}
               </button>
             </div>
             <h3>{t('setTheme')}</h3>
             <div className="theme-grid">
               {THEME_IDS.map((id) => (
-                <ThemeCard key={id} id={id} active={settings.theme === id} />
+                <ThemeCard key={id} id={id} active={!extTheme && settings.theme === id} />
               ))}
+              {extChoices.map((th) => (
+                <ExtThemeCard key={th.id} th={th} active={extTheme === th.id} />
+              ))}
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <button
+                className="small"
+                onClick={() => setState({ sidebar: 'extensions', modal: null })}
+              >
+                <Icon name="layers" size={13} /> {lang === 'en' ? 'More themes…' : 'Más temas…'}
+              </button>
             </div>
             <h3>{t('setLanguage')}</h3>
             <label className="settings-field">
@@ -849,6 +1088,7 @@ export function SettingsPanel() {
         {section === 'browser' && <BrowserSection />}
 
         {section === 'phone' && <PhoneSection />}
+        {section === 'account' && <AccountSection />}
 
         {section === 'owner' && isOwner && <OwnerKeysSection />}
 

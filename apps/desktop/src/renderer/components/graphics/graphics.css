@@ -108,12 +108,11 @@
     max-height: 100%;
     box-shadow: var(--elevation-1);
   }
+  /* Wraps: one line cut most names in a narrow panel ("Miniatura de You…"). */
   .gp-tpl-name {
     font-size: var(--text-xs);
     line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
   .gp-field {
     display: flex;

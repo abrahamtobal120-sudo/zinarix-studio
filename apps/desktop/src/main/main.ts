@@ -85,6 +85,8 @@ import { GOOGLE_ALL_SCOPE } from './googleMail.js';
 import { licenseStatus, normalizeKey, parseLicense } from './license.js';
 import type { StoredLicense } from './license.js';
 import { LicenseIssuer } from './licenseIssuer.js';
+import { ZinarixAccount } from './zinarixAccount.js';
+import type { AccountStatus } from '../shared/account.js';
 import { startUpdates } from './updates.js';
 import { diagnosticReport, initLog, logError, logInfo, logWarn } from './log.js';
 import { editionOf } from '../shared/edition.js';
@@ -110,7 +112,7 @@ import {
 import { LspHost } from './lsp.js';
 import { Knowledge } from './knowledge.js';
 import type { RemoteNotice } from '../shared/plans.js';
-import { DOWNLOAD_URL } from '../shared/plans.js';
+import { DOWNLOAD_URL, isActivated } from '../shared/plans.js';
 import {
   auditDependencies,
   checkSite,
@@ -933,9 +935,39 @@ function saveState(patch: Partial<DesktopState>): void {
   });
 }
 
+/** The Zinarix account of this installation (optional sign-in) and the owner's feed. */
+let zxAccountSvc: ZinarixAccount | undefined;
+function zxAccount(): ZinarixAccount {
+  return (zxAccountSvc ??= new ZinarixAccount({
+    file: join(app.getPath('userData'), 'zinarix-account.json'),
+    tokens: new TokenStore(join(app.getPath('userData'), 'zinarix-account.bin'), 'zinarix-account'),
+    packaged: app.isPackaged,
+    baseUrl: process.env.ZINARIX_ACCOUNT_URL,
+  }));
+}
+
+/** Keys cancelled by the owner: the signed control file plus the signed feed of the server. */
+function revokedIds(): string[] {
+  return [...(loadState().revoked ?? []), ...zxAccount().revoked()];
+}
+
 /** The plan of this installation (trial, Pro, owner or free). */
 function license() {
-  return licenseStatus(loadState(), undefined, undefined, edition, { devPlans: !app.isPackaged });
+  return licenseStatus({ ...loadState(), revoked: revokedIds() }, undefined, undefined, edition, {
+    devPlans: !app.isPackaged,
+  });
+}
+
+/**
+ * Signed in and no plan active here: the best key linked to the account is activated, so a
+ * key the owner made for this person works without pasting it.
+ */
+function adoptAccountLicense(): void {
+  if (isActivated(license().plan)) return;
+  const key = zxAccount().bestLicense(loadState().revoked);
+  if (!key) return;
+  saveState({ license: key, owner: undefined, codePlan: undefined });
+  for (const w of wins.values()) send(w, { type: 'settings:changed' });
 }
 
 function planName(): string {
@@ -1060,9 +1092,17 @@ function broadcastSettings(from: Win): void {
 function scope(w: Win, folder?: string): Scope {
   // The window's folder as it is now: a turn under way stays there if the window opens another.
   const current = w.workspace;
-  if (!folder) return { workspace: () => current, browser: w.browser };
+  // A4: after an edit the agent hears what the window's language servers say about the file
+  // (only while the window is still on that folder).
+  const own: Scope = {
+    workspace: () => current,
+    browser: w.browser,
+    diagnostics: (path, text) =>
+      w.workspace === current ? lspOf(w).check(path, text) : Promise.resolve(null),
+  };
+  if (!folder) return own;
   const abs = resolve(folder);
-  if (current?.root === abs) return { workspace: () => current, browser: w.browser };
+  if (current?.root === abs) return own;
   if (!existsSync(abs) || !statSync(abs).isDirectory())
     throw new Error(`La carpeta del chat ya no existe: ${abs}`);
   let ws = w.chatFolders.get(abs);
@@ -1093,7 +1133,7 @@ async function openFolder(w: Win, path: string): Promise<WorkspaceInfo | null> {
   w.workspace?.dispose();
   const workspace = new Workspace(abs);
   w.workspace = workspace;
-  workspace.watch(() => send(w, { type: 'fs:changed' }));
+  workspace.watch((paths) => send(w, { type: 'fs:changed', ...(paths ? { paths } : {}) }));
   const st = loadState();
   saveState({
     lastFolder: abs,
@@ -1335,6 +1375,8 @@ function registerIpc(): void {
   handle('workspace:createDir', z.tuple([rel]), (w, p) => ws(w).createDir(p));
   handle('workspace:rename', z.tuple([rel, rel]), (w, a, b) => ws(w).rename(a, b));
   handle('workspace:trash', z.tuple([rel]), (w, p) => shell.trashItem(ws(w).resolve(p)));
+  // Shows a file or folder of the project in the system file manager (it opens nothing).
+  handle('workspace:reveal', z.tuple([rel]), (w, p) => shell.showItemInFolder(ws(w).resolve(p)));
   handle('workspace:listFiles', z.tuple([]), (w) => ws(w).listFiles());
   handle('workspace:search', z.tuple([str, z.boolean(), z.boolean()]), (w, q, r, c) =>
     ws(w).search(q, r, c),
@@ -1909,7 +1951,21 @@ function registerIpc(): void {
     ]),
     (w, kind, name, folder) => ai.createKitFile(scope(w, folder), kind, name),
   );
-  handle('ai:resetContext', z.tuple([conv]), (_w, c) => ai.resetContext(c));
+  handle('ai:resetContext', z.tuple([conv, z.boolean().optional()]), (_w, c, afterRun) =>
+    ai.resetContext(c, afterRun),
+  );
+  handle(
+    'ai:compactChat',
+    z.tuple([
+      z
+        .array(
+          z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(2_000_000) }),
+        )
+        .max(20_000),
+      z.string().max(300).optional(),
+    ]),
+    (_w, messages, model) => ai.compactChat(messages, model),
+  );
 
   const paths = z.array(rel).max(5000);
   handle('git:status', z.tuple([]), (w) => git(w).status());
@@ -3152,10 +3208,15 @@ function registerIpc(): void {
     const key = normalizeKey(input);
     const p = parseLicense(key);
     if (p.exp && p.exp < Date.now()) throw new Error('Esta licencia ya venció.');
-    if (loadState().revoked?.includes(p.id))
+    if (revokedIds().includes(p.id))
       throw new Error('Esta licencia fue cancelada (reembolso o disputa del pago).');
     saveState({ license: key, owner: undefined, codePlan: undefined });
     broadcastSettings(w);
+    // Signed in: the key is linked to the account too (best effort, the key works anyway).
+    if (!p.owner && zxAccount().status().signedIn)
+      void zxAccount()
+        .redeem(key)
+        .catch(() => undefined);
     return license();
   });
   handle('license:remove', z.tuple([]), (w) => {
@@ -3196,6 +3257,38 @@ function registerIpc(): void {
       ownerOnly();
       return issuer.mark(id, given, note);
     },
+  );
+
+  // The Zinarix account (optional): register / sign in on the website's server.
+  const credentials = z.object({
+    email: z.string().trim().min(3).max(200),
+    password: z.string().min(1).max(200),
+    name: z.string().trim().max(80).optional(),
+  });
+  const signedIn = async (w: Win, work: Promise<AccountStatus>) => {
+    const status = await work;
+    adoptAccountLicense();
+    broadcastSettings(w);
+    return status;
+  };
+  handle('account:status', z.tuple([]), () => zxAccount().status());
+  handle('account:register', z.tuple([credentials]), (w, c) =>
+    signedIn(w, zxAccount().register(c)),
+  );
+  handle('account:login', z.tuple([credentials]), (w, c) => signedIn(w, zxAccount().login(c)));
+  handle('account:sync', z.tuple([]), async (w) => {
+    await zxAccount().refreshFeed();
+    return signedIn(w, zxAccount().sync());
+  });
+  handle('account:logout', z.tuple([]), async (w) => {
+    const status = await zxAccount().logout();
+    broadcastSettings(w);
+    return status;
+  });
+  handle(
+    'account:password',
+    z.tuple([z.string().min(1).max(200), z.string().min(8).max(200)]),
+    (_w, current, password) => zxAccount().changePassword(current, password),
   );
 }
 
@@ -5850,6 +5943,7 @@ async function createWindow(
     });
   if (opts.folder) await openFolder(w, opts.folder);
   if (lastNotice) send(w, { type: 'notice', ...lastNotice });
+  sendFeedNotices([w]);
   if (available) send(w, { type: 'update', state: 'available', ...available });
   return w;
 }
@@ -5894,12 +5988,37 @@ let lastNotice: RemoteNotice | undefined;
 let available: { version: string; url: string } | undefined;
 
 /**
+ * The owner's messages (the server's feed) as notices, oldest first: the renderer shows one
+ * at a time and skips the ones already closed on this computer, so the newest unseen wins.
+ */
+function sendFeedNotices(to: Iterable<Win>): void {
+  const messages = [...zxAccount().status().messages].sort((a, b) => a.at - b.at);
+  for (const w of to)
+    for (const m of messages) send(w, { type: 'notice', id: m.id, text: m.text, url: m.url });
+}
+
+/**
+ * Reads the account server: the owner's messages and cancelled keys (every app), and, when
+ * signed in, the keys linked to the account. Offline: nothing changes.
+ */
+async function refreshAccount(): Promise<void> {
+  const acc = zxAccount();
+  const before = JSON.stringify(acc.revoked());
+  const messages = await acc.refreshFeed();
+  if (messages) sendFeedNotices(wins.values());
+  await acc.sync().catch(() => undefined);
+  adoptAccountLicense();
+  if (JSON.stringify(acc.revoked()) !== before)
+    for (const w of wins.values()) send(w, { type: 'settings:changed' });
+}
+
+/**
  * Reads the owner's control file (app-config.json on the website): the billing switch and
  * plans, a notice for every installed app, and the newest version. Offline: nothing
  * changes (the last plans read stay in use).
  */
 async function refreshRemote(): Promise<boolean> {
-  const r = await fetchRemote({ packaged: app.isPackaged });
+  const r = await fetchRemote({ packaged: app.isPackaged, lastSeq: loadState().configSeq });
   if (r) {
     const st = loadState();
     const changed =
@@ -5908,6 +6027,7 @@ async function refreshRemote(): Promise<boolean> {
     saveState({
       plans: r.plans,
       revoked: r.revoked,
+      configSeq: Math.max(r.seq, st.configSeq ?? 0),
       ...(r.plans.billing && !st.billingSince ? { billingSince: Date.now() } : {}),
     });
     if (changed) for (const w of wins.values()) send(w, { type: 'settings:changed' });
@@ -6009,6 +6129,8 @@ app.whenReady().then(async () => {
   // The owner's switches and announcements, now and every few hours.
   void refreshRemote();
   setInterval(() => void refreshRemote(), 6 * 60 * 60 * 1000).unref();
+  void refreshAccount();
+  setInterval(() => void refreshAccount(), 60 * 60 * 1000).unref();
 });
 
 app.on('window-all-closed', () => {

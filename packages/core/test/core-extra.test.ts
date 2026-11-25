@@ -108,6 +108,47 @@ describe('OmniCore', () => {
     expect(r.usd).toBeCloseTo(3);
   });
 
+  it('fim() uses the native completions endpoint, counts usage and remembers a refusal', async () => {
+    const seen: { url: string; body: Record<string, unknown> }[] = [];
+    const srv = await mockServer((req, res) => {
+      const body = JSON.parse(req.body || '{}') as Record<string, unknown>;
+      seen.push({ url: req.url, body });
+      if (body.model === 'chat-only')
+        return json(res, 400, { error: { message: 'chat-only does not support insert' } });
+      json(res, 200, { choices: [{ text: 'a + b;' }] });
+    });
+    close = srv.close;
+    const fimEntry = entry('mock', srv.url);
+    fimEntry.supports.fim = true;
+    const c = open({
+      customProviders: [fimEntry, entry('plain', srv.url)],
+      roles: { inline: 'mock/coder' },
+      prices: { 'mock/coder': { input: 1, output: 2 } },
+    });
+    await c.vault.set('mock', 'mock-key-123456789', 'file');
+    await c.vault.set('plain', 'mock-key-123456789', 'file');
+    const signal = new AbortController().signal;
+    const req = { prefix: 'function sum(a, b) {\n  return ', suffix: '\n}\n', maxTokens: 32 };
+
+    expect(await c.fim(req, signal)).toEqual({ text: 'a + b;', provider: 'mock', model: 'coder' });
+    expect(seen[0]!.url).toBe('/completions');
+    expect(seen[0]!.body).toMatchObject({ prompt: req.prefix, suffix: req.suffix, max_tokens: 32 });
+    const row = c.db
+      .prepare('SELECT role, input_tokens, output_tokens, cost_usd FROM usage')
+      .get() as { role: string; input_tokens: number; output_tokens: number; cost_usd: number };
+    expect(row.role).toBe('inline');
+    expect(row.input_tokens).toBeGreaterThan(0);
+    expect(row.cost_usd).toBeGreaterThan(0);
+
+    // The model refuses: undefined (the caller uses chat) and no second request for it.
+    expect(await c.fim({ ...req, model: 'mock/chat-only' }, signal)).toBeUndefined();
+    expect(await c.fim({ ...req, model: 'mock/chat-only' }, signal)).toBeUndefined();
+    expect(seen).toHaveLength(2);
+    // A provider that does not declare fill-in-the-middle is never asked.
+    expect(await c.fim({ ...req, model: 'plain/m' }, signal)).toBeUndefined();
+    expect(seen).toHaveLength(2);
+  });
+
   it('lists connected providers from keys and keyless local entries', async () => {
     const c = open(
       { providers: { ollama: { params: {}, headers: {} } } },

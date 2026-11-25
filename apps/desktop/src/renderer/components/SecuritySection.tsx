@@ -166,7 +166,7 @@ function Findings({ report, kind }: { report: SecReportView; kind: SecKind }) {
                       aria-label={t('secAskAI')}
                       onClick={() => fixOne(kind, f)}
                     >
-                      <Icon name="sparkle" size={13} />
+                      <Icon name="message" size={13} />
                     </button>
                     <button
                       title={t('secCopy')}
@@ -653,7 +653,7 @@ export function SecuritySection() {
                 </button>
                 {store[cat]?.report?.findings.length ? (
                   <button onClick={() => explain(cat, store[cat]!.report!)}>
-                    <Icon name="sparkle" size={13} /> {t('secAskAI')}
+                    <Icon name="message" size={13} /> {t('secAskAI')}
                   </button>
                 ) : null}
               </div>
@@ -704,7 +704,7 @@ export function SecuritySection() {
               </button>
               {store.site?.report?.findings.length ? (
                 <button onClick={() => explain('site', store.site!.report!)}>
-                  <Icon name="sparkle" size={13} /> {t('secAskAI')}
+                  <Icon name="message" size={13} /> {t('secAskAI')}
                 </button>
               ) : null}
             </div>

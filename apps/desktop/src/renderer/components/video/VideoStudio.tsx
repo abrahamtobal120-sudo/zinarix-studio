@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { wireVideoAgent } from './videoAgent';
 import {
   FORMAT_PRESETS,
   FPS_CHOICES,
@@ -14,7 +13,6 @@ import { ExportDialog, RenderQueue } from './ExportDialog';
 import { Inspector } from './Inspector';
 import { AiPanel } from './AiPanel';
 import { Panel3D } from '../three/Panel3D';
-import { Studio3DHost } from '../three/Studio3D';
 import { EasyPanel } from './EasyPanel';
 import { ColorPanel } from './ColorPanel';
 import { rippleToPlayhead, rollToPlayhead, slideSelected, slipSelected } from './proEdit';
@@ -35,7 +33,6 @@ import {
 import { shuttle, stepFrame, togglePlay } from './Viewer';
 import { Viewer } from './Viewer';
 import './video.css';
-import { RecordBar } from './RecordDialog';
 import {
   closeStudio,
   commit,
@@ -47,16 +44,13 @@ import {
   minimizeStudio,
   newProjectWith,
   openProjectFile,
-  openStudio,
   redo,
   saveLayout,
   saveProject,
   seek,
   setV,
-  toggleStudio,
   undo,
   useV,
-  wireJobs,
   type Layout,
   type StudioTab,
 } from './videoStore';
@@ -90,46 +84,7 @@ function useWindowSize(): { w: number; h: number } {
   return size;
 }
 
-/** Mounted from the first time the studio opens, so closing it keeps everything as it was. */
-export function VideoStudioHost() {
-  const open = useV((s) => s.open);
-  // Fase 13B: the agent's video_* tools work even before the studio is first opened.
-  useEffect(() => wireVideoAgent(), []);
-  // Ctrl+Shift+V anywhere in the app (the menu has it too; toggleStudio ignores the double).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.code === 'KeyV') {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleStudio();
-      }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, []);
-  const minimized = useV((s) => s.minimized);
-  const [mounted, setMounted] = useState(false);
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    if (open && !minimized) {
-      setMounted(true);
-      wireJobs();
-      const r = requestAnimationFrame(() => setShown(true));
-      return () => cancelAnimationFrame(r);
-    }
-    setShown(false);
-  }, [open, minimized]);
-  return (
-    <>
-      {mounted && <VideoStudio shown={shown} visible={open && !minimized} />}
-      <MiniPill />
-      <RecordBar />
-      <Studio3DHost />
-    </>
-  );
-}
-
-function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
+export function VideoStudio({ shown, visible }: { shown: boolean; visible: boolean }) {
   const root = useRef<HTMLDivElement>(null);
   const tab = useV((s) => s.tab);
   const dialog = useV((s) => s.dialog);
@@ -509,26 +464,6 @@ function TopBar() {
 }
 
 /** Floating pill while the studio is minimized (or closed with an export running). */
-function MiniPill() {
-  const open = useV((s) => s.open);
-  const minimized = useV((s) => s.minimized);
-  const running = useV((s) => s.jobs.find((j) => j.state === 'running' || j.state === 'queued'));
-  if (open && !minimized) return null;
-  if (!minimized && !running) return null;
-  const pct = running ? Math.round(running.progress * 100) : null;
-  return (
-    <button className="vs-pill" onClick={() => void openStudio()} title={tv('restore')}>
-      <Icon name="film" size={15} />
-      {pct != null ? tv('rendering', { pct }) : tv('title')}
-      {pct != null && (
-        <span className="vs-pill-bar">
-          <span style={{ width: `${pct}%` }} />
-        </span>
-      )}
-    </button>
-  );
-}
-
 function NewProjectDialog() {
   const [aspect, setAspect] = useState(FORMAT_PRESETS[0]!.id);
   const [short, setShort] = useState(1080);

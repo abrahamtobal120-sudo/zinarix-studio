@@ -371,7 +371,7 @@ export function SketchupPanel() {
           />
           <div className="cad-row-btns">
             <button className="btn cad-small" disabled={!ask.trim()} onClick={sendAsk}>
-              <Icon name="sparkle" size={13} /> {tsu('askSend')}
+              <Icon name="message" size={13} /> {tsu('askSend')}
             </button>
           </div>
         </section>
@@ -548,7 +548,7 @@ export function SkpView({ path }: { path: string }) {
           className="btn ghost cad-small"
           onClick={() => askAgent(tsu('checkAiPrompt', { file: path }))}
         >
-          <Icon name="sparkle" size={13} /> {tsu('checkAi')}
+          <Icon name="message" size={13} /> {tsu('checkAi')}
         </button>
       </div>
       <div className="skp-view-body">

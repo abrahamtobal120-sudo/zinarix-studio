@@ -9,6 +9,8 @@ import { Agent } from '../src/main/agent.js';
 import { Workspace } from '../src/main/workspace.js';
 import {
   COMPUTER_MODE_NOTE,
+  computerPreview,
+  riskyOpen,
   type ComputerRunHooks,
   type ComputerService,
 } from '../src/main/computerTools.js';
@@ -104,7 +106,7 @@ function setup() {
     const results = events.flatMap((e) => (e.type === 'tool_result' ? [e] : []));
     return { asked, results };
   };
-  return { log, turn };
+  return { log, turn, agent };
 }
 
 const click = { name: 'computer_click', args: { x: 100, y: 200 } };
@@ -179,5 +181,55 @@ describe('Controlar la compu (chat switch)', () => {
     expect(COMPUTER_MODE_NOTE).toMatch(/Controlar la compu/);
     expect(COMPUTER_MODE_NOTE).toMatch(/never click it/);
     expect(COMPUTER_MODE_NOTE).toMatch(/passwords/);
+  });
+});
+
+describe('D4: consoles and outside text always ask', () => {
+  const open = (target: string) => ({ name: 'computer_open', args: { target } });
+
+  it('opening an ordinary program does not ask with the switch on', async () => {
+    const { turn, log } = setup();
+    const r = await turn([open('notepad'), open('https://example.com')], hooks([]));
+    expect(r.asked).toEqual([]);
+    expect(log).toEqual(['open app:notepad', 'open url:https://example.com']);
+  });
+
+  it('opening a terminal or the Run dialog asks every time, also with the switch on', async () => {
+    const { turn, log } = setup();
+    const calls = [
+      open('cmd'),
+      open('PowerShell'),
+      open('wt.exe'),
+      open('Windows Terminal'),
+      { name: 'computer_key', args: { keys: 'win+r' } },
+    ];
+    const r = await turn(calls, hooks([]));
+    expect(r.asked).toHaveLength(5);
+    // Approving once does not unlock the next one.
+    const again = await turn([open('cmd')], hooks([]));
+    expect(again.asked).toHaveLength(1);
+    expect(log.filter((l) => l.startsWith('open app:'))).toHaveLength(5);
+  });
+
+  it('after the model read outside text, opening anything asks; clicks do not', async () => {
+    const { turn, agent } = setup();
+    await turn([shot], hooks([]));
+    const sessions = (agent as unknown as { sessions: Map<string, { external?: boolean }> })
+      .sessions;
+    sessions.get('conv')!.external = true;
+    const r = await turn([open('notepad'), click], hooks([]));
+    expect(r.asked).toHaveLength(1);
+  });
+
+  it('the card says why and offers no "always"', () => {
+    const p = computerPreview('computer_open', { target: 'cmd' });
+    expect(p.allowKey).toBeUndefined();
+    expect(p.warning).toMatch(/terminal o consola/);
+    expect(computerPreview('computer_open', { target: 'notepad' }).allowKey).toBeDefined();
+    const ext = computerPreview('computer_open', { target: 'notepad' }, { external: true });
+    expect(ext.allowKey).toBeUndefined();
+    expect(ext.warning).toMatch(/contenido externo/);
+    expect(riskyOpen({ kind: 'app', name: 'Excel' })).toBeNull();
+    expect(riskyOpen({ kind: 'app', name: 'pwsh' })).not.toBeNull();
   });
 });

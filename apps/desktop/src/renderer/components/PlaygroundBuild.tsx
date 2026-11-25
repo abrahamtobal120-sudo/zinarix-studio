@@ -184,7 +184,7 @@ export function BuildView({ models }: { models: string[] }) {
             disabled={busy || desc.trim().length < 4 || !parent}
             onClick={() => void create()}
           >
-            <Icon name="sparkle" size={13} /> {busy ? tp('bdCreating') : tp('bdCreate')}
+            <Icon name="plus" size={13} /> {busy ? tp('bdCreating') : tp('bdCreate')}
           </button>
         </div>
       </section>

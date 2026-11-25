@@ -47,7 +47,14 @@ jobs:
       - name: Audit dependencies
         if: runner.os == 'Linux'
         run: pnpm audit:deps
-      - run: pnpm vitest run --coverage
+      # Linux runners have no screen: the tests that open a real window (the Phaser template
+      # in Electron) get a virtual one.
+      - name: Tests (Linux, virtual screen)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm vitest run --coverage
+      - name: Tests
+        if: runner.os != 'Linux'
+        run: pnpm vitest run --coverage
       # The agent bench (evals/) stays usable: every task fails as shipped and passes with its
       # reference solution. No model is called here.
       - run: pnpm evals:check

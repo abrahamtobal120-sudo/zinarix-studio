@@ -22,6 +22,65 @@ const OS_LABEL = {
 };
 const OS_BEST = { windows: 'win-exe', mac: 'mac-arm64', linux: 'deb' };
 
+/**
+ * Apple Silicon or Intel. Browsers on a Mac all say "Intel Mac OS X" in the user agent, so:
+ * Chromium tells the CPU through userAgentData; elsewhere (Safari, Firefox) the WebGL
+ * renderer names the GPU ("Apple M2", "Apple GPU" vs Intel / AMD). Unknown: Apple Silicon
+ * stays the main button (every Mac sold since 2020) and the Intel .dmg is one click away.
+ */
+async function detectMacArch() {
+  try {
+    const d = await navigator.userAgentData?.getHighEntropyValues?.(['architecture']);
+    if (d?.architecture) return /arm/i.test(d.architecture) ? 'arm64' : 'x64';
+  } catch {
+    // not allowed: fall through to the GPU name
+  }
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+    const gpu = String(
+      (ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || gl?.getParameter(gl.RENDERER) || '',
+    );
+    if (/Intel|AMD|Radeon|NVIDIA|GeForce/i.test(gpu)) return 'x64';
+    if (/Apple/i.test(gpu)) return 'arm64';
+  } catch {
+    // no WebGL
+  }
+  return null;
+}
+
+/** On a Mac: its .dmg goes on the main button and the "not signed by Apple" steps open. */
+async function setupMac(os) {
+  const steps = document.getElementById('mac-steps');
+  const openSteps = () => {
+    steps.open = true;
+  };
+  for (const a of document.querySelectorAll('[data-asset^="mac-"], a[href="#mac-steps"]'))
+    a.addEventListener('click', openSteps);
+  const onHash = () => {
+    if (location.hash === '#mac-steps') openSteps();
+  };
+  window.addEventListener('hashchange', onHash);
+  onHash();
+  if (os !== 'mac') return;
+  openSteps();
+  const arch = await detectMacArch();
+  if (!arch) return;
+  if (arch === 'x64') {
+    // Swap the two links: Intel becomes the button.
+    const arm = document.querySelector('[data-asset="mac-arm64"]');
+    const intel = document.querySelector('[data-asset="mac-x64"]');
+    arm.className = 'dl-link';
+    intel.className = 'btn btn-primary';
+    arm.before(intel);
+    OS_BEST.mac = 'mac-x64';
+  }
+  document.getElementById('mac-arch-note').textContent =
+    arch === 'x64'
+      ? 'Detectamos un Mac con Intel'
+      : 'Detectamos un Mac con Apple Silicon (M1 o más nuevo)';
+}
+
 function detectOs() {
   const ua = navigator.userAgent;
   if (/Windows/i.test(ua)) return 'windows';
@@ -32,6 +91,7 @@ function detectOs() {
 
 async function setupDownloads() {
   const os = detectOs();
+  await setupMac(os);
   const info = document.getElementById('release-info');
   if (os) document.querySelector(`.os[data-os="${os}"]`)?.classList.add('recommended');
 
@@ -44,7 +104,11 @@ async function setupDownloads() {
   } catch {
     // offline or rate-limited: keep fallback links
   }
-  const assets = release?.assets ?? [];
+  // The release also carries the Pro, AI and Pro + AI editions (Zinarix-Studio-AI-…,
+  // zinarix-studio-pro_…): this page offers the standard one.
+  const assets = (release?.assets ?? []).filter(
+    (x) => !/^zinarix-studio-(ai|pro|proai)[-_]/i.test(x.name),
+  );
   for (const a of document.querySelectorAll('[data-asset]')) {
     const match = assets.find((x) => MATCHERS[a.dataset.asset]?.(x.name));
     if (match) {
@@ -65,6 +129,13 @@ async function setupDownloads() {
   if (best && !best.classList.contains('disabled')) {
     const primary = document.getElementById('primary-download');
     primary.href = best.href === RELEASES ? '#descargar' : best.href;
+    // The hero button downloads right away: on a Mac, also show the first-open steps.
+    if (os === 'mac')
+      primary.addEventListener('click', () => {
+        const steps = document.getElementById('mac-steps');
+        steps.open = true;
+        setTimeout(() => steps.scrollIntoView(), 600);
+      });
     document.getElementById('primary-label').textContent = OS_LABEL[os];
     document.getElementById('primary-glyph').outerHTML =
       `<span class="os-logo ${os}" id="primary-glyph" aria-hidden="true"></span>`;

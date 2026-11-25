@@ -104,6 +104,8 @@ export interface StoredLicense {
   firstRun?: number;
   /** When this copy first saw billing switched on (ms): the trial runs from here. */
   billingSince?: number;
+  /** Highest sequence number of app-config.json accepted so far (remote.ts, isReplay). */
+  configSeq?: number;
   /** Last plans.json read from the website (used offline). */
   plans?: PlansConfig;
 }

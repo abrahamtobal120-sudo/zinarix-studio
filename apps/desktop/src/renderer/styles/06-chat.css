@@ -13,9 +13,9 @@
     padding: 8px 14px;
     user-select: text;
   }
-  /* Empty chat: centred in the panel, whatever its height; two columns of ideas when it is wide. */
+  /* Empty chat: a short list of ideas resting on the message box, like a command list. The
+   connect / offline states (which carry the logo) stay centred. */
   .chat-empty {
-    container-type: inline-size;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -24,22 +24,30 @@
     padding: 24px 8px;
     text-align: center;
   }
+  .chat-empty:has(> .chat-hints:not(.chat-bot-intro)) {
+    align-items: stretch;
+    justify-content: flex-end;
+    max-width: 780px;
+    margin-inline: auto;
+    padding: 12px 4px;
+    text-align: left;
+  }
   .chat-logo {
     width: 40px;
     height: 40px;
   }
   .chat-hello {
-    margin: 14px 0 6px;
-    font-size: var(--text-xl);
+    margin: 0 0 2px;
+    padding-inline: 8px;
+    font-size: var(--text-md);
     font-weight: 600;
-    letter-spacing: -0.02em;
     color: var(--fg-strong);
   }
   .chat-keys {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
     gap: 6px 16px;
+    padding-inline: 8px;
     font-size: var(--text-xs);
     color: var(--fg-dim);
   }
@@ -47,12 +55,18 @@
     margin-right: 4px;
     padding: 1px 5px;
     font-family: var(--font-mono);
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs);
     color: var(--fg);
     background: var(--bg-2);
     border: 1px solid var(--border);
     border-bottom-width: 2px;
     border-radius: var(--radius-xs);
+  }
+  /* Long chats mount their last turns only; this brings the earlier ones back. */
+  .chat-earlier {
+    display: block;
+    margin: 4px auto 12px;
+    font-size: var(--text-sm);
   }
   .turn {
     margin: 10px 0 16px;
@@ -120,6 +134,32 @@
   }
   .turn-reasoning-body.full {
     max-height: none;
+  }
+  /* "Compactar chat": the summary that replaces the compacted messages. */
+  .compact-card {
+    font-size: var(--text-sm);
+    color: var(--fg-dim);
+    border: 1px dashed var(--border, rgba(127, 127, 127, 0.3));
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .compact-card summary {
+    cursor: pointer;
+  }
+  .compact-card-body {
+    max-height: 420px;
+    overflow-y: auto;
+    margin-top: 6px;
+    color: var(--fg);
+  }
+  .compact-card-toggle {
+    margin-top: 4px;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: var(--text-xs);
+    color: var(--accent, inherit);
+    cursor: pointer;
   }
   .turn-reasoning-more {
     margin-top: 4px;
@@ -305,7 +345,7 @@
   .model-chip {
     background: var(--bg-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     padding: 3px 10px;
     font-size: var(--text-xs);
     color: var(--fg-dim);
@@ -399,6 +439,31 @@
     background: none;
     padding: 0;
     white-space: pre;
+  }
+  .syn-comment {
+    color: var(--syn-comment);
+    font-style: italic;
+  }
+  .syn-string {
+    color: var(--syn-string);
+  }
+  .syn-keyword {
+    color: var(--syn-keyword);
+  }
+  .syn-number {
+    color: var(--syn-number);
+  }
+  .syn-type {
+    color: var(--syn-type);
+  }
+  .syn-tag {
+    color: var(--syn-tag);
+  }
+  .syn-attr {
+    color: var(--syn-attr);
+  }
+  .syn-regexp {
+    color: var(--syn-regexp);
   }
 
   /* ---------- status bar ---------- */

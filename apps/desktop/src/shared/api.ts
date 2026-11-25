@@ -24,6 +24,7 @@ import type { AutoTaskInput, AutomationsStatus, BotInput } from './automations.j
  */
 import type { ChatMessage, ModelInfo } from '@omni/shared';
 import type { IssueRequest, IssuerStatus, LicenseStatus } from './plans.js';
+import type { AccountCredentials, AccountStatus } from './account.js';
 import type { ChromeState } from './windowChrome.js';
 import type { TestDiscovery, TestEvent, TestRunRequest, TestRunSummary } from './testing.js';
 import type {
@@ -1186,7 +1187,11 @@ export type AppEvent =
   | { type: 'automations'; status: AutomationsStatus }
   | { type: 'term:data'; id: number; data: string }
   | { type: 'term:exit'; id: number; code: number }
-  | { type: 'fs:changed' }
+  /**
+   * Something changed in the open folder. `paths` (relative, "/" separated) lists what, when
+   * it is known and short enough; without it, anything may have changed.
+   */
+  | { type: 'fs:changed'; paths?: string[] }
   | { type: 'workspace'; workspace: WorkspaceInfo | null }
   | { type: 'command'; command: string }
   | { type: 'browser:state'; state: BrowserStateView }
@@ -1773,6 +1778,8 @@ export interface OmniApi {
     createDir(path: string): Promise<void>;
     rename(from: string, to: string): Promise<void>;
     trash(path: string): Promise<void>;
+    /** Shows a file or folder of the project in the system file manager. */
+    reveal(path: string): Promise<void>;
     listFiles(): Promise<string[]>;
     search(query: string, regex: boolean, caseSensitive: boolean): Promise<SearchHit[]>;
   };
@@ -1833,6 +1840,11 @@ export interface OmniApi {
     commitMessage(): Promise<string>;
     /** Rewrites a prompt so the AI understands it better (the user reviews it before sending). */
     improvePrompt(prompt: string, model?: string): Promise<string>;
+    /** "Compactar chat": one summary of the conversation, without repetitions, for the AI to read. */
+    compactChat(
+      messages: { role: 'user' | 'assistant'; content: string }[],
+      model?: string,
+    ): Promise<string>;
     /** Project rules file in use (.zinarix/rules.md, AGENTS.md…) or null. */
     rulesFile(folder?: string): Promise<string | null>;
     /** Project rules that would enter a message with this context ("file:path" sources). */
@@ -1846,7 +1858,9 @@ export interface OmniApi {
       folder?: string,
     ): Promise<string>;
     /** Forget the agent's model-side transcript (regenerate / edit a message); keeps undo data. */
-    resetContext(conversationId: string): Promise<void>;
+    /** Drops the AI's own transcript (rebuilt from the history the UI sends). afterRun: when the
+     * conversation is working, it is dropped when that answer ends instead of skipped. */
+    resetContext(conversationId: string, afterRun?: boolean): Promise<void>;
     chat(requestId: string, req: ChatRequestView): Promise<void>;
     edit(requestId: string, req: EditRequestView): Promise<void>;
     abort(requestId: string): Promise<void>;
@@ -2584,6 +2598,16 @@ export interface OmniApi {
     issue(req: IssueRequest): Promise<IssuerStatus>;
     markIssued(id: string, given: boolean, note: string): Promise<IssuerStatus>;
   };
+  /** The Zinarix account (optional sign-in) and the owner's messages. */
+  account: {
+    status(): Promise<AccountStatus>;
+    register(c: AccountCredentials): Promise<AccountStatus>;
+    login(c: AccountCredentials): Promise<AccountStatus>;
+    /** Reads the server again: messages, profile and the keys of the account. */
+    sync(): Promise<AccountStatus>;
+    logout(): Promise<AccountStatus>;
+    password(current: string, password: string): Promise<AccountStatus>;
+  };
   lsp: {
     open(path: string, language: string, text: string): Promise<LspStatus | null>;
     change(path: string, text: string): Promise<void>;
@@ -2897,6 +2921,7 @@ export const CHANNELS = [
   'workspace:createDir',
   'workspace:rename',
   'workspace:trash',
+  'workspace:reveal',
   'workspace:listFiles',
   'workspace:search',
   'ai:providers',
@@ -2933,6 +2958,7 @@ export const CHANNELS = [
   'ai:complete',
   'ai:commitMessage',
   'ai:improvePrompt',
+  'ai:compactChat',
   'ai:rulesFile',
   'ai:activeRules',
   'ai:agentKit',
@@ -3107,6 +3133,12 @@ export const CHANNELS = [
   'license:issuer',
   'license:issue',
   'license:markIssued',
+  'account:status',
+  'account:register',
+  'account:login',
+  'account:sync',
+  'account:logout',
+  'account:password',
   'phone:status',
   'phone:start',
   'phone:stop',

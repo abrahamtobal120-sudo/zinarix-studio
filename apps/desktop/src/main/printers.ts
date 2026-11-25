@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { basename, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import {
   PRINTER_KINDS,
   type PrinterAction,
@@ -56,7 +56,8 @@ export function normalizePrinterUrl(raw: string): string {
 /** File name the printer will show: safe characters, ends in .gcode. */
 export function printerFileName(p: string): string {
   const b =
-    basename(p)
+    // Both separators on every system: a Windows path can reach a Mac or Linux host as text.
+    (p.split(/[\\/]/).pop() ?? '')
       .replace(/[^\w.\- ]+/g, '_')
       .replace(/\s+/g, '_')
       .replace(/_+/g, '_')

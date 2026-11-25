@@ -53,24 +53,100 @@ function stem(w: string): string {
   return w;
 }
 
-/** Splits a file into overlapping windows of lines (~`size` lines, `overlap` shared). */
-export function chunkLines(source: string, text: string, size = 60, overlap = 12): Chunk[] {
-  const lines = text.split('\n');
-  const chunks: Chunk[] = [];
-  if (!text.trim()) return chunks;
-  const step = Math.max(1, size - overlap);
-  for (let i = 0; i < lines.length; i += step) {
-    const part = lines.slice(i, i + size);
-    if (part.join('').trim())
-      chunks.push({
-        source,
-        start: i + 1,
-        end: i + part.length,
-        text: part.join('\n').slice(0, 8000),
-      });
-    if (i + size >= lines.length) break;
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
+/** Lines [lo, hi) as overlapping windows: the fallback for text with no structure to cut on. */
+function windowRange(
+  source: string,
+  lines: string[],
+  lo: number,
+  hi: number,
+  size: number,
+  out: Chunk[],
+): void {
+  const step = Math.max(1, size - Math.round(size / 5));
+  for (let i = lo; i < hi; i += step) {
+    pushRange(source, lines, i, Math.min(hi, i + size), out);
+    if (i + size >= hi) break;
   }
-  return chunks;
+}
+
+/** One chunk for lines [lo, hi), without the blank lines around it. */
+function pushRange(source: string, lines: string[], lo: number, hi: number, out: Chunk[]): void {
+  while (lo < hi && !lines[lo]!.trim()) lo++;
+  while (hi > lo && !lines[hi - 1]!.trim()) hi--;
+  if (lo >= hi) return;
+  out.push({ source, start: lo + 1, end: hi, text: lines.slice(lo, hi).join('\n').slice(0, 8000) });
+}
+
+/**
+ * Cuts lines [lo, hi) where declarations start: a line at `indent` that follows a blank line
+ * and is not a closing bracket. Small neighbours are packed together up to `size` lines; a
+ * block that is too long is cut the same way one level deeper (the methods of a class).
+ */
+function packRange(
+  source: string,
+  lines: string[],
+  lo: number,
+  hi: number,
+  indent: number,
+  size: number,
+  depth: number,
+  out: Chunk[],
+): void {
+  if (hi - lo <= size) return pushRange(source, lines, lo, hi, out);
+  const starts = [lo];
+  for (let i = lo + 1; i < hi; i++) {
+    const line = lines[i]!;
+    if (!line.trim() || indentOf(line) !== indent || lines[i - 1]!.trim()) continue;
+    if (/^([)\]}]|end\b)/.test(line.trimStart())) continue;
+    starts.push(i);
+  }
+  if (starts.length === 1) {
+    // One block: look for the next level of indentation that has blank-line separated parts.
+    let deeper = Infinity;
+    for (let i = lo + 1; i < hi; i++) {
+      const line = lines[i]!;
+      if (!line.trim() || lines[i - 1]!.trim()) continue;
+      const n = indentOf(line);
+      if (n > indent && n < deeper) deeper = n;
+    }
+    if (depth < 6 && deeper !== Infinity) {
+      return packRange(source, lines, lo, hi, deeper, size, depth + 1, out);
+    }
+    return windowRange(source, lines, lo, hi, size, out);
+  }
+  const max = Math.round(size * 1.5);
+  let from = lo;
+  for (let b = 0; b < starts.length; b++) {
+    const start = starts[b]!;
+    const end = starts[b + 1] ?? hi;
+    if (end - from <= size) continue;
+    // This block does not fit with the ones gathered so far: close them.
+    if (start > from) pushRange(source, lines, from, start, out);
+    from = start;
+    if (end - start > max) {
+      packRange(source, lines, start, end, indent, size, depth + 1, out);
+      from = end;
+    }
+  }
+  pushRange(source, lines, from, hi, out);
+}
+
+/**
+ * Splits a source file into chunks that follow its structure (plan A8): functions, classes and
+ * top-level paragraphs stay whole instead of being cut every `size` lines, so a search result
+ * is a complete piece of code. No parser: it reads indentation and blank lines, which holds for
+ * every language formatted the usual way; text without that shape falls back to line windows.
+ */
+export function chunkCode(source: string, text: string, size = 60): Chunk[] {
+  const out: Chunk[] = [];
+  if (!text.trim()) return out;
+  const lines = text.split('\n');
+  packRange(source, lines, 0, lines.length, 0, size, 0, out);
+  return out;
 }
 
 /** Splits prose (a docs page) into chunks of about `max` characters on paragraph breaks. */

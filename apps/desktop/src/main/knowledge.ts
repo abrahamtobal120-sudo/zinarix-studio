@@ -13,7 +13,7 @@ import type { Workspace } from './workspace.js';
 import {
   bm25Scores,
   buildBm25,
-  chunkLines,
+  chunkCode,
   chunkProse,
   cosine,
   docLinks,
@@ -77,8 +77,13 @@ interface CodeFile {
   chunks: StoredChunk[];
 }
 
+/** How code files are cut into chunks; an index made with an older way is cut again. */
+const CODE_CHUNKER = 2;
+
 interface CodeIndexFile {
   version: 1;
+  /** CODE_CHUNKER the chunks were made with (absent: line windows). */
+  chunker?: number;
   root: string;
   vecModel?: string;
   files: Record<string, CodeFile>;
@@ -430,12 +435,18 @@ export class Knowledge {
   private codeState(root: string) {
     let st = this.code.get(root);
     if (!st) {
-      let file: CodeIndexFile = { version: 1, root, files: {} };
+      let file: CodeIndexFile = { version: 1, chunker: CODE_CHUNKER, root, files: {} };
       try {
         const p = this.codePath(root);
         if (existsSync(p)) {
           const raw = JSON.parse(readFileSync(p, 'utf8')) as CodeIndexFile;
-          if (raw.root === root && raw.files) file = raw;
+          if (raw.root === root && raw.files) {
+            file = raw;
+            // Cut again by structure when that costs nothing: an index with vectors keeps
+            // its chunks (embedding them again may be billed) and changes file by file.
+            if (raw.chunker !== CODE_CHUNKER && !raw.vecModel) file.files = {};
+            file.chunker = CODE_CHUNKER;
+          }
         }
       } catch {
         // rebuilt below
@@ -489,7 +500,7 @@ export class Knowledge {
           continue;
         }
         const f = await ws.readFile(p).catch(() => undefined);
-        const chunks: StoredChunk[] = f && !f.binary && !f.tooLarge ? chunkLines(p, f.content) : [];
+        const chunks: StoredChunk[] = f && !f.binary && !f.tooLarge ? chunkCode(p, f.content) : [];
         // Incremental: a chunk whose text did not change keeps its vector (only the edited
         // parts of the file are embedded again).
         const prev = new Map<string, string>();

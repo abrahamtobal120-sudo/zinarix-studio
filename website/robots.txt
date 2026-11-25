@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /gracias
+Disallow: /admin
 
 Sitemap: https://zinarix-studio.vercel.app/sitemap.xml

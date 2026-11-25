@@ -1,21 +1,6 @@
 @layer features {
   /* CAD (OpenSCAD), the model viewer and 3D printing (Fase 7 del plan de funciones) */
-  .editor-split {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-  }
-  .editor-split > .editor-host {
-    flex: 1;
-    min-width: 0;
-  }
-  .editor-split {
-    position: relative;
-  }
-  /* The editor area is the container: a query cannot restyle its own container. */
-  .editor-area {
-    container: editor-area / inline-size;
-  }
+  /* .editor-split itself is in styles/04-editor.css: this file loads with the CAD chunks. */
   /* No room for both side by side: the 3D view goes under the code. */
   @container editor-area (max-width: 640px) {
     .editor-split {

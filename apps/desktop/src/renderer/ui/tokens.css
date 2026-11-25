@@ -22,37 +22,46 @@
   :root[data-theme='dark'] {
     /* Native controls (checkboxes, select lists, date pickers) follow the theme, not the system. */
     color-scheme: dark;
-    --bg: #1b1b1f;
-    --bg-2: #17171a;
-    --bg-3: #222226;
-    --bg-4: #2c2c31;
-    --activity: #131316;
-    --border: #2a2a2f;
-    --fg: #d6d6dc;
+    --bg: #1e1e1e;
+    --bg-2: #262626;
+    --bg-3: #2e2e2e;
+    --bg-4: #3a3a3a;
+    --activity: #2b2b2b;
+    --border: #3c3c3c;
+    --fg: #d4d4d4;
     /* >= 4.5:1 on every surface (--bg … --bg-4, --sel, --hover); #8c8c96 fell to 4.17 on --bg-4. */
-    --fg-dim: #9696a0;
-    --fg-strong: #f4f4f6;
-    --accent: #6d5ef6;
+    --fg-dim: #a6a6a6;
+    --fg-strong: #f2f2f2;
+    --accent: #2f6fdb;
     /* A hover fill under white text: darker than --accent, like the light theme. The old lighter
-     #7d6ff8 dropped white text to 3.82:1. */
-    --accent-hover: #5f50ee;
+     a lighter fill dropped white text below 4.5:1. */
+    --accent-hover: #2862c6;
     --accent-fg: #ffffff;
-    --focus: #7d6ff8;
-    --sel: #2a2840;
-    --hover: #26262b;
-    --status: #131316;
-    --status-fg: #9a9aa4;
+    --focus: #5b9bff;
+    --sel: #24364f;
+    --hover: #323232;
+    --status: #2b2b2b;
+    --status-fg: #b0b0b0;
     --danger: #f1595b;
     --ok: #83d6a0;
     --warn: #e0b341;
-    --code-bg: #141519;
-    --shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --brand-1: #8b5cff;
-    --brand-2: #3b82f6;
-    --brand: #7d6ff8;
-    --brand-grad: linear-gradient(135deg, #8b5cff, #3b82f6);
-    --radius: 6px;
-    --radius-sm: 4px;
+    --code-bg: #181818;
+    /* Code colours in the chat (the editor takes its own from the Monaco theme). */
+    --syn-comment: #7f8c98;
+    --syn-string: #e0a878;
+    --syn-keyword: #7aa8f0;
+    --syn-number: #b8d7a3;
+    --syn-type: #5fd0b8;
+    --syn-tag: #7aa8f0;
+    --syn-attr: #a8d4f5;
+    --syn-regexp: #e08a8a;
+    --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    --brand-1: #2f6fdb;
+    --brand-2: #2563eb;
+    --brand: #5b9bff;
+    --brand-grad: linear-gradient(135deg, #2f6fdb, #2563eb);
+    --radius: 3px;
+    --radius-sm: 2px;
     --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 38%, transparent);
     --sel-soft: color-mix(in srgb, var(--brand) 18%, transparent);
     --elev: 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -63,37 +72,45 @@
   :root[data-theme='light'] {
     color-scheme: light;
     --bg: #ffffff;
-    --bg-2: #f7f7f8;
-    --bg-3: #f1f1f3;
-    --bg-4: #e9e9ec;
-    --activity: #f0f0f2;
-    --border: #e3e3e7;
-    --fg: #2b2b31;
+    --bg-2: #f3f3f3;
+    --bg-3: #ebebeb;
+    --bg-4: #e0e0e0;
+    --activity: #e8e8e8;
+    --border: #d0d0d0;
+    --fg: #262626;
     /* >= 4.5:1 on every surface; #6e6e78 fell to 4.16 on --bg-4. */
-    --fg-dim: #686872;
-    --fg-strong: #0f0f12;
-    --accent: #5b4cf0;
-    --accent-hover: #4d3fe0;
+    --fg-dim: #5e5e5e;
+    --fg-strong: #111111;
+    --accent: #1f5fd0;
+    --accent-hover: #184fb4;
     --accent-fg: #ffffff;
-    --hover: #ececef;
-    --status: #f0f0f2;
-    --status-fg: #5b5b65;
+    --hover: #e6e6e6;
+    --status: #e8e8e8;
+    --status-fg: #505050;
     --danger: #c72e2e;
     --ok: #2e7d32;
     --warn: #8a6d00;
     --code-bg: #f6f8fa;
-    --shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
-    --brand-1: #7c3aed;
+    --syn-comment: #5f6b76;
+    --syn-string: #0a3069;
+    --syn-keyword: #b3202b;
+    --syn-number: #0550ae;
+    --syn-type: #8a3600;
+    --syn-tag: #116329;
+    --syn-attr: #0550ae;
+    --syn-regexp: #7a3e9d;
+    --shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    --brand-1: #1f5fd0;
     --brand-2: #2563eb;
-    --brand: #6d4df2;
-    --brand-grad: linear-gradient(135deg, #7c3aed, #2563eb);
-    --radius: 6px;
-    --radius-sm: 4px;
+    --brand: #1f5fd0;
+    --brand-grad: linear-gradient(135deg, #1f5fd0, #2563eb);
+    --radius: 3px;
+    --radius-sm: 2px;
     --ring: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
     --sel-soft: color-mix(in srgb, var(--brand) 14%, transparent);
     --elev: 0 2px 8px rgba(0, 0, 0, 0.1);
-    --focus: #6d4df2;
-    --sel: #e4e9ff;
+    --focus: #1f5fd0;
+    --sel: #dde8ff;
     /* WhatsApp green: darker in light themes so text and white-on-green pass AA. */
     --wa: #0f7a6d;
     --wa-fg: #ffffff;
@@ -123,14 +140,14 @@
     --text-hero: 40px;
     --leading-tight: 1.25;
     --leading-normal: 1.45;
-    --font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Inter, sans-serif;
     --font-mono:
       ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
     /* ---- Radii ---- */
-    --radius-xs: 4px;
-    --radius-md: 6px;
-    --radius-lg: 10px;
+    --radius-xs: 2px;
+    --radius-md: 3px;
+    --radius-lg: 4px;
     --radius-full: 9999px;
 
     /* ---- Elevation 0–4 (shadows take the theme's shadow color through --shadow-color) ---- */
@@ -138,8 +155,8 @@
     --elevation-0: none;
     --elevation-1: 0 1px 2px var(--shadow-color);
     --elevation-2: 0 2px 8px var(--shadow-color);
-    --elevation-3: 0 8px 24px var(--shadow-color);
-    --elevation-4: 0 16px 40px var(--shadow-color);
+    --elevation-3: 0 4px 12px var(--shadow-color);
+    --elevation-4: 0 6px 18px var(--shadow-color);
 
     /* ---- Motion ---- */
     --duration-instant: 60ms;

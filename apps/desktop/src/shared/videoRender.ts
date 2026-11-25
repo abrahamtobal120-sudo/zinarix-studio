@@ -610,7 +610,7 @@ export function buildRender(
       : measure
         ? `,${loudnormFilter(target)}`
         : extras.loudness
-          ? `,${loudnormFilter(target, extras.loudness)},aresample=48000`
+          ? `,${loudnormFilter(target, extras.loudness)},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo`
           : '';
   if (!audio.length) graph.push(`anullsrc=r=48000:cl=stereo,atrim=0:${num(D)}[aout]`);
   else if (audio.length === 1) graph.push(`[${audio[0]}]apad,atrim=0:${num(D)}${norm}[aout]`);

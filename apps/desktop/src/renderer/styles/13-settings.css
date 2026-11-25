@@ -38,6 +38,44 @@
     padding: 6px 10px;
     border-radius: var(--radius-xs);
   }
+  .settings-search {
+    margin: 0 4px 8px;
+  }
+  .settings-hits {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .settings-hits p {
+    padding: 6px 10px;
+  }
+  .settings-nav .settings-hits button {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    flex-shrink: 0;
+  }
+  .settings-hit-section {
+    font-size: var(--text-xs);
+    color: var(--fg-dim);
+  }
+  .settings-hit {
+    animation: settings-hit 1.8s ease-out;
+    border-radius: var(--radius-xs);
+  }
+  @keyframes settings-hit {
+    0%,
+    40% {
+      background: var(--sel);
+      box-shadow: 0 0 0 6px var(--sel);
+    }
+    100% {
+      background: transparent;
+      box-shadow: 0 0 0 6px transparent;
+    }
+  }
   .settings-nav button.on {
     background: var(--sel);
     color: var(--fg-strong);

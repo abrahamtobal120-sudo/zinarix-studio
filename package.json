@@ -1,7 +1,7 @@
 {
   "name": "zinarix-studio",
   "private": true,
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Zinarix Studio — IDE multi-IA (monorepo)",
   "license": "GPL-3.0-or-later",
   "type": "module",
@@ -34,6 +34,7 @@
     "evals": "node evals/run.mjs",
     "evals:check": "node evals/run.mjs --selfcheck",
     "e2e": "pnpm --filter @omni/desktop e2e",
+    "account:dev": "node scripts/dev-account-server.mjs",
     "config:sign": "node scripts/sign-app-config.mjs",
     "omni": "node apps/cli/dist/index.js",
     "desktop": "pnpm --filter @omni/desktop build && pnpm --filter @omni/desktop start",

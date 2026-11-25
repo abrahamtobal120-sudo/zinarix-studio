@@ -1,0 +1,74 @@
+name: Nightly (real tools)
+
+# The normal CI skips the tests that need a real program (Docker, Jupyter, PrusaSlicer,
+# OpenSCAD, Blender, Godot), because the runners do not have them. This installs them once a
+# night and runs the whole suite, so those tests stop passing "in silence" (estudio, punto E5).
+
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      OMNI_NO_KEYCHAIN: '1'
+      BLENDER_VERSION: '4.2.0'
+      GODOT_VERSION: '4.3'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Programs from apt (PrusaSlicer, OpenSCAD, a virtual screen)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends prusa-slicer openscad xvfb
+          echo "ZINARIX_PRUSASLICER=$(command -v prusa-slicer)" >> "$GITHUB_ENV"
+          echo "ZINARIX_OPENSCAD=$(command -v openscad)" >> "$GITHUB_ENV"
+
+      - name: Jupyter
+        run: python3 -m pip install --user --break-system-packages jupyter ipykernel
+
+      - name: Docker test image
+        run: docker pull hello-world
+
+      - name: Blender
+        run: |
+          major="${BLENDER_VERSION%.*}"
+          curl -fsSL -o blender.tar.xz \
+            "https://download.blender.org/release/Blender${major}/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar -xJf blender.tar.xz -C "$RUNNER_TEMP/blender" --strip-components=1
+          rm blender.tar.xz
+          echo "ZINARIX_BLENDER=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
+
+      - name: Godot
+        run: |
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          mkdir -p "$RUNNER_TEMP/godot"
+          unzip -q godot.zip -d "$RUNNER_TEMP/godot"
+          rm godot.zip
+          echo "ZINARIX_GODOT=$(ls "$RUNNER_TEMP"/godot/Godot_v*)" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # xvfb: Godot's screenshots and PrusaSlicer want a display even when they draw nothing.
+      - name: Whole suite with the real programs
+        run: xvfb-run -a pnpm vitest run --reporter=default --reporter=junit --outputFile.junit=nightly.xml
+
+      # The point of this job: list what was still skipped, so a tool that stopped being found
+      # shows up in the run summary instead of hiding behind a green check.
+      - name: Tests still skipped
+        if: always()
+        run: node scripts/skipped-tests.mjs nightly.xml >> "$GITHUB_STEP_SUMMARY"

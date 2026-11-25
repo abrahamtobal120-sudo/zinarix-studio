@@ -384,7 +384,7 @@ export function HelperBubble() {
           }}
         >
           <header className="hlp-head">
-            <Icon name="sparkle" size={15} />
+            <Icon name="message" size={15} />
             <span className="hlp-title">{t('hlpTitle')}</span>
             <span className="hlp-badge" title={cloud ? (cloudModel ?? '') : model}>
               {cloud ? t('hlpCloudBadge', { model: cloudModel ?? '' }) : t('hlpLocal', { model })}

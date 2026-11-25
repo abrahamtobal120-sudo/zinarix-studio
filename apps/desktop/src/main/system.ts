@@ -158,12 +158,23 @@ export function setAppDataDirs(dirs: string[]): void {
 
 export function deniedPath(input: string, mode: 'read' | 'write'): string | null {
   const p = realish(resolve(input)).replace(/\\/g, '/');
-  if (appDirs.some((d) => p === d || p.startsWith(`${d}/`)))
+  // Windows and macOS file systems ignore case: "~/.SSH/id_rsa" is the same file.
+  const anyCase = process.platform === 'win32' || process.platform === 'darwin';
+  const key = (x: string) => (anyCase ? x.toLowerCase() : x);
+  if (appDirs.some((d) => key(p) === key(d) || key(p).startsWith(`${key(d)}/`)))
     return 'Por seguridad la IA no puede acceder a contraseñas, llaves ni credenciales.';
-  const home = homedir().replace(/\\/g, '/');
-  const rel = p.startsWith(`${home}/`) ? p.slice(home.length + 1) : null;
-  const H = (re: RegExp) => rel !== null && re.test(rel);
+  // The home folder through the same symlink resolution as the path (macOS: /var and /etc
+  // are links into /private), or a home behind a link would hide its credential stores.
+  const home = realish(homedir()).replace(/\\/g, '/');
+  const underHome = key(p).startsWith(`${key(home)}/`);
+  const rel = underHome ? p.slice(home.length + 1) : null;
+  const H = (re: RegExp) => rel !== null && (anyCase ? new RegExp(re.source, 'i') : re).test(rel);
   const secret =
+    // Zinarix's own signing keys (licences, catalog, releases, Android keystore).
+    H(/^\.(omni-signing|zinarix-minisign|zinarix-android)(\/|$)/) ||
+    H(/^AppData\/Roaming\/(gcloud|GitHub CLI|Opera Software|omni)(\/|$)/) ||
+    H(/^AppData\/Local\/(Microsoft\/Edge|Vivaldi|Opera Software)(\/|$)/) ||
+    H(/^AppData\/(Roaming|Local)\/Zinarix Studio[^/]*(\/|$)/) ||
     H(/^\.ssh\/(?!config$|known_hosts$)/) ||
     H(/^\.gnupg(\/|$)/) ||
     H(/^\.omni(\/|$)/) ||
@@ -192,7 +203,7 @@ export function deniedPath(input: string, mode: 'read' | 'write'): string | null
     H(
       /^AppData\/(Roaming|Local)\/(Microsoft\/(Credentials|Protect|Vault)|Google\/Chrome|Mozilla|BraveSoftware|Zinarix Studio)(\/|$)/i,
     ) ||
-    /^\/etc\/(shadow|gshadow|sudoers)(\.d)?(\/|$)/.test(p) ||
+    /^(\/private)?\/etc\/(shadow|gshadow|sudoers|master\.passwd)(\.d)?(\/|$)/.test(p) ||
     // Another process's environment and memory hold the keys it was started with.
     /^\/proc\/(?:[^/]+\/)*(environ|mem)$/.test(p) ||
     /^\/(root|private\/var\/db)(\/|$)/.test(p);

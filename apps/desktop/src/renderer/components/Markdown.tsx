@@ -1,6 +1,7 @@
 import { Fragment, memo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { confirmDialog } from '../confirm';
+import { useCodeTokens } from '../highlight';
 import { t } from '../i18n';
 import { openLink } from '../links';
 import { getEditor, setState, toast } from '../store';
@@ -316,6 +317,7 @@ const SHELL = /^(bash|sh|shell|zsh|console|terminal|powershell|ps1|cmd)$/i;
 
 function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boolean }) {
   const [copied, setCopied] = useState(false);
+  const tokens = useCodeTokens(lang, code, !done);
   const insert = (replaceSelection: boolean) => {
     const ed = getEditor();
     const model = ed?.getModel();
@@ -382,7 +384,24 @@ function CodeBlock({ lang, code, done }: { lang: string; code: string; done: boo
         )}
       </div>
       <pre>
-        <code>{code}</code>
+        <code>
+          {tokens
+            ? tokens.map((line, n) => (
+                <Fragment key={n}>
+                  {n > 0 && '\n'}
+                  {line.map((tok, j) =>
+                    tok.kind ? (
+                      <span key={j} className={`syn-${tok.kind}`}>
+                        {tok.text}
+                      </span>
+                    ) : (
+                      tok.text
+                    ),
+                  )}
+                </Fragment>
+              ))
+            : code}
+        </code>
       </pre>
     </div>
   );

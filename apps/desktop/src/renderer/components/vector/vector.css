@@ -504,18 +504,3 @@
     line-height: 1.5;
   }
 }
-@layer features {
-  .breadcrumbs .crumb-action {
-    margin-left: 10px;
-    background: var(--bg-3);
-    border: 1px solid var(--border);
-    color: inherit;
-    border-radius: var(--radius-xs);
-    padding: 0 8px;
-    font-size: var(--text-xs);
-    cursor: pointer;
-  }
-  .breadcrumbs .crumb-action:hover {
-    background: var(--hover);
-  }
-}

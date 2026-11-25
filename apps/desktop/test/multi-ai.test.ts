@@ -244,6 +244,30 @@ describe('every AI can use tools', () => {
     expect(r.answer).toBe('Hecho.');
   });
 
+  it('runs a call the model wrote as JSON instead of calling the tool', async () => {
+    const r = await run(
+      {
+        'p1/small': {
+          turns: [
+            () => ({ text: 'Miro.\n{"name": "tree", "arguments": {}}' }),
+            () => ({ text: 'Hecho.' }),
+          ],
+        },
+      },
+      { model: 'p1/small' },
+    );
+    expect(
+      r.events.some((e) => e.type === 'notice' && /herramientas como texto/.test(e.message)),
+    ).toBe(true);
+    expect(r.events.some((e) => e.type === 'tool_call' && e.name === 'tree')).toBe(true);
+    const reqs = r.seen['p1/small'] as { messages: ChatMessage[]; tools?: unknown }[];
+    expect(reqs[1]!.tools).toBeUndefined();
+    expect((reqs[1]!.messages.at(-1) as { content: string }).content).toContain(
+      '<tool_result name="tree" ok="true">',
+    );
+    expect(r.answer).toContain('Hecho.');
+  });
+
   it('a CLI agent gets the browser and delegation tools in its prompt, not the file tools', async () => {
     const r = await run(
       {

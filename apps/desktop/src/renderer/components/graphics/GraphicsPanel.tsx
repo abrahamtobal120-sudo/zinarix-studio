@@ -264,7 +264,7 @@ export function GraphicsPanel() {
           {en ? t.name.en : t.name.es} · {w} × {h} px
         </p>
         <button className="gp-go" disabled={busy || !workspace} onClick={() => void createAi()}>
-          <Icon name="sparkle" size={14} /> {tg('aiGo')}
+          <Icon name="message" size={14} /> {tg('aiGo')}
         </button>
 
         <h4>{tg('newPaint')}</h4>

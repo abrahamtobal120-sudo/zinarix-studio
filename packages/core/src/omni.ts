@@ -35,6 +35,17 @@ import {
 import type { Price } from './usage.js';
 import { EnvStore, FileVault, KeychainStore, Vault } from './vault.js';
 
+/**
+ * Providers without `supports.fim` in the catalog whose completions endpoint is still worth
+ * one try per model: Ollama accepts a suffix only for models with an insert template.
+ */
+const FIM_PROBE_PROVIDERS = new Set(['ollama']);
+/** HTTP answers that mean "this model or endpoint has no fill-in-the-middle". */
+const FIM_REFUSED_STATUS = new Set([400, 404, 405, 422, 501]);
+
+/** How long a local provider (Ollama, LM Studio…) may take to start answering. */
+export const LOCAL_TIMEOUT_MS = 10 * 60_000;
+
 export interface OmniOptions {
   home?: string;
   env?: NodeJS.ProcessEnv;
@@ -212,7 +223,9 @@ export class OmniCore {
       extraHeaders: userCfg?.headers,
       fetch: this.fetchImpl,
       logger: this.logger,
-      timeoutMs: this.timeoutMs,
+      // A model running on this computer may take minutes to load and read the prompt
+      // before its first token: the 60 s that suit a cloud API would cut every request.
+      timeoutMs: this.timeoutMs ?? (entry.category === 'local' ? LOCAL_TIMEOUT_MS : undefined),
     };
   }
 
@@ -561,6 +574,83 @@ export class OmniCore {
       : input;
     const vectors = await adapter.embed(cfg, { model: ref.model, input: safe }, signal);
     return { model: `${ref.provider}/${ref.model}`, vectors };
+  }
+
+  /** provider/model pairs whose completions endpoint refused a fill-in-the-middle request. */
+  private readonly fimRefused = new Set<string>();
+
+  /**
+   * Fill-in-the-middle completion (editor ghost text) through the provider's native
+   * completions endpoint: no chat template, so it answers faster and with fewer tokens than
+   * a chat request. Returns undefined when the model of the "inline" role cannot do it, so
+   * the caller falls back to chat:
+   * - cloud providers only when the catalog declares `supports.fim`;
+   * - Ollama is tried once per model (only models with an insert template accept it);
+   * - a model whose endpoint refuses the request is remembered until restart.
+   * Budgets, redaction and usage accounting apply like in chat (tokens are estimated: these
+   * endpoints are read without their usage block).
+   */
+  async fim(
+    req: { prefix: string; suffix: string; maxTokens?: number; model?: string; project?: string },
+    signal: AbortSignal,
+  ): Promise<{ text: string; provider: string; model: string } | undefined> {
+    const ref = this.resolveModel(req.model, 'inline');
+    const key = `${ref.provider}/${ref.model}`;
+    if (this.fimRefused.has(key)) return undefined;
+    const entry = this.catalog.providers.get(ref.provider);
+    if (!entry || !(entry.supports.fim || FIM_PROBE_PROVIDERS.has(entry.id))) return undefined;
+    if (!isAdapterImplemented(entry.adapter)) return undefined;
+    const adapter = getAdapter(entry.adapter);
+    if (!adapter.complete) return undefined;
+    const cfg = await this.providerConfig(ref.provider);
+    const free =
+      cfg.entry.category === 'local' || (!cfg.apiKey && isLocalProvider(cfg.entry, cfg.baseUrl));
+    const unpriced =
+      !free && this.budgetsFor(ref.provider).length && !this.price(ref) ? key : undefined;
+    this.checkBudget(ref.provider, unpriced);
+    const scrub = (s: string) => (this.config.privacy.redactSecrets ? redactWithReport(s).text : s);
+    const prefix = scrub(req.prefix);
+    const suffix = scrub(req.suffix);
+    const started = Date.now();
+    const record = (text: string, ok: boolean) => {
+      const usage = {
+        inputTokens: estimateTokens(prefix.length + suffix.length),
+        outputTokens: estimateTokens(text.length),
+        cachedTokens: 0,
+        cacheWriteTokens: 0,
+      };
+      recordUsage(this.db, {
+        ...ref,
+        role: 'inline',
+        project: req.project,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cachedTokens: 0,
+        costUsd: this.cost(ref, usage),
+        latencyMs: Date.now() - started,
+        ...(ok ? {} : { ok: false }),
+      });
+    };
+    try {
+      const text = await adapter.complete(
+        { ...cfg, maxRetries: 0 },
+        { model: ref.model, prefix, suffix, maxTokens: req.maxTokens },
+        signal,
+      );
+      record(text, true);
+      return { text, provider: ref.provider, model: ref.model };
+    } catch (e) {
+      if (signal.aborted) throw e;
+      // "This model / endpoint cannot do it": remember and let the caller use chat instead.
+      const status = e instanceof OmniError ? e.status : undefined;
+      if (status !== undefined && FIM_REFUSED_STATUS.has(status)) {
+        this.fimRefused.add(key);
+        return undefined;
+      }
+      // The provider processed (and bills) the prompt of a request that failed later.
+      if (status !== undefined && status >= 500) record('', false);
+      throw e;
+    }
   }
 
   /** Collects a full response (used by `omni ask --json`, compare, tests). */

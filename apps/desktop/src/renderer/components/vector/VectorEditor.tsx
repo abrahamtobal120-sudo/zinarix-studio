@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent, KeyboardEvent, ReactNode } from 'react';
+import { Icon } from '../Icon';
 import { api, getDoc, save, setTabViewer, toast } from '../../store';
 import { askAgent } from '../Chat';
 import {
@@ -45,14 +46,14 @@ const FONTS = [
 ];
 const fontLabel = (f: string): string => f.split(',')[0]!.replace(/'/g, '');
 
-const TOOLS: { id: Tool; icon: string; tip: KeyG }[] = [
+const TOOLS: { id: Tool; icon: ReactNode; tip: KeyG }[] = [
   { id: 'select', icon: '➤', tip: 'toolSelect' },
   { id: 'rect', icon: '▭', tip: 'toolRect' },
   { id: 'ellipse', icon: '◯', tip: 'toolEllipse' },
   { id: 'line', icon: '╱', tip: 'toolLine' },
-  { id: 'pen', icon: '✒', tip: 'toolPen' },
+  { id: 'pen', icon: <Icon name="pen" size={15} />, tip: 'toolPen' },
   { id: 'text', icon: 'T', tip: 'toolText' },
-  { id: 'hand', icon: '✋', tip: 'toolHand' },
+  { id: 'hand', icon: <Icon name="hand" size={15} />, tip: 'toolHand' },
 ];
 const SHAPE_KINDS: ShapeKind[] = ['star', 'triangle', 'hexagon', 'arrow', 'heart', 'speech'];
 const KEY_TOOL: Record<string, Tool> = {
@@ -734,7 +735,7 @@ function Layers({ s }: { s: VectorSession }) {
                 title={tg('lock')}
                 onClick={(e) => (e.stopPropagation(), s.toggleLocked(el))}
               >
-                {isLocked(el) ? '🔒' : '🔓'}
+                <Icon name={isLocked(el) ? 'lock' : 'unlock'} size={13} />
               </button>
               <button
                 className={`vd-ico ${isHidden(el) ? 'set' : ''}`}

@@ -20,8 +20,9 @@
     box-shadow: 0 0 0 2px var(--activity);
     pointer-events: none;
   }
-  .status-item.off {
-    opacity: 0.6;
+  /* Off: only the icon dims; dimming the text too dropped it to 3.2:1 (2.6:1 in light). */
+  .status-item.off > svg {
+    opacity: 0.55;
   }
   .git-panel .git-list {
     background: transparent;

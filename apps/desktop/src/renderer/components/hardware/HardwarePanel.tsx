@@ -407,7 +407,7 @@ function BuildBox({
             <div className="spacer" />
             {errors.length > 0 && (
               <button className="btn hw-small" title={th('fixAiTip')} onClick={fix}>
-                <Icon name="sparkle" size={13} /> {th('fixAi')}
+                <Icon name="message" size={13} /> {th('fixAi')}
               </button>
             )}
           </div>

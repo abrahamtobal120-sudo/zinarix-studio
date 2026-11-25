@@ -43,13 +43,18 @@ let ws: string;
 let outside: string;
 
 beforeEach(() => {
+  // These tests are about approvals, not about reading a file before changing it.
+  process.env.ZINARIX_AGENT_EDIT_UNREAD = 'allow';
   root = mkdtempSync(join(tmpdir(), 'zx-escape-'));
   ws = join(root, 'project');
   outside = join(root, 'home');
   mkdirSync(ws);
   mkdirSync(outside);
 });
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+afterEach(() => {
+  delete process.env.ZINARIX_AGENT_EDIT_UNREAD;
+  rmSync(root, { recursive: true, force: true });
+});
 
 async function run(turns: Call[][], decide: (name: string) => ToolDecision = () => 'approve') {
   const seen: ChatMessage[][] = [];

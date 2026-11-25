@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
-import { isDark } from '../themes';
+import { isDark, THEME_EVENT } from '../themes';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { ChatContext } from '../../shared/api';
@@ -362,6 +362,16 @@ export function TerminalPanel() {
       showTerminal = () => {};
     };
   }, [create, kill]);
+
+  // B6: a theme of an extension changes the colors without changing settings.theme.
+  useEffect(() => {
+    const onTheme = () => {
+      for (const term of terms.values())
+        term.xterm.options.theme = xtermTheme(isDark(getState().settings.theme));
+    };
+    window.addEventListener(THEME_EVENT, onTheme);
+    return () => window.removeEventListener(THEME_EVENT, onTheme);
+  }, []);
 
   useEffect(() => {
     activeId = active;

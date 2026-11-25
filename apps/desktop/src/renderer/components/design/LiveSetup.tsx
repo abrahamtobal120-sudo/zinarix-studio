@@ -199,7 +199,7 @@ export function LiveSetup(props: {
             </button>
           )}
           <button onClick={() => askInChat(t('dzAiNotYet', { kind: app.label }))}>
-            <Icon name="sparkle" size={14} /> {t('dzAskAi')}
+            <Icon name="message" size={14} /> {t('dzAskAi')}
           </button>
           <button onClick={props.onExit}>{t('dzExit')}</button>
         </div>

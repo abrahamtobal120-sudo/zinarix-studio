@@ -1,3 +1,4 @@
+import { InlineCache, worthAsking } from '../shared/inlineCache';
 import { adaptiveDebounce } from '../shared/nextEdit';
 import { addMissingImports } from './autoImport';
 import { tl } from './i18nLsp';
@@ -13,6 +14,8 @@ const ACCEPTED_COMMAND = 'zx.inlineCompletion.accepted';
 let registered = false;
 let debounce = DEBOUNCE_MS;
 let statsAt = 0;
+/** Suggestions already made: typing through one, or coming back, asks nothing. */
+const cache = new InlineCache();
 
 function refreshDebounce(): void {
   if (Date.now() - statsAt < STATS_EVERY) return;
@@ -67,9 +70,6 @@ export function registerInlineCompletions(): void {
       const st = getState();
       if (!st.prefs.inlineCompletions) return none;
       if (model !== getEditor()?.getModel() || model.uri.scheme !== 'file') return none;
-      refreshDebounce();
-      await new Promise((r) => setTimeout(r, debounce));
-      if (token.isCancellationRequested) return none;
       const full = model.getFullModelRange();
       const prefix = model.getValueInRange({
         startLineNumber: 1,
@@ -83,8 +83,31 @@ export function registerInlineCompletions(): void {
         endLineNumber: full.endLineNumber,
         endColumn: full.endColumn,
       });
-      if (!prefix.trim()) return none;
+      if (!worthAsking(prefix, suffix)) return none;
       const path = model.uri.path.replace(/^\//, '');
+      const item = (text: string) => ({
+        items: [
+          {
+            insertText: text,
+            range: new monaco.Range(
+              position.lineNumber,
+              position.column,
+              position.lineNumber,
+              position.column,
+            ),
+            command: {
+              id: ACCEPTED_COMMAND,
+              title: '',
+              arguments: [model.uri.toString(), position.lineNumber, text.split('\n').length],
+            },
+          },
+        ],
+      });
+      const known = cache.get(path, prefix, suffix);
+      if (known !== undefined) return known ? item(known) : none;
+      refreshDebounce();
+      await new Promise((r) => setTimeout(r, debounce));
+      if (token.isCancellationRequested) return none;
       const rid = newRequestId();
       const sub = token.onCancellationRequested(() => void api().ai.abort(rid));
       try {
@@ -94,25 +117,10 @@ export function registerInlineCompletions(): void {
           prefix,
           suffix,
         });
-        if (!text || token.isCancellationRequested) return none;
-        return {
-          items: [
-            {
-              insertText: text,
-              range: new monaco.Range(
-                position.lineNumber,
-                position.column,
-                position.lineNumber,
-                position.column,
-              ),
-              command: {
-                id: ACCEPTED_COMMAND,
-                title: '',
-                arguments: [model.uri.toString(), position.lineNumber, text.split('\n').length],
-              },
-            },
-          ],
-        };
+        if (token.isCancellationRequested) return none;
+        // Empty answers are not kept: they may be a provider error, worth asking again.
+        if (text) cache.put(path, prefix, suffix, text);
+        return text ? item(text) : none;
       } catch {
         return none;
       } finally {

@@ -181,3 +181,61 @@ export function editNote(how: EditHow): string {
     return "; matched ignoring indentation, and written with the file's own indentation";
   return '';
 }
+
+/** One replacement of a multi-edit call. */
+export interface EditStep {
+  oldS: string;
+  newS: string;
+  replaceAll?: boolean;
+}
+
+/**
+ * The replacements an edit_file call asks for: the `edits` list when it is there (several
+ * changes to one file in a single call), else the one old_string / new_string pair.
+ * A string is the mistake to tell the model.
+ */
+export function editSteps(a: Record<string, unknown>): EditStep[] | string {
+  const step = (v: Record<string, unknown>, where: string): EditStep | string => {
+    if (typeof v.old_string !== 'string' || !v.old_string)
+      return `${where}old_string is required (use write_file to create a file).`;
+    if (typeof v.new_string !== 'string') return `${where}new_string is required.`;
+    return { oldS: v.old_string, newS: v.new_string, replaceAll: v.replace_all === true };
+  };
+  if (a.edits === undefined || a.edits === null) {
+    const one = step(a, '');
+    return typeof one === 'string' ? one : [one];
+  }
+  if (!Array.isArray(a.edits) || !a.edits.length)
+    return 'edits must be a non-empty list of { old_string, new_string }.';
+  const out: EditStep[] = [];
+  for (const [i, v] of a.edits.entries()) {
+    if (!v || typeof v !== 'object') return `edits[${i}] must be { old_string, new_string }.`;
+    const one = step(v as Record<string, unknown>, `edits[${i}]: `);
+    if (typeof one === 'string') return one;
+    out.push(one);
+  }
+  return out;
+}
+
+const HOW_RANK: Record<EditHow, number> = { exact: 0, 'line-endings': 1, whitespace: 2 };
+
+/**
+ * Applies the steps in order, each on the result of the one before. All or nothing: when one
+ * does not apply, nothing is changed and the error says which one.
+ */
+export function applyEdits(text: string, steps: EditStep[]): EditResult {
+  let out = text;
+  let count = 0;
+  let how: EditHow = 'exact';
+  for (const [i, s] of steps.entries()) {
+    const r = applyEdit(out, s.oldS, s.newS, { replaceAll: s.replaceAll });
+    if (!r.ok)
+      return steps.length > 1
+        ? { ok: false, error: `edits[${i}] did not apply, so nothing was changed: ${r.error}` }
+        : r;
+    out = r.text;
+    count += r.count;
+    if (HOW_RANK[r.how] > HOW_RANK[how]) how = r.how;
+  }
+  return { ok: true, text: out, count, how };
+}

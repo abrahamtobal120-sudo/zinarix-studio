@@ -15,6 +15,12 @@ const features = z.object({
 
 /** app-config.json: anything missing or wrong falls back to the safe default (free for all). */
 const Remote = z.object({
+  /**
+   * Sequence number of this edition of the file (scripts/sign-app-config.mjs stamps it). An
+   * app that has seen number N ignores a signed file with a lower one: without it, an old
+   * signed copy (charging off, an empty revoked list) could be served again for ever.
+   */
+  seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   billing: z.boolean().default(false),
   trialDays: z.number().int().min(0).max(365).default(DEFAULT_PLANS.trialDays),
   free: features.default(DEFAULT_PLANS.free),
@@ -36,6 +42,8 @@ const Remote = z.object({
 });
 
 export interface RemoteConfig {
+  /** 0 for files signed before the sequence number existed. */
+  seq: number;
   plans: PlansConfig;
   notice?: RemoteNotice;
   latestVersion?: string;
@@ -46,6 +54,7 @@ export interface RemoteConfig {
 export function parseRemote(json: unknown): RemoteConfig {
   const r = Remote.parse(json);
   return {
+    seq: r.seq,
     plans: {
       billing: r.billing,
       trialDays: r.trialDays,
@@ -98,6 +107,13 @@ export interface FetchRemoteOptions {
   /** Packaged apps: always the official URL, and only a signed file counts. */
   packaged: boolean;
   publicKeyPem?: string;
+  /** Highest sequence number this installation accepted so far (saved with its state). */
+  lastSeq?: number;
+}
+
+/** A replayed (older) edition of the control file is not accepted. */
+export function isReplay(seq: number, lastSeq: number | undefined): boolean {
+  return seq < (lastSeq ?? 0);
 }
 
 /**
@@ -113,7 +129,10 @@ export async function fetchRemote(opts: FetchRemoteOptions): Promise<RemoteConfi
     const sig = await getText(`${url}.sig`).catch(() => null);
     const signed = sig !== null && verifyConfig(body, sig, opts.publicKeyPem);
     if (!signed && !dev) return null;
-    return parseRemote(JSON.parse(body));
+    const cfg = parseRemote(JSON.parse(body));
+    // Development builds accept any file (tests serve their own), so no replay check there.
+    if (!dev && isReplay(cfg.seq, opts.lastSeq)) return null;
+    return cfg;
   } catch {
     return null;
   }

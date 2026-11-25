@@ -3,6 +3,7 @@ import { commands, runCommand } from '../commands';
 import { pressable } from '../a11y';
 import { SpaceSwitcher } from '../layout/SpaceSwitcher';
 import { t } from '../i18n';
+import { fold } from '../settingsSearch';
 import { formatUsd } from '../format';
 import { Icon, TONE, type IconName } from './Icon';
 import { PlanBadge } from './Plan';
@@ -10,6 +11,7 @@ import { BridgeStatus } from './BridgeStatus';
 import { LspStatusItem } from './LspStatusItem';
 import { tv } from './video/strings';
 import { tk } from './docker/dockerStrings';
+import { tx } from './extensions/extStrings';
 import { th } from './hardware/hardwareStrings';
 import { tm } from './mobile/mobileStrings';
 import { tgm } from './games/gamesStrings';
@@ -104,8 +106,8 @@ function useBarItems() {
     },
     git: view('git', t('gitTitle'), 'git', gitChanges),
     run: view('run', t('runTitle'), 'run'),
-    debug: view('debug', td('dbgBarTip'), 'bug'),
-    testing: view('testing', t('teBarTip'), 'beaker'),
+    debug: view('debug', td('dbgTitle'), 'bug'),
+    testing: view('testing', t('appsTestingName'), 'beaker'),
     chat: tool('chat', t('chat'), 'aiChat', 'toggle', chatOpen, () =>
       setState({ chatOpen: !chatOpen }),
     ),
@@ -124,6 +126,7 @@ function useBarItems() {
     gcloud: view('gcloud', 'Google Cloud', 'cloud'),
     mail: view('mail', t('mlTitle'), 'mail'),
     docker: view('docker', tk('title'), 'package'),
+    extensions: view('extensions', tx('title'), 'layers'),
     hardware: view('hardware', th('title'), 'cpu'),
     mobile: view('mobile', tm('title'), 'smartphone'),
     games: view('games', tgm('title'), 'gamepad'),
@@ -166,7 +169,7 @@ function useBarItems() {
     playground: tool(
       'playground',
       tp('pgOpen'),
-      'sparkle',
+      'beaker',
       'toggle',
       active === PLAYGROUND_TAB,
       () => openPlaygroundTab(),
@@ -257,6 +260,7 @@ export function ActivityBar() {
     items.gcloud,
     items.mail,
     items.docker,
+    items.extensions,
     items.hardware,
     items.mobile,
     items.games,
@@ -326,39 +330,98 @@ export function AppsPanel() {
       ) : null}
     </button>
   );
+  const [query, setQuery] = useState('');
+  type Entry = [item: BarItem, desc: string, name?: string];
+  const groups: Array<[string, Entry[]]> = [
+    [
+      t('appsIntegrations'),
+      [
+        [items.vercel, t('appsVercel')],
+        [items.supabase, t('appsSupabase')],
+        [items.gcloud, t('appsGcloud')],
+        [items.mail, t('appsMail')],
+        [items.automations, ta('desc'), ta('title')],
+        [items.whatsapp, t('appsWhatsapp')],
+        [items.browser, t('appsBrowser')],
+      ],
+    ],
+    [
+      t('appsCreate'),
+      [
+        [items.design, t('appsDesign')],
+        [items.video, t('appsVideo'), 'Video Studio'],
+        [items.studio3d, t('apps3d')],
+        [items.graphics, tg('desc')],
+        [items.cad, tcad('desc')],
+        [items.sketchup, tsu('desc')],
+        [items.games, tgm('desc')],
+      ],
+    ],
+    [
+      t('appsTools'),
+      [
+        [items.testing, t('appsTesting'), t('appsTestingName')],
+        [items.watch, t('appsWatch'), t('appsWatchName')],
+        [items.docker, tk('desc')],
+        [items.extensions, tx('desc')],
+        [items.hardware, th('desc')],
+        [items.mobile, tm('desc')],
+        [items.playground, tp('pgAppDesc'), tp('pgAppName')],
+        [items.usage, t('appsUsage')],
+        [items.palette, t('appsPalette')],
+        [items.providers, t('connectProvider')],
+        [items.security, t('securityIntro')],
+      ],
+    ],
+  ];
+  // Every word typed must be in the name or the description; accents and case do not count.
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  const shown = groups
+    .map(
+      ([title, list]) =>
+        [
+          title,
+          list.filter(([it, desc, name]) => {
+            const text = fold(`${name ?? it.title} ${desc}`);
+            return words.every((w) => text.includes(w));
+          }),
+        ] as [string, Entry[]],
+    )
+    .filter(([, list]) => list.length > 0);
+  const first = shown[0]?.[1][0];
   return (
     <div className="explorer apps-panel">
       <div className="sidebar-title">
         <span className="panel-title">{t('appsTitle')}</span>
       </div>
+      <input
+        className="apps-search"
+        type="search"
+        aria-label={t('appsSearch')}
+        placeholder={t('appsSearch')}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && words.length > 0 && first) {
+            e.preventDefault();
+            first[0].run();
+          } else if (e.key === 'Escape' && query) {
+            e.preventDefault();
+            e.stopPropagation();
+            setQuery('');
+          }
+        }}
+      />
       <div className="apps-body">
-        <div className="apps-section">{t('appsIntegrations')}</div>
-        {row(items.vercel, t('appsVercel'))}
-        {row(items.supabase, t('appsSupabase'))}
-        {row(items.gcloud, t('appsGcloud'))}
-        {row(items.mail, t('appsMail'))}
-        {row(items.automations, ta('desc'), ta('title'))}
-        {row(items.whatsapp, t('appsWhatsapp'))}
-        {row(items.browser, t('appsBrowser'))}
-        <div className="apps-section">{t('appsCreate')}</div>
-        {row(items.design, t('appsDesign'))}
-        {row(items.video, t('appsVideo'), 'Video Studio')}
-        {row(items.studio3d, t('apps3d'))}
-        {row(items.graphics, tg('desc'))}
-        {row(items.cad, tcad('desc'))}
-        {row(items.sketchup, tsu('desc'))}
-        {row(items.games, tgm('desc'))}
-        <div className="apps-section">{t('appsTools')}</div>
-        {row(items.testing, t('appsTesting'), t('appsTestingName'))}
-        {row(items.watch, t('appsWatch'), t('appsWatchName'))}
-        {row(items.docker, tk('desc'))}
-        {row(items.hardware, th('desc'))}
-        {row(items.mobile, tm('desc'))}
-        {row(items.playground, tp('pgTab'))}
-        {row(items.usage, t('appsUsage'))}
-        {row(items.palette, t('appsPalette'))}
-        {row(items.providers, t('connectProvider'))}
-        {row(items.security, t('securityIntro'))}
+        {shown.map(([title, list]) => (
+          <div key={title} className="apps-group" role="group" aria-label={title}>
+            <div className="apps-section">{title}</div>
+            <div className="apps-grid">{list.map(([it, desc, name]) => row(it, desc, name))}</div>
+          </div>
+        ))}
+        {shown.length === 0 && (
+          <p className="dim apps-none">{t('appsNone', { q: query.trim() })}</p>
+        )}
       </div>
     </div>
   );

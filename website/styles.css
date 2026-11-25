@@ -734,6 +734,43 @@ h4 {
   color: #7ee2a8;
 }
 
+.mac-steps {
+  margin: 20px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  scroll-margin-top: 90px;
+}
+.mac-steps summary {
+  padding: 14px 18px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+}
+.mac-steps-body {
+  padding: 0 18px 18px;
+}
+.mac-steps p,
+.mac-steps li {
+  max-width: 72ch;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.mac-steps ol {
+  margin: 8px 0 16px;
+  padding-left: 22px;
+}
+.mac-steps ol > li {
+  margin-bottom: 8px;
+}
+.mac-steps ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.mac-steps .cmd {
+  margin-bottom: 12px;
+}
+
 .manual {
   margin-top: 16px;
 }

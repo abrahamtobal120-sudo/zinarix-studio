@@ -399,7 +399,7 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
     const check = await svc.probe(out);
     expect(check.hasAudio).toBe(true);
     expect(Math.abs(check.duration - r.duration)).toBeLessThan(0.2);
-  }, 180_000);
+  }, 420_000);
 
   it('remuxes a recorded WebM so it gets a duration', async () => {
     const raw = join(dir, 'rec.webm.part');

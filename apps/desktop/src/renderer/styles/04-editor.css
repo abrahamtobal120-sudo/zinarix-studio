@@ -54,6 +54,8 @@
   }
   .tab-close {
     background: transparent;
+    min-width: 22px;
+    min-height: 22px;
     padding: 0 4px;
     visibility: hidden;
     font-size: var(--text-md);
@@ -76,9 +78,119 @@
     align-items: center;
     flex-shrink: 0;
   }
+  /* "Open in its viewer" buttons (design, scene, G-code). Here because the viewers' own CSS
+     loads with their chunks, and these buttons show while the file is open as text. */
+  .breadcrumbs .crumb-path {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 40px;
+  }
+  /* B7: the symbols around the cursor; a click lists the symbols of the file. */
+  .breadcrumbs .crumb-symbols {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .breadcrumbs .crumb-symbols:hover {
+    text-decoration: underline;
+  }
+  .breadcrumbs .crumb-sep {
+    color: var(--fg-dim);
+    margin: 0 5px;
+  }
+  .breadcrumbs .crumb-action {
+    flex-shrink: 0;
+    margin-left: 10px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    color: inherit;
+    border-radius: var(--radius-xs);
+    padding: 0 8px;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .breadcrumbs .crumb-action:hover {
+    background: var(--hover);
+  }
   .editor-host {
     flex: 1;
     min-height: 0;
+  }
+  /* The code editor and, for a .scad, its 3D view beside it. Here and not in cad.css: that
+     file loads with the CAD chunks, and without these rules the editor has no height. */
+  .editor-split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    position: relative;
+  }
+  .editor-split > .editor-host {
+    flex: 1;
+    min-width: 0;
+  }
+  /* B1: the side editor group, half of the width, with its own tabs. */
+  .editor-split.has-side > .editor-host {
+    flex: 1 1 0;
+  }
+  .editor-side {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    position: relative;
+  }
+  /* The divider between the two groups: a wide grab area over a 1px line. */
+  .editor-split-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -4px;
+    width: 7px;
+    z-index: 6;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .editor-split-handle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 1px;
+    background: transparent;
+    transition: background 0.12s;
+  }
+  .editor-split-handle:hover::after,
+  .editor-split-handle.dragging::after,
+  .editor-split-handle:focus-visible::after {
+    left: 2px;
+    width: 3px;
+    background: var(--accent);
+  }
+  .editor-split-handle:focus-visible {
+    outline: none;
+  }
+  .editor-side > .editor-host {
+    flex: 1;
+    min-height: 0;
+  }
+  /* The group with the keyboard: a line on top, like the active tab. */
+  .editor-split.side-focused > .editor-side {
+    box-shadow: inset 0 1px 0 var(--accent);
+  }
+  /* The editor area is the container: a query cannot restyle its own container. */
+  .editor-area {
+    container: editor-area / inline-size;
   }
   /* Image / hex / large-file viewers */
   .viewer-pane,
@@ -240,13 +352,12 @@
   .welcome h1 {
     margin: 6px 0 0;
     font-weight: 600;
-    font-size: var(--text-display);
-    letter-spacing: -0.4px;
+    font-size: var(--text-2xl);
     color: var(--fg-strong);
   }
   .welcome-logo {
-    width: 112px;
-    height: 112px;
+    width: 48px;
+    height: 48px;
   }
   .welcome-actions {
     display: flex;

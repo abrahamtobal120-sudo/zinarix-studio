@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as RKeyboardEvent, ReactNode } from 'react';
+import { Icon } from '../Icon';
 import { confirmDialog } from '../../confirm';
 import { api, onDiskChange, registerViewerSaver, setTabDirty, toast } from '../../store';
 import { isTypingTarget, uniqueName } from '../../../shared/graphics';
@@ -1399,14 +1400,14 @@ export function PaintView({
       <div className="pv-bar">
         {(
           [
-            ['brush', '🖌', 'brush'],
+            ['brush', <Icon key="i" name="brush" size={15} />, 'brush'],
             ['eraser', '⌫', 'eraser'],
-            ['bucket', '🪣', 'bucket'],
-            ['picker', '💧', 'picker'],
+            ['bucket', <Icon key="i" name="bucket" size={15} />, 'bucket'],
+            ['picker', <Icon key="i" name="pipette" size={15} />, 'picker'],
             ['rect', '⬚', 'selRect'],
-            ['lasso', '➰', 'selLasso'],
+            ['lasso', <Icon key="i" name="lasso" size={15} />, 'selLasso'],
             ['move', '✥', 'moveTool'],
-          ] as [Tool, string, KeyG][]
+          ] as [Tool, ReactNode, KeyG][]
         ).map(([id, icon, tip]) => (
           <button
             key={id}

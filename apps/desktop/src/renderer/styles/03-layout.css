@@ -212,6 +212,111 @@
     outline: none;
     transition: background 0.1s ease;
   }
+  /* Only the rows on screen are mounted (C5): each one is placed by its index. */
+  .tree-rows {
+    position: relative;
+  }
+  .tree-rows > .tree-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+  }
+  /* B7: the outline of the file, a section under the tree (closed: only its header). */
+  .tree {
+    min-height: 0;
+  }
+  .outline {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    min-height: 0;
+    border-top: 1px solid var(--border);
+  }
+  .outline.open {
+    flex: 0 0 40%;
+    min-height: 130px;
+  }
+  .outline-head {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 8px 0 6px;
+    flex-shrink: 0;
+  }
+  .outline-toggle {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--fg);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+  }
+  .outline-action {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--fg-dim);
+    cursor: pointer;
+  }
+  .outline-action:hover {
+    color: var(--fg);
+    background: var(--hover);
+  }
+  .outline-filter {
+    margin: 0 8px 4px;
+    height: 24px;
+    padding: 0 8px;
+    flex-shrink: 0;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-size: var(--text-sm);
+  }
+  .outline-list {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+  .outline-empty {
+    margin: 0;
+    padding: 8px 14px;
+    color: var(--fg-dim);
+    font-size: var(--text-sm);
+  }
+  .outline-kind {
+    flex-shrink: 0;
+    width: 16px;
+    margin-right: 6px;
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-align: center;
+    color: var(--fg-dim);
+  }
+  .outline-kind.type {
+    color: var(--warn);
+  }
+  .outline-kind.func {
+    color: var(--accent-text);
+  }
+  .outline-kind.value {
+    color: var(--ok);
+  }
   .tree-row:hover {
     background: var(--hover);
   }
@@ -235,6 +340,11 @@
   .twisty.open {
     transform: rotate(90deg);
   }
+  /* Fixed parts of a row: a long name shortens the label, never the arrow or the icon. */
+  .twisty,
+  .file-icon {
+    flex-shrink: 0;
+  }
   .file-icon {
     width: 22px;
     display: inline-grid;
@@ -248,6 +358,7 @@
     flex-shrink: 0;
   }
   .tree-label {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }

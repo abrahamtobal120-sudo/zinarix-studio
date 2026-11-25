@@ -13,5 +13,7 @@ export * from './scanners.js';
 export * from './agentPolicy.js';
 export * from './agentTools.js';
 export * from './editMatch.js';
+export * from './textTools.js';
+export * from './compact.js';
 export * from './agentProject.js';
 export * from './headlessAgent.js';

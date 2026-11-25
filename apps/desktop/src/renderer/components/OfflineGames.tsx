@@ -41,8 +41,8 @@ export function OfflineGames({ offline }: { offline: boolean }) {
       ) : (
         <div className="offline-games-pick">
           <span className="dim">{t('gamesWhileWaiting')}</span>
-          <button onClick={() => setGame('dino')}>🦖 {t('gameDino')}</button>
-          <button onClick={() => setGame('board')}>🏄 {t('gameBoard')}</button>
+          <button onClick={() => setGame('dino')}>{t('gameDino')}</button>
+          <button onClick={() => setGame('board')}>{t('gameBoard')}</button>
         </div>
       )}
     </div>
@@ -190,7 +190,7 @@ function dinoGame(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): () 
   const GROUND = H - 34;
   const fg = css('--fg', '#c8ccd4');
   const dim = css('--fg-dim', '#8a8f9a');
-  const brand = css('--brand', '#7c6cff');
+  const brand = css('--brand', '#5b9bff');
   const ok = css('--ok', '#83d6a0');
   let state: 'ready' | 'run' | 'over' = 'ready';
   let y = 0; // height above the ground
@@ -377,7 +377,7 @@ type Thing = { x: number; y: number; r: number; kind: 'rock' | 'buoy' | 'star' }
 function boardGame(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): () => void {
   // The ride goes left to right: the rider stays near the left, the sea flows past.
   const fg = css('--fg', '#c8ccd4');
-  const brand = css('--brand', '#7c6cff');
+  const brand = css('--brand', '#5b9bff');
   const warn = css('--warn', '#e0b341');
   const danger = css('--danger', '#f1595b');
   let state: 'ready' | 'run' | 'over' = 'ready';

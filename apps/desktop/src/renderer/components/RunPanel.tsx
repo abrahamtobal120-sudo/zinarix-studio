@@ -824,7 +824,7 @@ function RunStatusCard({ run, now }: { run: RunRecord; now: number }) {
         )}
         {run.status === 'failed' && (
           <button className="rp-btn ai" onClick={() => askAiAboutRun(run)}>
-            <Icon name="sparkle" size={13} /> {t('runFixWithAi')}
+            <Icon name="message" size={13} /> {t('runFixWithAi')}
           </button>
         )}
       </div>
@@ -1017,7 +1017,7 @@ export function RunPanel() {
             </ol>
             <div className="rp-empty-actions">
               <button className="primary" onClick={() => askAiHowToRun(files)}>
-                <Icon name="sparkle" size={14} /> {t('runAskAi')}
+                <Icon name="message" size={14} /> {t('runAskAi')}
               </button>
               <button onClick={() => setState({ panelOpen: true, panelView: 'terminal' })}>
                 <Icon name="terminal" size={14} /> {t('runOpenTerminal')}

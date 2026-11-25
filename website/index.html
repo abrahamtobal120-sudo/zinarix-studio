@@ -748,9 +748,10 @@
           </div>
           <div class="os" data-os="mac">
             <h3><span class="os-logo mac" aria-hidden="true"></span>macOS</h3>
-            <p class="muted">Apple Silicon e Intel</p>
+            <p class="muted" id="mac-arch-note">Apple Silicon e Intel</p>
             <a class="btn btn-primary" data-asset="mac-arm64" href="#">Apple Silicon .dmg</a>
             <a class="dl-link" data-asset="mac-x64" href="#">Intel .dmg</a>
+            <a class="dl-link" href="#mac-steps" id="mac-steps-link">Cómo abrirla la primera vez</a>
           </div>
           <div class="os" data-os="linux">
             <h3><span class="os-logo linux" aria-hidden="true"></span>Linux</h3>
@@ -760,6 +761,68 @@
             <a class="dl-link" data-asset="appimage" href="#">Otras distros .AppImage</a>
           </div>
         </div>
+
+        <details class="mac-steps" id="mac-steps">
+          <summary>Instalar en macOS: la app todavía no está firmada por Apple</summary>
+          <div class="mac-steps-body">
+            <p>
+              Zinarix Studio para Mac aún no lleva la firma de Apple, así que macOS no la abre con
+              un doble clic la primera vez. Son estos pasos, una sola vez:
+            </p>
+            <ol>
+              <li>
+                <b>Descarga el .dmg de tu Mac.</b> Menú Apple → <i>Acerca de este Mac</i>: si dice
+                «Chip Apple M1, M2, M3…» es <b>Apple Silicon</b>; si dice «Procesador Intel», es
+                <b>Intel</b>.
+              </li>
+              <li>
+                <b>Abre el .dmg</b> y arrastra <i>Zinarix Studio</i> a la carpeta
+                <i>Aplicaciones</i>.
+              </li>
+              <li>
+                <b>Ábrela desde Aplicaciones.</b> macOS dirá que no puede comprobar que no contiene
+                software malicioso. Pulsa <b>Aceptar</b> (no «Trasladar a la papelera»).
+              </li>
+              <li>
+                <b>Autorízala:</b>
+                <ul>
+                  <li>
+                    <b>macOS 15 (Sequoia) o más nuevo:</b> Ajustes del Sistema →
+                    <i>Privacidad y seguridad</i> → baja hasta <i>Seguridad</i> → junto al aviso de
+                    que se bloqueó Zinarix Studio pulsa <b>Abrir igualmente</b> → pon tu contraseña
+                    o Touch ID → <b>Abrir</b>.
+                  </li>
+                  <li>
+                    <b>macOS 14 o anterior:</b> en Aplicaciones haz clic derecho (o Control + clic)
+                    sobre Zinarix Studio → <b>Abrir</b> → <b>Abrir</b>.
+                  </li>
+                </ul>
+              </li>
+              <li>Desde entonces abre con doble clic, como cualquier app.</li>
+            </ol>
+            <p><b>Más rápido, desde Terminal</b> (después del paso 2):</p>
+            <div class="cmd">
+              <code>xattr -dr com.apple.quarantine "/Applications/Zinarix Studio.app"</code>
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <p>
+              <b>Si dice «está dañada y no puede abrirse»</b>, no está dañada: es el mismo bloqueo.
+              Ejecuta el comando de arriba y, si sigue igual, este otro:
+            </p>
+            <div class="cmd">
+              <code>codesign --force --deep --sign - "/Applications/Zinarix Studio.app"</code>
+              <button class="copy" type="button">Copiar</button>
+            </div>
+            <p>
+              <b>O todo en una línea:</b> descarga la versión de tu Mac, comprueba su suma SHA-256 y
+              la copia a Aplicaciones.
+            </p>
+            <div class="cmd">
+              <code>curl -fsSL https://zinarix-studio.vercel.app/install.sh | bash</code>
+              <button class="copy" type="button">Copiar</button>
+            </div>
+          </div>
+        </details>
 
         <div class="term" id="terminal">
           <div class="term-bar">
@@ -841,7 +904,8 @@
               <div class="panel" id="i-mac" hidden>
                 <p>
                   Abre el .dmg y arrastra la app a Aplicaciones. Como todavía no está firmada por
-                  Apple, la primera vez haz clic derecho → Abrir, o ejecuta:
+                  Apple, la primera vez hay que autorizarla: los pasos están en
+                  <a href="#mac-steps">Instalar en macOS</a>. Desde Terminal basta con:
                 </p>
                 <pre><code>xattr -dr com.apple.quarantine "/Applications/Zinarix Studio.app"</code></pre>
               </div>

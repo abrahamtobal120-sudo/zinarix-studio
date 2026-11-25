@@ -68,7 +68,7 @@ const es = {
   dbgReasonEntry: 'Detenido al empezar',
   dbgStep1:
     'Abre tu archivo y haz clic a la izquierda del número de línea para poner un punto rojo (o pulsa F9). Ahí se detendrá el programa.',
-  dbgStep1Done: '¡Listo! Tienes {n}.',
+  dbgStep1Done: 'Tienes {n}.',
   dbgStep2: 'Pulsa «{start}» (F5). Tu programa correrá hasta llegar al punto rojo.',
   dbgStep3:
     'Cuando se pause, mira los valores en Variables y avanza línea por línea con Paso por encima (F10).',
@@ -160,7 +160,7 @@ const en: Record<keyof typeof es, string> = {
   dbgReasonEntry: 'Stopped at the start',
   dbgStep1:
     'Open your file and click left of a line number to put a red dot (or press F9). The program will stop there.',
-  dbgStep1Done: 'Done! You have {n}.',
+  dbgStep1Done: 'You have {n}.',
   dbgStep2: 'Press "{start}" (F5). Your program runs until it reaches the red dot.',
   dbgStep3:
     'When it pauses, check the values in Variables and move line by line with Step over (F10).',

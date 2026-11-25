@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { type Breakpoint, type DebugVariable, logpointCondition } from '../../shared/devtools.js';
@@ -40,7 +41,15 @@ const INSPECTOR_NOISE =
 
 /** The regex CDP matches script URLs against for a file (drive letter case-insensitive). */
 export function urlRegexFor(absPath: string): string {
-  const href = pathToFileURL(absPath).href;
+  // Node names a script by its real path: a project opened through a link (macOS /var →
+  // /private/var) or a Windows short name (RUNNER~1) would never match its breakpoints.
+  let real = absPath;
+  try {
+    real = realpathSync.native(absPath);
+  } catch {
+    // not on disk (yet): use the path as given
+  }
+  const href = pathToFileURL(real).href;
   const esc = href.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
   // file:///C:/… — Windows drive letters may come in either case.
   return `^${esc.replace(/^(file:\\\/\\\/\\\/)([A-Za-z]):/, (_, p: string, d: string) => `${p}[${d.toLowerCase()}${d.toUpperCase()}]:`)}$`;

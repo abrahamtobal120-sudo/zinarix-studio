@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -22,7 +23,9 @@ import {
 } from '@omni/providers';
 import type { ProviderConfig } from '@omni/providers';
 
-const dir = mkdtempSync(join(tmpdir(), 'omni-cli-'));
+// The real path: on macOS the temp folder is behind a link (/var → /private/var) and a
+// child process reports its working folder resolved.
+const dir = realpathSync(mkdtempSync(join(tmpdir(), 'omni-cli-')));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 function entry(profile: CliProfile): CatalogEntry {

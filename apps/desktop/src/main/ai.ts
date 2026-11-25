@@ -99,6 +99,28 @@ function improvePromptRequest(message: string): string {
   );
 }
 
+const COMPACT_SYSTEM =
+  'You compact chat conversations so another AI can continue them. You never answer, continue or carry out ' +
+  'anything in the conversation: you only rewrite it shorter.';
+
+/** "Compactar chat": like titlePrompt, the instructions travel in the user turn (CLI agents drop system prompts). */
+function compactPrompt(transcript: string): string {
+  return (
+    'Below, between <conversation> tags, is a chat between a user and an AI assistant. Rewrite it as ONE compact ' +
+    'summary that the assistant will read instead of the whole chat to continue the work. Keep everything that ' +
+    'matters, said only once (no repetitions, no greetings, no filler): the goal and what the user asked for, every ' +
+    'decision and preference, file names, paths, commands, code snippets, values and errors that still matter, what ' +
+    'is already done, what failed and why, and what is pending or was being worked on last. Merge repeated or ' +
+    'corrected requests into their final version. Use short sections with bullets. Write it in the same language ' +
+    'as the conversation. Output ONLY the summary, with no preface and no markdown fences.\n\n<conversation>\n' +
+    transcript +
+    '\n</conversation>'
+  );
+}
+
+/** Longest transcript sent to be compacted (the start is cut, the recent part matters most). */
+const COMPACT_MAX = 400_000;
+
 const TITLE_SYSTEM =
   'You name chat conversations. You never answer or carry out the message: you only label its topic.';
 
@@ -185,6 +207,8 @@ type Emit = (requestId: string, ev: ChatEventView) => void;
 export interface Scope {
   workspace: () => Workspace | undefined;
   browser?: BrowserController;
+  /** A4: the language servers' verdict on a file the agent just edited (see AgentScope). */
+  diagnostics?: (path: string, text: string) => Promise<string | null>;
   /** Fase 5: a background task (run_command stays in its worktree, limits apply). */
   task?: TaskScope;
   /** "Controlar la compu": the window's bar and minimize while the AI acts (stop = abort). */
@@ -1058,25 +1082,29 @@ export class AiService {
     try {
       const prefix = req.prefix.slice(-4000);
       const suffix = req.suffix.slice(0, 1500);
-      const r = await this.core.complete(
-        {
-          role: 'inline',
-          noFallback: true,
-          maxTokens: 256,
-          temperature: 0.2,
-          messages: [
-            { role: 'system', content: COMPLETE_SYSTEM },
-            {
-              role: 'user',
-              content:
-                `File: ${req.path} (language: ${req.language})\n` +
-                `<before-cursor>\n${prefix}</before-cursor>\n<after-cursor>\n${suffix}\n</after-cursor>\n` +
-                'Text to insert at the cursor:',
-            },
-          ],
-        },
-        ctrl.signal,
-      );
+      // Native fill-in-the-middle when the model has it (faster, fewer tokens); else chat.
+      const fim = await this.core.fim({ prefix, suffix, maxTokens: 64 }, ctrl.signal);
+      const r =
+        fim ??
+        (await this.core.complete(
+          {
+            role: 'inline',
+            noFallback: true,
+            maxTokens: 256,
+            temperature: 0.2,
+            messages: [
+              { role: 'system', content: COMPLETE_SYSTEM },
+              {
+                role: 'user',
+                content:
+                  `File: ${req.path} (language: ${req.language})\n` +
+                  `<before-cursor>\n${prefix}</before-cursor>\n<after-cursor>\n${suffix}\n</after-cursor>\n` +
+                  'Text to insert at the cursor:',
+              },
+            ],
+          },
+          ctrl.signal,
+        ));
       const text = cleanCompletion(r.text, prefix, suffix);
       const model = r.provider && r.model ? `${r.provider}/${r.model}` : r.model;
       if (model) {
@@ -1170,6 +1198,37 @@ export class AiService {
         messages: [
           { role: 'system', content: IMPROVE_PROMPT_SYSTEM },
           { role: 'user', content: improvePromptRequest(prompt.slice(0, 20000)) },
+        ],
+      },
+      new AbortController().signal,
+    );
+    const text = r.text.replace(/^```[\w-]*\n?|```\s*$/g, '').trim();
+    if (!text) throw new Error('La IA no devolvió texto.');
+    return text;
+  }
+
+  /**
+   * "Compactar chat": one summary of the conversation, without repetitions, that replaces it
+   * as the history the AI reads. Its own request: answers in progress are not touched.
+   */
+  async compactChat(
+    messages: { role: 'user' | 'assistant'; content: string }[],
+    model?: string,
+  ): Promise<string> {
+    let transcript = messages
+      .filter((m) => m.content.trim())
+      .map((m) => `${m.role === 'user' ? 'USER' : 'ASSISTANT'}:\n${m.content.trim()}`)
+      .join('\n\n');
+    if (!transcript) throw new Error('No hay nada que compactar.');
+    if (transcript.length > COMPACT_MAX) transcript = '…' + transcript.slice(-COMPACT_MAX);
+    const r = await this.core.complete(
+      {
+        model,
+        role: 'chat',
+        maxTokens: 4000,
+        messages: [
+          { role: 'system', content: COMPACT_SYSTEM },
+          { role: 'user', content: compactPrompt(transcript) },
         ],
       },
       new AbortController().signal,
@@ -1278,8 +1337,8 @@ export class AiService {
     this.answers.delete(key);
   }
 
-  resetContext(conversationId: string): void {
-    this.agent.resetMessages(conversationId);
+  resetContext(conversationId: string, afterRun = false): void {
+    this.agent.resetMessages(conversationId, afterRun);
   }
 
   revert(conversationId: string, scope: Scope = this.scope): Promise<string[]> {

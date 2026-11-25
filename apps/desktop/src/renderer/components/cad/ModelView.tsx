@@ -200,7 +200,7 @@ export function ModelView({ path }: { path: string }) {
                 )
               }
             >
-              <Icon name="sparkle" size={13} /> {tc('askAi')}
+              <Icon name="message" size={13} /> {tc('askAi')}
             </button>
           </section>
           {SLICEABLE.test(path) && (

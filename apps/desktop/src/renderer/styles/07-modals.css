@@ -10,8 +10,7 @@
     justify-content: center;
     align-items: flex-start;
     padding-top: 8vh;
-    background: rgba(0, 0, 0, 0.32);
-    backdrop-filter: blur(2px);
+    background: rgba(0, 0, 0, 0.4);
     animation: fade-in 0.12s ease-out;
   }
   @keyframes fade-in {

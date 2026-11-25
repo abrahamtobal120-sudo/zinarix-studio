@@ -11,26 +11,12 @@ import { Modals } from './components/Modals';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { NoticeBanner, UpdateBanner, introOnStart, noticeSeen } from './components/Plan';
-import { MailPanel } from './components/MailPanel';
-import { WatchPanel } from './components/WatchPanel';
-import { AutomationsPanel } from './components/automations/AutomationsPanel';
 import { RunPanel } from './components/RunPanel';
 import { DebugPanel } from './components/DebugPanel';
 import { TestExplorer } from './components/TestExplorer';
-import { DockerPanel } from './components/docker/DockerPanel';
-import { HardwarePanel } from './components/hardware/HardwarePanel';
-import { GamesPanel } from './components/games/GamesPanel';
-import { CadPanel } from './components/cad/CadPanel';
-import { SketchupPanel } from './components/sketchup/SketchupPanel';
-import { MobilePanel } from './components/mobile/MobilePanel';
-import { GraphicsPanel } from './components/graphics/GraphicsPanel';
-import { SupabasePanel } from './components/SupabasePanel';
-import { VercelPanel } from './components/VercelPanel';
-import { GCloudPanel } from './components/GCloudPanel';
-import { DesignPanel } from './components/DesignPanel';
 import { SearchView } from './components/Search';
 import { TerminalPanel } from './components/Terminal';
-import { VideoStudioHost } from './components/video/VideoStudio';
+import { VideoStudioHost } from './components/video/VideoHost';
 import { HelperBubble } from './components/helper/HelperBubble';
 import { isStudioFile } from './components/video/videoCommands';
 import { getV as getVideo, openStudio } from './components/video/videoStore';
@@ -46,7 +32,9 @@ import {
   refreshModels,
   refreshSettings,
   setState,
+  initWorkspace,
   switchWorkspace,
+  syncOpenFiles,
   toast as showToast,
   updateChat,
   useStore,
@@ -66,6 +54,40 @@ import { useV } from './components/video/videoStore';
 import './layout/layout.css';
 import { TitleBar } from './layout/TitleBar';
 import './layout/titlebar.css';
+import { lazyNamed } from './lazy';
+import { startExtensions } from './extensions';
+
+// C2: loaded the first time they are shown (see lazy.tsx).
+const MailPanel = lazyNamed(() => import('./components/MailPanel'), 'MailPanel');
+const WatchPanel = lazyNamed(() => import('./components/WatchPanel'), 'WatchPanel');
+const AutomationsPanel = lazyNamed(
+  () => import('./components/automations/AutomationsPanel'),
+  'AutomationsPanel',
+);
+const DockerPanel = lazyNamed(() => import('./components/docker/DockerPanel'), 'DockerPanel');
+const ExtensionsPanel = lazyNamed(
+  () => import('./components/extensions/ExtensionsPanel'),
+  'ExtensionsPanel',
+);
+const HardwarePanel = lazyNamed(
+  () => import('./components/hardware/HardwarePanel'),
+  'HardwarePanel',
+);
+const GamesPanel = lazyNamed(() => import('./components/games/GamesPanel'), 'GamesPanel');
+const CadPanel = lazyNamed(() => import('./components/cad/CadPanel'), 'CadPanel');
+const SketchupPanel = lazyNamed(
+  () => import('./components/sketchup/SketchupPanel'),
+  'SketchupPanel',
+);
+const MobilePanel = lazyNamed(() => import('./components/mobile/MobilePanel'), 'MobilePanel');
+const GraphicsPanel = lazyNamed(
+  () => import('./components/graphics/GraphicsPanel'),
+  'GraphicsPanel',
+);
+const SupabasePanel = lazyNamed(() => import('./components/SupabasePanel'), 'SupabasePanel');
+const VercelPanel = lazyNamed(() => import('./components/VercelPanel'), 'VercelPanel');
+const GCloudPanel = lazyNamed(() => import('./components/GCloudPanel'), 'GCloudPanel');
+const DesignPanel = lazyNamed(() => import('./components/DesignPanel'), 'DesignPanel');
 
 /** Pixels a separator moves per arrow key press. */
 const SASH_STEP = 16;
@@ -473,7 +495,8 @@ export function App() {
     void (async () => {
       await Promise.all([refreshSettings(), loadPrefs(), refreshLicense()]);
       applyTheme(getState().settings.theme);
-      setState({ workspace: await api().workspace.current() });
+      startExtensions();
+      initWorkspace(await api().workspace.current());
       void api()
         .watch.status()
         .then((watch) => setState({ watch }));
@@ -507,7 +530,10 @@ export function App() {
     })();
     return api().on((ev) => {
       if (ev.type === 'workspace') switchWorkspace(ev.workspace);
-      if (ev.type === 'fs:changed') setState((s) => ({ fsVersion: s.fsVersion + 1 }));
+      if (ev.type === 'fs:changed') {
+        setState((s) => ({ fsVersion: s.fsVersion + 1 }));
+        void syncOpenFiles(ev.paths);
+      }
       if (ev.type === 'command') void runCommand(ev.command);
       if (ev.type === 'phone') runPhoneAction(ev.action);
       if (ev.type === 'phone:target') setPhoneTarget(ev.on);
@@ -563,7 +589,7 @@ export function App() {
         {sideOn && !design && (!max || max === 'side') && (
           <>
             <aside
-              className="sidebar"
+              className={max === 'side' ? 'sidebar sidebar-max' : 'sidebar'}
               style={max === 'side' ? { flex: 1, borderRight: 'none' } : { width: sideShown }}
             >
               <ErrorBoundary scope={`sidebar:${sidebar}`} resetKey={sidebar}>
@@ -579,6 +605,8 @@ export function App() {
                   <TestExplorer />
                 ) : sidebar === 'docker' ? (
                   <DockerPanel />
+                ) : sidebar === 'extensions' ? (
+                  <ExtensionsPanel />
                 ) : sidebar === 'hardware' ? (
                   <HardwarePanel />
                 ) : sidebar === 'mobile' ? (

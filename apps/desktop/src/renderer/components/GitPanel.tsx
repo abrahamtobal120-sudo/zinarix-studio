@@ -14,6 +14,7 @@ import { pressable } from '../a11y';
 import { t, type Key } from '../i18n';
 import { errText } from '../errText';
 import { api, askText, openFile, setState, toast, useStore } from '../store';
+import { refreshGitGutter } from '../gitGutter';
 import { openLink } from '../links';
 import { runInTerminal } from './Terminal';
 import { fileIcon } from './icons';
@@ -83,6 +84,7 @@ export function GitPanel() {
       const s = await api().git.status();
       setSt(s);
       setState({ gitChanges: s.files.length });
+      refreshGitGutter();
     } catch (e) {
       toast(errText(e));
     }

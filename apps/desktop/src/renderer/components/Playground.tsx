@@ -381,7 +381,7 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
               onClick={() => setMode(m)}
             >
               <Icon
-                name={m === 'single' ? 'sparkle' : m === 'compare' ? 'columns' : 'package'}
+                name={m === 'single' ? 'message' : m === 'compare' ? 'columns' : 'package'}
                 size={13}
               />
               {tp(
@@ -545,6 +545,7 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
               <textarea
                 rows={schema ? 8 : 2}
                 className="mono"
+                aria-label={tp('pgSchema')}
                 spellCheck={false}
                 value={schema}
                 aria-invalid={Boolean(parsedSchema.error)}
@@ -577,6 +578,7 @@ export function PlaygroundPane({ visible }: { visible: boolean }) {
               <textarea
                 rows={toolsText ? 8 : 2}
                 className="mono"
+                aria-label={tp('pgTools')}
                 spellCheck={false}
                 value={toolsText}
                 aria-invalid={Boolean(tools.error)}

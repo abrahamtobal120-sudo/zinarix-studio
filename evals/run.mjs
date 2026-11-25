@@ -123,13 +123,55 @@ function selfcheck(tasks) {
   return bad === 0;
 }
 
+/**
+ * The agent's result from its event stream (one JSON object per line). A run that was
+ * killed has no final "result" event: what it did until then is rebuilt from the events,
+ * with `stuckAt` telling where it stopped.
+ */
+function fromEvents(stdout) {
+  const partial = {
+    text: '',
+    steps: 0,
+    tools: [],
+    filesChanged: [],
+    usage: { inputTokens: 0, outputTokens: 0, usd: 0 },
+  };
+  let last = '';
+  for (const line of stdout.split('\n')) {
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (ev.type === 'result') return ev;
+    if (ev.type === 'text') {
+      partial.text += ev.delta;
+      last = `writing step ${partial.steps + 1} (${partial.text.length} characters so far)`;
+      continue;
+    }
+    if (ev.type === 'step') {
+      partial.steps = ev.step;
+      partial.usage.inputTokens += ev.inputTokens;
+      partial.usage.outputTokens += ev.outputTokens;
+      partial.usage.usd =
+        partial.usage.usd === null || ev.usd === null ? null : partial.usage.usd + ev.usd;
+      partial.text = '';
+    } else if (ev.type === 'tool_result')
+      partial.tools.push({ name: ev.name, ok: ev.ok, ...(ev.denied ? { denied: ev.denied } : {}) });
+    else if (ev.type === 'file_changed') partial.filesChanged.push(ev.path);
+    last = JSON.stringify(ev).slice(0, 300);
+  }
+  return last ? { ...partial, stuckAt: last } : null;
+}
+
 function runAgent(task, work, opts) {
   const args = [
     cli,
     'agent',
     '--approve',
     task.approve,
-    '--json',
+    '--stream-json',
     '--quiet',
     '-C',
     work,
@@ -154,15 +196,7 @@ function runAgent(task, work, opts) {
     }, opts.timeout * 1000);
     child.on('close', (code) => {
       clearTimeout(timer);
-      let result = null;
-      const from = stdout.indexOf('{');
-      if (from >= 0) {
-        try {
-          result = JSON.parse(stdout.slice(from));
-        } catch {
-          result = null;
-        }
-      }
+      const result = fromEvents(stdout);
       resolve({ code, result, stderr: stderr.trim(), timedOut, wallMs: Date.now() - started });
     });
   });
@@ -189,7 +223,10 @@ async function runOne(task, opts) {
       outputTokens: r?.usage?.outputTokens ?? 0,
       usd: r?.usage?.usd ?? null,
       seconds: Math.round(run.wallMs / 100) / 10,
-      error: r?.error ?? (r ? undefined : run.stderr.split('\n').slice(-3).join(' ')),
+      error:
+        r?.error ??
+        (r?.stuckAt ? `stuck at: ${r.stuckAt}` : undefined) ??
+        (r ? undefined : run.stderr.split('\n').slice(-3).join(' ')),
       checkDetail: verdict.detail || undefined,
       ...(opts.keep ? { dir: work } : {}),
     };

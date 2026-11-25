@@ -601,7 +601,7 @@ function SceneTools() {
         <div className="q3-grid">
           <Btn glyph="✦" label={tq('logo')} onClick={() => template('logo')} />
           <Btn glyph="⟳" label={tq('turntable')} onClick={() => template('turntable')} />
-          <Btn glyph="🎥" label={tq('orbit')} onClick={() => template('orbit')} />
+          <Btn glyph="◉" label={tq('orbit')} onClick={() => template('orbit')} />
           <Btn glyph="✕" label={tq('empty')} onClick={() => template('empty')} />
         </div>
       </Section>
@@ -731,7 +731,7 @@ function NodeTools({ n }: { n: Node3D }) {
                 ['float', '〰'],
                 ['bounce', '⤓'],
                 ['pulse', '♥'],
-                ['appear', '✨'],
+                ['appear', '✦'],
               ] as const
             ).map(([k, g]) => (
               <Btn key={k} glyph={g} label={tq(k)} on={anims.has(k)} onClick={() => animate(k)} />
@@ -763,7 +763,7 @@ function NodeTools({ n }: { n: Node3D }) {
           }
         />
         <Btn
-          glyph="🗑"
+          glyph="✕"
           label={tq('remove')}
           danger
           wide
@@ -784,13 +784,13 @@ export function QuickTools3D() {
   if (!show)
     return (
       <button type="button" className="q3-open s3-btn" onClick={() => toggle(true)}>
-        🧰 {tq('show')}
+        {tq('show')}
       </button>
     );
   return (
     <section className="q3-card" aria-label={tq('title')}>
       <header className="q3-head">
-        <strong>🧰 {tq('title')}</strong>
+        <strong>{tq('title')}</strong>
         <button type="button" className="q3-x" title={tq('hide')} onClick={() => toggle(false)}>
           ×
         </button>
@@ -806,7 +806,7 @@ export function QuickTools3D() {
               onClick={() => addNode(makeMesh(b.shape))}
             />
           ))}
-          <Btn glyph="💡" label={tq('light')} onClick={() => addNode(makeLight('point'))} />
+          <Btn glyph="☀" label={tq('light')} onClick={() => addNode(makeLight('point'))} />
         </div>
       </Section>
 

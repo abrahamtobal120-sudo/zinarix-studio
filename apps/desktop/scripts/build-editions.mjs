@@ -55,8 +55,11 @@ function configFor(id) {
   // ZINARIX_KEEP_ELECTRON_EXE=1: ship Electron's exe byte-for-byte (no icon/version edit).
   // Windows Smart App Control blocks any new unsigned exe; the untouched Electron exe is
   // already known to it, so the app keeps opening on PCs where that protection is on.
-  if (process.env.ZINARIX_KEEP_ELECTRON_EXE === '1')
+  // Flipping the fuses rewrites the exe too, so they are left off in that mode.
+  if (process.env.ZINARIX_KEEP_ELECTRON_EXE === '1') {
     c.win = { ...c.win, signAndEditExecutable: false };
+    delete c.electronFuses;
+  }
   if (id === 'standard') return c;
   // "Zinarix Studio Pro + AI" -> "Zinarix-Studio-ProAI" in file names.
   const file = e.name.replace(' + ', '').replaceAll(' ', '-');

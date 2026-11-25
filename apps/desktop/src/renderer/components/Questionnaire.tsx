@@ -24,7 +24,7 @@ import './questionnaire.css';
 
 const es = {
   label: 'Cuestionario de inicio',
-  hello: 'Hagamos Zinarix a tu medida',
+  hello: 'Configuración inicial',
   helloLead:
     'Responde 5 preguntas rápidas y la app se acomoda a lo que haces: los paneles que vas a usar, el tema y cuánto te ayuda la IA.',
   q1: '¿Qué quieres hacer con Zinarix?',
@@ -89,7 +89,7 @@ const es = {
 };
 const en: typeof es = {
   label: 'Getting started questionnaire',
-  hello: 'Let’s make Zinarix yours',
+  hello: 'Initial setup',
   helloLead:
     'Answer 5 quick questions and the app adapts to what you do: the panels you will use, the theme and how much the AI helps.',
   q1: 'What do you want to do with Zinarix?',
@@ -159,7 +159,7 @@ const tq = (k: K) => (lang === 'en' ? en : es)[k];
 const PANEL: Record<string, { icon: IconName; es: string; en: string }> = {
   browser: { icon: 'globe', es: 'Navegador', en: 'Browser' },
   design: { icon: 'palette', es: 'Edición', en: 'Design' },
-  playground: { icon: 'sparkle', es: 'Playground', en: 'Playground' },
+  playground: { icon: 'beaker', es: 'Playground', en: 'Playground' },
   mobile: { icon: 'smartphone', es: 'Celular', en: 'Mobile' },
   games: { icon: 'gamepad', es: 'Juegos', en: 'Games' },
   studio3d: { icon: 'cube', es: 'Estudio 3D', en: '3D Studio' },

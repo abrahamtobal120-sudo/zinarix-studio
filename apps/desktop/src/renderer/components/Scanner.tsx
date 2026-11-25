@@ -274,7 +274,7 @@ export function Scanner() {
                 );
               }}
             >
-              <Icon name="sparkle" size={13} /> {t('scannerExplain')}
+              <Icon name="message" size={13} /> {t('scannerExplain')}
             </button>
           )}
         </div>

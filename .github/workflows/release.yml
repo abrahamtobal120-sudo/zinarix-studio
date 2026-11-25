@@ -111,6 +111,20 @@ jobs:
         # draft created above and never publishes it. One app per plan: Zinarix Studio
         # (free), Pro, AI and Pro + AI, each with its own installers and update channel.
         run: node scripts/build-editions.mjs -- ${{ matrix.target }} --publish always
+      # Without an Apple certificate the app is not signed, but Apple Silicon only starts
+      # code with a valid (ad-hoc) signature: flipping the fuses breaks Electron's own, and
+      # electronFuses.resetAdHocDarwinSignature puts it back. A warning, not a failure: by
+      # now the installers are already uploaded to the draft.
+      - name: Check the macOS app signature
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          for app in release/mac-arm64/*.app; do
+            [ -d "$app" ] || continue
+            if codesign --verify --deep --strict "$app"; then echo "firma válida: $app"
+            else echo "::warning::$app no tiene una firma válida: Apple Silicon dirá que está dañada"; fi
+          done
 
   # The Android app of the phone remote (apps/remote-android): Zinarix-Remote.apk on the
   # release (the desktop app and the phone panel link to releases/latest/download/…).

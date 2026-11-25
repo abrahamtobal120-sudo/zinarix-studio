@@ -11,7 +11,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { ToolDefinition } from '@omni/shared';
 import type { AgentToolName } from './agentPolicy.js';
-import { applyEdit, editNote } from './editMatch.js';
+import { applyEdits, editNote, editSteps } from './editMatch.js';
 
 /**
  * Fase 15 — the tools of the headless agent. Every path is confined to the run's folder
@@ -70,7 +70,7 @@ export const TOOL_DEFS: Record<AgentToolName, ToolDefinition> = {
   edit_file: {
     name: 'edit_file',
     description:
-      'Replace an exact piece of text in a file. old_string must appear exactly once unless replace_all is true.',
+      'Replace an exact piece of text in a file. old_string must appear exactly once unless replace_all is true. For several changes to the same file, pass them all in edits.',
     parameters: {
       type: 'object',
       properties: {
@@ -78,8 +78,22 @@ export const TOOL_DEFS: Record<AgentToolName, ToolDefinition> = {
         old_string: { type: 'string' },
         new_string: { type: 'string' },
         replace_all: { type: 'boolean' },
+        edits: {
+          type: 'array',
+          description:
+            'Several replacements in this file in one call, applied in order; all or nothing. Use instead of old_string / new_string.',
+          items: {
+            type: 'object',
+            properties: {
+              old_string: { type: 'string' },
+              new_string: { type: 'string' },
+              replace_all: { type: 'boolean' },
+            },
+            required: ['old_string', 'new_string'],
+          },
+        },
       },
-      required: ['path', 'old_string', 'new_string'],
+      required: ['path'],
     },
   },
   run_command: {
@@ -109,6 +123,27 @@ export interface ToolContext {
   root: string;
   signal: AbortSignal;
   env?: NodeJS.ProcessEnv;
+  /**
+   * Files (absolute paths) the model has read or written in this run. When given, a file
+   * that exists cannot be edited or overwritten before it was read: models that guess the
+   * contents of a file break it.
+   */
+  seen?: Set<string>;
+}
+
+function unread(ctx: ToolContext, a: Record<string, unknown>): ToolOutcome | undefined {
+  if (!ctx.seen) return undefined;
+  const abs = resolveInside(ctx.root, a.path);
+  if (!existsSync(abs) || ctx.seen.has(abs)) return undefined;
+  return {
+    ok: false,
+    content: `You have not read ${str(a.path)} yet. Call read_file on it first, then change it: old_string must be copied from the real file.`,
+  };
+}
+
+function markSeen(ctx: ToolContext, a: Record<string, unknown>, out: ToolOutcome): ToolOutcome {
+  if (out.ok) ctx.seen?.add(resolveInside(ctx.root, a.path));
+  return out;
 }
 
 const SKIP_DIRS = new Set([
@@ -170,7 +205,125 @@ function isBinary(buf: Buffer): boolean {
   return false;
 }
 
-function listFiles(root: string, a: Record<string, unknown>): ToolOutcome {
+/** Every file under the root (skipping build output), as project-relative paths. */
+function allFiles(root: string, max: number): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (out.length >= max) return;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (!SKIP_DIRS.has(e.name)) walk(p);
+      } else if (e.isFile()) out.push(posix(relative(root, p)));
+    }
+  };
+  walk(root);
+  return out;
+}
+
+const stem = (name: string) => name.replace(/\.[^.]*$/, '').toLowerCase();
+
+/**
+ * Files of the project whose name looks like a path that does not exist: models often guess a
+ * path ("src/app.js") instead of listing the folder. Best matches first, at most five.
+ */
+export function similarFiles(root: string, wanted: string): string[] {
+  const want = posix(wanted.trim()).replace(/^\.\//, '');
+  const base = want.split('/').pop() ?? '';
+  if (!base) return [];
+  const wantStem = stem(base);
+  const wantDir = want.includes('/') ? want.slice(0, want.lastIndexOf('/')).toLowerCase() : '';
+  const scored: { path: string; score: number }[] = [];
+  for (const path of allFiles(realpathSync(root), 5000)) {
+    const name = path.split('/').pop()!;
+    const s = stem(name);
+    let score = 0;
+    if (name.toLowerCase() === base.toLowerCase()) score = 100;
+    else if (s === wantStem) score = 80;
+    else if (
+      wantStem.length >= 3 &&
+      (s.includes(wantStem) || wantStem.includes(s)) &&
+      s.length >= 3
+    )
+      score = 50;
+    const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')).toLowerCase() : '';
+    // Same folder: the model had the place right and the name wrong.
+    if (dir === wantDir) score += score ? 10 : 30;
+    if (score) scored.push({ path, score });
+  }
+  scored.sort((x, y) => y.score - x.score || x.path.length - y.path.length);
+  return scored.slice(0, 5).map((x) => x.path);
+}
+
+function notFound(root: string, p: string): ToolError {
+  const near = similarFiles(root, p);
+  return new ToolError(
+    near.length
+      ? `file not found: ${p}. Files that exist: ${near.join(', ')}`
+      : `file not found: ${p}. Call list_files to see what exists.`,
+  );
+}
+
+/**
+ * A short map of the project for the start of a run, so the model does not have to guess
+ * paths: folders and files up to `depth` levels, cut at `max` lines. Empty for an empty folder.
+ */
+export function projectTree(root: string, max = 150, depth = 3): string {
+  const out = listFiles(realpathSync(root), { path: '.', depth }, max);
+  return out.content === '(empty)' ? '' : out.content;
+}
+
+/** Build files of other ecosystems: with one of these the project has its own way to test. */
+const MANIFESTS = [
+  'pyproject.toml',
+  'setup.py',
+  'requirements.txt',
+  'Cargo.toml',
+  'go.mod',
+  'pom.xml',
+  'build.gradle',
+  'build.gradle.kts',
+  'Makefile',
+  'composer.json',
+  'Gemfile',
+  'deno.json',
+];
+
+/**
+ * What the project can run, for the start of a run: the scripts of its package.json, or a
+ * plain statement that it has no test setup. Without it small models answer "run the tests"
+ * by inventing a package.json and installing a test runner. Empty when it cannot tell.
+ */
+export function projectCommands(root: string): string {
+  const pkg = join(root, 'package.json');
+  if (existsSync(pkg)) {
+    let scripts: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(readFileSync(pkg, 'utf8')) as { scripts?: unknown };
+      if (parsed.scripts && typeof parsed.scripts === 'object')
+        scripts = parsed.scripts as Record<string, unknown>;
+    } catch {
+      return '';
+    }
+    const lines = Object.entries(scripts)
+      .filter(([, v]) => typeof v === 'string')
+      .slice(0, 20)
+      .map(([k, v]) => `npm run ${k}: ${String(v).slice(0, 120)}`);
+    return lines.length
+      ? lines.join('\n')
+      : 'package.json has no scripts: there is no test command. Do not add a test runner unless the task asks for one.';
+  }
+  if (MANIFESTS.some((m) => existsSync(join(root, m)))) return '';
+  return 'This project has no package.json and no test runner. Do not create one or install packages unless the task asks for it; to check a change, read the code again or run the file itself.';
+}
+
+function listFiles(root: string, a: Record<string, unknown>, max = MAX_LIST): ToolOutcome {
   const base = resolveInside(root, str(a.path) || '.');
   const depth = int(a.depth, 3, 1, 10);
   const lines: string[] = [];
@@ -184,7 +337,7 @@ function listFiles(root: string, a: Record<string, unknown>): ToolOutcome {
     }
     entries.sort((x, y) => x.name.localeCompare(y.name));
     for (const e of entries) {
-      if (lines.length >= MAX_LIST) {
+      if (lines.length >= max) {
         cut = true;
         return;
       }
@@ -197,13 +350,13 @@ function listFiles(root: string, a: Record<string, unknown>): ToolOutcome {
     }
   };
   walk(base, 1);
-  if (cut) lines.push(`… (cut at ${MAX_LIST} entries; list a sub-folder)`);
+  if (cut) lines.push(`… (cut at ${max} entries; list a sub-folder)`);
   return { ok: true, content: lines.join('\n') || '(empty)' };
 }
 
 function readFile(root: string, a: Record<string, unknown>): ToolOutcome {
   const abs = resolveInside(root, a.path);
-  if (!existsSync(abs)) throw new ToolError(`file not found: ${str(a.path)}`);
+  if (!existsSync(abs)) throw notFound(root, str(a.path));
   if (statSync(abs).isDirectory())
     throw new ToolError(`${str(a.path)} is a folder; use list_files`);
   const buf = readFileSync(abs);
@@ -275,12 +428,11 @@ function writeFile(root: string, a: Record<string, unknown>): ToolOutcome {
 
 function editFile(root: string, a: Record<string, unknown>): ToolOutcome {
   const abs = resolveInside(root, a.path);
-  if (!existsSync(abs)) throw new ToolError(`file not found: ${str(a.path)}`);
-  const oldS = str(a.old_string);
-  if (!oldS) throw new ToolError('old_string is required (use write_file to create a file)');
-  if (typeof a.new_string !== 'string') throw new ToolError('new_string is required');
+  if (!existsSync(abs)) throw notFound(root, str(a.path));
+  const steps = editSteps(a);
+  if (typeof steps === 'string') throw new ToolError(steps);
   const text = readFileSync(abs, 'utf8');
-  const res = applyEdit(text, oldS, a.new_string, { replaceAll: a.replace_all === true });
+  const res = applyEdits(text, steps);
   if (!res.ok)
     throw new ToolError(
       res.error.includes(' times;')
@@ -389,13 +541,13 @@ export async function runTool(
       case 'list_files':
         return listFiles(ctx.root, args);
       case 'read_file':
-        return readFile(ctx.root, args);
+        return markSeen(ctx, args, readFile(ctx.root, args));
       case 'search':
         return search(ctx.root, args);
       case 'write_file':
-        return writeFile(ctx.root, args);
+        return unread(ctx, args) ?? markSeen(ctx, args, writeFile(ctx.root, args));
       case 'edit_file':
-        return editFile(ctx.root, args);
+        return unread(ctx, args) ?? markSeen(ctx, args, editFile(ctx.root, args));
       case 'run_command':
         return await runCommand(ctx, args);
       default:

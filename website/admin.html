@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Zinarix Studio · Panel del dueño</title>
+    <link rel="icon" href="/assets/favicon.png" />
+    <link rel="stylesheet" href="/admin.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Zinarix Studio</strong> <span class="dim">Panel del dueño</span>
+      <button id="signout" class="link" hidden>Salir</button>
+    </header>
+
+    <main id="login">
+      <h1>Entrar</h1>
+      <p class="dim">Escribe tu clave de administrador (la variable ADMIN_TOKEN del servidor).</p>
+      <form id="login-form">
+        <label>
+          Clave de administrador
+          <input id="token" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary">Entrar</button>
+      </form>
+      <p id="login-error" class="error" role="alert"></p>
+    </main>
+
+    <main id="panel" hidden>
+      <section class="stats" id="stats" aria-label="Resumen"></section>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="keys" aria-selected="true">Llaves</button>
+        <button role="tab" data-tab="messages" aria-selected="false">Mensajes</button>
+        <button role="tab" data-tab="users" aria-selected="false">Usuarios</button>
+      </nav>
+      <p id="error" class="error" role="alert"></p>
+
+      <section id="tab-keys">
+        <h2>Crear llaves</h2>
+        <form id="key-form" class="row">
+          <label>
+            Plan
+            <select id="key-plan">
+              <option value="pro">Pro</option>
+              <option value="ai">AI</option>
+              <option value="proai">Pro + AI</option>
+            </select>
+          </label>
+          <label>
+            Correo del cliente (opcional)
+            <input id="key-email" type="email" placeholder="cliente@correo.com" />
+          </label>
+          <label>
+            Nombre (opcional)
+            <input id="key-name" maxlength="120" />
+          </label>
+          <label>
+            Días (0 = nunca vence)
+            <input id="key-days" type="number" min="0" max="36500" value="0" />
+          </label>
+          <label>
+            Cuántas
+            <input id="key-count" type="number" min="1" max="100" value="1" />
+          </label>
+          <label>
+            Nota (opcional)
+            <input id="key-note" maxlength="200" />
+          </label>
+          <button class="primary">Crear</button>
+        </form>
+        <p class="dim small">
+          Si el correo ya tiene cuenta y creas una sola llave, le aparece sola en su app. Si no,
+          cópiala y envíasela: la pega en la app (Ajustes → Cuenta, o al activar su plan).
+        </p>
+        <div id="new-keys"></div>
+        <h2>Llaves hechas</h2>
+        <input id="key-search" type="search" placeholder="Buscar por correo, nombre o nota" />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Para</th>
+                <th>Creada</th>
+                <th>Vence</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="keys"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tab-messages" hidden>
+        <h2>Mandar un mensaje a todos</h2>
+        <form id="msg-form">
+          <label>
+            Mensaje (máximo 500 caracteres)
+            <textarea id="msg-text" maxlength="500" rows="3" required></textarea>
+          </label>
+          <div class="row">
+            <label>
+              Enlace "Ver más" (opcional, https)
+              <input id="msg-url" type="url" placeholder="https://" />
+            </label>
+            <label>
+              Días que se muestra (0 = siempre)
+              <input id="msg-days" type="number" min="0" max="3650" value="30" />
+            </label>
+            <button class="primary">Enviar a todos</button>
+          </div>
+        </form>
+        <p class="dim small">
+          Sale una vez en cada app instalada, tenga cuenta o no, la próxima vez que la app revise
+          (al abrir y cada pocas horas). Borrarlo aquí evita que llegue a quien aún no lo vio.
+        </p>
+        <h2>Mensajes enviados</h2>
+        <div id="messages"></div>
+      </section>
+
+      <section id="tab-users" hidden>
+        <h2>Usuarios registrados</h2>
+        <input id="user-search" type="search" placeholder="Buscar por correo o nombre" />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Correo</th>
+                <th>Nombre</th>
+                <th>Registro</th>
+                <th>Última vez</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="/admin.js"></script>
+  </body>
+</html>

@@ -34,6 +34,7 @@ export const SIDE_VIEWS = [
   'debug',
   'testing',
   'docker',
+  'extensions',
   'hardware',
   'mobile',
   'games',

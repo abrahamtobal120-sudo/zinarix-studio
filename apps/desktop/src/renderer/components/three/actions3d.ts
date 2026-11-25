@@ -90,12 +90,10 @@ export async function render3d(
   }
 }
 
-let wired = false;
+type AppEvent = Parameters<Parameters<ReturnType<typeof api>['on']>[0]>[0];
 /** The agent's render_3d (engine "viewer") and its finished Blender renders. */
-export function wireAgent3d(): void {
-  if (wired) return;
-  wired = true;
-  api().on((ev) => {
+export function onAgent3dEvent(ev: AppEvent): void {
+  {
     if (ev.type === 'scene3d:imported') void addToVideo(ev.path, true);
     if (ev.type === 'scene3d:edit') {
       void editorTool(ev.name, ev.args)
@@ -121,7 +119,7 @@ export function wireAgent3d(): void {
           error: e instanceof Error ? e.message : String(e),
         }),
       );
-  });
+  }
 }
 
 /** The agent's scene3d_state / scene3d_edit / scene3d_render on the scene open in the editor. */

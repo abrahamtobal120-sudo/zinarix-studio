@@ -38,6 +38,8 @@ import {
   forgetResume,
   toggleChatList,
   toggleChatSplit,
+  closeSide,
+  openToSide,
   getEditor,
   getState,
   openBrowserTab,
@@ -98,6 +100,7 @@ async function editRules(): Promise<void> {
 }
 
 function baseCommands(): Command[] {
+  const en = lang === 'en';
   return [
     {
       id: 'workspace.open',
@@ -121,6 +124,20 @@ function baseCommands(): Command[] {
       run: () => setState({ modal: { kind: 'quickOpen' } }),
     },
     {
+      id: 'goToSymbol',
+      label: t('cmdGoToSymbol'),
+      keys: `${mod}+Shift+O`,
+      run: () => setState({ modal: { kind: 'symbols' } }),
+    },
+    {
+      id: 'showOutline',
+      label: t('cmdShowOutline'),
+      run: () => {
+        setState({ sidebar: 'explorer' });
+        window.dispatchEvent(new CustomEvent('zinarix:outline-show'));
+      },
+    },
+    {
       id: 'tasks.run',
       label: t('cmdRunTask'),
       run: () =>
@@ -128,12 +145,21 @@ function baseCommands(): Command[] {
     },
     {
       id: 'graphics.open',
-      label: 'Estudio gráfico: nuevo diseño, logo o dibujo / Graphics studio',
+      label: en
+        ? 'Graphics studio: new design, logo or drawing'
+        : 'Estudio gráfico: nuevo diseño, logo o dibujo',
       run: () => setState({ sidebar: 'graphics' }),
     },
     {
+      id: 'extensions.open',
+      label: en
+        ? 'Extensions: themes, snippets and languages'
+        : 'Extensiones: temas, fragmentos y lenguajes',
+      run: () => setState({ sidebar: 'extensions' }),
+    },
+    {
       id: 'docker.open',
-      label: 'Docker: abrir panel / open panel',
+      label: en ? 'Docker: open panel' : 'Docker: abrir panel',
       run: () => setState({ sidebar: 'docker' }),
     },
     {
@@ -143,22 +169,22 @@ function baseCommands(): Command[] {
     },
     {
       id: 'games.open',
-      label: 'Juegos / Games: Godot, web, Unity, Unreal',
+      label: en ? 'Games: Godot, web, Unity, Unreal' : 'Juegos: Godot, web, Unity, Unreal',
       run: () => setState({ sidebar: 'games' }),
     },
     {
       id: 'cad.open',
-      label: 'CAD 3D: OpenSCAD, impresión 3D / 3D printing',
+      label: en ? '3D CAD: OpenSCAD, 3D printing' : 'CAD 3D: OpenSCAD, impresión 3D',
       run: () => setState({ sidebar: 'cad' }),
     },
     {
       id: 'sketchup.open',
-      label: 'SketchUp: modelos .skp / .skp models',
+      label: en ? 'SketchUp: .skp models' : 'SketchUp: modelos .skp',
       run: () => setState({ sidebar: 'sketchup' }),
     },
     {
       id: 'mobile.open',
-      label: 'Celular / Phone: Android, Flutter, Expo',
+      label: en ? 'Phone: Android, Flutter, Expo' : 'Celular: Android, Flutter, Expo',
       run: () => setState({ sidebar: 'mobile' }),
     },
     {
@@ -207,6 +233,17 @@ function baseCommands(): Command[] {
       },
     },
     {
+      id: 'editor.splitRight',
+      label: t('editorSplitRight'),
+      keys: `${mod}+Alt+B`,
+      run: () => void openToSide(),
+    },
+    {
+      id: 'editor.closeSide',
+      label: t('editorCloseSide'),
+      run: () => closeSide(),
+    },
+    {
       id: 'view.explorer',
       label: t('explorer'),
       keys: `${mod}+Shift+E`,
@@ -245,6 +282,14 @@ function baseCommands(): Command[] {
       label: `${t('settings')}…`,
       keys: `${mod}+,`,
       run: () => setState({ modal: { kind: 'settings' } }),
+    },
+    {
+      id: 'app.account',
+      label:
+        lang === 'en'
+          ? 'Zinarix account: sign in or register…'
+          : 'Cuenta de Zinarix: iniciar sesión o registrarse…',
+      run: () => setState({ modal: { kind: 'settings', section: 'account' } }),
     },
     {
       id: 'ai.toggleInline',
@@ -477,11 +522,11 @@ function baseCommands(): Command[] {
     ...layoutCommands(),
     {
       id: 'ai.edit',
-      label: `${t('aiEdit')} (${t('cmdSelection')})`,
+      label: t('aiEdit'),
       keys: `${mod}+K`,
       run: () => {
-        const sel = getEditor()?.getSelection();
-        if (!sel || sel.isEmpty()) return toast(t('selectFirst'));
+        // No selection: the edit is about the line the cursor is on.
+        if (!getEditor()?.getModel()) return toast(t('selectFirst'));
         setState({ modal: { kind: 'aiEdit' } });
       },
     },

@@ -346,11 +346,52 @@
   }
 
   /* "Más" panel: integrations and tools as a list with a description. */
+  /* Maximized side panel: fields and main buttons keep a readable width instead of running
+   from one edge of the window to the other. Lists and tables still use the whole width. */
+  .sidebar-max :is(input:not([type='checkbox'], [type='radio'], [type='range']), select),
+  .sidebar-max :is(button.primary, .gp-go) {
+    max-width: 560px;
+  }
+  .sidebar-max :is(.cad-card, .gp textarea) {
+    max-width: 760px;
+  }
+  .sidebar-max :is(.sidebar-empty, .vc-hint) {
+    max-width: 760px;
+  }
+  .apps-panel {
+    container-type: inline-size;
+  }
+  .apps-search {
+    flex: none;
+    margin: 8px 12px 2px;
+  }
   .apps-body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     padding: 6px 8px 14px;
+  }
+  .apps-none {
+    padding: 12px 8px;
+  }
+  /* A wide (maximized) panel shows the apps in columns instead of one very long list. */
+  @container (min-width: 620px) {
+    .apps-body,
+    .apps-search {
+      width: 100%;
+      max-width: 1180px;
+      margin-inline: auto;
+    }
+    .apps-search {
+      width: calc(100% - 32px);
+      max-width: 420px;
+      margin-block: 14px 4px;
+    }
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 2px 12px;
+    }
   }
   .apps-section {
     padding: 12px 8px 6px;

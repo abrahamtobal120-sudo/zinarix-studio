@@ -624,7 +624,7 @@ export function DebugPanel() {
                   void askAiWherePaused().finally(() => setAsking(false));
                 }}
               >
-                <Icon name="sparkle" size={14} /> {td('dbgAiExplain')}
+                <Icon name="message" size={14} /> {td('dbgAiExplain')}
               </button>
             )}
           </>

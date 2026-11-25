@@ -315,12 +315,22 @@ describe('actions beyond the project', () => {
       join(h, '.aws', 'credentials'),
       join(h, '.config', 'google-chrome', 'Default', 'Cookies'),
       join(h, '.gnupg', 'private-keys-v1.d'),
+      join(h, '.omni-signing', 'catalog.key'),
+      join(h, '.zinarix-minisign', 'minisign.key'),
+      join(h, '.zinarix-android', 'release.keystore'),
       // System secrets of the platform the test runs on (on Windows "/etc/shadow" is just
       // C:\etc\shadow, an ordinary path).
       ...(process.platform === 'win32'
         ? [
             join(h, 'AppData', 'Roaming', 'Microsoft', 'Credentials', 'x'),
             join(h, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cookies'),
+            join(h, 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cookies'),
+            join(h, 'AppData', 'Roaming', 'gcloud', 'credentials.db'),
+            join(h, 'AppData', 'Roaming', 'Zinarix Studio AI', 'vault.json'),
+            // Windows ignores case in paths.
+            join(h, '.SSH', 'id_ed25519'),
+            join(h.toLowerCase(), '.Aws', 'Credentials'),
+            join(h, 'appdata', 'local', 'google', 'chrome', 'User Data'),
           ]
         : ['/etc/shadow', '/etc/sudoers', '/proc/1/environ']),
     ])

@@ -19,6 +19,7 @@ import {
   setPath,
   OmniConfig,
   updateCatalogFromUrl,
+  LOCAL_TIMEOUT_MS,
 } from '@omni/core';
 import type { OmniEvent } from '@omni/core';
 import type { CatalogEntry } from '@omni/shared';
@@ -683,5 +684,12 @@ describe('data directory', () => {
       data: join(fakeHome, '.omni'),
     });
     expect(defaultDirs({ HOME: fakeHome, OMNI_HOME: '/o' }, 'linux').data).toBe('/o');
+  });
+
+  it('gives a model on this computer minutes to start answering, not the 60 s of a cloud API', async () => {
+    const c = open({ OPENAI_API_KEY: 'sk-test-xxxxxxxxxxxx' });
+    expect((await c.providerConfig('ollama')).timeoutMs).toBe(LOCAL_TIMEOUT_MS);
+    expect(LOCAL_TIMEOUT_MS).toBeGreaterThanOrEqual(5 * 60_000);
+    expect((await c.providerConfig('openai')).timeoutMs).toBeUndefined();
   });
 });

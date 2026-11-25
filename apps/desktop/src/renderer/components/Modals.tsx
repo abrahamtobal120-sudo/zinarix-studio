@@ -6,7 +6,7 @@ import { t } from '../i18n';
 import { openLink } from '../links';
 import { confirmDialog } from '../confirm';
 import { monaco } from '../monaco';
-import { monacoTheme } from '../themes';
+import { proposeEdit } from '../inlineReview';
 import {
   api,
   chooseModel,
@@ -83,6 +83,7 @@ export function Modals() {
       {modal?.kind === 'palette' && <UnifiedPalette initial=">" />}
       {modal?.kind === 'tasks' && <TaskPick />}
       {modal?.kind === 'quickOpen' && <UnifiedPalette />}
+      {modal?.kind === 'symbols' && <UnifiedPalette initial="@" />}
       {modal?.kind === 'models' && <ModelPicker role={modal.role} pick={modal.pick} />}
       {modal?.kind === 'providers' && <Providers focus={modal.focus} />}
       {modal?.kind === 'aiEdit' && <AiEdit />}
@@ -500,7 +501,9 @@ function Providers({ focus }: { focus?: string }) {
                   {g.title} <span className="dim">{g.items.length}</span>
                   {g.items.some((x) => x.connected) && (
                     <span className="provider-group-on">
-                      {t('provConnectedCount', { n: g.items.filter((x) => x.connected).length })}
+                      {((n) => (n === 1 ? t('provConnectedOne') : t('provConnectedCount', { n })))(
+                        g.items.filter((x) => x.connected).length,
+                      )}
                     </span>
                   )}
                 </div>
@@ -704,23 +707,32 @@ function Providers({ focus }: { focus?: string }) {
   );
 }
 
-/** Ctrl+K: describe a change, stream the replacement, review it in a diff, accept or reject. */
+/**
+ * Ctrl+K: describe a change and stream the replacement; the result is applied in the editor
+ * and reviewed there block by block (inlineReview.ts). Without a selection the edit is about
+ * the line of the cursor.
+ */
 function AiEdit() {
   const ed = getEditor();
   const model = ed?.getModel();
-  const sel = ed?.getSelection();
+  // Read once: the dialog lives while one selection is being edited.
+  const [sel] = useState(() => {
+    const picked = ed?.getSelection();
+    if (!model || !picked || !picked.isEmpty()) return picked;
+    // No selection: the whole line of the cursor (an empty line = "write here").
+    const line = picked.startLineNumber;
+    return new monaco.Selection(line, 1, line, model.getLineMaxColumn(line));
+  });
   const [instruction, setInstruction] = useState('');
-  const [phase, setPhase] = useState<'ask' | 'gen' | 'review'>('ask');
+  const [phase, setPhase] = useState<'ask' | 'gen'>('ask');
   const [result, setResult] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const diffHost = useRef<HTMLDivElement>(null);
   const requestRef = useRef<string | null>(null);
   /** Unsubscribes the stream of the request in flight (null = none). */
   const offRef = useRef<(() => void) | null>(null);
-  const theme = useStore((s) => s.settings.theme);
 
   const original = model && sel ? model.getValueInRange(sel) : '';
-  const noSelection = !ed || !model || !sel || sel.isEmpty();
+  const noSelection = !ed || !model || !sel;
 
   // Closed (Esc, click outside, accept) while generating: stop listening and stop the request.
   useEffect(
@@ -742,26 +754,28 @@ function AiEdit() {
     toast(t('selectFirst'));
   }, [noSelection]);
 
-  useEffect(() => {
-    if (phase !== 'review' || !diffHost.current || !model) return;
-    const diff = monaco.editor.createDiffEditor(diffHost.current, {
-      readOnly: true,
-      renderSideBySide: true,
-      automaticLayout: true,
-      theme: monacoTheme(theme),
-      minimap: { enabled: false },
-    });
-    const a = monaco.editor.createModel(original, model.getLanguageId());
-    const b = monaco.editor.createModel(result, model.getLanguageId());
-    diff.setModel({ original: a, modified: b });
-    return () => {
-      diff.dispose();
-      a.dispose();
-      b.dispose();
-    };
-  }, [phase, model, original, result, theme]);
-
   if (noSelection) return null;
+
+  /** Put the answer in the document and open the review of each changed block there. */
+  const apply = (text: string) => {
+    if (ed.getModel() !== model) return close();
+    // Whole lines, so the blocks of the review are lines of the file.
+    const head = model.getValueInRange(
+      new monaco.Range(sel.startLineNumber, 1, sel.startLineNumber, sel.startColumn),
+    );
+    const tail = model.getValueInRange(
+      new monaco.Range(
+        sel.endLineNumber,
+        sel.endColumn,
+        sel.endLineNumber,
+        model.getLineMaxColumn(sel.endLineNumber),
+      ),
+    );
+    const blocks = proposeEdit(ed, sel.startLineNumber, sel.endLineNumber, head + text + tail);
+    close();
+    ed.focus();
+    toast(blocks ? t('aiRvHint') : t('aiRvNoChange'));
+  };
 
   const run = async () => {
     if (!instruction.trim()) return;
@@ -786,9 +800,8 @@ function AiEdit() {
       } else if (e.type === 'cost') {
         off();
         if (requestRef.current === requestId) requestRef.current = null;
-        setResult(stripFences(text));
-        setPhase('review');
         void refreshSettings();
+        apply(stripFences(text));
       }
     });
     const off = () => {
@@ -824,64 +837,37 @@ function AiEdit() {
     }
   };
 
-  const accept = () => {
-    ed.executeEdits('omni-ai-edit', [{ range: sel, text: result, forceMoveMarkers: true }]);
-    ed.pushUndoStop();
-    close();
-    ed.focus();
-  };
-
   return (
     <ModalShell
       onClose={() => (
         phase === 'gen' && requestRef.current ? void api().ai.abort(requestRef.current) : undefined,
         close()
       )}
-      className={`ai-edit ${phase === 'review' ? 'wide' : ''}`}
+      className="ai-edit"
       labelledBy="ai-edit-head"
     >
       <div className="ai-edit-head" id="ai-edit-head">
-        <Icon name="sparkle" size={14} /> {t('aiEdit')}{' '}
+        <Icon name="message" size={14} /> {t('aiEdit')}{' '}
         <span className="dim">
           · {getState().settings.roles.inline ?? getState().settings.defaultModel ?? t('noModel')} ·{' '}
           {sel.startLineNumber}–{sel.endLineNumber}
         </span>
       </div>
-      {phase !== 'review' && (
-        <input
-          autoFocus
-          value={instruction}
-          disabled={phase === 'gen'}
-          aria-label={t('aiEditPlaceholder')}
-          placeholder={t('aiEditPlaceholder')}
-          onChange={(e) => setInstruction(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void run();
-          }}
-        />
-      )}
+      <input
+        autoFocus
+        value={instruction}
+        disabled={phase === 'gen'}
+        aria-label={t('aiEditPlaceholder')}
+        placeholder={t('aiEditPlaceholder')}
+        onChange={(e) => setInstruction(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void run();
+        }}
+      />
       {phase === 'gen' && <pre className="ai-edit-stream">{result || t('generating')}</pre>}
-      {phase === 'review' && <div className="ai-edit-diff" ref={diffHost} />}
       {error && (
         <div className="err" role="alert">
           {error}
-        </div>
-      )}
-      {phase === 'review' && (
-        <div className="row">
-          <button className="primary" autoFocus onClick={accept}>
-            <Icon name="check" size={13} /> {t('accept')}
-          </button>
-          <button onClick={close}>
-            <Icon name="x" size={13} /> {t('reject')}
-          </button>
-          <button
-            onClick={() => setPhase('ask')}
-            aria-label={t('aiEditAgain')}
-            title={t('aiEditAgain')}
-          >
-            <Icon name="undo" size={13} />
-          </button>
         </div>
       )}
     </ModalShell>

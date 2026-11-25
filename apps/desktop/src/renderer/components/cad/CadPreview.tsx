@@ -410,7 +410,7 @@ export function CadPreview({ path, onHide }: { path: string; onHide: () => void 
                       )
                     }
                   >
-                    <Icon name="sparkle" size={13} /> {tc('fixAi')}
+                    <Icon name="message" size={13} /> {tc('fixAi')}
                   </button>
                 )}
               </>

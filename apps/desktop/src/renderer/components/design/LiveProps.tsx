@@ -67,7 +67,7 @@ export function LiveProps(props: {
           ))}
       </div>
       <button className="primary" disabled={!text.trim()} onClick={ask}>
-        <Icon name="sparkle" size={14} /> {t('dzAskAiDo')}
+        <Icon name="message" size={14} /> {t('dzAskAiDo')}
       </button>
     </div>
   );

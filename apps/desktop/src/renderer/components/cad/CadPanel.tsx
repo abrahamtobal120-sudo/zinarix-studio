@@ -150,7 +150,7 @@ export function CadPanel() {
                   className="btn ghost cad-small"
                   onClick={() => askInChat(tc('askAiPrompt'))}
                 >
-                  <Icon name="sparkle" size={13} /> {tc('askAi')}
+                  <Icon name="message" size={13} /> {tc('askAi')}
                 </button>
               </div>
               <p className="cad-hint">{tc('howTo')}</p>

@@ -30,47 +30,45 @@
     margin: 0 auto 10px;
     line-height: 1.5;
   }
-  .chat-suggestions {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    max-width: 340px;
-    margin: 22px auto 18px;
-    text-align: left;
+  .chat-hints .chat-mode-hint {
+    max-width: none;
+    margin: 0 0 10px;
+    padding-inline: 8px;
+    font-size: var(--text-sm);
   }
-  @container (min-width: 520px) {
-    .chat-suggestions {
-      grid-template-columns: 1fr 1fr;
-      max-width: 560px;
+  /* The ideas: plain rows, no cards. */
+  .chat-suggestions {
+    display: flex;
+    flex-direction: column;
+    margin: 0 0 10px;
+    padding-block: 4px;
+    border-block: 1px solid var(--border);
+  }
+  /* Short window: the explanation gives its room to the ideas. */
+  @media (max-height: 620px) {
+    .chat-empty .chat-mode-hint {
+      display: none;
     }
   }
   .chat-suggestion {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 10px;
     text-align: left;
-    padding: 10px 12px;
+    padding: 6px 8px;
     line-height: 1.35;
     background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border: 0;
+    border-radius: var(--radius-xs);
     color: var(--fg);
   }
   .chat-suggestion .icon {
     flex-shrink: 0;
+    color: var(--fg-dim);
   }
   .chat-suggestion:hover {
     background: var(--hover);
-    border-color: color-mix(in srgb, var(--fg-dim) 40%, var(--border));
-  }
-  .chat-suggestion .tone-badge {
-    width: 22px;
-    height: 22px;
-    color: var(--fg-dim);
-    background: var(--bg-4);
-  }
-  .chat-suggestion:hover .tone-badge {
-    color: var(--accent-text);
+    color: var(--fg-strong);
   }
   .tool-card {
     border: 1px solid var(--border);
@@ -202,7 +200,7 @@
     align-items: center;
     gap: 3px;
     padding: 1px 7px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--bg-3);
     border: 1px solid var(--border);
   }
@@ -526,7 +524,6 @@
   .mp-card.active {
     border-color: var(--focus);
     background: var(--bg-4);
-    transform: translateY(-1px);
   }
   .mp-card.connected {
     border-left: 3px solid var(--ok);
@@ -641,7 +638,6 @@
   .mp-card.active {
     border-color: var(--focus);
     background: var(--bg-4);
-    transform: translateY(-1px);
   }
   .mp-card.connected {
     border-left: 3px solid var(--ok);
