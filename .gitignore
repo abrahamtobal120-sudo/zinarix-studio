@@ -18,6 +18,8 @@ license-private*
 
 # Claves locales: nunca subir
 api.md
+# …salvo el archivo de ejemplo de una tarea del banco de pruebas (no es una clave).
+!evals/tasks/**/docs/api.md
 google-oauth.local.json
 
 # Code - OSS descargado; se reproduce con code:prepare.

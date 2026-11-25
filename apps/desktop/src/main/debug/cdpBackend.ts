@@ -41,18 +41,26 @@ const INSPECTOR_NOISE =
 
 /** The regex CDP matches script URLs against for a file (drive letter case-insensitive). */
 export function urlRegexFor(absPath: string): string {
-  // Node names a script by its real path: a project opened through a link (macOS /var →
-  // /private/var) or a Windows short name (RUNNER~1) would never match its breakpoints.
-  let real = absPath;
+  // Node names a script by the path it was started with, or by its real path when it went
+  // through a link (macOS /var → /private/var): both forms match. A Windows short name
+  // (RUNNER~1) stays as given, and its "~" comes as "~" or "%7E" depending on who wrote the URL.
+  const paths = [absPath];
   try {
-    real = realpathSync.native(absPath);
+    const real = realpathSync.native(absPath);
+    if (real !== absPath) paths.push(real);
   } catch {
-    // not on disk (yet): use the path as given
+    // not on disk (yet): only the path as given
   }
-  const href = pathToFileURL(real).href;
-  const esc = href.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
-  // file:///C:/… — Windows drive letters may come in either case.
-  return `^${esc.replace(/^(file:\\\/\\\/\\\/)([A-Za-z]):/, (_, p: string, d: string) => `${p}[${d.toLowerCase()}${d.toUpperCase()}]:`)}$`;
+  const one = (p: string): string =>
+    pathToFileURL(p)
+      .href.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
+      .replace(/~|%7[Ee]/g, '(?:~|%7[Ee])')
+      // file:///C:/… — Windows drive letters may come in either case.
+      .replace(
+        /^(file:\\\/\\\/\\\/)([A-Za-z]):/,
+        (_, pre: string, d: string) => `${pre}[${d.toLowerCase()}${d.toUpperCase()}]:`,
+      );
+  return `^(?:${paths.map(one).join('|')})$`;
 }
 
 /** Display text for a CDP value. */
