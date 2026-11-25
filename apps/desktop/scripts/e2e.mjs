@@ -845,21 +845,24 @@ async function smoke(project) {
   const { win, problems } = run;
   const fail = (msg) => problems.push(msg);
   try {
-    // The first run opens the welcome questionnaire over the workbench: skip it.
-    // It appears a moment after the workbench, so wait for it before deciding it is not there.
+    // The first run opens the welcome questionnaire over the workbench: skip it. On a
+    // computer with no AI at all (a CI runner) the "connect an AI" welcome follows it, with
+    // the same backdrop: skip that one too. They appear a moment after the workbench, so
+    // wait before deciding there is none.
     const welcome = win.locator('.onboarding-backdrop');
-    if (
-      await welcome.waitFor({ state: 'visible', timeout: 8_000 }).then(
+    for (let i = 0; i < 4; i++) {
+      const shown = await welcome.waitFor({ state: 'visible', timeout: i ? 2_500 : 8_000 }).then(
         () => true,
         () => false,
-      )
-    ) {
+      );
+      if (!shown) break;
       await win
         .getByRole('button', { name: /^(Saltar|Skip)$/ })
         .first()
         .click();
-      await welcome.waitFor({ state: 'detached', timeout: 10_000 });
+      await win.waitForTimeout(500);
     }
+    await welcome.waitFor({ state: 'detached', timeout: 10_000 });
     const row = win.locator('.tree-row', { hasText: 'hola.txt' }).first();
     await row
       .waitFor({ state: 'visible', timeout: 15_000 })

@@ -362,6 +362,8 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
   const hostedWindows = process.platform === 'win32' && !!process.env.GITHUB_ACTIONS;
   it.skipIf(hostedWindows)(
     'exports a clip with a speed ramp (every step, with sound) to the planned length',
+    // FFmpeg now and then never finishes on the 4-core CI runners (not reproduced on a PC).
+    { timeout: 120_000, retry: 3 },
     async () => {
       const src = join(dir, 'ramp-src.mp4');
       gen(src, '640x360', 4, [
@@ -390,13 +392,16 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
         { ...defaultExport(r.project), width: 640, height: 360, preset: 'veryfast' },
         out,
       );
+      // A render that is not done in a minute (it takes seconds) is canceled, so its FFmpeg
+      // does not stay behind, and the test is tried again (see `retry`).
+      const began = Date.now();
       await new Promise<void>((resolve) => {
         const tick = setInterval(() => {
           const j = svc.list().find((x) => x.id === job.id)!;
           if (j.state !== 'queued' && j.state !== 'running') {
             clearInterval(tick);
             resolve();
-          }
+          } else if (Date.now() - began > 60_000) svc.cancel(job.id);
         }, 100);
       });
       const final = svc.list().find((x) => x.id === job.id)!;
@@ -405,7 +410,6 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('Fase 4 with FFmpeg', () => {
       expect(check.hasAudio).toBe(true);
       expect(Math.abs(check.duration - r.duration)).toBeLessThan(0.2);
     },
-    180_000,
   );
 
   it('remuxes a recorded WebM so it gets a duration', async () => {

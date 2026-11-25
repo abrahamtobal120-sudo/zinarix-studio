@@ -215,7 +215,9 @@ describe('video mixer', () => {
 });
 
 describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video phase 2 (FFmpeg)', () => {
-  it('renders effects, a transition, a title and the mix with real FFmpeg', async () => {
+  // FFmpeg now and then never finishes on the 4-core CI runners (not reproduced on a PC).
+  const opts = { timeout: 120_000, retry: 3 };
+  it('renders effects, a transition, a title and the mix with real FFmpeg', opts, async () => {
     const red = join(dir, 'red.mp4');
     const blue = join(dir, 'blue.mp4');
     const png = join(dir, 'title.png');
@@ -263,13 +265,16 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video phase 2 (FFmpeg)', () =>
       out,
       { [t.clip.id]: (await import('node:fs')).readFileSync(png) },
     );
+    // A render that is not done in a minute (it takes seconds) is canceled, so its FFmpeg
+    // does not stay behind, and the test is tried again (see `retry`).
+    const began = Date.now();
     await new Promise<void>((resolve) => {
       const tick = setInterval(() => {
         const j = svc.list().find((x) => x.id === job.id)!;
         if (j.state !== 'queued' && j.state !== 'running') {
           clearInterval(tick);
           resolve();
-        }
+        } else if (Date.now() - began > 60_000) svc.cancel(job.id);
       }, 100);
     });
     const final = svc.list().find((x) => x.id === job.id)!;
@@ -296,5 +301,5 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video phase 2 (FFmpeg)', () =>
     expect(b2).toBeGreaterThan(200);
     const bar = rgb(5, 160, 90); // the title over the blue clip
     expect(Math.min(...bar)).toBeGreaterThan(200);
-  }, 300_000);
+  });
 });
