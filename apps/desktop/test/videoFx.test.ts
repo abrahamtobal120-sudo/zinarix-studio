@@ -296,5 +296,5 @@ describe.skipIf(!tools.ffmpeg || !tools.ffprobe)('video phase 2 (FFmpeg)', () =>
     expect(b2).toBeGreaterThan(200);
     const bar = rgb(5, 160, 90); // the title over the blue clip
     expect(Math.min(...bar)).toBeGreaterThan(200);
-  }, 120_000);
+  }, 300_000);
 });

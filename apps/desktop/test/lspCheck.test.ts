@@ -74,7 +74,12 @@ describe('LspHost.check with a real server process', () => {
   afterEach(async () => {
     await host.dispose();
     // On Windows the folder stays locked until the server process (cwd = root) is gone.
-    rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 50, retryDelay: 100 });
+    } catch {
+      // A slow runner can keep the folder locked longer: a leftover temp folder is not a
+      // failure of what this test checks.
+    }
   });
 
   const ready = async () => {
