@@ -415,6 +415,19 @@ Comprobado con tipos, lint, formato, la batería completa (2 020 pruebas) y `pnp
 - Verificado: tipos, lint, formato, 2 049 pruebas (29 nuevas), prueba de punta a punta y 17 comprobaciones en la app real contra el servidor local.
 - Sin hacer: verificación del correo y "olvidé mi contraseña" por correo (hace falta un servicio de envío), y prueba contra un Supabase real.
 
+### Avance del 2026-11-25, vigésima segunda tanda (publicación 0.6.6, sitio y CI en verde)
+
+- **Sitio:** la sección de descargas detecta Apple Silicon o Intel (userAgentData y, en Safari y Firefox, el nombre de la GPU por WebGL) y pone el .dmg correcto en el botón principal. Bloque nuevo "Instalar en macOS" con los pasos para abrir la app sin firma (Sequoia: Ajustes → Privacidad y seguridad → Abrir igualmente; antes: clic derecho → Abrir; por Terminal: `xattr` y `codesign`). Se abre solo en un Mac.
+- **Fallo corregido en el sitio:** desde que el release trae cuatro ediciones, los botones de Windows y Linux bajaban la edición AI (el primer archivo que coincidía). Ahora solo se ofrecen los de la edición estándar.
+- **macOS:** `electronFuses.resetAdHocDarwinSignature`. Los fuses rompen la firma ad-hoc de Electron y, sin certificado, nadie la reponía; Apple Silicon no arranca código sin firma válida. El release comprueba la firma con `codesign --verify` (aviso, no fallo). Sin probar en un Mac real.
+- **CI en verde en los tres sistemas (nunca lo había estado):**
+  - Pruebas que asumían rutas de Windows (`C:\\…`, `file:///C:/…`, PATH con `;`) o carpetas temporales sin enlaces (`/var` → `/private/var` en macOS, `RUNNER~1` en Windows).
+  - Fallos reales que destaparon: `deniedPath` no protegía `.npmrc`, `.netrc`, etc. cuando el home estaba detrás de un enlace, ni `/etc/sudoers` en macOS (`/private/etc`); los puntos de interrupción no se ligaban en un proyecto abierto por una ruta con enlace o con nombre corto; `printerFileName` dejaba la ruta de Windows en el nombre fuera de Windows.
+  - `docs/api.md` de la tarea 03 del banco estaba ignorado por `.gitignore` (regla `api.md`).
+  - Linux corre las pruebas con pantalla virtual (`xvfb-run`). La prueba de punta a punta salta también la bienvenida "conecta una IA" y cabe en 1024 px; `ZINARIX_E2E_SIZE=1024x728` lo reproduce en una pantalla grande.
+- **Pendiente, sin causa encontrada:** los renders de FFmpeg con muchos clips a veces no terminan en los runners de 4 núcleos (Linux a ratos; la rampa de velocidad siempre en el Windows de GitHub). No se reproduce en una PC, ni limitando el proceso a 2 núcleos. Las dos pruebas cancelan el render al minuto y reintentan (3 veces); la de la rampa se salta solo en el Windows de GitHub. La prueba del sandbox de Windows acepta "no disponible" solo en ese runner.
+- **Sin diagnóstico en macOS:** se añadió `aformat` estéreo al final de la cadena de audio con normalización; la prueba que fallaba ahí ("Cannot select channel layout") pasa desde entonces, pero no se comprobó que ese fuera el motivo.
+
 ## 1. Veredicto
 
 Zinarix Studio tiene una base de seguridad y de limpieza de código mejor que la de muchos productos comerciales, y una amplitud de funciones enorme. Lo que hoy le impide ser la mejor app **de programación** no es que le falten funciones, sino cuatro cosas:
