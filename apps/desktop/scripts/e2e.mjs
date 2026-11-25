@@ -168,7 +168,8 @@ async function splitEditor(run, project, fail) {
   await win.mouse.move(row.x + row.width * 0.3, row.y + row.height / 2, { steps: 4 });
   await win.mouse.up();
   const dragged = await mainWidth();
-  if (Math.abs(dragged - row.width * 0.3) > 24)
+  // A group never gets under 160 px (ratioAt): on a narrow row that is more than 30 %.
+  if (Math.abs(dragged - Math.max(row.width * 0.3, 160)) > 24)
     fail(`dragging the divider gave ${Math.round(dragged)} px of ${Math.round(row.width)}`);
   // After a reload (like reopening Zinarix) the side group is back, with its file and width.
   await win.reload();
@@ -803,6 +804,22 @@ async function launch(project, seed) {
   win.on('crash', () => problems.push('the window crashed'));
   await win.waitForSelector(READY, { state: 'visible', timeout: 60_000 });
   const readyMs = Date.now() - started;
+  // ZINARIX_E2E_SIZE=1024x768: the window of a small screen (what CI runners have), to try
+  // on a big one what only fails there.
+  const size = /^(\d+)x(\d+)$/.exec(process.env.ZINARIX_E2E_SIZE ?? '');
+  if (size) {
+    await app.evaluate(
+      ({ BrowserWindow }, [w, h]) => {
+        const bw = BrowserWindow.getAllWindows()[0];
+        bw.unmaximize();
+        bw.setSize(w, h);
+      },
+      [Number(size[1]), Number(size[2])],
+    );
+    // Reload so the panels take the widths of a window that opened at this size.
+    await win.reload();
+    await win.waitForSelector(READY, { state: 'visible', timeout: 60_000 });
+  }
   return { app, win, home, problems, mainErr, windowMs, readyMs };
 }
 
