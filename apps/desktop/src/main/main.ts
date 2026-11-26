@@ -2460,6 +2460,7 @@ function registerIpc(): void {
         computer: z.boolean().optional(),
         uiLang: z.enum(['es', 'en']).optional(),
         bot: z.string().uuid().optional(),
+        saver: z.boolean().optional(),
       }),
     ]),
     (w, requestId, { folder, noFolder, ...req }) => {

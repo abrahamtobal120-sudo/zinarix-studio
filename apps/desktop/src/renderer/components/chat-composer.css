@@ -184,4 +184,14 @@
     background: color-mix(in srgb, var(--warn) 26%, transparent);
     color: var(--warn);
   }
+
+  /* "Ahorrador de tokens" on: a green chip, so it is clear answers are kept short. */
+  .chat-input .chat-input-bar > .saver-pill.on {
+    background: color-mix(in srgb, var(--ok) 16%, transparent);
+    color: var(--ok);
+  }
+  .chat-input .chat-input-bar > .saver-pill.on:hover {
+    background: color-mix(in srgb, var(--ok) 24%, transparent);
+    color: var(--ok);
+  }
 }

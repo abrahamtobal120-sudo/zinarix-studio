@@ -251,6 +251,7 @@ export function AddMenu({
   reasoning,
   agentMode,
   computerOn,
+  saverOn,
   includeFile,
   tasks,
   showTasks,
@@ -264,6 +265,7 @@ export function AddMenu({
   onStudio,
   onReasoning,
   onToggleComputer,
+  onToggleSaver,
   onToggleIncludeFile,
   onTasks,
   onKit,
@@ -276,6 +278,7 @@ export function AddMenu({
   reasoning: ReasoningLevel | '';
   agentMode: boolean;
   computerOn: boolean;
+  saverOn: boolean;
   includeFile: boolean;
   tasks: { active: number; waiting: number };
   showTasks: boolean;
@@ -290,6 +293,7 @@ export function AddMenu({
   onStudio: () => void;
   onReasoning: (v: ReasoningLevel | '') => void;
   onToggleComputer: () => void;
+  onToggleSaver: () => void;
   onToggleIncludeFile: () => void;
   onTasks: () => void;
   onKit: () => void;
@@ -372,6 +376,17 @@ export function AddMenu({
           {computerOn && <Icon name="check" size={13} className="add-menu-check" />}
         </button>
       )}
+      <button
+        role="menuitemcheckbox"
+        aria-checked={saverOn}
+        className="add-menu-item"
+        title={t('saverTitle')}
+        onClick={onToggleSaver}
+      >
+        <Icon name="leaf" size={14} />
+        <span className="add-menu-label">{t('saverMenu')}</span>
+        {saverOn && <Icon name="check" size={13} className="add-menu-check" />}
+      </button>
       <button
         role="menuitemcheckbox"
         aria-checked={includeFile}

@@ -45,6 +45,7 @@ import { setCredentialEnvNames } from './env.js';
 import { openLocal, sealLocal } from './token-store.js';
 import { setAppDataDirs } from './system.js';
 import { botBlock, type BotDef } from '../shared/automations.js';
+import { SAVER_NOTE, saverContext, saverHistory } from '../shared/tokenSaver.js';
 import type { BrowserController } from './browser.js';
 import type { Workspace } from './workspace.js';
 import { COMPUTER_MODE_NOTE, type ComputerRunHooks } from './computerTools.js';
@@ -686,7 +687,10 @@ export class AiService {
     emit: Emit,
     scope: Scope,
   ): Promise<void> {
-    const { req, block: botRules } = await this.withBot(asked);
+    const bot = await this.withBot(asked);
+    // "Ahorrador de tokens": the attached files travel shortened.
+    const req = bot.req.saver ? { ...bot.req, context: saverContext(bot.req.context) } : bot.req;
+    const botRules = bot.block + (req.saver ? SAVER_NOTE : '');
     if (req.agent) return this.agentChat(requestId, req, emit, scope, botRules);
     const [system, user] = buildContextMessages(
       req.prompt,
@@ -700,7 +704,7 @@ export class AiService {
         botRules,
     ) as [ChatMessage, ChatMessage];
     const img = this.withImages(user, req, 'chat', requestId, emit);
-    let messages: ChatMessage[] = [system, ...recentHistory(req.history), img];
+    let messages: ChatMessage[] = [system, ...pastMessages(req), img];
     // CLI agents (Claude Code, Codex…) drop the system prompt: the identity rides on the user message.
     if (this.isCliModel(req.model, 'chat'))
       messages = withProtocol(messages, cliIdentityBlock() + botRules, 'user');
@@ -832,7 +836,8 @@ export class AiService {
           ),
         ),
         userMessage,
-        fallbackHistory: recentHistory(req.history),
+        fallbackHistory: pastMessages(req),
+        saver: req.saver,
         signal: ctrl.signal,
         emit: (ev) => send(ev.type === 'start' ? { ...ev, conversationId: id } : ev),
         ask: (toolCallId) =>
@@ -1451,6 +1456,11 @@ export function cleanCompletion(text: string, prefix: string, suffix: string): s
  * on a user message so the model never sees an orphan answer first.
  */
 export const HISTORY_KEEP = 200;
+/** The history a request sends: shorter in "Ahorrador de tokens" mode. */
+export function pastMessages(req: Pick<ChatRequestView, 'history' | 'saver'>): ChatMessage[] {
+  return req.saver ? saverHistory(req.history) : recentHistory(req.history);
+}
+
 export function recentHistory(history: ChatMessage[]): ChatMessage[] {
   const h = history.filter((m) => m.role !== 'system').slice(-HISTORY_KEEP);
   const first = h.findIndex((m) => m.role === 'user');

@@ -1134,6 +1134,8 @@ export interface ChatRequestView {
   uiLang?: 'es' | 'en';
   /** "Mis bots": the bot this chat talks as (its instructions, knowledge and @Docs ride along). */
   bot?: string;
+  /** "Ahorrador de tokens": shorter history and context, brief answers, earlier summaries. */
+  saver?: boolean;
 }
 
 export interface EditRequestView {

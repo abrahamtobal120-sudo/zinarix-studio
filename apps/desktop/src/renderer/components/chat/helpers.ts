@@ -217,6 +217,14 @@ export const loadReasoning = (): ReasoningLevel | '' => {
   return v === 'low' || v === 'medium' || v === 'high' ? v : '';
 };
 
+/** "Ahorrador de tokens": one switch for every chat, kept between sessions. */
+export const SAVER_KEY = 'zinarix.tokenSaver';
+export const loadSaver = (): boolean => localStorage.getItem(SAVER_KEY) === '1';
+export const saveSaver = (on: boolean): void => {
+  if (on) localStorage.setItem(SAVER_KEY, '1');
+  else localStorage.removeItem(SAVER_KEY);
+};
+
 /** Turns "Compactar chat" sums up: not compacted yet, answered, with text (summaries too). */
 export function compactable(turns: Turn[], running: ReadonlyMap<string, unknown>): Turn[] {
   return turns.filter(

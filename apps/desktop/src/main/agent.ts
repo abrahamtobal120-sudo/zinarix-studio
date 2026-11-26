@@ -45,6 +45,12 @@ import {
   todosResult,
 } from '../shared/agentModes.js';
 import { editedSince, hunks, revertHunks, rewindPlan, turnFiles } from '../shared/checkpoints.js';
+import {
+  SAVER_KEEP_TOOL_CHARS,
+  SAVER_TOOL_CHARS,
+  saverBudget,
+  shorten,
+} from '../shared/tokenSaver.js';
 import { CheckpointStore } from './checkpointStore.js';
 import { beforeData, bytesOf, isAsBefore, snapshot } from './checkpointBytes.js';
 import type { BrowserController, BrowserTab, PageSnapshot } from './browser.js';
@@ -288,6 +294,7 @@ const ZINARIX_KNOWLEDGE = `About Zinarix Studio (the app you live in): you know 
 - Creative tools: Edición / design panel (edit the project's web pages live like slides; changes are written to the files and can be undone) and a video editor (timeline, inspector, media library, export).
 - Knowledge: memories kept between conversations, @Docs (index external documentation sites), auto review (Watch) panel that reviews the project's changes.
 - Usage: spending today and this month per provider, 30-day chart, budgets with an alert at 80 %.
+- Token saver ("Ahorrador de tokens" in the "+" menu of the message box, a green "Ahorro" chip while on, for every chat): shorter answers, less history and attached-file text sent, and in Agent mode long tool results trimmed and the conversation summarized sooner.
 - CLI "omni": the same models from the terminal (omni ask, omni chat, omni compare, omni usage…).
 - Small offline games when no AI is connected.
 When the user asks how to do something in Zinarix, give concrete steps using these names. If a detail is not covered here, say you are not sure instead of inventing it.`;
@@ -1010,6 +1017,8 @@ interface LoopOpts {
   answer?: (toolCallId: string) => Promise<string[] | null>;
   /** "Controlar la compu" is on: hooks around every computer_* action. */
   computer?: ComputerRunHooks;
+  /** "Ahorrador de tokens": smaller tool results and an earlier summary of the conversation. */
+  saver?: boolean;
 }
 
 /** Separates a helper's session (and browser tab) from the conversation that asked for it. */
@@ -1221,6 +1230,8 @@ export class Agent {
     answer?: (toolCallId: string) => Promise<string[] | null>;
     /** The chat's "Controlar la compu" switch is on (screen and control pre-approved). */
     computer?: ComputerRunHooks;
+    /** "Ahorrador de tokens" (see LoopOpts.saver). */
+    saver?: boolean;
   }): Promise<string> {
     if (!opts.depth) this.computerSwitch(opts.conversationId, Boolean(opts.computer));
     // A message sent while the conversation works runs alongside, in a transcript of its own
@@ -1561,7 +1572,9 @@ When you finish, answer with a complete report: it is all the agent that launche
       context = undefined;
     }
     const fixed = Math.ceil(JSON.stringify(tools).length / 3.5);
-    const budget = contextBudget(context, fixed);
+    const own = contextBudget(context, fixed);
+    // "Ahorrador de tokens": the old part is summarized much sooner.
+    const budget = opts.saver ? saverBudget(own) : own;
     const before = conversationTokens(s.messages);
     if (before <= budget) return;
     const split = splitForSummary(s.messages, budget);
@@ -1927,22 +1940,36 @@ You have made this exact call ${repeats + 1} times in a row and the result is th
             role: 'tool',
             toolCallId: call.id,
             name: call.name,
-            content: result.content,
+            content: opts.saver
+              ? shorten(
+                  result.content,
+                  SAVER_TOOL_CHARS,
+                  'shortened by token saver mode; ask for a narrower range if you need the rest',
+                )
+              : result.content,
             isError: !result.ok,
           });
         }
-        compactToolResults(s.messages);
+        compactToolResults(s.messages, opts.saver ? SAVER_KEEP_TOOL_CHARS : KEEP_RECENT_TOOL_CHARS);
       } else {
         s.messages.push({
           role: 'user',
           content: resultsMessage(
-            toolCalls.map((c) => ({ name: c.name, ...resultOf(c) })),
+            toolCalls.map((c) => {
+              const r = resultOf(c);
+              return {
+                name: c.name,
+                ...r,
+                ...(opts.saver ? { content: shorten(r.content, SAVER_TOOL_CHARS) } : {}),
+              };
+            }),
             badCalls,
           ),
         });
       }
       if (shots.length) {
-        dropOldShots(s.messages);
+        // "Ahorrador de tokens": only the newest screenshot stays (each weighs ~1000 tokens).
+        dropOldShots(s.messages, opts.saver ? 0 : undefined);
         for (const shot of shots)
           s.messages.push({
             role: 'user',
@@ -3842,13 +3869,13 @@ export function renderTree(files: string[], base: string, depth: number): string
  * Keeps the conversation small in long agent runs: once tool results add up beyond the
  * budget, the oldest ones are replaced by a short stub (the model can read them again).
  */
-export function compactToolResults(messages: ChatMessage[]): void {
+export function compactToolResults(messages: ChatMessage[], keep = KEEP_RECENT_TOOL_CHARS): void {
   let kept = 0;
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]!;
     if (m.role !== 'tool') continue;
     kept += m.content.length;
-    if (kept > KEEP_RECENT_TOOL_CHARS && m.content.length > 400)
+    if (kept > keep && m.content.length > 400)
       messages[i] = {
         ...m,
         content: `${m.content.slice(0, 300)}\n… [older tool result removed to save context; run the tool again if you need it]`,

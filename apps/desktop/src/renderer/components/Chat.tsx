@@ -78,6 +78,8 @@ import {
   compactable,
   compactedHistory,
   loadReasoning,
+  loadSaver,
+  saveSaver,
   mentionedFiles,
   metaLine,
   newTurnId,
@@ -166,6 +168,14 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
   };
   const [includeFile, setIncludeFile] = useState(true);
   const [reasoning, setReasoning] = useState<ReasoningLevel | ''>(loadReasoning);
+  /** "Ahorrador de tokens" (one switch for every chat; see shared/tokenSaver.ts). */
+  const [saverOn, setSaverOn] = useState(loadSaver);
+  const toggleSaver = () => {
+    const on = !saverOn;
+    setSaverOn(on);
+    saveSaver(on);
+    toast(t(on ? 'saverOnToast' : 'saverOffToast'));
+  };
   const chatMode: ChatMode = meta ? modeFrom(meta.mode, meta.agent) : 'agent';
   const agentMode = usesAgent(chatMode);
   const setChatMode = (m: ChatMode, announce = false) => {
@@ -699,6 +709,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
         noFolder: noFolder || undefined,
         ...(meta?.bot ? { bot: meta.bot } : {}),
         ...(reasoning ? { reasoning } : {}),
+        ...(saverOn ? { saver: true } : {}),
         ...(sentImages.length
           ? { images: sentImages.map(({ mediaType, data }) => ({ mediaType, data })) }
           : {}),
@@ -1642,6 +1653,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             reasoning={reasoning}
             agentMode={agentMode}
             computerOn={computerOn}
+            saverOn={saverOn}
             includeFile={includeFile}
             tasks={tasksNow}
             showTasks={Boolean(root) || tasksNow.active > 0}
@@ -1657,6 +1669,7 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
             onStudio={() => void openStudio()}
             onReasoning={setReasoning}
             onToggleComputer={() => void toggleComputer()}
+            onToggleSaver={toggleSaver}
             onToggleIncludeFile={() => setIncludeFile(!includeFile)}
             onTasks={() => setTasksOpen(true)}
             onKit={() => setKitMenu(true)}
@@ -1755,6 +1768,18 @@ function ChatSession({ id, pane, split }: { id: string; pane: 0 | 1 | null; spli
               <span className="pill-label">
                 {computerOn ? t('computerPillOn') : t('computerPill')}
               </span>
+            </button>
+          )}
+          {saverOn && (
+            <button
+              type="button"
+              className="pill saver-pill on"
+              title={t('saverTitle')}
+              aria-pressed={saverOn}
+              onClick={toggleSaver}
+            >
+              <Icon name="leaf" size={14} />
+              <span className="pill-label">{t('saverPill')}</span>
             </button>
           )}
           {includeFile && active && !active.startsWith('::') && (
