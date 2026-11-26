@@ -177,7 +177,7 @@ Criterios de aceptación comunes de RM (se suman a los de cada tarea):
 - La forma de los datos guardados: `desktop.json`, conversaciones, proyectos de video. Solo se **añaden** campos opcionales.
 - `styles/overrides.css` (retoques a Monaco y xterm) salvo que una tarea lo nombre.
 - Los modelos de Monaco, el motor de render de video (`shared/videoRender.ts`) y FFmpeg.
-- Dependencias: **no se añade ninguna** sin aprobación del usuario. La única prevista es `axe-core` (`F8.1.2`).
+- Dependencias: **no se añade ninguna** sin aprobación del usuario. La única prevista es `axe-core` (`F8.1.2`), **ya aprobada por el usuario el 2026-11-25** como dependencia de desarrollo.
 - No se copian marcas ni diseños exactos de otros editores.
 
 ---
@@ -377,8 +377,8 @@ Cuando un ayudante entrega:
 
 Siempre antes de:
 
-1. Añadir cualquier dependencia (`axe-core` en `F8.1.2` o cualquier otra).
-2. Fusionar `rediseno/ui-2` en `main`, subir la versión, crear la etiqueta o publicar (`F9.1.2`–`F9.1.4`).
+1. Añadir cualquier dependencia. Excepción: `axe-core` como dependencia de desarrollo (`F8.1.2`) ya está aprobada (2026-11-25).
+2. Fusionar `rediseno/ui-2` en `main`, subir la versión, crear la etiqueta o publicar (`F9.1.2`–`F9.1.4`). El número `0.7.0` ya está aprobado (2026-11-25); el momento de subirlo, fusionar y publicar sigue necesitando aprobación.
 3. Borrar un archivo que no esté marcado NUEVO en este plan, o cambiar la forma de un dato guardado.
 4. Tocar algo de la lista 0.9.
 5. Cambiar un valor de la especificación 0.6 o una clave de 0.7.
@@ -3392,15 +3392,15 @@ Fases 4, 5, 6 y 7 completas.
 - **Paralelo con:** F8.1.2, F8.1.3, F8.2.x, F8.4.x.
 - **Riesgo y reversa:** bajo. Reversa: borrar script y carpeta.
 
-#### F8.1.2 — Pruebas con axe (requiere aprobación)
+#### F8.1.2 — Pruebas con axe (dependencia ya aprobada)
 
 - [ ] Hecha
 - **Agente:** QA
-- **Depende de:** Fase 6; **aprobación del usuario para añadir `axe-core`** como dependencia de desarrollo de `apps/desktop`
+- **Depende de:** Fase 6. El usuario **ya aprobó** (2026-11-25) añadir `axe-core` como dependencia de desarrollo de `apps/desktop`
 - **Archivos:** `apps/desktop/package.json`, `pnpm-lock.yaml`, `apps/desktop/scripts/a11y-axe.mjs` (NUEVO), `.github/workflows/ci.yml`
 - **Pasos:**
-  1. Pide la aprobación (C.5). Si el usuario dice que no, marca la tarea como "no aplica" y refuerza `F8.1.3` con las comprobaciones propias de `ui-audit.mjs`.
-  2. Con aprobación: `pnpm --filter @omni/desktop add -D axe-core`. Comprueba que la licencia (MPL-2.0) pasa `node apps/desktop/scripts/notices.mjs --check`; como es solo de desarrollo, no entra en el instalador.
+  1. La aprobación ya está dada; no hace falta volver a pedirla. Solo si `axe-core` no se puede instalar o su licencia no pasa la comprobación, marca la tarea como "no aplica" y refuerza `F8.1.3` con las comprobaciones propias de `ui-audit.mjs`.
+  2. `pnpm --filter @omni/desktop add -D axe-core`. Comprueba que la licencia (MPL-2.0) pasa `node apps/desktop/scripts/notices.mjs --check`; como es solo de desarrollo, no entra en el instalador.
   3. El script recorre las mismas pantallas, inyecta `axe-core` en la página y ejecuta las reglas `wcag2a`, `wcag2aa`, `wcag21aa` y `wcag22aa`. Escribe `docs/rediseno/base/axe.json`.
   4. Falla si hay alguna violación de impacto `serious` o `critical`. Las `moderate` y `minor` se listan.
   5. Corrige las violaciones que aparezcan (si pasan de 300 líneas, una tarea `F8.1.2b` por zona).
@@ -3611,10 +3611,10 @@ Fase 8 completa. **Todas las tareas de esta fase, salvo `F9.1.1`, necesitan la a
 
 - [ ] Hecha
 - **Agente:** Orquestadora
-- **Depende de:** F9.1.1, F7.1.3; aprobación del usuario del número de versión
+- **Depende de:** F9.1.1, F7.1.3; aprobación del usuario para subir la versión (el número `0.7.0` ya está aprobado, 2026-11-25)
 - **Archivos:** todos los `package.json` del espacio de trabajo
 - **Pasos:**
-  1. Confirma con el usuario el número (propuesta: `0.7.0`).
+  1. El número es `0.7.0` (aprobado por el usuario el 2026-11-25). Pídele solo el visto bueno para subirlo ahora.
   2. `node scripts/sync-version.mjs 0.7.0` y `node scripts/sync-version.mjs --check`.
   3. Corre la batería completa de `F8.2.2`.
   4. Commit: `Versión 0.7.0`.
